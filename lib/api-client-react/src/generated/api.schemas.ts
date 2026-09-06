@@ -283,6 +283,26 @@ export interface VendorQuoteUpdate {
   lineItems?: VendorQuoteLineItemInput[];
 }
 
+export interface PanoramaInput {
+  /**
+     * A JPEG, PNG, or WebP image encoded as a data URL
+     * @minLength 1
+     */
+  imageData: string;
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  label: string;
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  location: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  date: string;
+}
+
 export type GetProjectsParams = {
 status?: string;
 search?: string;

@@ -18,6 +18,7 @@ export * from './healthStatus';
 export * from './invoice';
 export * from './invoiceInput';
 export * from './panorama';
+export * from './panoramaInput';
 export * from './photo';
 export * from './project';
 export * from './projectDetail';

@@ -220,6 +220,37 @@ export const UpdateProjectResponse = zod.object({
 
 
 /**
+ * @summary Add a panorama to a project
+ */
+export const CreateProjectPanoramaParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+
+export const createProjectPanoramaBodyLabelMax = 100;
+
+export const createProjectPanoramaBodyLocationMax = 100;
+
+export const createProjectPanoramaBodyDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const CreateProjectPanoramaBody = zod.object({
+  "imageData": zod.string().min(1).describe('A JPEG, PNG, or WebP image encoded as a data URL'),
+  "label": zod.string().min(1).max(createProjectPanoramaBodyLabelMax),
+  "location": zod.string().min(1).max(createProjectPanoramaBodyLocationMax),
+  "date": zod.string().regex(createProjectPanoramaBodyDateRegExp)
+})
+
+export const CreateProjectPanoramaResponse = zod.object({
+  "id": zod.string(),
+  "url": zod.string(),
+  "label": zod.string(),
+  "location": zod.string(),
+  "date": zod.string()
+})
+
+
+/**
  * @summary Get project activity
  */
 export const GetProjectActivityParams = zod.object({

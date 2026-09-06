@@ -4,6 +4,7 @@ import { AppLayout } from "@/components/layout/app-layout"
 import { 
   useGetProject, 
   getGetProjectQueryKey,
+  useCreateProjectPanorama,
   useUpdateProject,
   useGetProjectActivity,
   getGetProjectActivityQueryKey
@@ -13,7 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -24,13 +25,20 @@ import {
 } from "lucide-react"
 import { cn, formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
+import { toast } from "@/hooks/use-toast"
 
-export default function ProjectDetail() {
+const PANORAMA_TYPES = ["image/jpeg", "image/png", "image/webp"]
+const MAX_PANORAMA_BYTES = 8 * 1024 * 1024
+
+export default function ProjectDetail({ projectIdOverride }: { projectIdOverride?: string } = {}) {
   const params = useParams()
   const [, setLocation] = useLocation()
-  const projectId = params.id as string
+  const projectId = projectIdOverride ?? params.id as string
   const queryClient = useQueryClient()
   const [isEditOpen, setIsEditOpen] = React.useState(false)
+  const [isPanoramaUploadOpen, setIsPanoramaUploadOpen] = React.useState(false)
+  const [panoramaImage, setPanoramaImage] = React.useState<{ dataUrl: string; name: string } | null>(null)
+  const [panoramaError, setPanoramaError] = React.useState("")
   const [photoIndex, setPhotoIndex] = React.useState<number | null>(null)
   const [activePanorama, setActivePanorama] = React.useState<{ url: string; label: string; location: string; date: string } | null>(null)
 
@@ -49,6 +57,71 @@ export default function ProjectDetail() {
   })
 
   const updateProject = useUpdateProject()
+  const createPanorama = useCreateProjectPanorama()
+
+  const resetPanoramaForm = () => {
+    setPanoramaImage(null)
+    setPanoramaError("")
+  }
+
+  const handlePanoramaDialogChange = (open: boolean) => {
+    if (createPanorama.isPending) return
+    setIsPanoramaUploadOpen(open)
+    if (!open) resetPanoramaForm()
+  }
+
+  const handlePanoramaFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    setPanoramaError("")
+    setPanoramaImage(null)
+    if (!file) return
+    if (!PANORAMA_TYPES.includes(file.type)) {
+      setPanoramaError("Choose a JPEG, PNG, or WebP image.")
+      event.target.value = ""
+      return
+    }
+    if (file.size > MAX_PANORAMA_BYTES) {
+      setPanoramaError("Choose an image that is 8 MB or smaller.")
+      event.target.value = ""
+      return
+    }
+    const reader = new FileReader()
+    reader.onerror = () => setPanoramaError("The image could not be read. Choose another file.")
+    reader.onload = () => setPanoramaImage({ dataUrl: String(reader.result), name: file.name })
+    reader.readAsDataURL(file)
+  }
+
+  const handlePanoramaUpload = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setPanoramaError("")
+    const formData = new FormData(event.currentTarget)
+    const label = String(formData.get("panorama-label") ?? "").trim()
+    const location = String(formData.get("panorama-location") ?? "").trim()
+    const date = String(formData.get("panorama-date") ?? "")
+
+    if (!panoramaImage || !label || !location || !date) {
+      setPanoramaError("Add an image, label, location, and capture date.")
+      return
+    }
+
+    createPanorama.mutate({
+      projectId,
+      data: { imageData: panoramaImage.dataUrl, label, location, date },
+    }, {
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) })
+        setIsPanoramaUploadOpen(false)
+        resetPanoramaForm()
+        toast({
+          title: "360° panorama uploaded",
+          description: `${label} is now available in the project gallery.`,
+        })
+      },
+      onError: (error) => {
+        setPanoramaError(error instanceof Error ? error.message : "The panorama could not be uploaded. Try again.")
+      },
+    })
+  }
 
   const handleUpdate = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -332,10 +405,61 @@ export default function ProjectDetail() {
             <TabsContent value="photos" className="space-y-6">
               <div className="flex justify-between items-center">
                 <h3 className="text-xl font-heading font-semibold">360° Panoramas</h3>
-                <Button variant="outline" className="gap-2">
-                  <Camera className="h-4 w-4" />
-                  Upload 360°
-                </Button>
+                <Dialog open={isPanoramaUploadOpen} onOpenChange={handlePanoramaDialogChange}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="gap-2">
+                      <Camera className="h-4 w-4" />
+                      Upload 360°
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Upload 360° panorama</DialogTitle>
+                      <DialogDescription>Add one panorama to {project.name}.</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handlePanoramaUpload} className="space-y-4" noValidate>
+                      <div className="space-y-2">
+                        <Label htmlFor="panorama-image">Panorama image</Label>
+                        <Input
+                          id="panorama-image"
+                          name="panorama-image"
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={handlePanoramaFile}
+                          aria-describedby="panorama-image-help"
+                        />
+                        <p id="panorama-image-help" className="text-xs text-muted-foreground">JPEG, PNG, or WebP, up to 8 MB.</p>
+                      </div>
+                      {panoramaImage && (
+                        <div className="overflow-hidden rounded-md border bg-muted">
+                          <img src={panoramaImage.dataUrl} alt="Selected panorama preview" className="h-36 w-full object-cover" />
+                          <p className="truncate px-3 py-2 text-xs text-muted-foreground">{panoramaImage.name}</p>
+                        </div>
+                      )}
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="panorama-label">Label</Label>
+                          <Input id="panorama-label" name="panorama-label" maxLength={100} placeholder="Week 25" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="panorama-location">Location</Label>
+                          <Input id="panorama-location" name="panorama-location" maxLength={100} placeholder="Main floor" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="panorama-date">Capture date</Label>
+                        <Input id="panorama-date" name="panorama-date" type="date" />
+                      </div>
+                      {panoramaError && <p role="alert" className="text-sm text-destructive">{panoramaError}</p>}
+                      <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => handlePanoramaDialogChange(false)} disabled={createPanorama.isPending}>Cancel</Button>
+                        <Button type="submit" disabled={createPanorama.isPending}>
+                          {createPanorama.isPending ? "Uploading..." : "Upload panorama"}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {project.panoramas.map(pano => (

@@ -125,6 +125,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Project"
+  /projects/{projectId}/panoramas:
+    post:
+      operationId: createProjectPanorama
+      tags: [projects]
+      summary: Add a panorama to a project
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PanoramaInput"
+      responses:
+        "201":
+          description: Created panorama
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Panorama"
+        "400":
+          description: Invalid panorama upload
+        "404":
+          description: Project not found
   /projects/{projectId}/activity:
     get:
       operationId: getProjectActivity
@@ -639,6 +663,19 @@ components:
         label: { type: string }
         location: { type: string }
         date: { type: string }
+    PanoramaInput:
+      type: object
+      required: [imageData, label, location, date]
+      properties:
+        imageData:
+          type: string
+          minLength: 1
+          description: A JPEG, PNG, or WebP image encoded as a data URL
+        label: { type: string, minLength: 1, maxLength: 100 }
+        location: { type: string, minLength: 1, maxLength: 100 }
+        date:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}$'
     Activity:
       type: object
       required: [id, type, title, description, author, date]

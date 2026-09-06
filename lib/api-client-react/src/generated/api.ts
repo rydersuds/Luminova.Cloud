@@ -29,6 +29,8 @@ import type {
   HealthStatus,
   Invoice,
   InvoiceInput,
+  Panorama,
+  PanoramaInput,
   Project,
   ProjectDetail,
   ProjectInput,
@@ -524,6 +526,78 @@ export const useUpdateProject = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateProjectMutationOptions(options));
+    }
+
+export const getCreateProjectPanoramaUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/panoramas`
+}
+
+/**
+ * @summary Add a panorama to a project
+ */
+export const createProjectPanorama = async (projectId: string,
+    panoramaInput: PanoramaInput, options?: Parameters<typeof customFetch>[1]): Promise<Panorama> => {
+
+  return customFetch<Panorama>(getCreateProjectPanoramaUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(panoramaInput)
+  }
+);}
+
+
+
+
+
+export const getCreateProjectPanoramaMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProjectPanorama>>, TError,{projectId: string;data: BodyType<PanoramaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createProjectPanorama>>, TError,{projectId: string;data: BodyType<PanoramaInput>}, TContext> => {
+
+const mutationKey = ['createProjectPanorama'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createProjectPanorama>>, {projectId: string;data: BodyType<PanoramaInput>}> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  createProjectPanorama(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateProjectPanoramaMutationResult = NonNullable<Awaited<ReturnType<typeof createProjectPanorama>>>
+    export type CreateProjectPanoramaMutationBody = BodyType<PanoramaInput>
+    export type CreateProjectPanoramaMutationError = ErrorType<void>
+
+    /**
+ * @summary Add a panorama to a project
+ */
+export const useCreateProjectPanorama = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProjectPanorama>>, TError,{projectId: string;data: BodyType<PanoramaInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createProjectPanorama>>,
+        TError,
+        {projectId: string;data: BodyType<PanoramaInput>},
+        TContext
+      > => {
+      return useMutation(getCreateProjectPanoramaMutationOptions(options));
     }
 
 export const getGetProjectActivityUrl = (projectId: string,) => {

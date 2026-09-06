@@ -4,6 +4,9 @@ import {
   CreateInvoiceResponse,
   CreateProjectBody,
   CreateProjectResponse,
+  CreateProjectPanoramaBody,
+  CreateProjectPanoramaParams,
+  CreateProjectPanoramaResponse,
   GetDashboardSummaryResponse,
   GetInvoicesQueryParams,
   GetInvoicesResponse,
@@ -32,6 +35,16 @@ import {
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
+
+type UploadedPanorama = {
+  id: string;
+  url: string;
+  label: string;
+  location: string;
+  date: string;
+};
+
+const uploadedPanoramas = new Map<string, UploadedPanorama[]>();
 
 const activities = [
   { id: "act-1", type: "invoice", title: "Invoice auto-approved", description: "Northline Electric invoice INV-2048 was within the electrical budget.", author: "System", date: "2026-09-04T16:40:00.000Z" },
@@ -245,6 +258,7 @@ const detailsFor = (project: (typeof projects)[number]) => ({
   panoramas: [
     { id: "pano-1", url: "https://images.pexels.com/photos/37347/office-sitting-room-executive-sitting.jpg?auto=compress&cs=tinysrgb&w=1600", label: "Week 24", location: "Main floor", date: "2026-09-03" },
     { id: "pano-2", url: "https://images.pexels.com/photos/271667/pexels-photo-271667.jpeg?auto=compress&cs=tinysrgb&w=1600", label: "Week 20", location: "Great room", date: "2026-08-06" },
+    ...(uploadedPanoramas.get(project.id) ?? []),
   ],
   activity: activities,
 });
@@ -305,6 +319,58 @@ router.get("/projects/:projectId", (req, res) => {
     return;
   }
   res.json(GetProjectResponse.parse(detailsFor(project)));
+});
+
+router.post("/projects/:projectId/panoramas", (req, res) => {
+  const params = CreateProjectPanoramaParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Invalid project" });
+    return;
+  }
+
+  const project = projects.find((item) => item.id === params.data.projectId);
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  const body = CreateProjectPanoramaBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: "Add an image, label, location, and valid capture date." });
+    return;
+  }
+
+  const { imageData, label, location, date } = body.data;
+  if (!label.trim() || !location.trim()) {
+    res.status(400).json({ error: "Label and location cannot be blank." });
+    return;
+  }
+  const parsedDate = new Date(`${date}T00:00:00.000Z`);
+  if (Number.isNaN(parsedDate.valueOf()) || parsedDate.toISOString().slice(0, 10) !== date) {
+    res.status(400).json({ error: "Capture date must be a valid calendar date." });
+    return;
+  }
+  const imageMatch = imageData.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/);
+  if (!imageMatch) {
+    res.status(400).json({ error: "Upload a JPEG, PNG, or WebP panorama image." });
+    return;
+  }
+
+  const estimatedBytes = Math.floor((imageMatch[2].length * 3) / 4);
+  if (estimatedBytes > 8 * 1024 * 1024) {
+    res.status(400).json({ error: "Panorama images must be 8 MB or smaller." });
+    return;
+  }
+
+  const panorama = CreateProjectPanoramaResponse.parse({
+    id: `pano-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    url: imageData,
+    label: label.trim(),
+    location: location.trim(),
+    date,
+  });
+  uploadedPanoramas.set(project.id, [...(uploadedPanoramas.get(project.id) ?? []), panorama]);
+  res.status(201).json(panorama);
 });
 
 router.patch("/projects/:projectId", (req, res) => {
