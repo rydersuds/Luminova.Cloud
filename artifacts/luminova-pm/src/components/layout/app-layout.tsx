@@ -154,7 +154,7 @@ export function AppLayoutView({
         </div>
 
         <nav className="flex-1 px-4 py-6 md:py-2 space-y-3 overflow-y-auto">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-sidebar-foreground/40 mb-4 px-2">Operations Center</div>
+          <div data-contrast-label="navigation section label" className="text-[10px] font-mono uppercase tracking-widest text-sidebar-foreground/60 mb-4 px-2">Operations Center</div>
           {NAV_ITEMS.map((item) => {
             const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href))
             const isForcedHover = hoveredHref === item.href && !isActive
@@ -162,6 +162,7 @@ export function AppLayoutView({
               <Link
                 key={item.href}
                 href={item.href}
+                data-contrast-label={`navigation link "${item.label}"`}
                 className={cn(
                   "group relative flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-all duration-300 overflow-hidden shadow-sm",
                   isActive
@@ -182,9 +183,10 @@ export function AppLayoutView({
           <div className="surface-3d bg-black/40 backdrop-blur-md p-2 rounded-2xl">
             <button
               type="button"
+              data-contrast-label="profile control"
               onClick={() => setProfileOpen((open) => !open)}
               aria-expanded={profileOpen}
-              className="flex w-full items-center gap-3 px-3 py-3 text-left text-sm text-sidebar-foreground hover:text-white transition-colors cursor-pointer rounded-xl bg-sidebar-accent/50 hover:bg-sidebar-accent shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]"
+              className="flex w-full items-center gap-3 px-3 py-3 text-left text-sm text-sidebar-foreground hover:text-white transition-colors cursor-pointer rounded-xl bg-sidebar-accent hover:bg-sidebar-accent shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]"
             >
               <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center font-heading font-bold text-primary-foreground shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),0_4px_8px_rgba(0,0,0,0.5)]">
                 {initials || "PM"}
@@ -198,6 +200,7 @@ export function AppLayoutView({
             {profileOpen && (
               <button
                 type="button"
+                data-contrast-label="sign-out control"
                 onClick={onSignOut}
                 className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-destructive/10 border border-destructive/20 px-3 py-3 text-xs font-bold uppercase tracking-wider text-destructive transition-all hover:bg-destructive hover:text-destructive-foreground hover:shadow-[0_4px_10px_rgba(255,0,0,0.3)]"
               >
