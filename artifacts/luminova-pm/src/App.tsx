@@ -14,7 +14,7 @@ import Messages from '@/pages/messages';
 import Login from '@/pages/login';
 import { SignUpPage } from '@/pages/login';
 import Users from '@/pages/users';
-import { ClerkProvider, Show } from '@clerk/react';
+import { ClerkProvider, Show, useAuth, useClerk } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 
@@ -108,6 +108,22 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
   return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
 }
 
+function SessionPolicy() {
+  const { isLoaded, isSignedIn } = useAuth();
+  const { signOut } = useClerk();
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    const remembered = localStorage.getItem("luminova-remember-session") !== "false";
+    const activeWindow = sessionStorage.getItem("luminova-session-window") === "active";
+    if (!remembered && !activeWindow) {
+      void signOut({ redirectUrl: import.meta.env.BASE_URL });
+    }
+  }, [isLoaded, isSignedIn, signOut]);
+
+  return null;
+}
+
 function App() {
   return (
     <WouterRouter base={basePath}>
@@ -126,6 +142,7 @@ function App() {
       >
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
+            <SessionPolicy />
             <Router />
             <Toaster />
           </TooltipProvider>
