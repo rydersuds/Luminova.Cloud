@@ -5,6 +5,7 @@ import {
   Users, 
   FileText, 
   MessageSquare, 
+  UserCog,
   Menu,
   X
 } from "lucide-react"
@@ -17,6 +18,7 @@ const NAV_ITEMS = [
   { href: "/trades", label: "Trades & Vendors", icon: Users },
   { href: "/invoices", label: "Financials", icon: FileText },
   { href: "/messages", label: "Communications", icon: MessageSquare },
+  { href: "/users", label: "Users & Roles", icon: UserCog },
 ]
 
 export function AppLayout({ children }: { children: React.ReactNode }) {

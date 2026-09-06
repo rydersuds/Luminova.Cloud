@@ -1,17 +1,16 @@
-import { Link, useLocation } from "wouter"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent } from "@/components/ui/card"
+import { SignIn, SignUp } from "@clerk/react"
 
 export default function Login() {
-  const [, setLocation] = useLocation()
+  return <AuthShell><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} /></AuthShell>
+}
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault()
-    setLocation("/")
-  }
+export function SignUpPage() {
+  return <AuthShell><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} /></AuthShell>
+}
 
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "")
+
+function AuthShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-sidebar flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background decoration */}
@@ -29,40 +28,7 @@ export default function Login() {
           <p className="text-sidebar-foreground/60 text-sm">Project management workspace</p>
         </div>
 
-        <Card className="border-sidebar-border bg-sidebar-accent/50 backdrop-blur-xl shadow-2xl">
-          <CardContent className="p-8">
-            <form onSubmit={handleLogin} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sidebar-foreground/80">Email address</Label>
-                <Input 
-                  id="email" 
-                  type="email" 
-                  placeholder="pm@luminova.build" 
-                  required
-                  className="bg-sidebar border-sidebar-border text-sidebar-foreground placeholder:text-sidebar-foreground/30 focus-visible:ring-sidebar-primary h-11"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <Label htmlFor="password" className="text-sidebar-foreground/80">Password</Label>
-                  <a href="#" className="text-xs font-medium text-sidebar-primary hover:text-sidebar-primary/80 transition-colors">Forgot password?</a>
-                </div>
-                <Input 
-                  id="password" 
-                  type="password" 
-                  placeholder="••••••••" 
-                  required
-                  className="bg-sidebar border-sidebar-border text-sidebar-foreground placeholder:text-sidebar-foreground/30 focus-visible:ring-sidebar-primary h-11"
-                />
-              </div>
-
-              <Button type="submit" className="w-full h-11 font-semibold text-base">
-                Sign in to workspace
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        {children}
 
         <p className="text-center text-xs text-sidebar-foreground/40 font-medium">
           © {new Date().getFullYear()} Luminova Construction. All rights reserved.
