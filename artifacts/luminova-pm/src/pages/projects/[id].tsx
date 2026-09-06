@@ -19,7 +19,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { 
   Building, MapPin, Calendar, DollarSign, ArrowLeft, 
-  Camera, Briefcase, FileText, CheckCircle2, ChevronRight, Activity, Clock
+  Camera, Briefcase, FileText, CheckCircle2, ChevronRight, Activity, Clock,
+  Maximize2, MoveHorizontal, ChevronLeft
 } from "lucide-react"
 import { cn, formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
@@ -30,6 +31,8 @@ export default function ProjectDetail() {
   const projectId = params.id as string
   const queryClient = useQueryClient()
   const [isEditOpen, setIsEditOpen] = React.useState(false)
+  const [photoIndex, setPhotoIndex] = React.useState<number | null>(null)
+  const [activePanorama, setActivePanorama] = React.useState<{ url: string; label: string; location: string; date: string } | null>(null)
 
   const { data: project, isLoading } = useGetProject(projectId, {
     query: {
@@ -333,7 +336,12 @@ export default function ProjectDetail() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {project.panoramas.map(pano => (
-                  <div key={pano.id} className="group relative rounded-lg overflow-hidden border border-border bg-sidebar h-[250px] cursor-pointer">
+                  <button
+                    type="button"
+                    key={pano.id}
+                    onClick={() => setActivePanorama(pano)}
+                    className="group relative h-[250px] overflow-hidden rounded-lg border border-border bg-sidebar text-left cursor-pointer"
+                  >
                     <img src={pano.url} alt={pano.label} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
                     <div className="absolute inset-0 flex items-center justify-center">
                       <div className="bg-background/90 text-foreground px-4 py-2 rounded-full font-medium shadow-lg flex items-center gap-2">
@@ -348,23 +356,77 @@ export default function ProjectDetail() {
                         <span>{formatDate(pano.date)}</span>
                       </div>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
 
               <h3 className="text-xl font-heading font-semibold mt-8 mb-4">Standard Photos</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {project.photos.map(photo => (
-                  <div key={photo.id} className="rounded-lg overflow-hidden border border-border group cursor-pointer">
+                {project.photos.map((photo, index) => (
+                  <button
+                    type="button"
+                    key={photo.id}
+                    onClick={() => setPhotoIndex(index)}
+                    className="group overflow-hidden rounded-lg border border-border text-left cursor-zoom-in"
+                  >
                     <div className="aspect-square bg-muted relative">
                       <img src={photo.url} alt={photo.caption} className="w-full h-full object-cover" />
                       <div className="absolute inset-0 bg-sidebar/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4 text-center">
-                        <p className="text-sidebar-foreground text-sm font-medium">{photo.caption}</p>
+                        <div className="text-sidebar-foreground">
+                          <Maximize2 className="mx-auto mb-2 h-5 w-5" />
+                          <p className="text-sm font-medium">{photo.caption}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
+
+              <Dialog open={photoIndex !== null} onOpenChange={(open) => !open && setPhotoIndex(null)}>
+                <DialogContent className="h-[92dvh] w-[96vw] !max-w-6xl overflow-hidden border-white/15 bg-black p-0 text-white">
+                  {photoIndex !== null && project.photos[photoIndex] && (
+                    <div className="flex h-full flex-col">
+                      <div className="flex-1 min-h-0 p-4 sm:p-8">
+                        <img
+                          src={project.photos[photoIndex].url}
+                          alt={project.photos[photoIndex].caption}
+                          className="h-full w-full object-contain"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between gap-4 border-t border-white/15 px-4 py-4 sm:px-8">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="border-white/20 bg-white/5 text-white hover:bg-white/15 hover:text-white"
+                          onClick={() => setPhotoIndex((photoIndex - 1 + project.photos.length) % project.photos.length)}
+                          aria-label="Previous photo"
+                        >
+                          <ChevronLeft className="h-5 w-5" />
+                        </Button>
+                        <div className="min-w-0 text-center">
+                          <p className="truncate font-medium">{project.photos[photoIndex].caption}</p>
+                          <p className="mt-1 text-xs text-white/55">{photoIndex + 1} of {project.photos.length}</p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="border-white/20 bg-white/5 text-white hover:bg-white/15 hover:text-white"
+                          onClick={() => setPhotoIndex((photoIndex + 1) % project.photos.length)}
+                          aria-label="Next photo"
+                        >
+                          <ChevronRight className="h-5 w-5" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={activePanorama !== null} onOpenChange={(open) => !open && setActivePanorama(null)}>
+                <DialogContent className="h-[92dvh] w-[96vw] !max-w-7xl overflow-hidden border-white/15 bg-black p-0 text-white">
+                  {activePanorama && <PanoramaViewer panorama={activePanorama} />}
+                </DialogContent>
+              </Dialog>
             </TabsContent>
 
             <TabsContent value="budget" className="space-y-6">
@@ -513,5 +575,76 @@ export default function ProjectDetail() {
         </div>
       </div>
     </AppLayout>
+  )
+}
+
+function PanoramaViewer({ panorama }: { panorama: { url: string; label: string; location: string; date: string } }) {
+  const [position, setPosition] = React.useState(50)
+  const drag = React.useRef<{ x: number; position: number } | null>(null)
+
+  const beginDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId)
+    drag.current = { x: event.clientX, position }
+  }
+
+  const moveDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!drag.current) return
+    const movement = event.clientX - drag.current.x
+    setPosition(((drag.current.position - movement * 0.12) % 100 + 100) % 100)
+  }
+
+  const endDrag = () => {
+    drag.current = null
+  }
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "ArrowLeft") {
+      event.preventDefault()
+      setPosition((value) => ((value - 4) % 100 + 100) % 100)
+    }
+    if (event.key === "ArrowRight") {
+      event.preventDefault()
+      setPosition((value) => (value + 4) % 100)
+    }
+  }
+
+  return (
+    <div className="flex h-full flex-col bg-black">
+      <div
+        role="application"
+        tabIndex={0}
+        aria-label={`360 degree viewer for ${panorama.label}. Drag or use left and right arrow keys to look around.`}
+        className="relative flex-1 min-h-0 cursor-grab touch-none select-none overflow-hidden outline-none active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
+        onPointerDown={beginDrag}
+        onPointerMove={moveDrag}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onKeyDown={handleKeyDown}
+        style={{
+          backgroundImage: `url("${panorama.url}")`,
+          backgroundPosition: `${position}% center`,
+          backgroundRepeat: "repeat-x",
+          backgroundSize: "auto 115%",
+        }}
+      >
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/20 via-transparent to-black/20" />
+        <div className="pointer-events-none absolute left-1/2 top-5 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/15 bg-black/55 px-4 py-2 text-xs font-medium text-white backdrop-blur-sm">
+          <MoveHorizontal className="h-4 w-4" />
+          Drag to look around
+        </div>
+        <div className="pointer-events-none absolute bottom-5 left-1/2 h-1 w-40 -translate-x-1/2 overflow-hidden rounded-full bg-white/20">
+          <div className="h-full w-6 rounded-full bg-primary" style={{ transform: `translateX(${position * 1.36}px)` }} />
+        </div>
+      </div>
+      <div className="border-t border-white/15 px-5 py-4 sm:px-8">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="font-medium">{panorama.label}</p>
+            <p className="mt-1 text-xs text-white/55">{panorama.location}</p>
+          </div>
+          <p className="text-xs text-white/55">{formatDate(panorama.date)}</p>
+        </div>
+      </div>
+    </div>
   )
 }
