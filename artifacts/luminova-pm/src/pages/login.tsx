@@ -1,9 +1,10 @@
 import { SignUp, useSignIn } from "@clerk/react"
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Link } from "wouter"
+import { Link, useLocation } from "wouter"
 
 export default function Login() {
   const { signIn, fetchStatus } = useSignIn()
+  const [, setLocation] = useLocation()
   const [identifier, setIdentifier] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
@@ -21,7 +22,7 @@ export default function Login() {
       return
     }
     await signIn.finalize()
-    window.location.assign(`${basePath}/intro`)
+    setLocation("/intro", { replace: true })
   }
 
   return (
