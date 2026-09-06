@@ -32,7 +32,7 @@ export default function Messages() {
 
   return (
     <AppLayout>
-      <div className="flex-1 flex overflow-hidden bg-background bg-tech-grid-dense relative">
+      <div className="comms-link flex-1 flex overflow-hidden bg-background bg-tech-grid-dense relative text-white">
         {/* Decorative Grid Overlay */}
         <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-transparent via-background/50 to-background z-0"></div>
 
@@ -43,13 +43,13 @@ export default function Messages() {
             <div className="p-5 border-b border-border/50 space-y-4 bg-black/40">
               <div className="flex items-center gap-2">
                 <Terminal className="h-5 w-5 text-primary" />
-                <h2 className="text-xl font-heading font-bold text-foreground tracking-tight uppercase">Comms Link</h2>
+                <h2 className="text-xl font-heading font-bold text-white tracking-tight uppercase">Comms Link</h2>
               </div>
               <div className="relative group">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/60 group-focus-within:text-primary transition-colors" />
                 <Input 
                   placeholder="Intercept signal..." 
-                  className="pl-9 bg-black/50 border-border/50 focus-visible:ring-primary/50 font-mono text-xs h-9 rounded-none" 
+                  className="pl-9 bg-black/50 border-border/50 text-white placeholder:text-white/50 focus-visible:ring-primary/50 font-mono text-xs h-9 rounded-none"
                 />
               </div>
             </div>
@@ -85,15 +85,15 @@ export default function Messages() {
                     <div className="flex justify-between items-baseline mb-1">
                       <h3 className={cn(
                         "font-medium truncate pr-2 font-mono text-sm tracking-tight",
-                        chat.unread || activeChat.id === chat.id ? "text-foreground" : "text-foreground/70"
+                        chat.unread || activeChat.id === chat.id ? "text-white" : "text-white/75"
                       )}>
                         {chat.name}
                       </h3>
-                      <span className="text-[10px] font-mono text-muted-foreground shrink-0">{chat.time}</span>
+                      <span className="text-[10px] font-mono text-white/60 shrink-0">{chat.time}</span>
                     </div>
                     <p className={cn(
                       "text-xs truncate font-mono",
-                      chat.unread ? "font-bold text-primary" : "text-muted-foreground/70"
+                      chat.unread ? "font-bold text-primary" : "text-white/60"
                     )}>
                       {chat.lastMessage}
                     </p>
@@ -108,7 +108,7 @@ export default function Messages() {
             </div>
             
             {/* System Status footer */}
-            <div className="p-3 bg-black/60 border-t border-border/50 flex items-center justify-between text-[10px] font-mono uppercase text-muted-foreground">
+            <div className="p-3 bg-black/60 border-t border-border/50 flex items-center justify-between text-[10px] font-mono uppercase text-white/65">
               <span className="flex items-center gap-1.5"><ShieldCheck className="h-3 w-3 text-success" /> Encrypted</span>
               <span>Port: 443</span>
             </div>
@@ -123,7 +123,7 @@ export default function Messages() {
                   {activeChat.initials}
                 </div>
                 <div>
-                  <h3 className="font-bold text-foreground font-mono tracking-tight flex items-center gap-2">
+                  <h3 className="font-bold text-white font-mono tracking-tight flex items-center gap-2">
                     {activeChat.name}
                   </h3>
                   <p className="text-[10px] font-mono uppercase tracking-widest text-success flex items-center gap-1.5 mt-0.5">
@@ -133,10 +133,10 @@ export default function Messages() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <div className="hidden lg:flex items-center gap-2 text-[10px] font-mono text-muted-foreground/50 bg-black/40 px-3 py-1.5 border border-border/30 rounded-none mr-2">
+                <div className="hidden lg:flex items-center gap-2 text-[10px] font-mono text-white/60 bg-black/40 px-3 py-1.5 border border-border/30 rounded-none mr-2">
                   <Cpu className="h-3 w-3" /> Latency: 12ms
                 </div>
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-none">
+                <Button variant="ghost" size="icon" className="text-white/65 hover:text-primary hover:bg-primary/10 rounded-none">
                   <MoreVertical className="h-5 w-5" />
                 </Button>
               </div>
@@ -148,7 +148,7 @@ export default function Messages() {
               
               <div className="text-center my-6 relative z-10 flex items-center justify-center">
                 <div className="h-px bg-border/50 flex-1"></div>
-                <span className="text-[10px] font-mono uppercase tracking-widest bg-black/60 text-muted-foreground px-4 py-1 border border-border/50 shadow-sm">
+                <span className="text-[10px] font-mono uppercase tracking-widest bg-black/60 text-white/65 px-4 py-1 border border-border/50 shadow-sm">
                   Session Log — Today
                 </span>
                 <div className="h-px bg-border/50 flex-1"></div>
@@ -161,11 +161,11 @@ export default function Messages() {
                       "px-5 py-3 text-sm font-mono leading-relaxed tech-clip backdrop-blur-md shadow-lg",
                       msg.sender === 'me' 
                         ? 'bg-primary text-primary-foreground border border-primary/80 gold-glow' 
-                        : 'bg-card/80 border border-border/60 text-foreground'
+                        : 'bg-card/80 border border-border/60 text-white'
                     )}>
                       <p>{msg.text}</p>
                     </div>
-                    <div className="flex items-center gap-1.5 mt-2 text-[10px] font-mono uppercase text-muted-foreground px-1">
+                    <div className="flex items-center gap-1.5 mt-2 text-[10px] font-mono uppercase text-white/65 px-1">
                       <span>{msg.time}</span>
                       {msg.sender === 'me' && <ShieldCheck className="h-3 w-3 text-primary drop-shadow-[0_0_3px_rgba(var(--primary),0.5)]" />}
                     </div>
@@ -178,12 +178,12 @@ export default function Messages() {
             {/* Input Console */}
             <div className="p-5 bg-card/60 backdrop-blur-xl border-t border-border/50 shrink-0 z-20">
               <div className="max-w-5xl mx-auto relative flex items-center bg-black/40 border border-border/50 p-1 focus-within:border-primary/50 focus-within:shadow-[0_0_15px_rgba(var(--primary),0.1)] transition-all">
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary rounded-none h-10 w-10 shrink-0">
+                <Button variant="ghost" size="icon" className="text-white/65 hover:text-primary rounded-none h-10 w-10 shrink-0">
                   <Paperclip className="h-4 w-4" />
                 </Button>
                 <Input 
                   placeholder="Transmit message..." 
-                  className="flex-1 bg-transparent border-none focus-visible:ring-0 shadow-none font-mono text-sm px-2"
+                  className="flex-1 bg-transparent border-none text-white placeholder:text-white/50 focus-visible:ring-0 shadow-none font-mono text-sm px-2"
                   value={message}
                   onChange={e => setMessage(e.target.value)}
                   onKeyDown={e => {
@@ -198,7 +198,7 @@ export default function Messages() {
                     "h-10 w-10 rounded-none transition-all duration-300 shrink-0",
                     message 
                       ? "bg-primary text-primary-foreground gold-glow hover:bg-primary/90" 
-                      : "bg-muted/20 text-muted-foreground hover:bg-muted/40"
+                      : "bg-white/10 text-white/45 hover:bg-white/15"
                   )}
                   disabled={!message}
                   onClick={() => setMessage("")}
