@@ -13,7 +13,7 @@ import {
   LogOut,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useClerk, useUser } from "@clerk/react"
 
 const NAV_ITEMS = [
@@ -49,7 +49,63 @@ export function AppLayoutView({
 }: AppLayoutViewProps) {
   const [sidebarOpen, setSidebarOpen] = useState(initialSidebarOpen)
   const [profileOpen, setProfileOpen] = useState(initialProfileOpen)
+  const [isMobile, setIsMobile] = useState(false)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const sidebarRef = useRef<HTMLElement>(null)
   const initials = displayName.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()
+
+  const closeSidebar = useCallback(() => {
+    setSidebarOpen(false)
+    window.requestAnimationFrame(() => menuButtonRef.current?.focus())
+  }, [])
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 767px)")
+    const updateMobileState = () => setIsMobile(mediaQuery.matches)
+    updateMobileState()
+    mediaQuery.addEventListener("change", updateMobileState)
+    return () => mediaQuery.removeEventListener("change", updateMobileState)
+  }, [])
+
+  useEffect(() => {
+    if (!sidebarOpen || !isMobile) return
+
+    const sidebar = sidebarRef.current
+    const focusableSelector = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    const focusableElements = () =>
+      Array.from(sidebar?.querySelectorAll<HTMLElement>(focusableSelector) ?? [])
+
+    window.requestAnimationFrame(() => focusableElements()[0]?.focus())
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault()
+        closeSidebar()
+        return
+      }
+
+      if (event.key !== "Tab") return
+      const elements = focusableElements()
+      if (elements.length === 0) {
+        event.preventDefault()
+        sidebar?.focus()
+        return
+      }
+
+      const first = elements[0]
+      const last = elements[elements.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [closeSidebar, isMobile, sidebarOpen])
 
   return (
     <div data-testid="app-layout" className="min-h-[100dvh] flex flex-col md:flex-row bg-background bg-tech-grid text-foreground selection:bg-primary selection:text-primary-foreground">
@@ -58,9 +114,12 @@ export function AppLayoutView({
           <img src="/luminova-logo.png" alt="Luminova Construction" className="h-10 w-36 object-contain object-left drop-shadow-md" />
         </div>
         <button
+          ref={menuButtonRef}
           type="button"
           aria-label={sidebarOpen ? "Close navigation" : "Open navigation"}
-          onClick={() => setSidebarOpen(!sidebarOpen)}
+          aria-controls="mobile-navigation"
+          aria-expanded={sidebarOpen}
+          onClick={() => sidebarOpen ? closeSidebar() : setSidebarOpen(true)}
           className="p-2 -mr-2 text-primary hover:text-primary/80 transition-colors"
         >
           {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
@@ -68,14 +127,24 @@ export function AppLayoutView({
       </div>
 
       {sidebarOpen && (
-        <div
+        <button
+          type="button"
+          aria-label="Dismiss navigation"
           data-testid="sidebar-overlay"
           className="fixed inset-0 bg-black/80 backdrop-blur-sm z-20 md:hidden transition-opacity"
-          onClick={() => setSidebarOpen(false)}
+          onClick={closeSidebar}
         />
       )}
 
-      <aside className={cn(
+      <aside
+        ref={sidebarRef}
+        id="mobile-navigation"
+        role={isMobile ? "dialog" : undefined}
+        aria-modal={isMobile ? true : undefined}
+        aria-label={isMobile ? "Main navigation" : undefined}
+        aria-hidden={isMobile && !sidebarOpen ? true : undefined}
+        tabIndex={isMobile ? -1 : undefined}
+        className={cn(
         "fixed md:static inset-y-0 left-0 w-72 glass-panel-dark text-sidebar-foreground flex flex-col z-30 transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] md:m-4 md:rounded-2xl md:h-[calc(100dvh-2rem)]",
         sidebarOpen ? "translate-x-0 shadow-[0_0_50px_rgba(0,0,0,0.8)]" : "-translate-x-full md:translate-x-0",
       )}>
@@ -100,7 +169,7 @@ export function AppLayoutView({
                     : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_2px_10px_rgba(0,0,0,0.2)]",
                   isForcedHover && "bg-sidebar-accent text-sidebar-foreground shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_2px_10px_rgba(0,0,0,0.2)]",
                 )}
-                onClick={() => setSidebarOpen(false)}
+                onClick={closeSidebar}
               >
                 <item.icon size={20} className={cn("transition-transform duration-300 drop-shadow-md", isActive ? "scale-110" : "group-hover:scale-110 group-hover:text-primary", isForcedHover && "scale-110 text-primary")} />
                 <span className="relative z-10 tracking-wide drop-shadow-sm">{item.label}</span>

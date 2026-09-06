@@ -36,4 +36,25 @@ test.describe('navigation contrast', () => {
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
     await expect(page).toHaveScreenshot('mobile-drawer-overlay.png', { animations: 'disabled' });
   });
+
+  test('mobile drawer supports keyboard navigation and dismissal', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await stabilize(page);
+
+    const menuButton = page.getByRole('button', { name: 'Open navigation' });
+    await menuButton.focus();
+    await page.keyboard.press('Enter');
+
+    const drawer = page.getByRole('dialog', { name: 'Main navigation' });
+    await expect(drawer).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Dismiss navigation' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Command Center' })).toBeFocused();
+
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('link', { name: 'All Projects' })).toBeFocused();
+
+    await page.keyboard.press('Escape');
+    await expect(drawer).not.toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open navigation' })).toBeFocused();
+  });
 });
