@@ -315,7 +315,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Force the unpacked document itself to black before it replaces this shell.
     template = template.replace(
       /<\/head>/i,
-      '<style>html,body,[ref]{background:#000!important;}[ref]>div{width:min(62vw,620px)!important;}@media(max-width:640px){[ref]>div{width:min(78vw,480px)!important;}}</style></head>'
+      '<style>html,body,[ref]{background:#000!important;}[ref]>div{width:min(40vw,400px)!important;}@media(max-width:640px){[ref]>div{width:min(64vw,320px)!important;}}</style></head>'
     );
 
     // Parse the template and swap the root element. Scripts inserted via
