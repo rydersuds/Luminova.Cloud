@@ -5,6 +5,7 @@ import {
   useGetProject, 
   getGetProjectQueryKey,
   useCreateProjectPanorama,
+  useUpdateProjectPanorama,
   useUpdateProject,
   useGetProjectActivity,
   getGetProjectActivityQueryKey
@@ -21,7 +22,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { 
   Building, MapPin, Calendar, DollarSign, ArrowLeft, 
   Camera, Briefcase, FileText, CheckCircle2, ChevronRight, Activity, Clock,
-  Maximize2, ChevronLeft
+  Maximize2, ChevronLeft, Pencil
 } from "lucide-react"
 import { cn, formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
@@ -30,6 +31,13 @@ import { PanoramaViewer } from "@/components/panorama-viewer"
 
 const PANORAMA_TYPES = ["image/jpeg", "image/png", "image/webp"]
 const MAX_PANORAMA_BYTES = 8 * 1024 * 1024
+type ProjectPanorama = {
+  id: string
+  url: string
+  label: string | null
+  location: string | null
+  date: string | null
+}
 
 export default function ProjectDetail({ projectIdOverride }: { projectIdOverride?: string } = {}) {
   const params = useParams()
@@ -42,7 +50,9 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const [panoramaError, setPanoramaError] = React.useState("")
   const [isPanoramaUploading, setIsPanoramaUploading] = React.useState(false)
   const [photoIndex, setPhotoIndex] = React.useState<number | null>(null)
-  const [activePanorama, setActivePanorama] = React.useState<{ url: string; label: string | null; location: string | null; date: string | null } | null>(null)
+  const [activePanorama, setActivePanorama] = React.useState<ProjectPanorama | null>(null)
+  const [editingPanorama, setEditingPanorama] = React.useState<ProjectPanorama | null>(null)
+  const [panoramaEditError, setPanoramaEditError] = React.useState("")
   const panoramaName = (label: string | null) => label || "Untitled panorama"
 
   const { data: project, isLoading } = useGetProject(projectId, {
@@ -61,6 +71,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
 
   const updateProject = useUpdateProject()
   const createPanorama = useCreateProjectPanorama()
+  const updatePanorama = useUpdateProjectPanorama()
 
   const resetPanoramaForm = () => {
     setPanoramaImage(null)
@@ -150,6 +161,42 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
       setPanoramaError(error instanceof Error ? error.message : "The panorama could not be uploaded. Try again.")
     } finally {
       setIsPanoramaUploading(false)
+    }
+  }
+
+  const openPanoramaEditor = (panorama: ProjectPanorama) => {
+    setPanoramaEditError("")
+    setActivePanorama(null)
+    setEditingPanorama(panorama)
+  }
+
+  const handlePanoramaEdit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!editingPanorama) return
+    setPanoramaEditError("")
+    const formData = new FormData(event.currentTarget)
+    const label = String(formData.get("panorama-edit-label") ?? "").trim()
+    const location = String(formData.get("panorama-edit-location") ?? "").trim()
+    const date = String(formData.get("panorama-edit-date") ?? "")
+
+    try {
+      await updatePanorama.mutateAsync({
+        projectId,
+        panoramaId: editingPanorama.id,
+        data: {
+          label: label || null,
+          location: location || null,
+          date: date || null,
+        },
+      })
+      await queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) })
+      setEditingPanorama(null)
+      toast({
+        title: "Panorama details saved",
+        description: `${panoramaName(label)} is up to date.`,
+      })
+    } catch {
+      setPanoramaEditError("The panorama details could not be saved. Check the values and try again.")
     }
   }
 
@@ -493,12 +540,12 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {project.panoramas.map(pano => (
-                  <button
-                    type="button"
-                    key={pano.id}
-                    onClick={() => setActivePanorama(pano)}
-                    className="group relative h-[250px] overflow-hidden rounded-lg border border-border bg-sidebar text-left cursor-pointer"
-                  >
+                  <div key={pano.id} className="group relative h-[250px] overflow-hidden rounded-lg border border-border bg-sidebar">
+                    <button
+                      type="button"
+                      onClick={() => setActivePanorama(pano)}
+                      className="absolute inset-0 text-left cursor-pointer"
+                    >
                     <img src={pano.url} alt={`360° panorama: ${panoramaName(pano.label)}`} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
                     <div className="absolute inset-0 flex items-center justify-center">
                       <div className="bg-background/90 text-foreground px-4 py-2 rounded-full font-medium shadow-lg flex items-center gap-2">
@@ -513,7 +560,18 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                         <span>{pano.date ? formatDate(pano.date) : "Capture date not provided"}</span>
                       </div>
                     </div>
-                  </button>
+                    </button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      className="absolute right-3 top-3 z-10 gap-2 shadow-md"
+                      onClick={() => openPanoramaEditor(pano)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit details
+                    </Button>
+                  </div>
                 ))}
               </div>
 
@@ -584,8 +642,62 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                   {activePanorama && (
                     <>
                       <DialogTitle className="sr-only">{panoramaName(activePanorama.label)} 360 degree panorama</DialogTitle>
-                      <PanoramaViewer panorama={activePanorama} formatDate={formatDate} />
+                      <PanoramaViewer panorama={activePanorama} formatDate={formatDate} onEdit={() => openPanoramaEditor(activePanorama)} />
                     </>
+                  )}
+                </DialogContent>
+              </Dialog>
+
+              <Dialog
+                open={editingPanorama !== null}
+                onOpenChange={(open) => {
+                  if (!open && !updatePanorama.isPending) setEditingPanorama(null)
+                }}
+              >
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Edit panorama details</DialogTitle>
+                    <DialogDescription>Add, change, or clear the optional details for this panorama.</DialogDescription>
+                  </DialogHeader>
+                  {editingPanorama && (
+                    <form onSubmit={handlePanoramaEdit} className="space-y-4" noValidate>
+                      <div className="space-y-2">
+                        <Label htmlFor="panorama-edit-label">Label <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                        <Input
+                          id="panorama-edit-label"
+                          name="panorama-edit-label"
+                          maxLength={100}
+                          defaultValue={editingPanorama.label ?? ""}
+                          placeholder="Week 25"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="panorama-edit-location">Location <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                        <Input
+                          id="panorama-edit-location"
+                          name="panorama-edit-location"
+                          maxLength={100}
+                          defaultValue={editingPanorama.location ?? ""}
+                          placeholder="Main floor"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="panorama-edit-date">Capture date <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                        <Input
+                          id="panorama-edit-date"
+                          name="panorama-edit-date"
+                          type="date"
+                          defaultValue={editingPanorama.date ?? ""}
+                        />
+                      </div>
+                      {panoramaEditError && <p role="alert" className="text-sm text-destructive">{panoramaEditError}</p>}
+                      <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setEditingPanorama(null)} disabled={updatePanorama.isPending}>Cancel</Button>
+                        <Button type="submit" disabled={updatePanorama.isPending}>
+                          {updatePanorama.isPending ? "Saving..." : "Save details"}
+                        </Button>
+                      </DialogFooter>
+                    </form>
                   )}
                 </DialogContent>
               </Dialog>

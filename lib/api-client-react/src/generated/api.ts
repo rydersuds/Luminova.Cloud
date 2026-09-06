@@ -32,6 +32,7 @@ import type {
   InvoiceInput,
   Panorama,
   PanoramaInput,
+  PanoramaUpdate,
   Project,
   ProjectDetail,
   ProjectInput,
@@ -605,6 +606,80 @@ export const useCreateProjectPanorama = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getCreateProjectPanoramaMutationOptions(options));
+    }
+
+export const getUpdateProjectPanoramaUrl = (projectId: string,
+    panoramaId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/panoramas/${panoramaId}`
+}
+
+/**
+ * @summary Update panorama details
+ */
+export const updateProjectPanorama = async (projectId: string,
+    panoramaId: string,
+    panoramaUpdate: PanoramaUpdate, options?: Parameters<typeof customFetch>[1]): Promise<Panorama> => {
+
+  return customFetch<Panorama>(getUpdateProjectPanoramaUrl(projectId,panoramaId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(panoramaUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateProjectPanoramaMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProjectPanorama>>, TError,{projectId: string;panoramaId: string;data: BodyType<PanoramaUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateProjectPanorama>>, TError,{projectId: string;panoramaId: string;data: BodyType<PanoramaUpdate>}, TContext> => {
+
+const mutationKey = ['updateProjectPanorama'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateProjectPanorama>>, {projectId: string;panoramaId: string;data: BodyType<PanoramaUpdate>}> = (props) => {
+          const {projectId,panoramaId,data} = props ?? {};
+
+          return  updateProjectPanorama(projectId,panoramaId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateProjectPanoramaMutationResult = NonNullable<Awaited<ReturnType<typeof updateProjectPanorama>>>
+    export type UpdateProjectPanoramaMutationBody = BodyType<PanoramaUpdate>
+    export type UpdateProjectPanoramaMutationError = ErrorType<void>
+
+    /**
+ * @summary Update panorama details
+ */
+export const useUpdateProjectPanorama = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProjectPanorama>>, TError,{projectId: string;panoramaId: string;data: BodyType<PanoramaUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateProjectPanorama>>,
+        TError,
+        {projectId: string;panoramaId: string;data: BodyType<PanoramaUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateProjectPanoramaMutationOptions(options));
     }
 
 export const getRequestUploadUrlUrl = () => {

@@ -253,6 +253,39 @@ export const CreateProjectPanoramaResponse = zod.object({
 
 
 /**
+ * @summary Update panorama details
+ */
+
+
+
+export const UpdateProjectPanoramaParams = zod.object({
+  "projectId": zod.coerce.string(),
+  "panoramaId": zod.coerce.string().min(1)
+})
+
+export const updateProjectPanoramaBodyLabelMax = 100;
+
+export const updateProjectPanoramaBodyLocationMax = 100;
+
+export const updateProjectPanoramaBodyDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const UpdateProjectPanoramaBody = zod.object({
+  "label": zod.string().max(updateProjectPanoramaBodyLabelMax).nullable(),
+  "location": zod.string().max(updateProjectPanoramaBodyLocationMax).nullable(),
+  "date": zod.string().regex(updateProjectPanoramaBodyDateRegExp).nullable()
+})
+
+export const UpdateProjectPanoramaResponse = zod.object({
+  "id": zod.string(),
+  "url": zod.string(),
+  "label": zod.string().nullable(),
+  "location": zod.string().nullable(),
+  "date": zod.string().nullable()
+})
+
+
+/**
  * @summary Request a direct upload URL
  */
 export const requestUploadUrlBodyNameMax = 255;

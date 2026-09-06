@@ -371,6 +371,24 @@ export interface PanoramaInput {
   date?: string;
 }
 
+export interface PanoramaUpdate {
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  label: string | null;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  location: string | null;
+  /**
+     * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  date: string | null;
+}
+
 export type UploadUrlRequestContentType = typeof UploadUrlRequestContentType[keyof typeof UploadUrlRequestContentType];
 
 

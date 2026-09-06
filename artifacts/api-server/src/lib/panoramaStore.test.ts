@@ -21,6 +21,17 @@ class MemoryRepository implements PanoramaRepository {
     this.rows.push(stored);
     return stored;
   }
+
+  async update(
+    projectId: string,
+    panoramaId: string,
+    details: Pick<ProjectPanorama, "label" | "location" | "captureDate">,
+  ) {
+    const row = this.rows.find((item) => item.projectId === projectId && item.id === panoramaId);
+    if (!row) return null;
+    Object.assign(row, details);
+    return row;
+  }
 }
 
 class FakeStorage implements PanoramaObjectStorage {
@@ -96,6 +107,62 @@ test("reloads metadata for only the requested project after a store restart", as
   assert.equal(panoramas.length, 1);
   assert.equal(panoramas[0].label, "Week 25");
   assert.equal(panoramas[0].url, `/api/storage${upload.objectPath}`);
+});
+
+test("adds, changes, and clears panorama details", async () => {
+  const repository = new MemoryRepository();
+  const store = new DatabasePanoramaStore(new FakeStorage(), repository);
+  const created = await store.create({ ...upload, label: null, location: null, date: null });
+
+  const added = await store.update({
+    projectId: upload.projectId,
+    panoramaId: created.id,
+    label: "Week 26",
+    location: "Second floor",
+    date: "2026-09-07",
+  });
+  assert.deepEqual(added && {
+    label: added.label,
+    location: added.location,
+    date: added.date,
+  }, {
+    label: "Week 26",
+    location: "Second floor",
+    date: "2026-09-07",
+  });
+
+  const changed = await store.update({
+    projectId: upload.projectId,
+    panoramaId: created.id,
+    label: "Closeout",
+    location: null,
+    date: null,
+  });
+  assert.equal(changed?.label, "Closeout");
+  assert.equal(changed?.location, null);
+  assert.equal(changed?.date, null);
+
+  const reloaded = await new DatabasePanoramaStore(new FakeStorage(), repository).list(upload.projectId);
+  assert.equal(reloaded[0].label, "Closeout");
+  assert.equal(reloaded[0].location, null);
+  assert.equal(reloaded[0].date, null);
+});
+
+test("does not update a panorama from another project", async () => {
+  const repository = new MemoryRepository();
+  const store = new DatabasePanoramaStore(new FakeStorage(), repository);
+  const created = await store.create(upload);
+
+  const updated = await store.update({
+    projectId: "ridge-house",
+    panoramaId: created.id,
+    label: "Wrong project",
+    location: null,
+    date: null,
+  });
+
+  assert.equal(updated, null);
+  assert.equal(repository.rows[0].label, "Week 25");
 });
 
 test("does not persist metadata when the uploaded object is missing or invalid", async () => {

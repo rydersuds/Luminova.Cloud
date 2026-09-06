@@ -23,6 +23,9 @@ import {
   UpdateProjectBody,
   UpdateProjectParams,
   UpdateProjectResponse,
+  UpdateProjectPanoramaBody,
+  UpdateProjectPanoramaParams,
+  UpdateProjectPanoramaResponse,
   CreateVendorQuoteBody,
   CreateVendorQuoteResponse,
   GetVendorQuoteParams,
@@ -37,6 +40,11 @@ import { DatabasePanoramaStore } from "../lib/panoramaStore";
 
 const router: IRouter = Router();
 const panoramaStore = new DatabasePanoramaStore();
+
+const isValidCalendarDate = (date: string) => {
+  const parsedDate = new Date(`${date}T00:00:00.000Z`);
+  return !Number.isNaN(parsedDate.valueOf()) && parsedDate.toISOString().slice(0, 10) === date;
+};
 
 const activities = [
   { id: "act-1", type: "invoice", title: "Invoice auto-approved", description: "Northline Electric invoice INV-2048 was within the electrical budget.", author: "System", date: "2026-09-04T16:40:00.000Z" },
@@ -338,12 +346,9 @@ router.post("/projects/:projectId/panoramas", async (req, res): Promise<void> =>
   }
 
   const { objectPath, label, location, date } = body.data;
-  if (date) {
-    const parsedDate = new Date(`${date}T00:00:00.000Z`);
-    if (Number.isNaN(parsedDate.valueOf()) || parsedDate.toISOString().slice(0, 10) !== date) {
-      res.status(400).json({ error: "Capture date must be a valid calendar date." });
-      return;
-    }
+  if (date && !isValidCalendarDate(date)) {
+    res.status(400).json({ error: "Capture date must be a valid calendar date." });
+    return;
   }
   try {
     const panorama = await panoramaStore.create({
@@ -358,6 +363,48 @@ router.post("/projects/:projectId/panoramas", async (req, res): Promise<void> =>
   } catch (error) {
     req.log.error({ err: error, projectId: project.id }, "Failed to persist project panorama");
     res.status(500).json({ error: "The uploaded panorama could not be saved. Try again." });
+  }
+});
+
+router.patch("/projects/:projectId/panoramas/:panoramaId", async (req, res): Promise<void> => {
+  const params = UpdateProjectPanoramaParams.safeParse(req.params);
+  const body = UpdateProjectPanoramaBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: "Check the supplied panorama details." });
+    return;
+  }
+
+  const project = projects.find((item) => item.id === params.data.projectId);
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  const { label, location, date } = body.data;
+  if (date && !isValidCalendarDate(date)) {
+    res.status(400).json({ error: "Capture date must be a valid calendar date." });
+    return;
+  }
+
+  try {
+    const panorama = await panoramaStore.update({
+      projectId: project.id,
+      panoramaId: params.data.panoramaId,
+      label: label?.trim() || null,
+      location: location?.trim() || null,
+      date: date || null,
+    });
+    if (!panorama) {
+      res.status(404).json({ error: "Panorama not found" });
+      return;
+    }
+    res.json(UpdateProjectPanoramaResponse.parse(panorama));
+  } catch (error) {
+    req.log.error(
+      { err: error, projectId: project.id, panoramaId: params.data.panoramaId },
+      "Failed to update project panorama",
+    );
+    res.status(500).json({ error: "The panorama details could not be saved. Try again." });
   }
 });
 

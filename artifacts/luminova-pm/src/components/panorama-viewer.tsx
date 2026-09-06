@@ -1,5 +1,5 @@
 import * as React from "react"
-import { LoaderCircle, Minus, Move, Plus, RotateCcw } from "lucide-react"
+import { LoaderCircle, Minus, Move, Pencil, Plus, RotateCcw } from "lucide-react"
 
 type Panorama = {
   url: string
@@ -91,9 +91,11 @@ const clampFieldOfView = (fieldOfView: number) =>
 export function PanoramaViewer({
   panorama,
   formatDate,
+  onEdit,
 }: {
   panorama: Panorama
   formatDate: (date: string) => string
+  onEdit: () => void
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
   const renderRef = React.useRef<((view: View) => void) | null>(null)
@@ -434,7 +436,17 @@ export function PanoramaViewer({
             <p className="font-medium">{displayLabel}</p>
             <p className="mt-1 text-xs text-white/55">{panorama.location || "Location not provided"}</p>
           </div>
-          <p className="text-xs text-white/55">{panorama.date ? formatDate(panorama.date) : "Capture date not provided"}</p>
+          <div className="flex items-center gap-4">
+            <p className="text-xs text-white/55">{panorama.date ? formatDate(panorama.date) : "Capture date not provided"}</p>
+            <button
+              type="button"
+              onClick={onEdit}
+              className="inline-flex items-center gap-2 rounded-md border border-white/20 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Edit details
+            </button>
+          </div>
         </div>
       </div>
     </div>
