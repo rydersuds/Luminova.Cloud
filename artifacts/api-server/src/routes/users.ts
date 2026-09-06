@@ -1,12 +1,16 @@
-import { createClerkClient, type User } from "@clerk/backend";
+import { createClerkClient, type Invitation, type User } from "@clerk/backend";
 import { getAuth } from "@clerk/express";
 import { pool } from "@workspace/db";
 import {
   DeleteWorkspaceUserParams,
+  GetWorkspaceInvitationsResponse,
   GetCurrentWorkspaceUserResponse,
   GetWorkspaceUsersResponse,
   InviteWorkspaceUserBody,
   InviteWorkspaceUserResponse,
+  ResendWorkspaceInvitationParams,
+  ResendWorkspaceInvitationResponse,
+  RevokeWorkspaceInvitationParams,
   UpdateWorkspaceUserBody,
   UpdateWorkspaceUserParams,
   UpdateWorkspaceUserResponse,
@@ -53,6 +57,23 @@ function serializeUser(user: User) {
     createdAt: user.createdAt,
     lastSignInAt: user.lastSignInAt,
     imageUrl: user.imageUrl,
+  };
+}
+
+function invitationRole(invitation: Invitation): (typeof ROLES)[number] {
+  const role = invitation.publicMetadata?.role;
+  return ROLES.includes(role as (typeof ROLES)[number])
+    ? role as (typeof ROLES)[number]
+    : "Project Manager";
+}
+
+function serializeInvitation(invitation: Invitation) {
+  return {
+    id: invitation.id,
+    email: invitation.emailAddress,
+    role: invitationRole(invitation),
+    status: invitation.status,
+    createdAt: invitation.createdAt,
   };
 }
 
@@ -107,7 +128,7 @@ export function clerkErrorResponse(error: unknown, fallback: string) {
   const detail = clerkError.errors?.[0];
   const code = detail?.code ?? "";
   const status = clerkError.status;
-  if (status === 404) return { status: 404, error: "User not found" };
+  if (status === 404) return { status: 404, error: fallback.includes("invitation") ? "Invitation not found" : "User not found" };
   if (status === 409 || code.includes("already") || code.includes("taken") || code.includes("exists")) {
     return { status: 409, error: detail?.longMessage || detail?.message || "That email address is already in use" };
   }
@@ -126,6 +147,22 @@ router.get("/users", async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!await requireAdmin(client, req, res)) return;
   const result = await client.users.getUserList({ limit: 100, orderBy: "-created_at" });
   res.json(GetWorkspaceUsersResponse.parse(result.data.map(serializeUser)));
+});
+
+router.get("/users/invitations", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!await requireAdmin(client, req, res)) return;
+  try {
+    const result = await client.invitations.getInvitationList({
+      status: "pending",
+      limit: 100,
+      orderBy: "-created_at",
+    });
+    res.json(GetWorkspaceInvitationsResponse.parse(result.data.map(serializeInvitation)));
+  } catch (error) {
+    const normalized = clerkErrorResponse(error, "Clerk could not list pending invitations");
+    req.log.warn({ status: normalized.status }, "Clerk invitation listing failed");
+    res.status(normalized.status).json({ error: normalized.error });
+  }
 });
 
 router.post("/users/invitations", async (req: AuthenticatedRequest, res): Promise<void> => {
@@ -150,10 +187,70 @@ router.post("/users/invitations", async (req: AuthenticatedRequest, res): Promis
       email: invitation.emailAddress,
       role: parsed.data.role,
       status: invitation.status,
+      createdAt: invitation.createdAt,
     }));
   } catch (error) {
     const normalized = clerkErrorResponse(error, "Clerk could not send the invitation");
     req.log.warn({ status: normalized.status }, "Clerk invitation failed");
+    res.status(normalized.status).json({ error: normalized.error });
+  }
+});
+
+router.post("/users/invitations/:invitationId/resend", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!await requireAdmin(client, req, res)) return;
+  const params = ResendWorkspaceInvitationParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Invalid invitation" });
+    return;
+  }
+  try {
+    const pending = await client.invitations.getInvitationList({
+      status: "pending",
+      query: params.data.invitationId,
+      limit: 1,
+    });
+    const invitation = pending.data.find((candidate) => candidate.id === params.data.invitationId);
+    if (!invitation) {
+      res.status(404).json({ error: "Invitation not found" });
+      return;
+    }
+    const replacement = await client.invitations.createInvitation({
+      emailAddress: invitation.emailAddress,
+      publicMetadata: { role: invitationRole(invitation) },
+      notify: true,
+      ignoreExisting: true,
+    });
+    try {
+      await client.invitations.revokeInvitation(invitation.id);
+    } catch (error) {
+      try {
+        await client.invitations.revokeInvitation(replacement.id);
+      } catch (cleanupError) {
+        req.log.warn({ status: (cleanupError as ClerkError).status }, "Replacement invitation cleanup failed");
+      }
+      throw error;
+    }
+    res.json(ResendWorkspaceInvitationResponse.parse(serializeInvitation(replacement)));
+  } catch (error) {
+    const normalized = clerkErrorResponse(error, "Clerk could not resend the invitation");
+    req.log.warn({ status: normalized.status }, "Clerk invitation resend failed");
+    res.status(normalized.status).json({ error: normalized.error });
+  }
+});
+
+router.delete("/users/invitations/:invitationId", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!await requireAdmin(client, req, res)) return;
+  const params = RevokeWorkspaceInvitationParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Invalid invitation" });
+    return;
+  }
+  try {
+    await client.invitations.revokeInvitation(params.data.invitationId);
+    res.status(204).send();
+  } catch (error) {
+    const normalized = clerkErrorResponse(error, "Clerk could not revoke the invitation");
+    req.log.warn({ status: normalized.status }, "Clerk invitation revocation failed");
     res.status(normalized.status).json({ error: normalized.error });
   }
 });

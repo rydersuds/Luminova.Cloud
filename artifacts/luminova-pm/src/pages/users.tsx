@@ -2,11 +2,16 @@ import * as React from "react"
 import { useUser } from "@clerk/react"
 import {
   getGetWorkspaceUsersQueryKey,
+  getGetWorkspaceInvitationsQueryKey,
   useDeleteWorkspaceUser,
+  useGetWorkspaceInvitations,
   useGetWorkspaceUsers,
   useInviteWorkspaceUser,
+  useResendWorkspaceInvitation,
+  useRevokeWorkspaceInvitation,
   useUpdateWorkspaceUser,
   type WorkspaceRole,
+  type WorkspaceInvitation,
   type WorkspaceUser,
 } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
@@ -26,7 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Loader2, MailPlus, Pencil, Search, ShieldCheck, Trash2, Users as UsersIcon, X } from "lucide-react"
+import { Loader2, MailPlus, Pencil, RefreshCw, Search, ShieldCheck, Trash2, Users as UsersIcon, X } from "lucide-react"
 
 const ROLES: WorkspaceRole[] = ["Admin", "Project Manager", "Field Team", "Client"]
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -62,7 +67,10 @@ export default function Users() {
   const queryClient = useQueryClient()
   const { user: currentUser } = useUser()
   const usersQuery = useGetWorkspaceUsers()
+  const invitationsQuery = useGetWorkspaceInvitations()
   const inviteUser = useInviteWorkspaceUser()
+  const resendInvitation = useResendWorkspaceInvitation()
+  const revokeInvitation = useRevokeWorkspaceInvitation()
   const updateUser = useUpdateWorkspaceUser()
   const deleteUser = useDeleteWorkspaceUser()
   const [search, setSearch] = React.useState("")
@@ -71,15 +79,18 @@ export default function Users() {
   const [inviteOpen, setInviteOpen] = React.useState(false)
   const [editing, setEditing] = React.useState<WorkspaceUser | null>(null)
   const [deleting, setDeleting] = React.useState<WorkspaceUser | null>(null)
+  const [revoking, setRevoking] = React.useState<WorkspaceInvitation | null>(null)
+  const [resendingId, setResendingId] = React.useState<string | null>(null)
   const [feedback, setFeedback] = React.useState<Feedback>(null)
 
   const users = usersQuery.data ?? []
-  const pending = inviteUser.isPending || updateUser.isPending || deleteUser.isPending
+  const pending = inviteUser.isPending || updateUser.isPending || deleteUser.isPending || resendInvitation.isPending || revokeInvitation.isPending
   const visible = users.filter((user) =>
     `${user.name} ${user.email} ${user.role}`.toLowerCase().includes(search.trim().toLowerCase()),
   )
 
   const refreshUsers = () => queryClient.invalidateQueries({ queryKey: getGetWorkspaceUsersQueryKey() })
+  const refreshInvitations = () => queryClient.invalidateQueries({ queryKey: getGetWorkspaceInvitationsQueryKey() })
 
   const submitInvitation = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -94,9 +105,39 @@ export default function Users() {
       setInviteEmail("")
       setInviteRole("Project Manager")
       setInviteOpen(false)
+      await refreshInvitations()
       setFeedback({ kind: "success", message: `Invitation sent to ${email}.` })
     } catch (error) {
       setFeedback({ kind: "error", message: errorMessage(error, "Unable to send the invitation.") })
+    }
+  }
+
+  const resend = async (invitation: WorkspaceInvitation) => {
+    setFeedback(null)
+    setResendingId(invitation.id)
+    try {
+      await resendInvitation.mutateAsync({ invitationId: invitation.id })
+      await refreshInvitations()
+      setFeedback({ kind: "success", message: `A new invitation was sent to ${invitation.email}.` })
+    } catch (error) {
+      setFeedback({ kind: "error", message: errorMessage(error, "Unable to resend this invitation.") })
+    } finally {
+      setResendingId(null)
+    }
+  }
+
+  const confirmRevoke = async () => {
+    if (!revoking) return
+    const email = revoking.email
+    setFeedback(null)
+    try {
+      await revokeInvitation.mutateAsync({ invitationId: revoking.id })
+      setRevoking(null)
+      await refreshInvitations()
+      setFeedback({ kind: "success", message: `The invitation for ${email} was canceled.` })
+    } catch (error) {
+      setRevoking(null)
+      setFeedback({ kind: "error", message: errorMessage(error, "Unable to cancel this invitation.") })
     }
   }
 
@@ -192,6 +233,48 @@ export default function Users() {
             </Card>
           )}
 
+          <section aria-labelledby="pending-invitations-heading" className="space-y-3">
+            <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-muted-foreground">
+              <MailPlus className="h-4 w-4" />
+              <h2 id="pending-invitations-heading">Pending invitations</h2>
+            </div>
+            {invitationsQuery.isLoading ? (
+              <Card className="flex items-center justify-center gap-3 p-6" role="status">
+                <Loader2 className="h-5 w-5 animate-spin" />Loading pending invitations…
+              </Card>
+            ) : invitationsQuery.isError ? (
+              <Card className="p-6 text-center" role="alert">
+                <p>{errorMessage(invitationsQuery.error, "Unable to load pending invitations.")}</p>
+                <Button variant="outline" className="mt-4" onClick={() => void invitationsQuery.refetch()}>Try again</Button>
+              </Card>
+            ) : invitationsQuery.data?.length ? (
+              <div className="space-y-3">
+                {invitationsQuery.data.map((invitation) => (
+                  <Card key={invitation.id} className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold">{invitation.email}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Sent {new Date(invitation.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <Badge variant="secondary" className="self-start sm:self-auto">{invitation.role}</Badge>
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="outline" size="sm" onClick={() => void resend(invitation)} disabled={pending}>
+                        {resendingId === invitation.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                        {resendingId === invitation.id ? "Resending…" : "Resend"}
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => setRevoking(invitation)} disabled={pending}>
+                        <X className="mr-2 h-4 w-4" />Cancel invitation
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card className="p-6 text-center text-sm text-muted-foreground">No pending invitations.</Card>
+            )}
+          </section>
+
           {usersQuery.isLoading ? (
             <Card className="flex items-center justify-center gap-3 p-10" role="status">
               <Loader2 className="h-5 w-5 animate-spin" />Loading workspace users…
@@ -280,6 +363,23 @@ export default function Users() {
             <AlertDialogCancel disabled={pending}>Keep user</AlertDialogCancel>
             <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={pending} onClick={() => void confirmDelete()}>
               {deleteUser.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Delete user
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={Boolean(revoking)} onOpenChange={(open) => !open && !revokeInvitation.isPending && setRevoking(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel invitation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The invitation link sent to {revoking?.email} will stop working. You can invite this email again later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={pending}>Keep invitation</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={pending} onClick={() => void confirmRevoke()}>
+              {revokeInvitation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Cancel invitation
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

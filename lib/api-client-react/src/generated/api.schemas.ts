@@ -47,6 +47,7 @@ export interface WorkspaceInvitation {
   email: string;
   role: WorkspaceRole;
   status: string;
+  createdAt: number;
 }
 
 export interface WorkspaceUserUpdate {

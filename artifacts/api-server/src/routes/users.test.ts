@@ -25,6 +25,20 @@ function makeUser(id: string, role: Role, email = `${id}@example.com`): User {
 function fakeClerk(seed: User[]) {
   let users = [...seed];
   const invitations: Array<{ emailAddress: string; publicMetadata?: object }> = [];
+  let invitationRecords: Array<{
+    id: string;
+    emailAddress: string;
+    publicMetadata: object;
+    status: string;
+    createdAt: number;
+  }> = [{
+    id: "inv_pending",
+    emailAddress: "pending@example.com",
+    publicMetadata: { role: "Client" },
+    status: "pending",
+    createdAt: 100,
+  }];
+  let invitationSequence = 1;
   const client = {
     users: {
       getUser: async (id: string) => {
@@ -56,13 +70,34 @@ function fakeClerk(seed: User[]) {
       },
     },
     invitations: {
+      getInvitationList: async (params?: { status?: string; query?: string }) => {
+        const data = invitationRecords.filter((invitation) =>
+          (!params?.status || invitation.status === params.status)
+          && (!params?.query || invitation.id.includes(params.query) || invitation.emailAddress.includes(params.query)),
+        );
+        return { data, totalCount: data.length };
+      },
       createInvitation: async (input: { emailAddress: string; publicMetadata?: object }) => {
         invitations.push(input);
-        return { id: "inv_1", emailAddress: input.emailAddress, status: "pending" };
+        const invitation = {
+          id: `inv_${invitationSequence++}`,
+          emailAddress: input.emailAddress,
+          publicMetadata: input.publicMetadata ?? {},
+          status: "pending",
+          createdAt: 200 + invitationSequence,
+        };
+        invitationRecords.unshift(invitation);
+        return invitation;
+      },
+      revokeInvitation: async (id: string) => {
+        const invitation = invitationRecords.find((candidate) => candidate.id === id);
+        if (!invitation || invitation.status !== "pending") throw { status: 404 };
+        invitation.status = "revoked";
+        return invitation;
       },
     },
   };
-  return { client, invitations, getUsers: () => users };
+  return { client, invitations, getUsers: () => users, getInvitations: () => invitationRecords };
 }
 
 const servers: Server[] = [];
@@ -102,12 +137,67 @@ test("blocks non-administrators from listing and mutating users", async () => {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ email: "new@example.com", role: "Client" }),
   })).status, 403);
+  assert.equal((await fetch(`${base}/users/invitations`)).status, 403);
+  assert.equal((await fetch(`${base}/users/invitations/inv_pending/resend`, { method: "POST" })).status, 403);
+  assert.equal((await fetch(`${base}/users/invitations/inv_pending`, { method: "DELETE" })).status, 403);
   assert.equal((await fetch(`${base}/users/admin`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ role: "Client" }),
   })).status, 403);
   assert.equal((await fetch(`${base}/users/admin`, { method: "DELETE" })).status, 403);
+});
+
+test("lists, resends, and revokes pending invitations", async () => {
+  const fake = fakeClerk([makeUser("admin", "Admin")]);
+  const base = await startApi("admin", fake.client);
+
+  const listed = await fetch(`${base}/users/invitations`);
+  assert.equal(listed.status, 200);
+  assert.deepEqual(await listed.json(), [{
+    id: "inv_pending",
+    email: "pending@example.com",
+    role: "Client",
+    status: "pending",
+    createdAt: 100,
+  }]);
+
+  const resent = await fetch(`${base}/users/invitations/inv_pending/resend`, { method: "POST" });
+  assert.equal(resent.status, 200);
+  assert.deepEqual(fake.invitations.at(-1), {
+    emailAddress: "pending@example.com",
+    publicMetadata: { role: "Client" },
+    notify: true,
+    ignoreExisting: true,
+  });
+  assert.equal(fake.getInvitations().find((invitation) => invitation.id === "inv_pending")?.status, "revoked");
+
+  const replacement = await resent.json() as { id: string };
+  assert.equal((await fetch(`${base}/users/invitations/${replacement.id}`, { method: "DELETE" })).status, 204);
+  assert.equal(fake.getInvitations().find((invitation) => invitation.id === replacement.id)?.status, "revoked");
+});
+
+test("returns useful errors when Clerk invitation actions fail", async () => {
+  const fake = fakeClerk([makeUser("admin", "Admin")]);
+  const client = fake.client;
+  client.invitations.getInvitationList = async () => {
+    throw { status: 503, errors: [{ longMessage: "Invitation service unavailable." }] };
+  };
+  const base = await startApi("admin", client);
+  const listFailure = await fetch(`${base}/users/invitations`);
+  assert.equal(listFailure.status, 502);
+  assert.deepEqual(await listFailure.json(), { error: "Invitation service unavailable." });
+
+  client.invitations.getInvitationList = async () => ({
+    data: fake.getInvitations().filter((invitation) => invitation.status === "pending"),
+    totalCount: 1,
+  });
+  client.invitations.revokeInvitation = async () => {
+    throw { status: 404 };
+  };
+  const revokeFailure = await fetch(`${base}/users/invitations/inv_pending`, { method: "DELETE" });
+  assert.equal(revokeFailure.status, 404);
+  assert.deepEqual(await revokeFailure.json(), { error: "Invitation not found" });
 });
 
 test("validates invitations and passes the initial role to Clerk", async () => {

@@ -368,6 +368,23 @@ paths:
         "403":
           description: Administrator access required
   /users/invitations:
+    get:
+      operationId: getWorkspaceInvitations
+      tags: [users]
+      summary: List pending workspace invitations
+      responses:
+        "200":
+          description: Pending workspace invitation list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkspaceInvitation"
+        "401":
+          description: Authentication required
+        "403":
+          description: Administrator access required
     post:
       operationId: inviteWorkspaceUser
       tags: [users]
@@ -395,6 +412,46 @@ paths:
           description: Email is already invited or registered
         "502":
           description: Identity provider rejected the invitation
+  /users/invitations/{invitationId}/resend:
+    post:
+      operationId: resendWorkspaceInvitation
+      tags: [users]
+      summary: Resend a pending workspace invitation
+      parameters:
+        - $ref: "#/components/parameters/InvitationId"
+      responses:
+        "200":
+          description: Replacement invitation sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceInvitation"
+        "401":
+          description: Authentication required
+        "403":
+          description: Administrator access required
+        "404":
+          description: Pending invitation not found
+        "502":
+          description: Identity provider rejected the invitation
+  /users/invitations/{invitationId}:
+    delete:
+      operationId: revokeWorkspaceInvitation
+      tags: [users]
+      summary: Revoke a pending workspace invitation
+      parameters:
+        - $ref: "#/components/parameters/InvitationId"
+      responses:
+        "204":
+          description: Invitation revoked
+        "401":
+          description: Authentication required
+        "403":
+          description: Administrator access required
+        "404":
+          description: Pending invitation not found
+        "502":
+          description: Identity provider rejected the revocation
   /users/{userId}:
     patch:
       operationId: updateWorkspaceUser
@@ -471,6 +528,13 @@ components:
       schema:
         type: string
         minLength: 1
+    InvitationId:
+      name: invitationId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
   schemas:
     WorkspaceRole:
       type: string
@@ -510,13 +574,14 @@ components:
           $ref: "#/components/schemas/WorkspaceRole"
     WorkspaceInvitation:
       type: object
-      required: [id, email, role, status]
+      required: [id, email, role, status, createdAt]
       properties:
         id: { type: string }
         email: { type: string, format: email }
         role:
           $ref: "#/components/schemas/WorkspaceRole"
         status: { type: string }
+        createdAt: { type: integer }
     WorkspaceUserUpdate:
       type: object
       additionalProperties: false

@@ -673,6 +673,19 @@ export const GetWorkspaceUsersResponse = zod.array(GetWorkspaceUsersResponseItem
 
 
 /**
+ * @summary List pending workspace invitations
+ */
+export const GetWorkspaceInvitationsResponseItem = zod.object({
+  "id": zod.string(),
+  "email": zod.string().email(),
+  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client']),
+  "status": zod.string(),
+  "createdAt": zod.number().int()
+})
+export const GetWorkspaceInvitationsResponse = zod.array(GetWorkspaceInvitationsResponseItem)
+
+
+/**
  * @summary Invite a user with an initial workspace role
  */
 export const inviteWorkspaceUserBodyEmailMin = 3;
@@ -689,8 +702,41 @@ export const InviteWorkspaceUserResponse = zod.object({
   "id": zod.string(),
   "email": zod.string().email(),
   "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client']),
-  "status": zod.string()
+  "status": zod.string(),
+  "createdAt": zod.number().int()
 })
+
+
+/**
+ * @summary Resend a pending workspace invitation
+ */
+
+
+
+export const ResendWorkspaceInvitationParams = zod.object({
+  "invitationId": zod.coerce.string().min(1)
+})
+
+export const ResendWorkspaceInvitationResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string().email(),
+  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client']),
+  "status": zod.string(),
+  "createdAt": zod.number().int()
+})
+
+
+/**
+ * @summary Revoke a pending workspace invitation
+ */
+
+
+
+export const RevokeWorkspaceInvitationParams = zod.object({
+  "invitationId": zod.coerce.string().min(1)
+})
+
+export const RevokeWorkspaceInvitationResponse = zod.void()
 
 
 /**
