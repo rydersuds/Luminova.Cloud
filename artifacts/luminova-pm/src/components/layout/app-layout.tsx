@@ -7,10 +7,13 @@ import {
   MessageSquare, 
   UserCog,
   Menu,
-  X
+  X,
+  ChevronDown,
+  LogOut
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
+import { useClerk, useUser } from "@clerk/react"
 
 const NAV_ITEMS = [
   { href: "/", label: "Command Center", icon: Building2 },
@@ -24,6 +27,12 @@ const NAV_ITEMS = [
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
+  const { signOut } = useClerk()
+  const { user } = useUser()
+  const displayName = user?.fullName || user?.firstName || "Project Manager"
+  const email = user?.primaryEmailAddress?.emailAddress || "Signed in"
+  const initials = displayName.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()
   return (
     <div className="min-h-[100dvh] flex flex-col md:flex-row bg-background bg-tech-grid text-foreground selection:bg-primary selection:text-primary-foreground">
       {/* Mobile header */}
@@ -84,16 +93,31 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* User / Status Bottom Area */}
         <div className="p-4 border-t border-sidebar-border/50 mt-auto bg-black/20 backdrop-blur-md">
-          <div className="flex items-center gap-3 px-3 py-3 text-sm text-sidebar-foreground hover:text-white transition-colors cursor-pointer tech-clip bg-sidebar-accent/50 hover:bg-sidebar-accent border border-sidebar-border">
+          <button
+            type="button"
+            onClick={() => setProfileOpen((open) => !open)}
+            aria-expanded={profileOpen}
+            className="flex w-full items-center gap-3 px-3 py-3 text-left text-sm text-sidebar-foreground hover:text-white transition-colors cursor-pointer tech-clip bg-sidebar-accent/50 hover:bg-sidebar-accent border border-sidebar-border"
+          >
             <div className="w-9 h-9 rounded-none bg-primary flex items-center justify-center font-heading font-bold text-primary-foreground shadow-[0_0_10px_rgba(0,0,0,0.5)]">
-              PM
+              {initials || "PM"}
             </div>
             <div className="flex-1 overflow-hidden">
-              <p className="font-medium truncate tracking-wide">Project Manager</p>
-              <p className="text-xs font-mono opacity-60 truncate">pm@luminova.build</p>
+              <p className="font-medium truncate tracking-wide">{displayName}</p>
+              <p className="text-xs font-mono opacity-60 truncate">{email}</p>
             </div>
-          </div>
-          
+            <ChevronDown className={cn("h-4 w-4 shrink-0 text-primary transition-transform", profileOpen && "rotate-180")} />
+          </button>
+          {profileOpen && (
+            <button
+              type="button"
+              onClick={() => void signOut({ redirectUrl: import.meta.env.BASE_URL })}
+              className="mt-2 flex w-full items-center justify-center gap-2 border border-sidebar-border/60 px-3 py-2.5 text-xs font-mono uppercase tracking-wider text-sidebar-foreground/75 transition-colors hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive"
+            >
+              <LogOut className="h-4 w-4" />
+              Sign out
+            </button>
+          )}
         </div>
       </aside>
 
