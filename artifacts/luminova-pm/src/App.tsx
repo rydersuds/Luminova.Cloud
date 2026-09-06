@@ -14,6 +14,7 @@ import Messages from '@/pages/messages';
 import Login from '@/pages/login';
 import { SignUpPage } from '@/pages/login';
 import Users from '@/pages/users';
+import { AppLayoutView } from '@/components/layout/app-layout';
 import { ClerkProvider, Show, useAuth, useClerk } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
@@ -134,6 +135,29 @@ function SessionPolicy() {
 }
 
 function App() {
+  if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/sidebar')) {
+    const params = new URLSearchParams(window.location.search);
+    return (
+      <WouterRouter base={basePath}>
+        <AppLayoutView
+          location="/projects"
+          displayName="Morgan Reyes"
+          email="morgan@luminova.test"
+          onSignOut={() => undefined}
+          initialSidebarOpen={params.get('drawer') === 'open'}
+          initialProfileOpen={params.get('profile') === 'open'}
+          hoveredHref={params.get('hover') === 'trades' ? '/trades' : undefined}
+        >
+          <section className="m-4 min-h-64 rounded-2xl bg-sidebar p-8 text-sidebar-foreground shadow-xl" data-testid="shared-dark-surface">
+            <p className="font-mono text-xs uppercase tracking-widest text-sidebar-foreground/60">Shared dark surface</p>
+            <h1 className="mt-3 text-3xl font-bold">Project controls stay readable.</h1>
+            <div className="mt-6 border-t border-sidebar-border pt-4 text-sidebar-foreground/70">Divider and secondary label token check</div>
+          </section>
+        </AppLayoutView>
+      </WouterRouter>
+    );
+  }
+
   return (
     <WouterRouter base={basePath}>
       <ClerkProvider

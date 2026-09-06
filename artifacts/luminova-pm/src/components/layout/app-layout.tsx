@@ -1,15 +1,15 @@
 import { Link, useLocation } from "wouter"
-import { 
-  Building2, 
+import {
+  Building2,
   FolderKanban,
-  Users, 
-  FileText, 
-  MessageSquare, 
+  Users,
+  FileText,
+  MessageSquare,
   UserCog,
   Menu,
   X,
   ChevronDown,
-  LogOut
+  LogOut,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
@@ -24,71 +24,89 @@ const NAV_ITEMS = [
   { href: "/users", label: "Users & Roles", icon: UserCog },
 ]
 
-export function AppLayout({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation()
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [profileOpen, setProfileOpen] = useState(false)
-  const { signOut } = useClerk()
-  const { user } = useUser()
-  const displayName = user?.fullName || user?.firstName || "Project Manager"
-  const email = user?.primaryEmailAddress?.emailAddress || "Signed in"
+type AppLayoutViewProps = {
+  children: React.ReactNode
+  location: string
+  displayName: string
+  email: string
+  onSignOut: () => void
+  initialSidebarOpen?: boolean
+  initialProfileOpen?: boolean
+  hoveredHref?: string
+}
+
+export function AppLayoutView({
+  children,
+  location,
+  displayName,
+  email,
+  onSignOut,
+  initialSidebarOpen = false,
+  initialProfileOpen = false,
+  hoveredHref,
+}: AppLayoutViewProps) {
+  const [sidebarOpen, setSidebarOpen] = useState(initialSidebarOpen)
+  const [profileOpen, setProfileOpen] = useState(initialProfileOpen)
   const initials = displayName.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()
+
   return (
-    <div className="min-h-[100dvh] flex flex-col md:flex-row bg-background bg-tech-grid text-foreground selection:bg-primary selection:text-primary-foreground">
-      {/* Mobile header */}
+    <div data-testid="app-layout" className="min-h-[100dvh] flex flex-col md:flex-row bg-background bg-tech-grid text-foreground selection:bg-primary selection:text-primary-foreground">
       <div className="md:hidden flex items-center justify-between p-4 glass-panel-dark text-sidebar-foreground z-30 relative border-b border-sidebar-border shadow-md">
         <div className="flex items-center">
           <img src="/luminova-logo.png" alt="Luminova Construction" className="h-10 w-36 object-contain object-left drop-shadow-md" />
         </div>
-        <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 -mr-2 text-primary hover:text-primary/80 transition-colors">
+        <button
+          type="button"
+          aria-label={sidebarOpen ? "Close navigation" : "Open navigation"}
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="p-2 -mr-2 text-primary hover:text-primary/80 transition-colors"
+        >
           {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
       </div>
 
-      {/* Sidebar overlay for mobile */}
       {sidebarOpen && (
-        <div 
+        <div
+          data-testid="sidebar-overlay"
           className="fixed inset-0 bg-black/80 backdrop-blur-sm z-20 md:hidden transition-opacity"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Futuristic Sidebar */}
       <aside className={cn(
         "fixed md:static inset-y-0 left-0 w-72 glass-panel-dark text-sidebar-foreground flex flex-col z-30 transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] md:m-4 md:rounded-2xl md:h-[calc(100dvh-2rem)]",
-        sidebarOpen ? "translate-x-0 shadow-[0_0_50px_rgba(0,0,0,0.8)]" : "-translate-x-full md:translate-x-0"
+        sidebarOpen ? "translate-x-0 shadow-[0_0_50px_rgba(0,0,0,0.8)]" : "-translate-x-full md:translate-x-0",
       )}>
-        {/* Top Branding Area */}
         <div className="px-6 py-8 hidden md:flex flex-col relative items-center">
-          <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-primary/10 to-transparent opacity-50"></div>
+          <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-primary/10 to-transparent opacity-50" />
           <img src="/luminova-logo.png" alt="Luminova Construction" className="h-16 w-auto object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)] z-10" />
         </div>
 
-        {/* Navigation Links */}
         <nav className="flex-1 px-4 py-6 md:py-2 space-y-3 overflow-y-auto">
           <div className="text-[10px] font-mono uppercase tracking-widest text-sidebar-foreground/40 mb-4 px-2">Operations Center</div>
           {NAV_ITEMS.map((item) => {
             const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href))
+            const isForcedHover = hoveredHref === item.href && !isActive
             return (
-              <Link 
-                key={item.href} 
+              <Link
+                key={item.href}
                 href={item.href}
                 className={cn(
                   "group relative flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-all duration-300 overflow-hidden shadow-sm",
-                  isActive 
-                    ? "text-primary-foreground bg-primary shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),0_4px_15px_-3px_hsl(var(--primary)/0.5)] transform scale-[1.02]" 
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_2px_10px_rgba(0,0,0,0.2)]"
+                  isActive
+                    ? "text-primary-foreground bg-primary shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),0_4px_15px_-3px_hsl(var(--primary)/0.5)] transform scale-[1.02]"
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_2px_10px_rgba(0,0,0,0.2)]",
+                  isForcedHover && "bg-sidebar-accent text-sidebar-foreground shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_2px_10px_rgba(0,0,0,0.2)]",
                 )}
                 onClick={() => setSidebarOpen(false)}
               >
-                <item.icon size={20} className={cn("transition-transform duration-300 drop-shadow-md", isActive ? "scale-110" : "group-hover:scale-110 group-hover:text-primary")} />
+                <item.icon size={20} className={cn("transition-transform duration-300 drop-shadow-md", isActive ? "scale-110" : "group-hover:scale-110 group-hover:text-primary", isForcedHover && "scale-110 text-primary")} />
                 <span className="relative z-10 tracking-wide drop-shadow-sm">{item.label}</span>
               </Link>
             )
           })}
         </nav>
 
-        {/* User / Status Bottom Area */}
         <div className="p-4 mt-auto">
           <div className="surface-3d bg-black/40 backdrop-blur-md p-2 rounded-2xl">
             <button
@@ -109,7 +127,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             {profileOpen && (
               <button
                 type="button"
-                onClick={() => void signOut({ redirectUrl: import.meta.env.BASE_URL })}
+                onClick={onSignOut}
                 className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-destructive/10 border border-destructive/20 px-3 py-3 text-xs font-bold uppercase tracking-wider text-destructive transition-all hover:bg-destructive hover:text-destructive-foreground hover:shadow-[0_4px_10px_rgba(255,0,0,0.3)]"
               >
                 <LogOut className="h-4 w-4" />
@@ -120,14 +138,29 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-w-0 relative md:overflow-hidden">
-        {/* Subtle overlay gradient to give depth */}
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-background/20 via-transparent to-background/80 z-0"></div>
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-background/20 via-transparent to-background/80 z-0" />
         <div className="relative z-10 flex-1 flex flex-col min-h-0 md:h-full md:overflow-hidden">
           {children}
         </div>
       </main>
     </div>
+  )
+}
+
+export function AppLayout({ children }: { children: React.ReactNode }) {
+  const [location] = useLocation()
+  const { signOut } = useClerk()
+  const { user } = useUser()
+
+  return (
+    <AppLayoutView
+      location={location}
+      displayName={user?.fullName || user?.firstName || "Project Manager"}
+      email={user?.primaryEmailAddress?.emailAddress || "Signed in"}
+      onSignOut={() => void signOut({ redirectUrl: import.meta.env.BASE_URL })}
+    >
+      {children}
+    </AppLayoutView>
   )
 }
