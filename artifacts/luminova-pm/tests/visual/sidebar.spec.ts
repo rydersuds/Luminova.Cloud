@@ -198,34 +198,70 @@ test.describe('navigation contrast', () => {
 });
 
 test.describe('navigation selection motion', () => {
-  test('positions immediately on load, then animates desktop route changes', async ({ page }) => {
+  const expectIndicatorAligned = async (
+    indicator: import('@playwright/test').Locator,
+    link: import('@playwright/test').Locator,
+  ) => {
+    await expect.poll(async () => {
+      const [indicatorBox, linkBox] = await Promise.all([
+        indicator.boundingBox(),
+        link.boundingBox(),
+      ]);
+      if (!indicatorBox || !linkBox) return Number.POSITIVE_INFINITY;
+      const indicatorCenter = indicatorBox.y + indicatorBox.height / 2;
+      const linkCenter = linkBox.y + linkBox.height / 2;
+      return Math.abs(indicatorCenter - linkCenter);
+    }).toBeLessThan(1);
+  };
+
+  const expectStagedLanding = async (
+    indicator: import('@playwright/test').Locator,
+    link: import('@playwright/test').Locator,
+    direction: 'up' | 'down',
+  ) => {
+    await expect(indicator).toHaveAttribute('data-motion-phase', 'travel');
+    await expect(indicator).toHaveAttribute('data-motion-direction', direction);
+    await expect(indicator).toHaveAttribute('data-last-motion', 'staged');
+    await expect(indicator).toHaveAttribute('data-motion-phase', 'idle');
+    await expectIndicatorAligned(indicator, link);
+  };
+
+  test('stages downward and upward desktop route changes after immediate initial positioning', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.setViewportSize({ width: 1440, height: 900 });
     await stabilize(page);
 
     const indicator = page.getByTestId('sidebar-selection-indicator');
     await expect(indicator).toHaveAttribute('data-animate', 'false');
-    await expect(indicator).toHaveCSS('transition-duration', '0s');
-    const initialTransform = await indicator.evaluate((element) => getComputedStyle(element).transform);
+    await expect(indicator).toHaveAttribute('data-motion-phase', 'idle');
+    await expectIndicatorAligned(indicator, page.getByRole('link', { name: 'All Projects' }));
 
-    await page.getByRole('link', { name: 'Communications' }).click();
-    await expect(page.getByRole('link', { name: 'Communications' })).toHaveAttribute('aria-current', 'page');
-    await expect(indicator).toHaveAttribute('data-animate', 'true');
-    await expect(indicator).toHaveCSS('transition-duration', '0.5s');
-    await expect.poll(() => indicator.evaluate((element) => getComputedStyle(element).transform))
-      .not.toBe(initialTransform);
+    const communications = page.getByRole('link', { name: 'Communications' });
+    await communications.click();
+    await expect(communications).toHaveAttribute('aria-current', 'page');
+    await expectStagedLanding(indicator, communications, 'down');
+
+    const projects = page.getByRole('link', { name: 'All Projects' });
+    await projects.click();
+    await expect(projects).toHaveAttribute('aria-current', 'page');
+    await expectStagedLanding(indicator, projects, 'up');
   });
 
-  test('uses the same emphasized motion in the open mobile drawer', async ({ page }) => {
+  test('uses the same staged motion in both directions in the open mobile drawer', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/__visual/sidebar?drawer=open');
     await expect(page.getByRole('dialog', { name: 'Main navigation' })).toBeVisible();
 
     const indicator = page.getByTestId('sidebar-selection-indicator');
     await expect(indicator).toHaveAttribute('data-animate', 'false');
-    await page.getByRole('link', { name: 'Vendor Quotes' }).click();
-    await expect(page.getByRole('link', { name: 'Vendor Quotes' })).toHaveAttribute('aria-current', 'page');
-    await expect(indicator).toHaveAttribute('data-animate', 'true');
-    await expect(indicator).toHaveCSS('transition-duration', '0.5s');
+    const quotes = page.getByRole('link', { name: 'Vendor Quotes' });
+    await quotes.click();
+    await expectStagedLanding(indicator, quotes, 'down');
+
+    const projects = page.getByRole('link', { name: 'All Projects' });
+    await projects.click();
+    await expectStagedLanding(indicator, projects, 'up');
     await expect(page.getByRole('dialog', { name: 'Main navigation' })).toBeVisible();
   });
 
@@ -235,9 +271,11 @@ test.describe('navigation selection motion', () => {
     await stabilize(page);
 
     const indicator = page.getByTestId('sidebar-selection-indicator');
-    await page.getByRole('link', { name: 'Financials' }).click();
-    await expect(page.getByRole('link', { name: 'Financials' })).toHaveAttribute('aria-current', 'page');
-    await expect(indicator).toHaveAttribute('data-animate', 'true');
-    await expect(indicator).toHaveCSS('transition-duration', '0s');
+    const financials = page.getByRole('link', { name: 'Financials' });
+    await financials.click();
+    await expect(financials).toHaveAttribute('aria-current', 'page');
+    await expect(indicator).toHaveAttribute('data-animate', 'false');
+    await expect(indicator).toHaveAttribute('data-motion-phase', 'idle');
+    await expectIndicatorAligned(indicator, financials);
   });
 });

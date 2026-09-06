@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils"
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useClerk, useUser } from "@clerk/react"
 
+type IndicatorPhase = "idle" | "travel" | "settle"
+
 const NAV_ITEMS = [
   { href: "/", label: "Command Center", icon: Building2 },
   { href: "/projects", label: "All Projects", icon: FolderKanban },
@@ -56,9 +58,22 @@ export function AppLayoutView({
   const sidebarRef = useRef<HTMLElement>(null)
   const navRef = useRef<HTMLElement>(null)
   const activeLinkRef = useRef<HTMLAnchorElement>(null)
+  const indicatorRef = useRef<HTMLDivElement>(null)
+  const indicatorAnimationRef = useRef<Animation | null>(null)
+  const indicatorPhaseRef = useRef<IndicatorPhase>("idle")
+  const finishTimerRef = useRef<number | null>(null)
   const hasPositionedIndicator = useRef(false)
   const previousIndicatorLocation = useRef(location)
-  const [indicator, setIndicator] = useState({ top: 0, height: 0, ready: false, animate: false })
+  const indicatorTopRef = useRef(0)
+  const [indicator, setIndicator] = useState({
+    top: 0,
+    height: 0,
+    ready: false,
+    phase: "idle" as IndicatorPhase,
+    lastMotion: "none" as "none" | "staged",
+    direction: "none" as "none" | "up" | "down",
+  })
+  const [visuallyActiveLocation, setVisuallyActiveLocation] = useState(location)
   const initials = displayName.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()
 
   const closeSidebar = useCallback(() => {
@@ -120,29 +135,108 @@ export function AppLayoutView({
     if (!nav || !activeLink) return
     const shouldAnimate = hasPositionedIndicator.current && previousIndicatorLocation.current !== location
 
-    const positionIndicator = () => {
+    const measureIndicator = () => {
       const navRect = nav.getBoundingClientRect()
       const linkRect = activeLink.getBoundingClientRect()
       const navPaddingTop = Number.parseFloat(window.getComputedStyle(nav).paddingTop)
-      setIndicator({
+      return {
         top: linkRect.top - navRect.top + nav.scrollTop - navPaddingTop,
         height: linkRect.height,
-        ready: true,
-        animate: shouldAnimate,
-      })
-      hasPositionedIndicator.current = true
-      previousIndicatorLocation.current = location
+      }
     }
 
-    positionIndicator()
-    const observer = new ResizeObserver(positionIndicator)
+    const clearMotion = () => {
+      indicatorAnimationRef.current?.cancel()
+      indicatorAnimationRef.current = null
+      if (finishTimerRef.current !== null) {
+        window.clearTimeout(finishTimerRef.current)
+        finishTimerRef.current = null
+      }
+    }
+
+    const target = measureIndicator()
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    clearMotion()
+
+    if (shouldAnimate && !prefersReducedMotion && indicatorRef.current) {
+      const startTop = indicatorTopRef.current
+      indicatorTopRef.current = target.top
+      indicatorPhaseRef.current = "travel"
+      setIndicator({
+        ...target,
+        ready: true,
+        phase: "travel",
+        lastMotion: "none",
+        direction: target.top > startTop ? "down" : "up",
+      })
+
+      const indicatorElement = indicatorRef.current
+      const travelAnimation = indicatorElement.animate(
+        [
+          { transform: `translateY(${startTop}px) scale(1.025)` },
+          { transform: `translateY(${target.top - 7}px) scale(1.025)` },
+        ],
+        {
+          duration: 345,
+          easing: "cubic-bezier(0.22, 0.8, 0.24, 1)",
+          fill: "both",
+        },
+      )
+      indicatorAnimationRef.current = travelAnimation
+      travelAnimation.finished.then(() => {
+        if (indicatorAnimationRef.current !== travelAnimation) return
+        indicatorPhaseRef.current = "settle"
+        setIndicator((current) => ({ ...current, phase: "settle" }))
+        setVisuallyActiveLocation(location)
+
+        const settleAnimation = indicatorElement.animate(
+          [
+            { transform: `translateY(${target.top - 7}px) scale(1.025)` },
+            { transform: `translateY(${target.top}px) scale(1.025)` },
+          ],
+          {
+            duration: 135,
+            easing: "cubic-bezier(0.2, 0.9, 0.3, 1)",
+            fill: "both",
+          },
+        )
+        indicatorAnimationRef.current = settleAnimation
+        settleAnimation.finished.then(() => {
+          if (indicatorAnimationRef.current !== settleAnimation) return
+          indicatorAnimationRef.current = null
+          finishTimerRef.current = window.setTimeout(() => {
+            indicatorPhaseRef.current = "idle"
+            finishTimerRef.current = null
+            setIndicator((current) => ({ ...current, phase: "idle", lastMotion: "staged" }))
+          }, 140)
+        }).catch(() => undefined)
+      }).catch(() => undefined)
+    } else {
+      indicatorTopRef.current = target.top
+      indicatorPhaseRef.current = "idle"
+      setIndicator({ ...target, ready: true, phase: "idle", lastMotion: "none", direction: "none" })
+      setVisuallyActiveLocation(location)
+    }
+
+    const positionAfterLayoutChange = () => {
+      if (indicatorPhaseRef.current !== "idle") return
+      const measured = measureIndicator()
+      indicatorTopRef.current = measured.top
+      setIndicator((current) => ({ ...current, ...measured, ready: true, phase: "idle" }))
+      hasPositionedIndicator.current = true
+    }
+
+    hasPositionedIndicator.current = true
+    previousIndicatorLocation.current = location
+    const observer = new ResizeObserver(positionAfterLayoutChange)
     observer.observe(nav)
     observer.observe(activeLink)
-    window.addEventListener("resize", positionIndicator)
+    window.addEventListener("resize", positionAfterLayoutChange)
 
     return () => {
+      clearMotion()
       observer.disconnect()
-      window.removeEventListener("resize", positionIndicator)
+      window.removeEventListener("resize", positionAfterLayoutChange)
     }
   }, [location, sidebarOpen])
 
@@ -194,12 +288,15 @@ export function AppLayoutView({
 
         <nav ref={navRef} className="relative flex-1 px-4 py-6 md:py-2 space-y-3 overflow-y-auto">
           <div
+            ref={indicatorRef}
             data-testid="sidebar-selection-indicator"
-            data-animate={indicator.animate ? "true" : "false"}
+            data-animate={indicator.phase === "idle" ? "false" : "true"}
+            data-motion-phase={indicator.phase}
+            data-motion-direction={indicator.direction}
+            data-last-motion={indicator.lastMotion}
             aria-hidden="true"
             className={cn(
               "pointer-events-none absolute left-4 right-4 z-0 rounded-xl bg-primary shadow-[inset_0_1px_2px_rgba(255,255,255,0.38),0_5px_18px_-3px_hsl(var(--primary)/0.72)] will-change-transform",
-              indicator.animate && "transition-[transform,height,box-shadow] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
               !indicator.ready && "opacity-0",
             )}
             style={{ height: indicator.height, transform: `translateY(${indicator.top}px) scale(1.025)` }}
@@ -207,6 +304,7 @@ export function AppLayoutView({
           <div data-contrast-label="navigation section label" className="relative z-10 text-[10px] font-mono uppercase tracking-widest text-sidebar-foreground/60 mb-4 px-2">Operations Center</div>
           {NAV_ITEMS.map((item) => {
             const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href))
+            const isVisuallyActive = visuallyActiveLocation === item.href || (item.href !== "/" && visuallyActiveLocation.startsWith(item.href))
             const isForcedHover = hoveredHref === item.href && !isActive
             return (
               <Link
@@ -217,7 +315,7 @@ export function AppLayoutView({
                 data-contrast-label={`navigation link "${item.label}"`}
                 className={cn(
                   "group relative z-10 flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-[color,background-color,box-shadow,transform] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden shadow-sm motion-reduce:transition-none",
-                  isActive
+                  isVisuallyActive
                     ? "text-primary-foreground transform scale-[1.025]"
                     : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_2px_10px_rgba(0,0,0,0.2)]",
                   isForcedHover && "bg-sidebar-accent text-sidebar-foreground shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_2px_10px_rgba(0,0,0,0.2)]",
@@ -235,14 +333,14 @@ export function AppLayoutView({
                   size={20}
                   className={cn(
                     "relative z-10 transition-[transform,color,filter] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] drop-shadow-md motion-reduce:transition-none",
-                    isActive ? "scale-[1.18] -rotate-3 drop-shadow-[0_2px_5px_rgba(0,0,0,0.35)]" : "group-hover:scale-110 group-hover:text-primary",
+                    isVisuallyActive ? "scale-[1.18] -rotate-3 drop-shadow-[0_2px_5px_rgba(0,0,0,0.35)]" : "group-hover:scale-110 group-hover:text-primary",
                     isForcedHover && "scale-110 text-primary",
                   )}
                 />
                 <span
                   className={cn(
                     "relative z-10 tracking-wide drop-shadow-sm transition-[transform,letter-spacing] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
-                    isActive && "translate-x-1 tracking-[0.035em]",
+                    isVisuallyActive && "translate-x-1 tracking-[0.035em]",
                   )}
                 >
                   {item.label}
