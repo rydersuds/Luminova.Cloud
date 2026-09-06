@@ -6,15 +6,11 @@ import {
   FileText, 
   MessageSquare, 
   LogOut, 
-  Settings,
   Menu,
-  X,
-  Activity,
-  ShieldAlert
+  X
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
-import { useHealthCheck } from "@workspace/api-client-react"
 
 const NAV_ITEMS = [
   { href: "/", label: "Command Center", icon: Building2 },
@@ -27,7 +23,6 @@ const NAV_ITEMS = [
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { data: health } = useHealthCheck()
   return (
     <div className="min-h-[100dvh] flex flex-col md:flex-row bg-background bg-tech-grid text-foreground selection:bg-primary selection:text-primary-foreground">
       {/* Mobile header */}
@@ -98,33 +93,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <button className="flex items-center justify-center gap-2 px-3 py-2 border border-sidebar-border/50 text-xs font-mono uppercase text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-primary transition-colors">
-              <Settings size={14} />
-              Sys Config
-            </button>
-            <Link href="/login" className="flex items-center justify-center gap-2 px-3 py-2 border border-sidebar-border/50 text-xs font-mono uppercase text-destructive/80 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors">
+          <div className="mt-3">
+            <Link href="/login" className="flex w-full items-center justify-center gap-2 px-3 py-2 border border-sidebar-border/50 text-xs font-mono uppercase text-destructive/80 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors">
               <LogOut size={14} />
               Disconnect
             </Link>
-          </div>
-
-          <div className="mt-5 flex items-center justify-between text-[10px] font-mono uppercase border border-sidebar-border/30 p-2 bg-black/40">
-            <span className="text-sidebar-foreground/40 flex items-center gap-1.5">
-              <Activity className="h-3 w-3" />
-              Uplink
-            </span>
-            {health?.status === "ok" ? (
-              <span className="text-success flex items-center gap-1 animate-pulse">
-                <span className="w-1.5 h-1.5 rounded-full bg-success"></span>
-                Secure
-              </span>
-            ) : (
-              <span className="text-warning flex items-center gap-1">
-                <ShieldAlert className="h-3 w-3" />
-                Degraded
-              </span>
-            )}
           </div>
         </div>
       </aside>
