@@ -5,7 +5,6 @@ import {
   Users, 
   FileText, 
   MessageSquare, 
-  LogOut, 
   Menu,
   X
 } from "lucide-react"
@@ -93,12 +92,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           
-          <div className="mt-3">
-            <Link href="/login" className="flex w-full items-center justify-center gap-2 px-3 py-2 border border-sidebar-border/50 text-xs font-mono uppercase text-destructive/80 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors">
-              <LogOut size={14} />
-              Disconnect
-            </Link>
-          </div>
         </div>
       </aside>
 
