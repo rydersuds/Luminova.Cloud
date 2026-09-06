@@ -21,11 +21,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { 
   Building, MapPin, Calendar, DollarSign, ArrowLeft, 
   Camera, Briefcase, FileText, CheckCircle2, ChevronRight, Activity, Clock,
-  Maximize2, MoveHorizontal, ChevronLeft
+  Maximize2, ChevronLeft
 } from "lucide-react"
 import { cn, formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "@/hooks/use-toast"
+import { PanoramaViewer } from "@/components/panorama-viewer"
 
 const PANORAMA_TYPES = ["image/jpeg", "image/png", "image/webp"]
 const MAX_PANORAMA_BYTES = 8 * 1024 * 1024
@@ -551,7 +552,12 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
 
               <Dialog open={activePanorama !== null} onOpenChange={(open) => !open && setActivePanorama(null)}>
                 <DialogContent className="h-[92dvh] w-[96vw] !max-w-7xl overflow-hidden border-white/15 bg-black p-0 text-white">
-                  {activePanorama && <PanoramaViewer panorama={activePanorama} />}
+                  {activePanorama && (
+                    <>
+                      <DialogTitle className="sr-only">{activePanorama.label} 360 degree panorama</DialogTitle>
+                      <PanoramaViewer panorama={activePanorama} formatDate={formatDate} />
+                    </>
+                  )}
                 </DialogContent>
               </Dialog>
             </TabsContent>
@@ -702,76 +708,5 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
         </div>
       </div>
     </AppLayout>
-  )
-}
-
-function PanoramaViewer({ panorama }: { panorama: { url: string; label: string; location: string; date: string } }) {
-  const [position, setPosition] = React.useState(50)
-  const drag = React.useRef<{ x: number; position: number } | null>(null)
-
-  const beginDrag = (event: React.PointerEvent<HTMLDivElement>) => {
-    event.currentTarget.setPointerCapture(event.pointerId)
-    drag.current = { x: event.clientX, position }
-  }
-
-  const moveDrag = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!drag.current) return
-    const movement = event.clientX - drag.current.x
-    setPosition(((drag.current.position - movement * 0.12) % 100 + 100) % 100)
-  }
-
-  const endDrag = () => {
-    drag.current = null
-  }
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "ArrowLeft") {
-      event.preventDefault()
-      setPosition((value) => ((value - 4) % 100 + 100) % 100)
-    }
-    if (event.key === "ArrowRight") {
-      event.preventDefault()
-      setPosition((value) => (value + 4) % 100)
-    }
-  }
-
-  return (
-    <div className="flex h-full flex-col bg-black">
-      <div
-        role="application"
-        tabIndex={0}
-        aria-label={`360 degree viewer for ${panorama.label}. Drag or use left and right arrow keys to look around.`}
-        className="relative flex-1 min-h-0 cursor-grab touch-none select-none overflow-hidden outline-none active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
-        onPointerDown={beginDrag}
-        onPointerMove={moveDrag}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-        onKeyDown={handleKeyDown}
-        style={{
-          backgroundImage: `url("${panorama.url}")`,
-          backgroundPosition: `${position}% center`,
-          backgroundRepeat: "repeat-x",
-          backgroundSize: "auto 115%",
-        }}
-      >
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/20 via-transparent to-black/20" />
-        <div className="pointer-events-none absolute left-1/2 top-5 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/15 bg-black/55 px-4 py-2 text-xs font-medium text-white backdrop-blur-sm">
-          <MoveHorizontal className="h-4 w-4" />
-          Drag to look around
-        </div>
-        <div className="pointer-events-none absolute bottom-5 left-1/2 h-1 w-40 -translate-x-1/2 overflow-hidden rounded-full bg-white/20">
-          <div className="h-full w-6 rounded-full bg-primary" style={{ transform: `translateX(${position * 1.36}px)` }} />
-        </div>
-      </div>
-      <div className="border-t border-white/15 px-5 py-4 sm:px-8">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="font-medium">{panorama.label}</p>
-            <p className="mt-1 text-xs text-white/55">{panorama.location}</p>
-          </div>
-          <p className="text-xs text-white/55">{formatDate(panorama.date)}</p>
-        </div>
-      </div>
-    </div>
   )
 }

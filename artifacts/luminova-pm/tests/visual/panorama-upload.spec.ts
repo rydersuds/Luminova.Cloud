@@ -22,7 +22,7 @@ const project = {
   photos: [],
   panoramas: [{
     id: 'pano-1',
-    url: 'data:image/png;base64,iVBORw0KGgo=',
+    url: '/panorama-test-fixture.svg',
     label: 'Week 24',
     location: 'Main floor',
     date: '2026-09-03',
@@ -122,4 +122,91 @@ test('uploads, refreshes the gallery, and opens the new panorama', async ({ page
   await expect(newCard).toBeVisible();
   await newCard.click();
   await expect(page.getByRole('dialog')).toContainText('Week 25');
+});
+
+test('explores the full spherical panorama with drag and keyboard controls', async ({ page }) => {
+  await openGallery(page);
+  await page.getByRole('button', { name: /Week 24/ }).click();
+
+  const viewer = page.getByRole('application', { name: /360 degree viewer for Week 24/ });
+  await expect(viewer).toHaveAttribute('data-render-status', 'ready');
+  await expect(viewer).toContainText('Drag or use arrow keys to look around');
+  await expect(viewer).toHaveAttribute('data-view-yaw', '0.0');
+  await expect(viewer).toHaveAttribute('data-view-pitch', '0.0');
+  await expect(page.getByRole('dialog', { name: 'Week 24 360 degree panorama' })).toBeVisible();
+
+  const initialCanvas = await viewer.locator('canvas').screenshot();
+  const box = await viewer.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + box!.width * 0.7, box!.y + box!.height * 0.5);
+  await page.mouse.down();
+  await page.mouse.move(box!.x + box!.width * 0.2, box!.y + box!.height * 0.75, { steps: 5 });
+  await page.mouse.up();
+  await expect(viewer).not.toHaveAttribute('data-view-yaw', '0.0');
+  await expect(viewer).not.toHaveAttribute('data-view-pitch', '0.0');
+  const draggedCanvas = await viewer.locator('canvas').screenshot();
+  expect(draggedCanvas.equals(initialCanvas)).toBe(false);
+
+  const yawBeforeTouch = await viewer.getAttribute('data-view-yaw');
+  await viewer.dispatchEvent('pointerdown', { pointerId: 7, pointerType: 'touch', clientX: 700, clientY: 300 });
+  await viewer.dispatchEvent('pointermove', { pointerId: 7, pointerType: 'touch', clientX: 520, clientY: 220 });
+  await viewer.dispatchEvent('pointerup', { pointerId: 7, pointerType: 'touch', clientX: 520, clientY: 220 });
+  await expect(viewer).not.toHaveAttribute('data-view-yaw', yawBeforeTouch!);
+
+  await viewer.focus();
+  await viewer.press('ArrowRight');
+  await viewer.press('ArrowUp');
+  await expect(viewer).toBeFocused();
+  await expect(viewer).toHaveAttribute('aria-label', /use the arrow keys/);
+
+  for (let index = 0; index < 40; index += 1) await viewer.press('ArrowRight');
+  const wrappedYaw = Number(await viewer.getAttribute('data-view-yaw'));
+  expect(wrappedYaw).toBeGreaterThanOrEqual(0);
+  expect(wrappedYaw).toBeLessThan(360);
+
+  const dialogBox = await page.getByRole('dialog').boundingBox();
+  expect(dialogBox!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  expect(dialogBox!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+
+  await page.keyboard.press('Escape');
+  await expect(viewer).not.toBeVisible();
+  await page.getByRole('button', { name: /Week 24/ }).click();
+  const reopenedViewer = page.getByRole('application', { name: /360 degree viewer for Week 24/ });
+  await expect(reopenedViewer).toHaveAttribute('data-render-status', 'ready');
+  await expect(reopenedViewer).toHaveAttribute('data-view-yaw', '0.0');
+  await expect(reopenedViewer).toHaveAttribute('data-view-pitch', '0.0');
+});
+
+test.describe('mobile panorama controls', () => {
+  test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
+
+  test('supports touch dragging in the responsive dialog', async ({ page }) => {
+    await openGallery(page);
+    await page.getByRole('button', { name: /Week 24/ }).click();
+
+    const viewer = page.getByRole('application', { name: /360 degree viewer for Week 24/ });
+    await expect(viewer).toHaveAttribute('data-render-status', 'ready');
+    const box = await viewer.boundingBox();
+    expect(box).not.toBeNull();
+
+    const client = await page.context().newCDPSession(page);
+    const startX = box!.x + box!.width * 0.75;
+    const startY = box!.y + box!.height * 0.65;
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: startX, y: startY }],
+    });
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{ x: box!.x + box!.width * 0.25, y: box!.y + box!.height * 0.3 }],
+    });
+    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+
+    await expect(viewer).not.toHaveAttribute('data-view-yaw', '0.0');
+    await expect(viewer).not.toHaveAttribute('data-view-pitch', '0.0');
+
+    const dialogBox = await page.getByRole('dialog').boundingBox();
+    expect(dialogBox!.width).toBeLessThanOrEqual(390);
+    expect(dialogBox!.height).toBeLessThanOrEqual(844);
+  });
 });
