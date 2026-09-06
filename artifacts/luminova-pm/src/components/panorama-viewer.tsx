@@ -1,5 +1,5 @@
 import * as React from "react"
-import { LoaderCircle, Minus, Move, Plus } from "lucide-react"
+import { LoaderCircle, Minus, Move, Plus, RotateCcw } from "lucide-react"
 
 type Panorama = {
   url: string
@@ -102,7 +102,9 @@ export function PanoramaViewer({
   const pointersRef = React.useRef(new Map<number, { x: number; y: number }>())
   const pinchRef = React.useRef<{ distance: number; fieldOfView: number } | null>(null)
   const [view, setView] = React.useState<View>({ yaw: 0, pitch: 0, fieldOfView: INITIAL_FIELD_OF_VIEW })
-  const [status, setStatus] = React.useState<"loading" | "ready" | "error">("loading")
+  const [status, setStatus] = React.useState<"loading" | "ready" | "restoring" | "error" | "restore-error">("loading")
+  const [renderAttempt, setRenderAttempt] = React.useState(0)
+  const lastPanoramaUrlRef = React.useRef<string | null>(null)
 
   const updateView = React.useCallback((next: View) => {
     const normalized = {
@@ -119,7 +121,10 @@ export function PanoramaViewer({
     const canvas = canvasRef.current
     if (!canvas) return
     setStatus("loading")
-    updateView({ yaw: 0, pitch: 0, fieldOfView: INITIAL_FIELD_OF_VIEW })
+    if (lastPanoramaUrlRef.current !== panorama.url) {
+      lastPanoramaUrlRef.current = panorama.url
+      updateView({ yaw: 0, pitch: 0, fieldOfView: INITIAL_FIELD_OF_VIEW })
+    }
 
     const gl = canvas.getContext("webgl", {
       alpha: false,
@@ -135,72 +140,91 @@ export function PanoramaViewer({
     let texture: WebGLTexture | null = null
     let buffer: WebGLBuffer | null = null
     let disposed = false
+    const image = new Image()
+    image.crossOrigin = "anonymous"
 
-    try {
-      program = createProgram(gl)
-      buffer = gl.createBuffer()
-      texture = gl.createTexture()
-      if (!buffer || !texture) throw new Error("Unable to allocate panorama rendering resources.")
-
-      gl.useProgram(program)
-      gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW)
-      const position = gl.getAttribLocation(program, "position")
-      gl.enableVertexAttribArray(position)
-      gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0)
-      gl.bindTexture(gl.TEXTURE_2D, texture)
-      // The shader wraps longitude with fract(), allowing non-power-of-two uploads in WebGL 1.
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-    } catch {
+    const releaseResources = () => {
+      renderRef.current = null
       if (texture) gl.deleteTexture(texture)
       if (buffer) gl.deleteBuffer(buffer)
       if (program) gl.deleteProgram(program)
-      setStatus("error")
-      return
+      texture = null
+      buffer = null
+      program = null
     }
 
-    const yawLocation = gl.getUniformLocation(program, "yaw")
-    const pitchLocation = gl.getUniformLocation(program, "pitch")
-    const viewportLocation = gl.getUniformLocation(program, "viewport")
-    const fieldOfViewLocation = gl.getUniformLocation(program, "fieldOfView")
-
-    const render = (currentView: View) => {
-      const width = Math.max(1, Math.round(canvas.clientWidth * Math.min(window.devicePixelRatio || 1, 2)))
-      const height = Math.max(1, Math.round(canvas.clientHeight * Math.min(window.devicePixelRatio || 1, 2)))
-      if (canvas.width !== width || canvas.height !== height) {
-        canvas.width = width
-        canvas.height = height
-      }
-      gl.viewport(0, 0, width, height)
-      gl.uniform2f(viewportLocation, width, height)
-      gl.uniform1f(yawLocation, currentView.yaw * Math.PI / 180)
-      gl.uniform1f(pitchLocation, currentView.pitch * Math.PI / 180)
-      gl.uniform1f(fieldOfViewLocation, currentView.fieldOfView)
-      gl.drawArrays(gl.TRIANGLES, 0, 6)
-    }
-    renderRef.current = render
-
-    const image = new Image()
-    image.crossOrigin = "anonymous"
-    image.onload = () => {
-      if (disposed) return
+    const initializeRenderer = (restoring: boolean) => {
       try {
+        releaseResources()
+        program = createProgram(gl)
+        buffer = gl.createBuffer()
+        texture = gl.createTexture()
+        if (!buffer || !texture) throw new Error("Unable to allocate panorama rendering resources.")
+
+        gl.useProgram(program)
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW)
+        const position = gl.getAttribLocation(program, "position")
+        gl.enableVertexAttribArray(position)
+        gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0)
         gl.bindTexture(gl.TEXTURE_2D, texture)
+        // The shader wraps longitude with fract(), allowing non-power-of-two uploads in WebGL 1.
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1)
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image)
+
+        const yawLocation = gl.getUniformLocation(program, "yaw")
+        const pitchLocation = gl.getUniformLocation(program, "pitch")
+        const viewportLocation = gl.getUniformLocation(program, "viewport")
+        const fieldOfViewLocation = gl.getUniformLocation(program, "fieldOfView")
+        const render = (currentView: View) => {
+          if (gl.isContextLost()) return
+          const width = Math.max(1, Math.round(canvas.clientWidth * Math.min(window.devicePixelRatio || 1, 2)))
+          const height = Math.max(1, Math.round(canvas.clientHeight * Math.min(window.devicePixelRatio || 1, 2)))
+          if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width
+            canvas.height = height
+          }
+          gl.viewport(0, 0, width, height)
+          gl.uniform2f(viewportLocation, width, height)
+          gl.uniform1f(yawLocation, currentView.yaw * Math.PI / 180)
+          gl.uniform1f(pitchLocation, currentView.pitch * Math.PI / 180)
+          gl.uniform1f(fieldOfViewLocation, currentView.fieldOfView)
+          gl.drawArrays(gl.TRIANGLES, 0, 6)
+        }
+        renderRef.current = render
         render(viewRef.current)
         setStatus("ready")
       } catch {
-        setStatus("error")
+        releaseResources()
+        setStatus(restoring ? "restore-error" : "error")
       }
+    }
+
+    image.onload = () => {
+      if (!disposed) initializeRenderer(false)
     }
     image.onerror = () => !disposed && setStatus("error")
     image.src = panorama.url
 
-    const resizeObserver = new ResizeObserver(() => status !== "error" && render(viewRef.current))
+    const handleContextLost = (event: WebGLContextEvent) => {
+      event.preventDefault()
+      dragRef.current = null
+      pointersRef.current.clear()
+      pinchRef.current = null
+      renderRef.current = null
+      setStatus("restoring")
+    }
+    const handleContextRestored = () => {
+      if (!disposed && image.complete && image.naturalWidth > 0) initializeRenderer(true)
+    }
+    canvas.addEventListener("webglcontextlost", handleContextLost)
+    canvas.addEventListener("webglcontextrestored", handleContextRestored)
+
+    const resizeObserver = new ResizeObserver(() => renderRef.current?.(viewRef.current))
     resizeObserver.observe(canvas)
 
     return () => {
@@ -208,12 +232,11 @@ export function PanoramaViewer({
       image.onload = null
       image.onerror = null
       resizeObserver.disconnect()
-      renderRef.current = null
-      if (texture) gl.deleteTexture(texture)
-      if (buffer) gl.deleteBuffer(buffer)
-      if (program) gl.deleteProgram(program)
+      canvas.removeEventListener("webglcontextlost", handleContextLost)
+      canvas.removeEventListener("webglcontextrestored", handleContextRestored)
+      releaseResources()
     }
-  }, [panorama.url, updateView])
+  }, [panorama.url, renderAttempt, updateView])
 
   const beginDrag = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.currentTarget.hasPointerCapture(event.pointerId) === false) {
@@ -305,15 +328,32 @@ export function PanoramaViewer({
         data-render-status={status}
       >
         <canvas ref={canvasRef} className="block h-full w-full" aria-hidden="true" />
-        {status === "loading" && (
+        {(status === "loading" || status === "restoring") && (
           <div className="absolute inset-0 flex items-center justify-center bg-black text-sm text-white/80" role="status">
             <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
-            Loading panorama…
+            {status === "restoring" ? "Restoring panorama…" : "Loading panorama…"}
           </div>
         )}
         {status === "error" && (
           <div className="absolute inset-0 flex items-center justify-center bg-black px-6 text-center text-sm text-white/80" role="alert">
             This panorama could not be rendered. Try closing it and opening it again.
+          </div>
+        )}
+        {status === "restore-error" && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black px-6 text-center text-sm text-white/80" role="alert">
+            <p>The panorama renderer could not recover after the device graphics restarted.</p>
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 font-medium text-black transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation()
+                setRenderAttempt(attempt => attempt + 1)
+              }}
+            >
+              <RotateCcw className="h-4 w-4" />
+              Retry panorama
+            </button>
           </div>
         )}
         <div className="pointer-events-none absolute left-1/2 top-5 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/15 bg-black/55 px-4 py-2 text-xs font-medium text-white backdrop-blur-sm">

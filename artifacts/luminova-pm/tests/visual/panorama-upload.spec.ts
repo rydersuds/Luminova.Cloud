@@ -42,7 +42,7 @@ async function openGallery(page: Page) {
 }
 
 test.beforeEach(async ({ page }) => {
-  const current = structuredClone(project);
+  let current = structuredClone(project);
   await page.route('**/api/projects/riverstone/activity', route => route.fulfill({ json: [] }));
   await page.route('**/api/projects/riverstone', async route => {
     if (route.request().method() === 'GET') {
@@ -124,7 +124,7 @@ test('uploads, refreshes the gallery, and opens the new panorama', async ({ page
   await expect(page.getByRole('dialog')).toContainText('Week 25');
 });
 
-test('explores the full spherical panorama with drag and keyboard controls', async ({ page }) => {
+test('explores the full spherical panorama with drag, keyboard, and zoom controls', async ({ page }) => {
   await openGallery(page);
   await page.getByRole('button', { name: /Week 24/ }).click();
 
@@ -192,10 +192,44 @@ test('explores the full spherical panorama with drag and keyboard controls', asy
   await expect(reopenedViewer).toHaveAttribute('data-field-of-view', '1.15');
 });
 
+test('restores the panorama and complete view after WebGL context loss', async ({ page }) => {
+  await openGallery(page);
+  await page.getByRole('button', { name: /Week 24/ }).click();
+
+  const viewer = page.getByRole('application', { name: /360 degree viewer for Week 24/ });
+  await expect(viewer).toHaveAttribute('data-render-status', 'ready');
+  await viewer.focus();
+  await viewer.press('ArrowRight');
+  await viewer.press('ArrowUp');
+  await viewer.hover();
+  await page.mouse.wheel(0, -200);
+  const yaw = await viewer.getAttribute('data-view-yaw');
+  const pitch = await viewer.getAttribute('data-view-pitch');
+  const fieldOfView = await viewer.getAttribute('data-field-of-view');
+
+  const supportsContextLoss = await viewer.locator('canvas').evaluate((canvas: HTMLCanvasElement) => {
+    const gl = canvas.getContext('webgl');
+    const extension = gl?.getExtension('WEBGL_lose_context');
+    if (!extension) return false;
+    extension.loseContext();
+    window.setTimeout(() => extension.restoreContext(), 50);
+    return true;
+  });
+  expect(supportsContextLoss).toBe(true);
+
+  await expect(viewer).toHaveAttribute('data-render-status', 'restoring');
+  await expect(viewer.getByRole('status')).toHaveText('Restoring panorama…');
+  await expect(viewer).toHaveAttribute('data-render-status', 'ready');
+  await expect(viewer).toHaveAttribute('data-view-yaw', yaw!);
+  await expect(viewer).toHaveAttribute('data-view-pitch', pitch!);
+  await expect(viewer).toHaveAttribute('data-field-of-view', fieldOfView!);
+  await expect(page.getByRole('dialog', { name: 'Week 24 360 degree panorama' })).toBeVisible();
+});
+
 test.describe('mobile panorama controls', () => {
   test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
 
-  test('supports touch dragging in the responsive dialog', async ({ page }) => {
+  test('supports touch dragging and pinch zoom in the responsive dialog', async ({ page }) => {
     await openGallery(page);
     await page.getByRole('button', { name: /Week 24/ }).click();
 
