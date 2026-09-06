@@ -33,18 +33,10 @@ import {
   UpdateVendorQuoteParams,
   UpdateVendorQuoteResponse,
 } from "@workspace/api-zod";
+import { DatabasePanoramaStore } from "../lib/panoramaStore";
 
 const router: IRouter = Router();
-
-type UploadedPanorama = {
-  id: string;
-  url: string;
-  label: string;
-  location: string;
-  date: string;
-};
-
-const uploadedPanoramas = new Map<string, UploadedPanorama[]>();
+const panoramaStore = new DatabasePanoramaStore();
 
 const activities = [
   { id: "act-1", type: "invoice", title: "Invoice auto-approved", description: "Northline Electric invoice INV-2048 was within the electrical budget.", author: "System", date: "2026-09-04T16:40:00.000Z" },
@@ -227,7 +219,7 @@ let vendorQuotes = [
   },
 ];
 
-const detailsFor = (project: (typeof projects)[number]) => ({
+const detailsFor = async (project: (typeof projects)[number]) => ({
   ...project,
   startDate: "2026-03-18",
   clientQuote: {
@@ -258,7 +250,7 @@ const detailsFor = (project: (typeof projects)[number]) => ({
   panoramas: [
     { id: "pano-1", url: "https://images.pexels.com/photos/37347/office-sitting-room-executive-sitting.jpg?auto=compress&cs=tinysrgb&w=1600", label: "Week 24", location: "Main floor", date: "2026-09-03" },
     { id: "pano-2", url: "https://images.pexels.com/photos/271667/pexels-photo-271667.jpeg?auto=compress&cs=tinysrgb&w=1600", label: "Week 20", location: "Great room", date: "2026-08-06" },
-    ...(uploadedPanoramas.get(project.id) ?? []),
+    ...await panoramaStore.list(project.id),
   ],
   activity: activities,
 });
@@ -307,7 +299,7 @@ router.post("/projects", (req, res) => {
   res.status(201).json(CreateProjectResponse.parse(project));
 });
 
-router.get("/projects/:projectId", (req, res) => {
+router.get("/projects/:projectId", async (req, res): Promise<void> => {
   const parsed = GetProjectParams.safeParse(req.params);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -318,10 +310,15 @@ router.get("/projects/:projectId", (req, res) => {
     res.status(404).json({ error: "Project not found" });
     return;
   }
-  res.json(GetProjectResponse.parse(detailsFor(project)));
+  try {
+    res.json(GetProjectResponse.parse(await detailsFor(project)));
+  } catch (error) {
+    req.log.error({ err: error, projectId: project.id }, "Failed to load project panoramas");
+    res.status(500).json({ error: "Project details could not be loaded." });
+  }
 });
 
-router.post("/projects/:projectId/panoramas", (req, res) => {
+router.post("/projects/:projectId/panoramas", async (req, res): Promise<void> => {
   const params = CreateProjectPanoramaParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: "Invalid project" });
@@ -340,7 +337,7 @@ router.post("/projects/:projectId/panoramas", (req, res) => {
     return;
   }
 
-  const { imageData, label, location, date } = body.data;
+  const { objectPath, label, location, date } = body.data;
   if (!label.trim() || !location.trim()) {
     res.status(400).json({ error: "Label and location cannot be blank." });
     return;
@@ -350,27 +347,20 @@ router.post("/projects/:projectId/panoramas", (req, res) => {
     res.status(400).json({ error: "Capture date must be a valid calendar date." });
     return;
   }
-  const imageMatch = imageData.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/);
-  if (!imageMatch) {
-    res.status(400).json({ error: "Upload a JPEG, PNG, or WebP panorama image." });
-    return;
+  try {
+    const panorama = await panoramaStore.create({
+      projectId: project.id,
+      objectPath,
+      label: label.trim(),
+      location: location.trim(),
+      date,
+      ownerId: String((req as typeof req & { userId?: string }).userId),
+    });
+    res.status(201).json(CreateProjectPanoramaResponse.parse(panorama));
+  } catch (error) {
+    req.log.error({ err: error, projectId: project.id }, "Failed to persist project panorama");
+    res.status(500).json({ error: "The uploaded panorama could not be saved. Try again." });
   }
-
-  const estimatedBytes = Math.floor((imageMatch[2].length * 3) / 4);
-  if (estimatedBytes > 8 * 1024 * 1024) {
-    res.status(400).json({ error: "Panorama images must be 8 MB or smaller." });
-    return;
-  }
-
-  const panorama = CreateProjectPanoramaResponse.parse({
-    id: `pano-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    url: imageData,
-    label: label.trim(),
-    location: location.trim(),
-    date,
-  });
-  uploadedPanoramas.set(project.id, [...(uploadedPanoramas.get(project.id) ?? []), panorama]);
-  res.status(201).json(panorama);
 });
 
 router.patch("/projects/:projectId", (req, res) => {

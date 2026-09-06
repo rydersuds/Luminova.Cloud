@@ -38,8 +38,9 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const queryClient = useQueryClient()
   const [isEditOpen, setIsEditOpen] = React.useState(false)
   const [isPanoramaUploadOpen, setIsPanoramaUploadOpen] = React.useState(false)
-  const [panoramaImage, setPanoramaImage] = React.useState<{ dataUrl: string; name: string } | null>(null)
+  const [panoramaImage, setPanoramaImage] = React.useState<{ file: File; dataUrl: string; name: string } | null>(null)
   const [panoramaError, setPanoramaError] = React.useState("")
+  const [isPanoramaUploading, setIsPanoramaUploading] = React.useState(false)
   const [photoIndex, setPhotoIndex] = React.useState<number | null>(null)
   const [activePanorama, setActivePanorama] = React.useState<{ url: string; label: string; location: string; date: string } | null>(null)
 
@@ -66,7 +67,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   }
 
   const handlePanoramaDialogChange = (open: boolean) => {
-    if (createPanorama.isPending) return
+    if (isPanoramaUploading) return
     setIsPanoramaUploadOpen(open)
     if (!open) resetPanoramaForm()
   }
@@ -88,11 +89,11 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
     }
     const reader = new FileReader()
     reader.onerror = () => setPanoramaError("The image could not be read. Choose another file.")
-    reader.onload = () => setPanoramaImage({ dataUrl: String(reader.result), name: file.name })
+    reader.onload = () => setPanoramaImage({ file, dataUrl: String(reader.result), name: file.name })
     reader.readAsDataURL(file)
   }
 
-  const handlePanoramaUpload = (event: React.FormEvent<HTMLFormElement>) => {
+  const handlePanoramaUpload = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setPanoramaError("")
     const formData = new FormData(event.currentTarget)
@@ -105,23 +106,45 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
       return
     }
 
-    createPanorama.mutate({
-      projectId,
-      data: { imageData: panoramaImage.dataUrl, label, location, date },
-    }, {
-      onSuccess: async () => {
-        await queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) })
-        setIsPanoramaUploadOpen(false)
-        resetPanoramaForm()
-        toast({
-          title: "360° panorama uploaded",
-          description: `${label} is now available in the project gallery.`,
-        })
-      },
-      onError: (error) => {
-        setPanoramaError(error instanceof Error ? error.message : "The panorama could not be uploaded. Try again.")
-      },
-    })
+    setIsPanoramaUploading(true)
+    try {
+      const request = await fetch("/api/storage/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: panoramaImage.file.name,
+          size: panoramaImage.file.size,
+          contentType: panoramaImage.file.type,
+        }),
+      })
+      const upload = await request.json() as { uploadURL?: string; objectPath?: string; error?: string }
+      if (!request.ok || !upload.uploadURL || !upload.objectPath) {
+        throw new Error(upload.error || "The panorama upload could not be started.")
+      }
+
+      const stored = await fetch(upload.uploadURL, {
+        method: "PUT",
+        headers: { "Content-Type": panoramaImage.file.type },
+        body: panoramaImage.file,
+      })
+      if (!stored.ok) throw new Error("The image could not be stored. Try again.")
+
+      await createPanorama.mutateAsync({
+        projectId,
+        data: { objectPath: upload.objectPath, label, location, date },
+      })
+      await queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) })
+      setIsPanoramaUploadOpen(false)
+      resetPanoramaForm()
+      toast({
+        title: "360° panorama uploaded",
+        description: `${label} is now available in the project gallery.`,
+      })
+    } catch (error) {
+      setPanoramaError(error instanceof Error ? error.message : "The panorama could not be uploaded. Try again.")
+    } finally {
+      setIsPanoramaUploading(false)
+    }
   }
 
   const handleUpdate = (e: React.FormEvent<HTMLFormElement>) => {
@@ -453,9 +476,9 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                       </div>
                       {panoramaError && <p role="alert" className="text-sm text-destructive">{panoramaError}</p>}
                       <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => handlePanoramaDialogChange(false)} disabled={createPanorama.isPending}>Cancel</Button>
-                        <Button type="submit" disabled={createPanorama.isPending}>
-                          {createPanorama.isPending ? "Uploading..." : "Upload panorama"}
+                        <Button type="button" variant="outline" onClick={() => handlePanoramaDialogChange(false)} disabled={isPanoramaUploading}>Cancel</Button>
+                        <Button type="submit" disabled={isPanoramaUploading}>
+                          {isPanoramaUploading ? "Uploading..." : "Upload panorama"}
                         </Button>
                       </DialogFooter>
                     </form>

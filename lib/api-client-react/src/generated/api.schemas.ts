@@ -349,10 +349,11 @@ export interface VendorQuoteUpdate {
 
 export interface PanoramaInput {
   /**
-     * A JPEG, PNG, or WebP image encoded as a data URL
+     * App Storage object path returned after a direct upload
      * @minLength 1
+     * @pattern ^/objects/uploads/[A-Za-z0-9-]+$
      */
-  imageData: string;
+  objectPath: string;
   /**
      * @minLength 1
      * @maxLength 100
@@ -365,6 +366,35 @@ export interface PanoramaInput {
   location: string;
   /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   date: string;
+}
+
+export type UploadUrlRequestContentType = typeof UploadUrlRequestContentType[keyof typeof UploadUrlRequestContentType];
+
+
+export const UploadUrlRequestContentType = {
+  'image/jpeg': 'image/jpeg',
+  'image/png': 'image/png',
+  'image/webp': 'image/webp',
+} as const;
+
+export interface UploadUrlRequest {
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  name: string;
+  /**
+     * @minimum 1
+     * @maximum 8388608
+     */
+  size: number;
+  contentType: UploadUrlRequestContentType;
+}
+
+export interface UploadUrlResponse {
+  uploadURL: string;
+  objectPath: string;
+  metadata?: UploadUrlRequest;
 }
 
 export type GetProjectsParams = {

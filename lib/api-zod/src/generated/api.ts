@@ -227,6 +227,8 @@ export const CreateProjectPanoramaParams = zod.object({
 })
 
 
+
+export const createProjectPanoramaBodyObjectPathRegExp = new RegExp('^/objects/uploads/[A-Za-z0-9-]+$');
 export const createProjectPanoramaBodyLabelMax = 100;
 
 export const createProjectPanoramaBodyLocationMax = 100;
@@ -235,7 +237,7 @@ export const createProjectPanoramaBodyDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\
 
 
 export const CreateProjectPanoramaBody = zod.object({
-  "imageData": zod.string().min(1).describe('A JPEG, PNG, or WebP image encoded as a data URL'),
+  "objectPath": zod.string().min(1).regex(createProjectPanoramaBodyObjectPathRegExp).describe('App Storage object path returned after a direct upload'),
   "label": zod.string().min(1).max(createProjectPanoramaBodyLabelMax),
   "location": zod.string().min(1).max(createProjectPanoramaBodyLocationMax),
   "date": zod.string().regex(createProjectPanoramaBodyDateRegExp)
@@ -248,6 +250,48 @@ export const CreateProjectPanoramaResponse = zod.object({
   "location": zod.string(),
   "date": zod.string()
 })
+
+
+/**
+ * @summary Request a direct upload URL
+ */
+export const requestUploadUrlBodyNameMax = 255;
+
+export const requestUploadUrlBodySizeMax = 8388608;
+
+
+
+export const RequestUploadUrlBody = zod.object({
+  "name": zod.string().min(1).max(requestUploadUrlBodyNameMax),
+  "size": zod.number().int().min(1).max(requestUploadUrlBodySizeMax),
+  "contentType": zod.enum(['image/jpeg', 'image/png', 'image/webp'])
+})
+
+export const requestUploadUrlResponseMetadataNameMax = 255;
+
+export const requestUploadUrlResponseMetadataSizeMax = 8388608;
+
+
+
+export const RequestUploadUrlResponse = zod.object({
+  "uploadURL": zod.string().url(),
+  "objectPath": zod.string(),
+  "metadata": zod.object({
+  "name": zod.string().min(1).max(requestUploadUrlResponseMetadataNameMax),
+  "size": zod.number().int().min(1).max(requestUploadUrlResponseMetadataSizeMax),
+  "contentType": zod.enum(['image/jpeg', 'image/png', 'image/webp'])
+}).optional()
+})
+
+
+/**
+ * @summary Serve a stored object
+ */
+export const GetStorageObjectParams = zod.object({
+  "objectPath": zod.coerce.string()
+})
+
+export const GetStorageObjectResponse = zod.unknown()
 
 
 /**

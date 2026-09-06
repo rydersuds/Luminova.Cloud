@@ -22,6 +22,8 @@ tags:
     description: Vendor and subcontractor quote management
   - name: users
     description: Workspace user administration
+  - name: storage
+    description: Persistent object upload and serving
 paths:
   /healthz:
     get:
@@ -151,6 +153,50 @@ paths:
           description: Invalid panorama upload
         "404":
           description: Project not found
+        "500":
+          description: Panorama could not be persisted
+  /storage/uploads/request-url:
+    post:
+      operationId: requestUploadUrl
+      tags: [storage]
+      summary: Request a direct upload URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadUrlRequest"
+      responses:
+        "200":
+          description: Upload URL generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrlResponse"
+        "400":
+          description: Invalid file metadata
+        "500":
+          description: Upload URL could not be generated
+  /storage/objects/{objectPath}:
+    get:
+      operationId: getStorageObject
+      tags: [storage]
+      summary: Serve a stored object
+      parameters:
+        - name: objectPath
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Stored object
+          content:
+            "*/*":
+              schema: { type: string, format: binary }
+        "403":
+          description: Access denied
+        "404":
+          description: Object not found
   /projects/{projectId}/activity:
     get:
       operationId: getProjectActivity
@@ -913,17 +959,35 @@ components:
         date: { type: string }
     PanoramaInput:
       type: object
-      required: [imageData, label, location, date]
+      required: [objectPath, label, location, date]
       properties:
-        imageData:
+        objectPath:
           type: string
           minLength: 1
-          description: A JPEG, PNG, or WebP image encoded as a data URL
+          pattern: '^/objects/uploads/[A-Za-z0-9-]+$'
+          description: App Storage object path returned after a direct upload
         label: { type: string, minLength: 1, maxLength: 100 }
         location: { type: string, minLength: 1, maxLength: 100 }
         date:
           type: string
           pattern: '^\d{4}-\d{2}-\d{2}$'
+    UploadUrlRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 255 }
+        size: { type: integer, minimum: 1, maximum: 8388608 }
+        contentType:
+          type: string
+          enum: [image/jpeg, image/png, image/webp]
+    UploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL: { type: string, format: uri }
+        objectPath: { type: string }
+        metadata:
+          $ref: "#/components/schemas/UploadUrlRequest"
     Activity:
       type: object
       required: [id, type, title, description, author, date]

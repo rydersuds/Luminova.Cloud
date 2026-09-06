@@ -43,6 +43,13 @@ async function openGallery(page: Page) {
 
 test.beforeEach(async ({ page }) => {
   let current = structuredClone(project);
+  await page.route('**/api/storage/uploads/request-url', route => route.fulfill({
+    json: {
+      uploadURL: 'http://localhost:4173/__panorama-upload',
+      objectPath: '/objects/uploads/123e4567-e89b-12d3-a456-426614174000',
+    },
+  }));
+  await page.route('**/__panorama-upload', route => route.fulfill({ status: 200 }));
   await page.route('**/api/projects/riverstone/activity', route => route.fulfill({ json: [] }));
   await page.route('**/api/projects/riverstone', async route => {
     if (route.request().method() === 'GET') {
@@ -88,7 +95,7 @@ test('reports upload failures', async ({ page }) => {
 test('uploads, refreshes the gallery, and opens the new panorama', async ({ page }) => {
   const uploaded = {
     id: 'pano-new',
-    url: `data:image/png;base64,${png.toString('base64')}`,
+    url: '/panorama-test-fixture.svg',
     label: 'Week 25',
     location: 'Great room',
     date: '2026-09-06',
@@ -103,6 +110,12 @@ test('uploads, refreshes the gallery, and opens the new panorama', async ({ page
     await route.fallback();
   });
   await page.route('**/api/projects/riverstone/panoramas', async route => {
+    expect(route.request().postDataJSON()).toEqual({
+      objectPath: '/objects/uploads/123e4567-e89b-12d3-a456-426614174000',
+      label: uploaded.label,
+      location: uploaded.location,
+      date: uploaded.date,
+    });
     current = { ...current, panoramas: [...current.panoramas, uploaded] };
     await route.fulfill({ status: 201, json: uploaded });
   });

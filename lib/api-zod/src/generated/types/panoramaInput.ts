@@ -8,10 +8,11 @@
 
 export interface PanoramaInput {
   /**
-     * A JPEG, PNG, or WebP image encoded as a data URL
+     * App Storage object path returned after a direct upload
      * @minLength 1
+     * @pattern ^/objects/uploads/[A-Za-z0-9-]+$
      */
-  imageData: string;
+  objectPath: string;
   /**
      * @minLength 1
      * @maxLength 100
