@@ -20,6 +20,8 @@ tags:
     description: Invoice intake and approval
   - name: vendor-quotes
     description: Vendor and subcontractor quote management
+  - name: users
+    description: Workspace user administration
 paths:
   /healthz:
     get:
@@ -333,6 +335,115 @@ paths:
           description: Invalid quote
         "404":
           description: Quote, project, or vendor not found
+  /users/me:
+    get:
+      operationId: getCurrentWorkspaceUser
+      tags: [users]
+      summary: Get the current workspace identity and role
+      responses:
+        "200":
+          description: Current workspace user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentWorkspaceUser"
+        "401":
+          description: Authentication required
+  /users:
+    get:
+      operationId: getWorkspaceUsers
+      tags: [users]
+      summary: List workspace users
+      responses:
+        "200":
+          description: Workspace user list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkspaceUser"
+        "401":
+          description: Authentication required
+        "403":
+          description: Administrator access required
+  /users/invitations:
+    post:
+      operationId: inviteWorkspaceUser
+      tags: [users]
+      summary: Invite a user with an initial workspace role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkspaceInvitationInput"
+      responses:
+        "201":
+          description: Invitation sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceInvitation"
+        "400":
+          description: Invalid invitation
+        "401":
+          description: Authentication required
+        "403":
+          description: Administrator access required
+        "409":
+          description: Email is already invited or registered
+        "502":
+          description: Identity provider rejected the invitation
+  /users/{userId}:
+    patch:
+      operationId: updateWorkspaceUser
+      tags: [users]
+      summary: Update a workspace user's profile and role
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkspaceUserUpdate"
+      responses:
+        "200":
+          description: Updated workspace user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceUser"
+        "400":
+          description: Invalid profile update
+        "401":
+          description: Authentication required
+        "403":
+          description: Administrator access required or final administrator protected
+        "404":
+          description: User not found
+        "409":
+          description: Email is already in use
+        "502":
+          description: Identity provider rejected the update
+    delete:
+      operationId: deleteWorkspaceUser
+      tags: [users]
+      summary: Delete a workspace user
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "204":
+          description: User deleted
+        "401":
+          description: Authentication required
+        "403":
+          description: Administrator access required, self-deletion blocked, or final administrator protected
+        "404":
+          description: User not found
+        "502":
+          description: Identity provider rejected the deletion
 components:
   parameters:
     ProjectId:
@@ -353,7 +464,79 @@ components:
       required: true
       schema:
         type: string
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
   schemas:
+    WorkspaceRole:
+      type: string
+      enum: [Admin, Project Manager, Field Team, Client]
+    CurrentWorkspaceUser:
+      type: object
+      required: [userId, role]
+      properties:
+        userId: { type: string }
+        role:
+          $ref: "#/components/schemas/WorkspaceRole"
+    WorkspaceUser:
+      type: object
+      required: [id, firstName, lastName, name, email, role, createdAt, imageUrl]
+      properties:
+        id: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+        role:
+          $ref: "#/components/schemas/WorkspaceRole"
+        createdAt: { type: integer }
+        lastSignInAt: { type: [integer, "null"] }
+        imageUrl: { type: string }
+    WorkspaceInvitationInput:
+      type: object
+      additionalProperties: false
+      required: [email, role]
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 3
+          maxLength: 254
+        role:
+          $ref: "#/components/schemas/WorkspaceRole"
+    WorkspaceInvitation:
+      type: object
+      required: [id, email, role, status]
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+        role:
+          $ref: "#/components/schemas/WorkspaceRole"
+        status: { type: string }
+    WorkspaceUserUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          minLength: 3
+          maxLength: 254
+        role:
+          $ref: "#/components/schemas/WorkspaceRole"
     HealthStatus:
       type: object
       properties:

@@ -9,6 +9,7 @@
 export * from './activity';
 export * from './budgetLineItem';
 export * from './clientQuote';
+export * from './currentWorkspaceUser';
 export * from './dashboardSummary';
 export * from './getInvoicesParams';
 export * from './getProjectsParams';
@@ -36,3 +37,8 @@ export * from './vendorQuoteLineItem';
 export * from './vendorQuoteLineItemInput';
 export * from './vendorQuoteStatus';
 export * from './vendorQuoteUpdate';
+export * from './workspaceInvitation';
+export * from './workspaceInvitationInput';
+export * from './workspaceRole';
+export * from './workspaceUser';
+export * from './workspaceUserUpdate';

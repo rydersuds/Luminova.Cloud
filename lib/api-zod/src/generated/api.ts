@@ -646,3 +646,102 @@ export const UpdateVendorQuoteResponse = zod.object({
 })
 
 
+/**
+ * @summary Get the current workspace identity and role
+ */
+export const GetCurrentWorkspaceUserResponse = zod.object({
+  "userId": zod.string(),
+  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client'])
+})
+
+
+/**
+ * @summary List workspace users
+ */
+export const GetWorkspaceUsersResponseItem = zod.object({
+  "id": zod.string(),
+  "firstName": zod.string(),
+  "lastName": zod.string(),
+  "name": zod.string(),
+  "email": zod.string().email(),
+  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client']),
+  "createdAt": zod.number().int(),
+  "lastSignInAt": zod.number().int().nullish(),
+  "imageUrl": zod.string()
+})
+export const GetWorkspaceUsersResponse = zod.array(GetWorkspaceUsersResponseItem)
+
+
+/**
+ * @summary Invite a user with an initial workspace role
+ */
+export const inviteWorkspaceUserBodyEmailMin = 3;
+export const inviteWorkspaceUserBodyEmailMax = 254;
+
+
+
+export const InviteWorkspaceUserBody = zod.object({
+  "email": zod.string().email().min(inviteWorkspaceUserBodyEmailMin).max(inviteWorkspaceUserBodyEmailMax),
+  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client'])
+})
+
+export const InviteWorkspaceUserResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string().email(),
+  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client']),
+  "status": zod.string()
+})
+
+
+/**
+ * @summary Update a workspace user's profile and role
+ */
+
+
+
+export const UpdateWorkspaceUserParams = zod.object({
+  "userId": zod.coerce.string().min(1)
+})
+
+export const updateWorkspaceUserBodyFirstNameMax = 100;
+
+export const updateWorkspaceUserBodyLastNameMax = 100;
+
+export const updateWorkspaceUserBodyEmailMin = 3;
+export const updateWorkspaceUserBodyEmailMax = 254;
+
+
+
+export const UpdateWorkspaceUserBody = zod.object({
+  "firstName": zod.string().min(1).max(updateWorkspaceUserBodyFirstNameMax).optional(),
+  "lastName": zod.string().min(1).max(updateWorkspaceUserBodyLastNameMax).optional(),
+  "email": zod.string().email().min(updateWorkspaceUserBodyEmailMin).max(updateWorkspaceUserBodyEmailMax).optional(),
+  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client']).optional()
+})
+
+export const UpdateWorkspaceUserResponse = zod.object({
+  "id": zod.string(),
+  "firstName": zod.string(),
+  "lastName": zod.string(),
+  "name": zod.string(),
+  "email": zod.string().email(),
+  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client']),
+  "createdAt": zod.number().int(),
+  "lastSignInAt": zod.number().int().nullish(),
+  "imageUrl": zod.string()
+})
+
+
+/**
+ * @summary Delete a workspace user
+ */
+
+
+
+export const DeleteWorkspaceUserParams = zod.object({
+  "userId": zod.coerce.string().min(1)
+})
+
+export const DeleteWorkspaceUserResponse = zod.void()
+
+

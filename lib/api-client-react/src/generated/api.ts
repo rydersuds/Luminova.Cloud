@@ -21,6 +21,7 @@ import type {
 
 import type {
   Activity,
+  CurrentWorkspaceUser,
   DashboardSummary,
   GetInvoicesParams,
   GetProjectsParams,
@@ -39,7 +40,11 @@ import type {
   TradeDetail,
   VendorQuote,
   VendorQuoteInput,
-  VendorQuoteUpdate
+  VendorQuoteUpdate,
+  WorkspaceInvitation,
+  WorkspaceInvitationInput,
+  WorkspaceUser,
+  WorkspaceUserUpdate
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -1295,5 +1300,373 @@ export const useUpdateVendorQuote = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateVendorQuoteMutationOptions(options));
+    }
+
+export const getGetCurrentWorkspaceUserUrl = () => {
+
+
+
+
+  return `/api/users/me`
+}
+
+/**
+ * @summary Get the current workspace identity and role
+ */
+export const getCurrentWorkspaceUser = async ( options?: Parameters<typeof customFetch>[1]): Promise<CurrentWorkspaceUser> => {
+
+  return customFetch<CurrentWorkspaceUser>(getGetCurrentWorkspaceUserUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCurrentWorkspaceUserQueryKey = () => {
+    return [
+    `/api/users/me`
+    ] as const;
+    }
+
+
+export const getGetCurrentWorkspaceUserQueryOptions = <TData = Awaited<ReturnType<typeof getCurrentWorkspaceUser>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentWorkspaceUser>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCurrentWorkspaceUserQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCurrentWorkspaceUser>>> = ({ signal }) => getCurrentWorkspaceUser({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCurrentWorkspaceUser>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCurrentWorkspaceUserQueryResult = NonNullable<Awaited<ReturnType<typeof getCurrentWorkspaceUser>>>
+export type GetCurrentWorkspaceUserQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the current workspace identity and role
+ */
+
+export function useGetCurrentWorkspaceUser<TData = Awaited<ReturnType<typeof getCurrentWorkspaceUser>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentWorkspaceUser>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCurrentWorkspaceUserQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetWorkspaceUsersUrl = () => {
+
+
+
+
+  return `/api/users`
+}
+
+/**
+ * @summary List workspace users
+ */
+export const getWorkspaceUsers = async ( options?: Parameters<typeof customFetch>[1]): Promise<WorkspaceUser[]> => {
+
+  return customFetch<WorkspaceUser[]>(getGetWorkspaceUsersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetWorkspaceUsersQueryKey = () => {
+    return [
+    `/api/users`
+    ] as const;
+    }
+
+
+export const getGetWorkspaceUsersQueryOptions = <TData = Awaited<ReturnType<typeof getWorkspaceUsers>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceUsers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetWorkspaceUsersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWorkspaceUsers>>> = ({ signal }) => getWorkspaceUsers({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceUsers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetWorkspaceUsersQueryResult = NonNullable<Awaited<ReturnType<typeof getWorkspaceUsers>>>
+export type GetWorkspaceUsersQueryError = ErrorType<void>
+
+
+/**
+ * @summary List workspace users
+ */
+
+export function useGetWorkspaceUsers<TData = Awaited<ReturnType<typeof getWorkspaceUsers>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceUsers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetWorkspaceUsersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getInviteWorkspaceUserUrl = () => {
+
+
+
+
+  return `/api/users/invitations`
+}
+
+/**
+ * @summary Invite a user with an initial workspace role
+ */
+export const inviteWorkspaceUser = async (workspaceInvitationInput: WorkspaceInvitationInput, options?: Parameters<typeof customFetch>[1]): Promise<WorkspaceInvitation> => {
+
+  return customFetch<WorkspaceInvitation>(getInviteWorkspaceUserUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(workspaceInvitationInput)
+  }
+);}
+
+
+
+
+
+export const getInviteWorkspaceUserMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inviteWorkspaceUser>>, TError,{data: BodyType<WorkspaceInvitationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof inviteWorkspaceUser>>, TError,{data: BodyType<WorkspaceInvitationInput>}, TContext> => {
+
+const mutationKey = ['inviteWorkspaceUser'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof inviteWorkspaceUser>>, {data: BodyType<WorkspaceInvitationInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  inviteWorkspaceUser(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type InviteWorkspaceUserMutationResult = NonNullable<Awaited<ReturnType<typeof inviteWorkspaceUser>>>
+    export type InviteWorkspaceUserMutationBody = BodyType<WorkspaceInvitationInput>
+    export type InviteWorkspaceUserMutationError = ErrorType<void>
+
+    /**
+ * @summary Invite a user with an initial workspace role
+ */
+export const useInviteWorkspaceUser = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inviteWorkspaceUser>>, TError,{data: BodyType<WorkspaceInvitationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof inviteWorkspaceUser>>,
+        TError,
+        {data: BodyType<WorkspaceInvitationInput>},
+        TContext
+      > => {
+      return useMutation(getInviteWorkspaceUserMutationOptions(options));
+    }
+
+export const getUpdateWorkspaceUserUrl = (userId: string,) => {
+
+
+
+
+  return `/api/users/${userId}`
+}
+
+/**
+ * @summary Update a workspace user's profile and role
+ */
+export const updateWorkspaceUser = async (userId: string,
+    workspaceUserUpdate: WorkspaceUserUpdate, options?: Parameters<typeof customFetch>[1]): Promise<WorkspaceUser> => {
+
+  return customFetch<WorkspaceUser>(getUpdateWorkspaceUserUrl(userId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(workspaceUserUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateWorkspaceUserMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWorkspaceUser>>, TError,{userId: string;data: BodyType<WorkspaceUserUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateWorkspaceUser>>, TError,{userId: string;data: BodyType<WorkspaceUserUpdate>}, TContext> => {
+
+const mutationKey = ['updateWorkspaceUser'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateWorkspaceUser>>, {userId: string;data: BodyType<WorkspaceUserUpdate>}> = (props) => {
+          const {userId,data} = props ?? {};
+
+          return  updateWorkspaceUser(userId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateWorkspaceUserMutationResult = NonNullable<Awaited<ReturnType<typeof updateWorkspaceUser>>>
+    export type UpdateWorkspaceUserMutationBody = BodyType<WorkspaceUserUpdate>
+    export type UpdateWorkspaceUserMutationError = ErrorType<void>
+
+    /**
+ * @summary Update a workspace user's profile and role
+ */
+export const useUpdateWorkspaceUser = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWorkspaceUser>>, TError,{userId: string;data: BodyType<WorkspaceUserUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateWorkspaceUser>>,
+        TError,
+        {userId: string;data: BodyType<WorkspaceUserUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateWorkspaceUserMutationOptions(options));
+    }
+
+export const getDeleteWorkspaceUserUrl = (userId: string,) => {
+
+
+
+
+  return `/api/users/${userId}`
+}
+
+/**
+ * @summary Delete a workspace user
+ */
+export const deleteWorkspaceUser = async (userId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteWorkspaceUserUrl(userId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteWorkspaceUserMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteWorkspaceUser>>, TError,{userId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteWorkspaceUser>>, TError,{userId: string}, TContext> => {
+
+const mutationKey = ['deleteWorkspaceUser'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteWorkspaceUser>>, {userId: string}> = (props) => {
+          const {userId} = props ?? {};
+
+          return  deleteWorkspaceUser(userId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteWorkspaceUserMutationResult = NonNullable<Awaited<ReturnType<typeof deleteWorkspaceUser>>>
+
+    export type DeleteWorkspaceUserMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete a workspace user
+ */
+export const useDeleteWorkspaceUser = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteWorkspaceUser>>, TError,{userId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteWorkspaceUser>>,
+        TError,
+        {userId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteWorkspaceUserMutationOptions(options));
     }
 

@@ -5,6 +5,69 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type WorkspaceRole = typeof WorkspaceRole[keyof typeof WorkspaceRole];
+
+
+export const WorkspaceRole = {
+  Admin: 'Admin',
+  Project_Manager: 'Project Manager',
+  Field_Team: 'Field Team',
+  Client: 'Client',
+} as const;
+
+export interface CurrentWorkspaceUser {
+  userId: string;
+  role: WorkspaceRole;
+}
+
+export interface WorkspaceUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  name: string;
+  email: string;
+  role: WorkspaceRole;
+  createdAt: number;
+  /** @nullable */
+  lastSignInAt?: number | null;
+  imageUrl: string;
+}
+
+export interface WorkspaceInvitationInput {
+  /**
+     * @minLength 3
+     * @maxLength 254
+     */
+  email: string;
+  role: WorkspaceRole;
+}
+
+export interface WorkspaceInvitation {
+  id: string;
+  email: string;
+  role: WorkspaceRole;
+  status: string;
+}
+
+export interface WorkspaceUserUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  firstName?: string;
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  lastName?: string;
+  /**
+     * @minLength 3
+     * @maxLength 254
+     */
+  email?: string;
+  role?: WorkspaceRole;
+}
+
 export interface HealthStatus {
   status: string;
 }
