@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -56,6 +56,31 @@ function Home() {
   </>;
 }
 
+function Intro() {
+  const [, setLocation] = useLocation();
+  const [leaving, setLeaving] = useState(false);
+
+  useEffect(() => {
+    const fadeTimer = window.setTimeout(() => setLeaving(true), 5500);
+    const routeTimer = window.setTimeout(() => setLocation("/", { replace: true }), 6000);
+    return () => {
+      window.clearTimeout(fadeTimer);
+      window.clearTimeout(routeTimer);
+    };
+  }, [setLocation]);
+
+  return (
+    <div className={`fixed inset-0 z-[100] bg-black transition-opacity duration-500 ${leaving ? "opacity-0" : "opacity-100"}`}>
+      <iframe
+        src={`${basePath}/luminova-intro-animation.html`}
+        title="Luminova Construction introduction"
+        className="h-full w-full border-0 bg-black"
+        allow="autoplay"
+      />
+    </div>
+  );
+}
+
 function Router() {
   return (
     <RoutedErrorBoundary>
@@ -64,6 +89,7 @@ function Router() {
         <Route path="/sign-up/*?" component={SignUpPage} />
         <Route path="/login" component={Login} />
         <Route path="/" component={Home} />
+        <Route path="/intro"><Protected><Intro /></Protected></Route>
         <Route path="/projects/:id"><Protected><ProjectDetail /></Protected></Route>
         <Route path="/projects"><Protected><Projects /></Protected></Route>
         <Route path="/trades"><Protected><TradesDirectory /></Protected></Route>

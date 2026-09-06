@@ -1,11 +1,11 @@
 import { SignIn, SignUp } from "@clerk/react"
 
 export default function Login() {
-  return <AuthShell><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} /></AuthShell>
+  return <AuthShell><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} forceRedirectUrl={`${basePath}/intro`} /></AuthShell>
 }
 
 export function SignUpPage() {
-  return <AuthShell><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} /></AuthShell>
+  return <AuthShell><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} forceRedirectUrl={`${basePath}/intro`} /></AuthShell>
 }
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "")
