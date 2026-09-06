@@ -48,8 +48,7 @@ function Home() {
           <img src="/luminova-logo.png" alt="Luminova Construction" className="mx-auto mb-8 h-32 w-72 object-contain" />
           <p className="font-mono text-xs uppercase tracking-[.24em] text-primary">Secure construction operations</p>
           <h1 className="mt-4 text-4xl font-extrabold sm:text-5xl">Build with complete visibility.</h1>
-          <p className="mx-auto mt-5 max-w-lg text-sidebar-foreground/65">Manage projects, trades, budgets, invoices, field activity, and your team from one protected workspace.</p>
-          <Link href="/sign-in" className="tech-clip gold-glow mx-auto mt-8 inline-flex h-12 items-center justify-center bg-primary px-8 font-bold text-primary-foreground">Sign in to workspace</Link>
+          <Link href="/sign-in" className="tech-clip gold-glow mx-auto mt-8 inline-flex h-12 items-center justify-center bg-primary px-8 font-bold text-primary-foreground">Sign in</Link>
         </div>
       </main>
     </Show>
