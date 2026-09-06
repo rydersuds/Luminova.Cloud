@@ -160,8 +160,11 @@ export default function ProjectDetail() {
                           >
                             <option value="Active">Active</option>
                             <option value="Planning">Planning</option>
+                             <option value="In progress">In progress</option>
+                             <option value="On hold">On hold</option>
                             <option value="Completed">Completed</option>
                             <option value="Delayed">Delayed</option>
+                             <option value="Rejected for bid">Rejected for bid</option>
                           </select>
                         </div>
                         <div className="space-y-2">

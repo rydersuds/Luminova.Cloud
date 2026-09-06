@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Building2, Grid2X2, List, MapPin, Search, SlidersHorizontal, X } from "lucide-react"
 import { cn, formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
 
-const STATUSES = ["Pre-construction", "In progress", "On hold", "Complete"]
+const STATUSES = ["Pre-construction", "Planning", "Active", "In progress", "On hold", "Completed", "Rejected for bid"]
 const REGIONS = ["Calgary", "Canmore", "Edmonton"]
 
 export default function Projects() {

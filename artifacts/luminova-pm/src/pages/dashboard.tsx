@@ -263,7 +263,10 @@ export default function Dashboard() {
                                 <option value="" disabled className="bg-background text-muted-foreground">Select Status...</option>
                                 <option value="Active" className="bg-background">Active</option>
                                 <option value="Planning" className="bg-background">Planning</option>
+                                 <option value="In progress" className="bg-background">In progress</option>
+                                 <option value="On hold" className="bg-background">On hold</option>
                                 <option value="Completed" className="bg-background">Completed</option>
+                                 <option value="Rejected for bid" className="bg-background">Rejected for bid</option>
                               </select>
                               {errors.status && <span className="text-[10px] font-mono text-destructive uppercase">{errors.status.message as string}</span>}
                             </div>

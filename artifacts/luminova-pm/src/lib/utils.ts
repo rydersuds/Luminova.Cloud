@@ -32,6 +32,7 @@ export function getStatusColor(status: string) {
       return "warning"
     case "delayed":
     case "rejected":
+    case "rejected for bid":
     case "overdue":
       return "destructive"
     default:
