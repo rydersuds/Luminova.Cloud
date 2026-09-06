@@ -35,6 +35,8 @@ import type {
   PanoramaUpdate,
   Project,
   ProjectDetail,
+  ProjectImport,
+  ProjectImportInput,
   ProjectInput,
   ProjectUpdate,
   Trade,
@@ -829,6 +831,77 @@ export function useGetStorageObject<TData = Awaited<ReturnType<typeof getStorage
 
 
 
+
+export const getCreateProjectImportUrl = () => {
+
+
+
+
+  return `/api/project-imports`
+}
+
+/**
+ * @summary Build a project from privately uploaded folder documents
+ */
+export const createProjectImport = async (projectImportInput: ProjectImportInput, options?: Parameters<typeof customFetch>[1]): Promise<ProjectImport> => {
+
+  return customFetch<ProjectImport>(getCreateProjectImportUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(projectImportInput)
+  }
+);}
+
+
+
+
+
+export const getCreateProjectImportMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProjectImport>>, TError,{data: BodyType<ProjectImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createProjectImport>>, TError,{data: BodyType<ProjectImportInput>}, TContext> => {
+
+const mutationKey = ['createProjectImport'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createProjectImport>>, {data: BodyType<ProjectImportInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createProjectImport(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateProjectImportMutationResult = NonNullable<Awaited<ReturnType<typeof createProjectImport>>>
+    export type CreateProjectImportMutationBody = BodyType<ProjectImportInput>
+    export type CreateProjectImportMutationError = ErrorType<void>
+
+    /**
+ * @summary Build a project from privately uploaded folder documents
+ */
+export const useCreateProjectImport = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProjectImport>>, TError,{data: BodyType<ProjectImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createProjectImport>>,
+        TError,
+        {data: BodyType<ProjectImportInput>},
+        TContext
+      > => {
+      return useMutation(getCreateProjectImportMutationOptions(options));
+    }
 
 export const getGetProjectActivityUrl = (projectId: string,) => {
 

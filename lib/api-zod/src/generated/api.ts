@@ -290,19 +290,28 @@ export const UpdateProjectPanoramaResponse = zod.object({
  */
 export const requestUploadUrlBodyNameMax = 255;
 
-export const requestUploadUrlBodySizeMax = 8388608;
+export const requestUploadUrlBodySizeMax = 209715200;
+
+export const requestUploadUrlBodyContentTypeMax = 255;
+
+export const requestUploadUrlBodyRelativePathMax = 1024;
 
 
 
 export const RequestUploadUrlBody = zod.object({
   "name": zod.string().min(1).max(requestUploadUrlBodyNameMax),
   "size": zod.number().int().min(1).max(requestUploadUrlBodySizeMax),
-  "contentType": zod.enum(['image/jpeg', 'image/png', 'image/webp'])
+  "contentType": zod.string().max(requestUploadUrlBodyContentTypeMax),
+  "relativePath": zod.string().min(1).max(requestUploadUrlBodyRelativePathMax).optional()
 })
 
 export const requestUploadUrlResponseMetadataNameMax = 255;
 
-export const requestUploadUrlResponseMetadataSizeMax = 8388608;
+export const requestUploadUrlResponseMetadataSizeMax = 209715200;
+
+export const requestUploadUrlResponseMetadataContentTypeMax = 255;
+
+export const requestUploadUrlResponseMetadataRelativePathMax = 1024;
 
 
 
@@ -312,7 +321,8 @@ export const RequestUploadUrlResponse = zod.object({
   "metadata": zod.object({
   "name": zod.string().min(1).max(requestUploadUrlResponseMetadataNameMax),
   "size": zod.number().int().min(1).max(requestUploadUrlResponseMetadataSizeMax),
-  "contentType": zod.enum(['image/jpeg', 'image/png', 'image/webp'])
+  "contentType": zod.string().max(requestUploadUrlResponseMetadataContentTypeMax),
+  "relativePath": zod.string().min(1).max(requestUploadUrlResponseMetadataRelativePathMax).optional()
 }).optional()
 })
 
@@ -325,6 +335,60 @@ export const GetStorageObjectParams = zod.object({
 })
 
 export const GetStorageObjectResponse = zod.unknown()
+
+
+/**
+ * @summary Build a project from privately uploaded folder documents
+ */
+export const createProjectImportBodyDocumentsItemRelativePathMax = 1024;
+
+export const createProjectImportBodyDocumentsItemObjectPathRegExp = new RegExp('^/objects/uploads/[A-Za-z0-9-]+$');
+export const createProjectImportBodyDocumentsItemNameMax = 255;
+
+export const createProjectImportBodyDocumentsItemSizeMax = 209715200;
+
+export const createProjectImportBodyDocumentsItemContentTypeMax = 255;
+
+export const createProjectImportBodyDocumentsItemTextSnippetMax = 24000;
+
+export const createProjectImportBodyDocumentsMax = 1000;
+
+
+
+export const CreateProjectImportBody = zod.object({
+  "documents": zod.array(zod.object({
+  "relativePath": zod.string().min(1).max(createProjectImportBodyDocumentsItemRelativePathMax),
+  "objectPath": zod.string().regex(createProjectImportBodyDocumentsItemObjectPathRegExp),
+  "name": zod.string().min(1).max(createProjectImportBodyDocumentsItemNameMax),
+  "size": zod.number().int().min(1).max(createProjectImportBodyDocumentsItemSizeMax),
+  "contentType": zod.string().min(1).max(createProjectImportBodyDocumentsItemContentTypeMax),
+  "textSnippet": zod.string().max(createProjectImportBodyDocumentsItemTextSnippetMax).optional()
+})).min(1).max(createProjectImportBodyDocumentsMax)
+})
+
+export const CreateProjectImportResponse = zod.object({
+  "project": zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "address": zod.string(),
+  "region": zod.string(),
+  "status": zod.string(),
+  "progress": zod.number().int(),
+  "pmName": zod.string(),
+  "clientName": zod.string(),
+  "targetDate": zod.string(),
+  "budgeted": zod.number().int(),
+  "invoiced": zod.number().int(),
+  "exteriorImage": zod.string(),
+  "description": zod.string()
+}),
+  "importId": zod.string(),
+  "documentsImported": zod.number().int(),
+  "documentsFailed": zod.number().int(),
+  "vendorsCreated": zod.number().int(),
+  "quotesCreated": zod.number().int(),
+  "invoicesCreated": zod.number().int()
+})
 
 
 /**

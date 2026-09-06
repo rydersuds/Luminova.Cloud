@@ -389,15 +389,6 @@ export interface PanoramaUpdate {
   date: string | null;
 }
 
-export type UploadUrlRequestContentType = typeof UploadUrlRequestContentType[keyof typeof UploadUrlRequestContentType];
-
-
-export const UploadUrlRequestContentType = {
-  'image/jpeg': 'image/jpeg',
-  'image/png': 'image/png',
-  'image/webp': 'image/webp',
-} as const;
-
 export interface UploadUrlRequest {
   /**
      * @minLength 1
@@ -406,16 +397,67 @@ export interface UploadUrlRequest {
   name: string;
   /**
      * @minimum 1
-     * @maximum 8388608
+     * @maximum 209715200
      */
   size: number;
-  contentType: UploadUrlRequestContentType;
+  /** @maxLength 255 */
+  contentType: string;
+  /**
+     * @minLength 1
+     * @maxLength 1024
+     */
+  relativePath?: string;
 }
 
 export interface UploadUrlResponse {
   uploadURL: string;
   objectPath: string;
   metadata?: UploadUrlRequest;
+}
+
+export interface ProjectImportDocument {
+  /**
+     * @minLength 1
+     * @maxLength 1024
+     */
+  relativePath: string;
+  /** @pattern ^/objects/uploads/[A-Za-z0-9-]+$ */
+  objectPath: string;
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  name: string;
+  /**
+     * @minimum 1
+     * @maximum 209715200
+     */
+  size: number;
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  contentType: string;
+  /** @maxLength 24000 */
+  textSnippet?: string;
+}
+
+export interface ProjectImportInput {
+  /**
+     * @minItems 1
+     * @maxItems 1000
+     */
+  documents: ProjectImportDocument[];
+}
+
+export interface ProjectImport {
+  project: Project;
+  importId: string;
+  documentsImported: number;
+  documentsFailed: number;
+  vendorsCreated: number;
+  quotesCreated: number;
+  invoicesCreated: number;
 }
 
 export type GetProjectsParams = {

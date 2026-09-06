@@ -92,6 +92,17 @@ export class ObjectStorageService {
     }
   }
 
+  async verifyConstructionDocument(input: { objectPath: string; name: string; size: number; contentType: string }): Promise<void> {
+    const file = await this.getObjectEntityFile(input.objectPath);
+    const [metadata] = await file.getMetadata();
+    const extension = input.name.split(".").pop()?.toLowerCase();
+    const allowedExtensions = new Set(["pdf", "doc", "docx", "xls", "xlsx", "csv", "txt", "md", "json", "rtf", "jpg", "jpeg", "png", "webp", "heic", "tif", "tiff"]);
+    if (!extension || !allowedExtensions.has(extension) || Number(metadata.size) !== input.size ||
+      String(metadata.contentType || "application/octet-stream") !== input.contentType || input.size > 200 * 1024 * 1024) {
+      throw new Error("Stored object metadata does not match a supported project document");
+    }
+  }
+
   async canRead(userId: string | undefined, file: File): Promise<boolean> {
     return canAccessObject({ userId, objectFile: file, requestedPermission: ObjectPermission.READ });
   }

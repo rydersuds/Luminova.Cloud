@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
-import { Plus, Search, MapPin, Building, Activity, Camera, DollarSign, Clock, UploadCloud, FileJson, FileSpreadsheet, X, CheckCircle2, AlertTriangle, ShieldAlert } from "lucide-react"
+import { Plus, Search, MapPin, Building, Activity, Camera, DollarSign, Clock, UploadCloud, FileJson, FileSpreadsheet, X, CheckCircle2, AlertTriangle, ShieldAlert, FolderUp, FileText } from "lucide-react"
 import { Link, useLocation } from "wouter"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils"
 import { z } from "zod"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { boundedTextSnippet, folderFileIssue, normalizeRelativePath, type FolderCandidate, type SkippedFolderFile } from "@/lib/project-folder-import"
 
 // Strict validation schema, zero defaults
 const projectSchema = z.object({
@@ -103,6 +104,137 @@ export default function Dashboard() {
   const [dragActive, setDragActive] = React.useState(false)
   const [parsedRows, setParsedRows] = React.useState<any[]>([])
   const [importStatus, setImportStatus] = React.useState<"idle" | "processing" | "success">("idle")
+  const folderInputRef = React.useRef<HTMLInputElement>(null)
+  const [folderFiles, setFolderFiles] = React.useState<FolderCandidate[]>([])
+  const [skippedFolderFiles, setSkippedFolderFiles] = React.useState<SkippedFolderFile[]>([])
+  const [folderStatus, setFolderStatus] = React.useState<"idle" | "uploading" | "building" | "success" | "error">("idle")
+  const [folderProgress, setFolderProgress] = React.useState({ uploaded: 0, failed: 0 })
+  const [folderError, setFolderError] = React.useState("")
+
+  const collectFolderFiles = React.useCallback((files: File[]) => {
+    const seen = new Set<string>()
+    const accepted: FolderCandidate[] = []
+    const skipped: SkippedFolderFile[] = []
+    files.forEach((file) => {
+      const rawPath = file.webkitRelativePath || file.name
+      const relativePath = normalizeRelativePath(rawPath)
+      const issue = relativePath ? folderFileIssue(file, relativePath) : "Unsafe relative path"
+      if (!relativePath || issue) {
+        skipped.push({ name: rawPath, reason: issue || "Unsafe relative path" })
+      } else if (seen.has(relativePath.toLocaleLowerCase())) {
+        skipped.push({ name: rawPath, reason: "Collides with another relative path" })
+      } else {
+        seen.add(relativePath.toLocaleLowerCase())
+        accepted.push({ file, relativePath })
+      }
+    })
+    setFolderFiles(accepted)
+    setSkippedFolderFiles(skipped)
+    setFolderProgress({ uploaded: 0, failed: 0 })
+    setFolderError("")
+    setFolderStatus("idle")
+  }, [])
+
+  const readDroppedEntries = async (items: DataTransferItemList): Promise<File[]> => {
+    const output: File[] = []
+    const visit = async (entry: any, prefix = ""): Promise<void> => {
+      if (entry.isFile) {
+        await new Promise<void>((resolve) => entry.file((file: File) => {
+          Object.defineProperty(file, "webkitRelativePath", { value: `${prefix}${file.name}` })
+          output.push(file)
+          resolve()
+        }, resolve))
+      } else if (entry.isDirectory) {
+        const reader = entry.createReader()
+        const entries: any[] = []
+        let batch: any[]
+        do {
+          batch = await new Promise((resolve, reject) => reader.readEntries(resolve, reject))
+          entries.push(...batch)
+        } while (batch.length)
+        await Promise.all(entries.map((child) => visit(child, `${prefix}${entry.name}/`)))
+      }
+    }
+    await Promise.all(Array.from(items).map((item) => {
+      const entry = (item as DataTransferItem & { webkitGetAsEntry?: () => any }).webkitGetAsEntry?.()
+      return entry ? visit(entry) : Promise.resolve()
+    }))
+    return output
+  }
+
+  const handleFolderDrop = async (event: React.DragEvent) => {
+    event.preventDefault()
+    setDragActive(false)
+    const files = await readDroppedEntries(event.dataTransfer.items)
+    collectFolderFiles(files.length ? files : Array.from(event.dataTransfer.files))
+  }
+
+  const handleFolderImport = async () => {
+    if (!folderFiles.length) return
+    setFolderStatus("uploading")
+    setFolderError("")
+    setFolderProgress({ uploaded: 0, failed: 0 })
+    const uploaded: Array<{ relativePath: string; objectPath: string; name: string; size: number; contentType: string; textSnippet?: string }> = []
+    const failures: SkippedFolderFile[] = []
+    let cursor = 0
+    const uploadOne = async (candidate: FolderCandidate) => {
+      try {
+        const request = await fetch("/api/storage/uploads/request-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: candidate.file.name, size: candidate.file.size, contentType: candidate.file.type || "application/octet-stream", relativePath: candidate.relativePath }),
+        })
+        const signed = await request.json() as { uploadURL?: string; objectPath?: string; error?: string }
+        if (!request.ok || !signed.uploadURL || !signed.objectPath) throw new Error(signed.error || "Could not start upload")
+        const put = await fetch(signed.uploadURL, { method: "PUT", headers: { "Content-Type": candidate.file.type || "application/octet-stream" }, body: candidate.file })
+        if (!put.ok) throw new Error("Storage upload failed")
+        uploaded.push({ relativePath: candidate.relativePath, objectPath: signed.objectPath, name: candidate.file.name, size: candidate.file.size, contentType: candidate.file.type || "application/octet-stream", textSnippet: await boundedTextSnippet(candidate.file) })
+        setFolderProgress((current) => ({ ...current, uploaded: current.uploaded + 1 }))
+      } catch (error) {
+        failures.push({ name: candidate.relativePath, reason: error instanceof Error ? error.message : "Upload failed" })
+        setFolderProgress((current) => ({ ...current, failed: current.failed + 1 }))
+      }
+    }
+    const worker = async () => {
+      while (cursor < folderFiles.length) {
+        const candidate = folderFiles[cursor++]
+        await uploadOne(candidate)
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(4, folderFiles.length) }, worker))
+    setSkippedFolderFiles((current) => [...current, ...failures])
+    if (!uploaded.length) {
+      setFolderStatus("error")
+      setFolderError("No supported files could be uploaded. Review the per-file results and try again.")
+      return
+    }
+    setFolderStatus("building")
+    try {
+      let remainingSnippetCharacters = 250_000
+      const documentsForAnalysis = uploaded.map((document) => {
+        if (!document.textSnippet || remainingSnippetCharacters <= 0) {
+          return { ...document, textSnippet: undefined }
+        }
+        const textSnippet = document.textSnippet.slice(0, remainingSnippetCharacters)
+        remainingSnippetCharacters -= textSnippet.length
+        return { ...document, textSnippet }
+      })
+      const response = await fetch("/api/project-imports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documents: documentsForAnalysis }),
+      })
+      const body = await response.json() as { project?: { id: string }; error?: string }
+      if (!response.ok || !body.project) throw new Error(body.error || "The project could not be built")
+      await queryClient.invalidateQueries({ queryKey: getGetProjectsQueryKey() })
+      await queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() })
+      setFolderStatus("success")
+      setTimeout(() => { setIsCreateOpen(false); setFolderFiles([]); setSkippedFolderFiles([]); setFolderStatus("idle") }, 1800)
+    } catch (error) {
+      setFolderStatus("error")
+      setFolderError(error instanceof Error ? error.message : "The uploaded documents could not be analyzed.")
+    }
+  }
 
   const handleFile = async (file: File) => {
     try {
@@ -314,30 +446,67 @@ export default function Dashboard() {
                         </form>
                       ) : (
                         <div className="space-y-6">
-                          {!parsedRows.length ? (
+                          {!parsedRows.length && !folderFiles.length ? (
                             <div 
                               onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
                               onDragLeave={() => setDragActive(false)}
-                              onDrop={handleDrop}
+                              onDrop={handleFolderDrop}
                               className={cn(
                                 "p-12 flex flex-col items-center justify-center text-center transition-all bg-black/10 rounded-xl recessed-3d",
                                 dragActive ? "border-primary bg-primary/10 scale-[1.01]" : ""
                               )}
                             >
+                              <input
+                                ref={folderInputRef}
+                                type="file"
+                                className="hidden"
+                                id="folder-upload"
+                                onChange={(event) => collectFolderFiles(Array.from(event.target.files || []))}
+                                {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
+                              />
                               <input type="file" accept=".csv,.json" onChange={handleFileInput} className="hidden" id="file-upload" />
-                              <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center gap-4">
+                              <label htmlFor="folder-upload" className="cursor-pointer flex flex-col items-center gap-4">
                                 <div className="h-20 w-20 rounded-full bg-background flex items-center justify-center surface-3d shadow-xl">
-                                  <UploadCloud className="h-10 w-10 text-primary drop-shadow-sm" />
+                                  <FolderUp className="h-10 w-10 text-primary drop-shadow-sm" />
                                 </div>
                                 <div>
-                                  <p className="text-lg font-heading tracking-tight mb-1 drop-shadow-sm">Drag and drop data file</p>
-                                  <p className="text-sm font-mono text-muted-foreground">Supports .csv or .json formatted to protocol standards</p>
+                                  <p className="text-lg font-heading tracking-tight mb-1 drop-shadow-sm">Drop a project folder</p>
+                                  <p className="text-sm font-mono text-muted-foreground">Or choose a folder. Supported construction documents and images are uploaded privately; max 200 MB each.</p>
                                 </div>
                                 <div className="flex gap-4 mt-4">
-                                  <span className="flex items-center gap-1.5 text-xs font-mono surface-3d px-3 py-1 text-muted-foreground"><FileSpreadsheet className="h-3 w-3" /> CSV</span>
-                                  <span className="flex items-center gap-1.5 text-xs font-mono surface-3d px-3 py-1 text-muted-foreground"><FileJson className="h-3 w-3" /> JSON</span>
+                                  <span className="flex items-center gap-1.5 text-xs font-mono surface-3d px-3 py-1 text-muted-foreground"><FileText className="h-3 w-3" /> Documents</span>
+                                  <span className="flex items-center gap-1.5 text-xs font-mono surface-3d px-3 py-1 text-muted-foreground">Private storage</span>
                                 </div>
                               </label>
+                              <label htmlFor="file-upload" className="mt-6 cursor-pointer text-xs font-mono uppercase tracking-widest text-muted-foreground hover:text-primary">
+                                Import a legacy CSV or JSON file instead
+                              </label>
+                            </div>
+                          ) : folderFiles.length ? (
+                            <div className="space-y-4">
+                              <div className="flex flex-col gap-4 bg-black/30 p-4 rounded-xl recessed-3d sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex items-center gap-5">
+                                  <FolderUp className="h-8 w-8 text-primary" />
+                                  <div>
+                                    <p className="font-mono text-sm font-bold">{folderFiles.length} supported file{folderFiles.length === 1 ? "" : "s"} ready</p>
+                                    <p className="text-xs font-mono text-muted-foreground">
+                                      {skippedFolderFiles.length} skipped · {folderProgress.uploaded} uploaded · {folderProgress.failed} failed
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex gap-3">
+                                  <Button variant="outline" onClick={() => { setFolderFiles([]); setSkippedFolderFiles([]); setFolderStatus("idle") }} disabled={folderStatus === "uploading" || folderStatus === "building"} className="font-mono text-xs uppercase btn-3d">Reset</Button>
+                                  <Button onClick={handleFolderImport} disabled={folderStatus === "uploading" || folderStatus === "building"} className="btn-3d font-mono uppercase tracking-widest bg-primary text-primary-foreground">
+                                    {folderStatus === "uploading" ? `Uploading ${folderProgress.uploaded + folderProgress.failed}/${folderFiles.length}` : folderStatus === "building" ? "Analyzing documents..." : folderStatus === "success" ? "Project initialized" : "Upload & build project"}
+                                  </Button>
+                                </div>
+                              </div>
+                              <div className="surface-3d bg-black/20 max-h-[230px] overflow-auto p-3 font-mono text-xs">
+                                {folderFiles.slice(0, 100).map(({ relativePath, file }) => <div key={relativePath} className="flex justify-between gap-4 border-b border-border/20 py-2"><span className="truncate">{relativePath}</span><span className="shrink-0 text-muted-foreground">{(file.size / 1024 / 1024).toFixed(1)} MB</span></div>)}
+                                {folderFiles.length > 100 && <p className="pt-3 text-muted-foreground">Showing the first 100 files.</p>}
+                                {!!skippedFolderFiles.length && <div className="mt-3 border-t border-destructive/30 pt-2 text-destructive">{skippedFolderFiles.slice(0, 20).map((item, index) => <p key={`${item.name}-${index}`}>{item.name}: {item.reason}</p>)}{skippedFolderFiles.length > 20 && <p>Plus {skippedFolderFiles.length - 20} more skipped files.</p>}</div>}
+                              </div>
+                              {folderError && <p role="alert" className="font-mono text-xs text-destructive">{folderError}</p>}
                             </div>
                           ) : (
                             <div className="space-y-4">

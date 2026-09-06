@@ -5,7 +5,6 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { UploadUrlRequestContentType } from './uploadUrlRequestContentType';
 
 export interface UploadUrlRequest {
   /**
@@ -15,8 +14,14 @@ export interface UploadUrlRequest {
   name: string;
   /**
      * @minimum 1
-     * @maximum 8388608
+     * @maximum 209715200
      */
   size: number;
-  contentType: UploadUrlRequestContentType;
+  /** @maxLength 255 */
+  contentType: string;
+  /**
+     * @minLength 1
+     * @maxLength 1024
+     */
+  relativePath?: string;
 }

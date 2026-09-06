@@ -6,11 +6,17 @@ import { ObjectNotFoundError, ObjectStorageService } from "../lib/objectStorage"
 type AuthenticatedRequest = Request & { userId?: string };
 const router: IRouter = Router();
 const storage = new ObjectStorageService();
+const supportedExtensions = new Set(["pdf", "doc", "docx", "xls", "xlsx", "csv", "txt", "md", "json", "rtf", "jpg", "jpeg", "png", "webp", "heic", "tif", "tiff"]);
 
 router.post("/storage/uploads/request-url", async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const parsed = RequestUploadUrlBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Choose a JPEG, PNG, or WebP image that is 8 MB or smaller." });
+    res.status(400).json({ error: "Choose a supported construction document or image up to 200 MB." });
+    return;
+  }
+  const extension = parsed.data.name.split(".").pop()?.toLowerCase();
+  if (!extension || !supportedExtensions.has(extension)) {
+    res.status(400).json({ error: "This file type is not supported for project imports." });
     return;
   }
   try {
@@ -21,8 +27,8 @@ router.post("/storage/uploads/request-url", async (req: AuthenticatedRequest, re
       metadata: parsed.data,
     }));
   } catch (error) {
-    req.log.error({ err: error }, "Failed to generate panorama upload URL");
-    res.status(500).json({ error: "The panorama upload could not be started." });
+    req.log.error({ err: error }, "Failed to generate project document upload URL");
+    res.status(500).json({ error: "The document upload could not be started." });
   }
 });
 
