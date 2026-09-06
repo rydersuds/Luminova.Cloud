@@ -140,6 +140,10 @@ test.describe('navigation contrast', () => {
     await assertNavigationContrast(page, 'desktop profile expanded');
     await expect(page).toHaveScreenshot('desktop-profile-sign-out.png', { animations: 'disabled' });
 
+    await page.locator('[data-contrast-label="profile control"]').hover();
+    await assertNavigationContrast(page, 'desktop profile hover');
+    await expect(page).toHaveScreenshot('desktop-profile-hover.png', { animations: 'disabled' });
+
     await page.getByRole('button', { name: 'Sign out' }).hover();
     await assertNavigationContrast(page, 'desktop sign out hover');
     await expect(page).toHaveScreenshot('desktop-sign-out-hover.png', { animations: 'disabled' });

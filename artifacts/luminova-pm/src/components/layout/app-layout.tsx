@@ -180,20 +180,26 @@ export function AppLayoutView({
         </nav>
 
         <div className="p-4 mt-auto">
-          <div className="surface-3d bg-black/40 backdrop-blur-md p-2 rounded-2xl">
+          <div className="rounded-2xl bg-black p-2">
             <button
               type="button"
               data-contrast-label="profile control"
               onClick={() => setProfileOpen((open) => !open)}
               aria-expanded={profileOpen}
-              className="flex w-full items-center gap-3 px-3 py-3 text-left text-sm text-sidebar-foreground hover:text-white transition-colors cursor-pointer rounded-xl bg-sidebar-accent hover:bg-sidebar-accent shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]"
+              className="flex w-full items-center gap-3 rounded-xl bg-[#202020] px-3 py-3 text-left text-sm text-sidebar-foreground transition-colors hover:bg-[#292929] hover:text-white cursor-pointer"
             >
               <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center font-heading font-bold text-primary-foreground shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),0_4px_8px_rgba(0,0,0,0.5)]">
                 {initials || "PM"}
               </div>
-              <div className="flex-1 overflow-hidden">
+              <div className="min-w-0 flex-1">
                 <p className="font-bold truncate tracking-wide drop-shadow-sm">{displayName}</p>
-                <p className="text-xs font-mono opacity-60 truncate">{email}</p>
+                <p
+                  data-contrast-label="profile email"
+                  className="truncate text-[13px] font-medium leading-5 text-white/75"
+                  title={email}
+                >
+                  {email}
+                </p>
               </div>
               <ChevronDown className={cn("h-4 w-4 shrink-0 text-primary transition-transform drop-shadow-sm", profileOpen && "rotate-180")} />
             </button>
@@ -202,7 +208,7 @@ export function AppLayoutView({
                 type="button"
                 data-contrast-label="sign-out control"
                 onClick={onSignOut}
-                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-destructive/10 border border-destructive/20 px-3 py-3 text-xs font-bold uppercase tracking-wider text-destructive transition-all hover:bg-destructive hover:text-destructive-foreground hover:shadow-[0_4px_10px_rgba(255,0,0,0.3)]"
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-destructive/10 border border-destructive/20 px-3 py-3 text-xs font-bold uppercase tracking-wider text-red-400 transition-all hover:bg-destructive hover:text-destructive-foreground hover:shadow-[0_4px_10px_rgba(255,0,0,0.3)]"
               >
                 <LogOut className="h-4 w-4" />
                 Sign out
