@@ -10,6 +10,14 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: dashboard
+    description: Dashboard summaries
+  - name: projects
+    description: Construction projects
+  - name: trades
+    description: Trade directory
+  - name: invoices
+    description: Invoice intake and approval
 paths:
   /healthz:
     get:
@@ -24,7 +32,204 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+  /projects:
+    get:
+      operationId: getProjects
+      tags: [projects]
+      summary: List accessible projects
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: region
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Project list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Create a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectInput"
+      responses:
+        "201":
+          description: Created project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+  /projects/{projectId}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get a project
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Project details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDetail"
+        "404":
+          description: Project not found
+    patch:
+      operationId: updateProject
+      tags: [projects]
+      summary: Update a project
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectUpdate"
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+  /projects/{projectId}/activity:
+    get:
+      operationId: getProjectActivity
+      tags: [projects]
+      summary: Get project activity
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Activity feed
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Activity"
+  /trades:
+    get:
+      operationId: getTrades
+      tags: [trades]
+      summary: List trades
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: tradeType
+          in: query
+          schema:
+            type: string
+        - name: region
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Trade directory
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Trade"
+  /trades/{tradeId}:
+    get:
+      operationId: getTrade
+      tags: [trades]
+      summary: Get a trade profile
+      parameters:
+        - $ref: "#/components/parameters/TradeId"
+      responses:
+        "200":
+          description: Trade profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TradeDetail"
+  /invoices:
+    get:
+      operationId: getInvoices
+      tags: [invoices]
+      summary: List invoices
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Invoice list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Invoice"
+    post:
+      operationId: createInvoice
+      tags: [invoices]
+      summary: Submit an invoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceInput"
+      responses:
+        "201":
+          description: Created invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
 components:
+  parameters:
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema:
+        type: string
+    TradeId:
+      name: tradeId
+      in: path
+      required: true
+      schema:
+        type: string
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +238,237 @@ components:
           type: string
       required:
         - status
+    DashboardSummary:
+      type: object
+      required: [activeProjects, awaitingApproval, unreadMessages, new360Photos, budgeted, invoiced, recentActivity]
+      properties:
+        activeProjects:
+          type: integer
+        awaitingApproval:
+          type: integer
+        unreadMessages:
+          type: integer
+        new360Photos:
+          type: integer
+        budgeted:
+          type: integer
+        invoiced:
+          type: integer
+        recentActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/Activity"
+    Project:
+      type: object
+      required: [id, name, address, region, status, progress, pmName, clientName, targetDate, budgeted, invoiced, exteriorImage, description]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        address: { type: string }
+        region: { type: string }
+        status: { type: string }
+        progress: { type: integer }
+        pmName: { type: string }
+        clientName: { type: string }
+        targetDate: { type: string }
+        budgeted: { type: integer }
+        invoiced: { type: integer }
+        exteriorImage: { type: string }
+        description: { type: string }
+    ProjectInput:
+      type: object
+      required: [name, address, region, status, pmName, clientName, targetDate, budgeted, description]
+      properties:
+        name: { type: string }
+        address: { type: string }
+        region: { type: string }
+        status: { type: string }
+        pmName: { type: string }
+        clientName: { type: string }
+        targetDate: { type: string }
+        budgeted: { type: integer }
+        description: { type: string }
+        exteriorImage: { type: string }
+    ProjectUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        status: { type: string }
+        progress: { type: integer }
+        targetDate: { type: string }
+        description: { type: string }
+    ProjectDetail:
+      allOf:
+        - $ref: "#/components/schemas/Project"
+        - type: object
+          required: [startDate, clientQuote, lineItems, invoices, trades, photos, panoramas, activity]
+          properties:
+            startDate: { type: string }
+            clientQuote: { $ref: "#/components/schemas/ClientQuote" }
+            lineItems:
+              type: array
+              items:
+                $ref: "#/components/schemas/BudgetLineItem"
+            invoices:
+              type: array
+              items:
+                $ref: "#/components/schemas/Invoice"
+            trades:
+              type: array
+              items:
+                $ref: "#/components/schemas/Trade"
+            photos:
+              type: array
+              items:
+                $ref: "#/components/schemas/Photo"
+            panoramas:
+              type: array
+              items:
+                $ref: "#/components/schemas/Panorama"
+            activity:
+              type: array
+              items:
+                $ref: "#/components/schemas/Activity"
+    ClientQuote:
+      type: object
+      required: [total, revision, portions]
+      properties:
+        total: { type: integer }
+        revision: { type: string }
+        portions:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuotePortion"
+    QuotePortion:
+      type: object
+      required: [code, label, amount]
+      properties:
+        code: { type: string }
+        label: { type: string }
+        amount: { type: integer }
+    BudgetLineItem:
+      type: object
+      required: [id, code, description, budgeted, invoiced, variance]
+      properties:
+        id: { type: string }
+        code: { type: string }
+        description: { type: string }
+        budgeted: { type: integer }
+        invoiced: { type: integer }
+        variance: { type: integer }
+    Trade:
+      type: object
+      required: [id, companyName, contactName, tradeType, region, rating, reviewCount, completedJobs, initials, accent]
+      properties:
+        id: { type: string }
+        companyName: { type: string }
+        contactName: { type: string }
+        tradeType: { type: string }
+        region: { type: string }
+        rating: { type: number }
+        reviewCount: { type: integer }
+        completedJobs: { type: integer }
+        initials: { type: string }
+        accent: { type: string }
+    TradeDetail:
+      allOf:
+        - $ref: "#/components/schemas/Trade"
+        - type: object
+          required: [phone, email, website, licence, insuranceExpiry, regions, reviews, jobHistory, bids]
+          properties:
+            phone: { type: string }
+            email: { type: string }
+            website: { type: string }
+            licence: { type: string }
+            insuranceExpiry: { type: string }
+            regions:
+              type: array
+              items: { type: string }
+            reviews:
+              type: array
+              items:
+                $ref: "#/components/schemas/Review"
+            jobHistory:
+              type: array
+              items:
+                type: object
+                required: [projectName, date, amount]
+                properties:
+                  projectName: { type: string }
+                  date: { type: string }
+                  amount: { type: integer }
+            bids:
+              type: array
+              items:
+                $ref: "#/components/schemas/TradeBid"
+    Review:
+      type: object
+      required: [projectName, reviewer, date, rating, comment]
+      properties:
+        projectName: { type: string }
+        reviewer: { type: string }
+        date: { type: string }
+        rating: { type: integer }
+        comment: { type: string }
+    TradeBid:
+      type: object
+      required: [projectName, scope, amount, date, outcome]
+      properties:
+        projectName: { type: string }
+        scope: { type: string }
+        amount: { type: integer }
+        date: { type: string }
+        outcome: { type: string }
+    Invoice:
+      type: object
+      required: [id, invoiceNumber, projectId, projectName, vendor, amount, date, status, lineItem, overage]
+      properties:
+        id: { type: string }
+        invoiceNumber: { type: string }
+        projectId: { type: string }
+        projectName: { type: string }
+        vendor: { type: string }
+        amount: { type: integer }
+        date: { type: string }
+        status: { type: string }
+        lineItem: { type: string }
+        overage: { type: integer }
+    InvoiceInput:
+      type: object
+      required: [invoiceNumber, projectId, vendor, amount, date, lineItem]
+      properties:
+        invoiceNumber: { type: string }
+        projectId: { type: string }
+        vendor: { type: string }
+        amount: { type: integer }
+        date: { type: string }
+        lineItem: { type: string }
+    Photo:
+      type: object
+      required: [id, url, caption, phase, date]
+      properties:
+        id: { type: string }
+        url: { type: string }
+        caption: { type: string }
+        phase: { type: string }
+        date: { type: string }
+    Panorama:
+      type: object
+      required: [id, url, label, location, date]
+      properties:
+        id: { type: string }
+        url: { type: string }
+        label: { type: string }
+        location: { type: string }
+        date: { type: string }
+    Activity:
+      type: object
+      required: [id, type, title, description, author, date]
+      properties:
+        id: { type: string }
+        type: { type: string }
+        title: { type: string }
+        description: { type: string }
+        author: { type: string }
+        date: { type: string }
 

@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Luminova Construction PM"
+description = "A responsive construction project management workspace for Luminova Construction teams to track projects, budgets, trades, site photos, client quotes, invoices, and field communication."
+version = "1.0.0"
+id = "artifacts/luminova-pm"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21403
+
+[services.development]
+run = "pnpm --filter @workspace/luminova-pm run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/luminova-pm", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/luminova-pm/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21403"
+BASE_PATH = "/"
