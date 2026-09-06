@@ -61,8 +61,8 @@ function Intro() {
   const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
-    const fadeTimer = window.setTimeout(() => setLeaving(true), 5500);
-    const routeTimer = window.setTimeout(() => setLocation("/", { replace: true }), 6000);
+    const fadeTimer = window.setTimeout(() => setLeaving(true), 3500);
+    const routeTimer = window.setTimeout(() => setLocation("/", { replace: true }), 4000);
     return () => {
       window.clearTimeout(fadeTimer);
       window.clearTimeout(routeTimer);
