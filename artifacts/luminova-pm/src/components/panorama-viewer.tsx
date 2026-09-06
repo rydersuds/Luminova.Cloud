@@ -126,11 +126,17 @@ export function PanoramaViewer({
       updateView({ yaw: 0, pitch: 0, fieldOfView: INITIAL_FIELD_OF_VIEW })
     }
 
-    const gl = canvas.getContext("webgl", {
-      alpha: false,
-      antialias: true,
-      powerPreference: "high-performance",
-    })
+    let gl: WebGLRenderingContext | null = null
+    try {
+      gl = canvas.getContext("webgl", {
+        alpha: false,
+        antialias: true,
+        powerPreference: "high-performance",
+      })
+    } catch {
+      setStatus("error")
+      return
+    }
     if (!gl) {
       setStatus("error")
       return
@@ -139,15 +145,20 @@ export function PanoramaViewer({
     let program: WebGLProgram | null = null
     let texture: WebGLTexture | null = null
     let buffer: WebGLBuffer | null = null
+    let resizeFrame: number | null = null
     let disposed = false
     const image = new Image()
     image.crossOrigin = "anonymous"
 
     const releaseResources = () => {
       renderRef.current = null
-      if (texture) gl.deleteTexture(texture)
-      if (buffer) gl.deleteBuffer(buffer)
-      if (program) gl.deleteProgram(program)
+      try {
+        if (texture) gl.deleteTexture(texture)
+        if (buffer) gl.deleteBuffer(buffer)
+        if (program) gl.deleteProgram(program)
+      } catch {
+        // A lost graphics context may reject cleanup; resources are already unusable.
+      }
       texture = null
       buffer = null
       program = null
@@ -181,23 +192,29 @@ export function PanoramaViewer({
         const viewportLocation = gl.getUniformLocation(program, "viewport")
         const fieldOfViewLocation = gl.getUniformLocation(program, "fieldOfView")
         const render = (currentView: View) => {
-          if (gl.isContextLost()) return
-          const width = Math.max(1, Math.round(canvas.clientWidth * Math.min(window.devicePixelRatio || 1, 2)))
-          const height = Math.max(1, Math.round(canvas.clientHeight * Math.min(window.devicePixelRatio || 1, 2)))
-          if (canvas.width !== width || canvas.height !== height) {
-            canvas.width = width
-            canvas.height = height
+          if (disposed) return
+          try {
+            if (gl.isContextLost()) return
+            const width = Math.max(1, Math.round(canvas.clientWidth * Math.min(window.devicePixelRatio || 1, 2)))
+            const height = Math.max(1, Math.round(canvas.clientHeight * Math.min(window.devicePixelRatio || 1, 2)))
+            if (canvas.width !== width || canvas.height !== height) {
+              canvas.width = width
+              canvas.height = height
+            }
+            gl.viewport(0, 0, width, height)
+            gl.uniform2f(viewportLocation, width, height)
+            gl.uniform1f(yawLocation, currentView.yaw * Math.PI / 180)
+            gl.uniform1f(pitchLocation, currentView.pitch * Math.PI / 180)
+            gl.uniform1f(fieldOfViewLocation, currentView.fieldOfView)
+            gl.drawArrays(gl.TRIANGLES, 0, 6)
+          } catch {
+            releaseResources()
+            if (!disposed) setStatus(restoring ? "restore-error" : "error")
           }
-          gl.viewport(0, 0, width, height)
-          gl.uniform2f(viewportLocation, width, height)
-          gl.uniform1f(yawLocation, currentView.yaw * Math.PI / 180)
-          gl.uniform1f(pitchLocation, currentView.pitch * Math.PI / 180)
-          gl.uniform1f(fieldOfViewLocation, currentView.fieldOfView)
-          gl.drawArrays(gl.TRIANGLES, 0, 6)
         }
         renderRef.current = render
         render(viewRef.current)
-        setStatus("ready")
+        if (renderRef.current) setStatus("ready")
       } catch {
         releaseResources()
         setStatus(restoring ? "restore-error" : "error")
@@ -208,7 +225,11 @@ export function PanoramaViewer({
       if (!disposed) initializeRenderer(false)
     }
     image.onerror = () => !disposed && setStatus("error")
-    image.src = panorama.url
+    try {
+      image.src = panorama.url
+    } catch {
+      setStatus("error")
+    }
 
     const handleContextLost = (event: WebGLContextEvent) => {
       event.preventDefault()
@@ -224,14 +245,31 @@ export function PanoramaViewer({
     canvas.addEventListener("webglcontextlost", handleContextLost)
     canvas.addEventListener("webglcontextrestored", handleContextRestored)
 
-    const resizeObserver = new ResizeObserver(() => renderRef.current?.(viewRef.current))
-    resizeObserver.observe(canvas)
+    let resizeObserver: ResizeObserver | null = null
+    try {
+      resizeObserver = new ResizeObserver(() => {
+        if (resizeFrame !== null) cancelAnimationFrame(resizeFrame)
+        resizeFrame = requestAnimationFrame(() => {
+          resizeFrame = null
+          renderRef.current?.(viewRef.current)
+        })
+      })
+      resizeObserver.observe(canvas)
+    } catch {
+      setStatus("error")
+    }
 
     return () => {
       disposed = true
       image.onload = null
       image.onerror = null
-      resizeObserver.disconnect()
+      renderRef.current = null
+      if (resizeFrame !== null) cancelAnimationFrame(resizeFrame)
+      try {
+        resizeObserver?.disconnect()
+      } catch {
+        // The observer may already be detached while the dialog is closing.
+      }
       canvas.removeEventListener("webglcontextlost", handleContextLost)
       canvas.removeEventListener("webglcontextrestored", handleContextRestored)
       releaseResources()

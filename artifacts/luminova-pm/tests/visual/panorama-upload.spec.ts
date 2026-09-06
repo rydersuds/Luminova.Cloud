@@ -226,6 +226,41 @@ test('restores the panorama and complete view after WebGL context loss', async (
   await expect(page.getByRole('dialog', { name: 'Week 24 360 degree panorama' })).toBeVisible();
 });
 
+test('contains a renderer startup failure and can reopen the panorama', async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on('pageerror', error => pageErrors.push(error));
+  await page.addInitScript(() => {
+    const originalGetContext = HTMLCanvasElement.prototype.getContext;
+    let failNextWebGlStartup = true;
+    HTMLCanvasElement.prototype.getContext = function (...args) {
+      if (args[0] === 'webgl' && failNextWebGlStartup) {
+        failNextWebGlStartup = false;
+        throw new Error('Simulated panorama renderer startup failure');
+      }
+      return originalGetContext.apply(this, args as Parameters<typeof originalGetContext>);
+    } as typeof originalGetContext;
+  });
+
+  await openGallery(page);
+  await page.getByRole('button', { name: /Week 24/ }).click();
+
+  const failedViewer = page.getByRole('application', { name: /360 degree viewer for Week 24/ });
+  await expect(failedViewer).toHaveAttribute('data-render-status', 'error');
+  await expect(page.getByRole('alert')).toHaveText(
+    'This panorama could not be rendered. Try closing it and opening it again.',
+  );
+  await expect(page.getByRole('dialog', { name: 'Week 24 360 degree panorama' })).toBeVisible();
+  expect(pageErrors).toEqual([]);
+
+  await page.keyboard.press('Escape');
+  await expect(failedViewer).not.toBeVisible();
+  await page.getByRole('button', { name: /Week 24/ }).click();
+
+  const reopenedViewer = page.getByRole('application', { name: /360 degree viewer for Week 24/ });
+  await expect(reopenedViewer).toHaveAttribute('data-render-status', 'ready');
+  expect(pageErrors).toEqual([]);
+});
+
 test.describe('mobile panorama controls', () => {
   test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
 

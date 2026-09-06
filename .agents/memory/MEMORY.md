@@ -1,1 +1,2 @@
 - [Date-only OpenAPI fields](date-only-openapi-fields.md) — preserve editable calendar values as validated date-only strings instead of generated Date objects.
+- [WebGL resize observers](webgl-resize-observers.md) — schedule canvas resizing outside ResizeObserver callbacks to avoid generic browser runtime errors.
