@@ -17,12 +17,12 @@ export interface PanoramaInput {
      * @minLength 1
      * @maxLength 100
      */
-  label: string;
+  label?: string;
   /**
      * @minLength 1
      * @maxLength 100
      */
-  location: string;
+  location?: string;
   /** @pattern ^\d{4}-\d{2}-\d{2}$ */
-  date: string;
+  date?: string;
 }

@@ -9,7 +9,10 @@
 export interface Panorama {
   id: string;
   url: string;
-  label: string;
-  location: string;
-  date: string;
+  /** @nullable */
+  label: string | null;
+  /** @nullable */
+  location: string | null;
+  /** @nullable */
+  date: string | null;
 }

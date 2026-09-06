@@ -954,12 +954,12 @@ components:
       properties:
         id: { type: string }
         url: { type: string }
-        label: { type: string }
-        location: { type: string }
-        date: { type: string }
+        label: { type: [string, "null"] }
+        location: { type: [string, "null"] }
+        date: { type: [string, "null"] }
     PanoramaInput:
       type: object
-      required: [objectPath, label, location, date]
+      required: [objectPath]
       properties:
         objectPath:
           type: string

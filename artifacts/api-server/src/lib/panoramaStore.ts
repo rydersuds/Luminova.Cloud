@@ -6,9 +6,9 @@ import { ObjectStorageService } from "./objectStorage";
 export type PanoramaRecord = {
   id: string;
   url: string;
-  label: string;
-  location: string;
-  date: string;
+  label: string | null;
+  location: string | null;
+  date: string | null;
 };
 
 export interface PanoramaStore {
@@ -16,9 +16,9 @@ export interface PanoramaStore {
   create(input: {
     projectId: string;
     objectPath: string;
-    label: string;
-    location: string;
-    date: string;
+    label: string | null;
+    location: string | null;
+    date: string | null;
     ownerId: string;
   }): Promise<PanoramaRecord>;
 }

@@ -3,9 +3,9 @@ import { LoaderCircle, Minus, Move, Plus, RotateCcw } from "lucide-react"
 
 type Panorama = {
   url: string
-  label: string
-  location: string
-  date: string
+  label: string | null
+  location: string | null
+  date: string | null
 }
 
 type View = { yaw: number; pitch: number; fieldOfView: number }
@@ -105,6 +105,7 @@ export function PanoramaViewer({
   const [status, setStatus] = React.useState<"loading" | "ready" | "restoring" | "error" | "restore-error">("loading")
   const [renderAttempt, setRenderAttempt] = React.useState(0)
   const lastPanoramaUrlRef = React.useRef<string | null>(null)
+  const displayLabel = panorama.label || "Untitled panorama"
 
   const updateView = React.useCallback((next: View) => {
     const normalized = {
@@ -214,7 +215,7 @@ export function PanoramaViewer({
         }
         renderRef.current = render
         render(viewRef.current)
-        if (renderRef.current) setStatus("ready")
+        setStatus("ready")
       } catch {
         releaseResources()
         setStatus(restoring ? "restore-error" : "error")
@@ -349,7 +350,7 @@ export function PanoramaViewer({
       <div
         role="application"
         tabIndex={0}
-        aria-label={`360 degree viewer for ${panorama.label}. Drag in any direction or use the arrow keys to look around. Use the labeled controls to zoom.`}
+        aria-label={`360 degree viewer for ${displayLabel}. Drag in any direction or use the arrow keys to look around. Use the labeled controls to zoom.`}
         className="relative flex-1 min-h-0 cursor-grab touch-none select-none overflow-hidden outline-none active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
         onPointerDown={beginDrag}
         onPointerMove={moveDrag}
@@ -430,10 +431,10 @@ export function PanoramaViewer({
       <div className="border-t border-white/15 px-5 py-4 sm:px-8">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="font-medium">{panorama.label}</p>
-            <p className="mt-1 text-xs text-white/55">{panorama.location}</p>
+            <p className="font-medium">{displayLabel}</p>
+            <p className="mt-1 text-xs text-white/55">{panorama.location || "Location not provided"}</p>
           </div>
-          <p className="text-xs text-white/55">{formatDate(panorama.date)}</p>
+          <p className="text-xs text-white/55">{panorama.date ? formatDate(panorama.date) : "Capture date not provided"}</p>
         </div>
       </div>
     </div>

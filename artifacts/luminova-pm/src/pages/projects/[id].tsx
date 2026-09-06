@@ -42,7 +42,8 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const [panoramaError, setPanoramaError] = React.useState("")
   const [isPanoramaUploading, setIsPanoramaUploading] = React.useState(false)
   const [photoIndex, setPhotoIndex] = React.useState<number | null>(null)
-  const [activePanorama, setActivePanorama] = React.useState<{ url: string; label: string; location: string; date: string } | null>(null)
+  const [activePanorama, setActivePanorama] = React.useState<{ url: string; label: string | null; location: string | null; date: string | null } | null>(null)
+  const panoramaName = (label: string | null) => label || "Untitled panorama"
 
   const { data: project, isLoading } = useGetProject(projectId, {
     query: {
@@ -101,8 +102,8 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
     const location = String(formData.get("panorama-location") ?? "").trim()
     const date = String(formData.get("panorama-date") ?? "")
 
-    if (!panoramaImage || !label || !location || !date) {
-      setPanoramaError("Add an image, label, location, and capture date.")
+    if (!panoramaImage) {
+      setPanoramaError("Add a panorama image.")
       return
     }
 
@@ -129,16 +130,21 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
       })
       if (!stored.ok) throw new Error("The image could not be stored. Try again.")
 
+      const details = {
+        ...(label ? { label } : {}),
+        ...(location ? { location } : {}),
+        ...(date ? { date } : {}),
+      }
       await createPanorama.mutateAsync({
         projectId,
-        data: { objectPath: upload.objectPath, label, location, date },
+        data: { objectPath: upload.objectPath, ...details },
       })
       await queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) })
       setIsPanoramaUploadOpen(false)
       resetPanoramaForm()
       toast({
         title: "360° panorama uploaded",
-        description: `${label} is now available in the project gallery.`,
+        description: `${panoramaName(label)} is now available in the project gallery.`,
       })
     } catch (error) {
       setPanoramaError(error instanceof Error ? error.message : "The panorama could not be uploaded. Try again.")
@@ -462,16 +468,16 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                       )}
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                          <Label htmlFor="panorama-label">Label</Label>
+                          <Label htmlFor="panorama-label">Label <span className="font-normal text-muted-foreground">(optional)</span></Label>
                           <Input id="panorama-label" name="panorama-label" maxLength={100} placeholder="Week 25" />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="panorama-location">Location</Label>
+                          <Label htmlFor="panorama-location">Location <span className="font-normal text-muted-foreground">(optional)</span></Label>
                           <Input id="panorama-location" name="panorama-location" maxLength={100} placeholder="Main floor" />
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="panorama-date">Capture date</Label>
+                        <Label htmlFor="panorama-date">Capture date <span className="font-normal text-muted-foreground">(optional)</span></Label>
                         <Input id="panorama-date" name="panorama-date" type="date" />
                       </div>
                       {panoramaError && <p role="alert" className="text-sm text-destructive">{panoramaError}</p>}
@@ -493,7 +499,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                     onClick={() => setActivePanorama(pano)}
                     className="group relative h-[250px] overflow-hidden rounded-lg border border-border bg-sidebar text-left cursor-pointer"
                   >
-                    <img src={pano.url} alt={pano.label} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                    <img src={pano.url} alt={`360° panorama: ${panoramaName(pano.label)}`} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
                     <div className="absolute inset-0 flex items-center justify-center">
                       <div className="bg-background/90 text-foreground px-4 py-2 rounded-full font-medium shadow-lg flex items-center gap-2">
                         <Activity className="h-4 w-4" />
@@ -501,10 +507,10 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                       </div>
                     </div>
                     <div className="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-sidebar/90 to-transparent">
-                      <p className="text-sidebar-foreground font-medium">{pano.label}</p>
+                      <p className="text-sidebar-foreground font-medium">{panoramaName(pano.label)}</p>
                       <div className="flex justify-between text-xs text-sidebar-foreground/70 mt-1">
-                        <span>{pano.location}</span>
-                        <span>{formatDate(pano.date)}</span>
+                        <span>{pano.location || "Location not provided"}</span>
+                        <span>{pano.date ? formatDate(pano.date) : "Capture date not provided"}</span>
                       </div>
                     </div>
                   </button>
@@ -577,7 +583,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                 <DialogContent className="h-[92dvh] w-[96vw] !max-w-7xl overflow-hidden border-white/15 bg-black p-0 text-white">
                   {activePanorama && (
                     <>
-                      <DialogTitle className="sr-only">{activePanorama.label} 360 degree panorama</DialogTitle>
+                      <DialogTitle className="sr-only">{panoramaName(activePanorama.label)} 360 degree panorama</DialogTitle>
                       <PanoramaViewer panorama={activePanorama} formatDate={formatDate} />
                     </>
                   )}

@@ -66,12 +66,12 @@ test('opens the accessible upload form and validates missing input', async ({ pa
 
   await expect(page.getByRole('dialog', { name: 'Upload 360° panorama' })).toBeVisible();
   await expect(page.getByLabel('Panorama image')).toBeVisible();
-  await expect(page.getByLabel('Label')).toBeVisible();
-  await expect(page.getByLabel('Location')).toBeVisible();
-  await expect(page.getByLabel('Capture date')).toBeVisible();
+  await expect(page.getByLabel('Label (optional)')).toBeVisible();
+  await expect(page.getByLabel('Location (optional)')).toBeVisible();
+  await expect(page.getByLabel('Capture date (optional)')).toBeVisible();
 
   await page.getByRole('button', { name: 'Upload panorama' }).click();
-  await expect(page.getByRole('alert')).toHaveText('Add an image, label, location, and capture date.');
+  await expect(page.getByRole('alert')).toHaveText('Add a panorama image.');
 });
 
 test('reports upload failures', async ({ page }) => {
@@ -135,6 +135,46 @@ test('uploads, refreshes the gallery, and opens the new panorama', async ({ page
   await expect(newCard).toBeVisible();
   await newCard.click();
   await expect(page.getByRole('dialog')).toContainText('Week 25');
+});
+
+test('uploads an image without details and shows accessible fallbacks', async ({ page }) => {
+  const uploaded = {
+    id: 'pano-image-only',
+    url: '/panorama-test-fixture.svg',
+    label: null,
+    location: null,
+    date: null,
+  };
+  let current = structuredClone(project);
+  await page.unroute('**/api/projects/riverstone');
+  await page.route('**/api/projects/riverstone', async route => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ json: current });
+      return;
+    }
+    await route.fallback();
+  });
+  await page.route('**/api/projects/riverstone/panoramas', async route => {
+    expect(route.request().postDataJSON()).toEqual({
+      objectPath: '/objects/uploads/123e4567-e89b-12d3-a456-426614174000',
+    });
+    current = { ...current, panoramas: [...current.panoramas, uploaded] };
+    await route.fulfill({ status: 201, json: uploaded });
+  });
+
+  await openGallery(page);
+  await page.getByRole('button', { name: 'Upload 360°' }).click();
+  await page.getByLabel('Panorama image').setInputFiles({ name: 'site.png', mimeType: 'image/png', buffer: png });
+  await page.getByRole('button', { name: 'Upload panorama' }).click();
+
+  await expect(page.getByText('Untitled panorama is now available in the project gallery.', { exact: true })).toBeVisible();
+  const newCard = page.getByRole('button', { name: /Untitled panorama/ });
+  await expect(newCard).toContainText('Location not provided');
+  await expect(newCard).toContainText('Capture date not provided');
+  await expect(newCard.getByAltText('360° panorama: Untitled panorama')).toBeVisible();
+  await newCard.click();
+  await expect(page.getByRole('dialog', { name: 'Untitled panorama 360 degree panorama' })).toBeVisible();
+  await expect(page.getByRole('application', { name: /360 degree viewer for Untitled panorama/ })).toBeVisible();
 });
 
 test('explores the full spherical panorama with drag, keyboard, and zoom controls', async ({ page }) => {

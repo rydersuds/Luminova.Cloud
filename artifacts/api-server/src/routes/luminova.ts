@@ -333,27 +333,25 @@ router.post("/projects/:projectId/panoramas", async (req, res): Promise<void> =>
 
   const body = CreateProjectPanoramaBody.safeParse(req.body);
   if (!body.success) {
-    res.status(400).json({ error: "Add an image, label, location, and valid capture date." });
+    res.status(400).json({ error: "Add a valid panorama image and check any supplied details." });
     return;
   }
 
   const { objectPath, label, location, date } = body.data;
-  if (!label.trim() || !location.trim()) {
-    res.status(400).json({ error: "Label and location cannot be blank." });
-    return;
-  }
-  const parsedDate = new Date(`${date}T00:00:00.000Z`);
-  if (Number.isNaN(parsedDate.valueOf()) || parsedDate.toISOString().slice(0, 10) !== date) {
-    res.status(400).json({ error: "Capture date must be a valid calendar date." });
-    return;
+  if (date) {
+    const parsedDate = new Date(`${date}T00:00:00.000Z`);
+    if (Number.isNaN(parsedDate.valueOf()) || parsedDate.toISOString().slice(0, 10) !== date) {
+      res.status(400).json({ error: "Capture date must be a valid calendar date." });
+      return;
+    }
   }
   try {
     const panorama = await panoramaStore.create({
       projectId: project.id,
       objectPath,
-      label: label.trim(),
-      location: location.trim(),
-      date,
+      label: label?.trim() || null,
+      location: location?.trim() || null,
+      date: date ?? null,
       ownerId: String((req as typeof req & { userId?: string }).userId),
     });
     res.status(201).json(CreateProjectPanoramaResponse.parse(panorama));

@@ -64,6 +64,23 @@ test("persists a verified panorama and returns a stable serving URL", async () =
   }]);
 });
 
+test("persists an image-only panorama with absent details", async () => {
+  const repository = new MemoryRepository();
+  const store = new DatabasePanoramaStore(new FakeStorage(), repository);
+
+  const created = await store.create({
+    ...upload,
+    label: null,
+    location: null,
+    date: null,
+  });
+
+  assert.equal(created.label, null);
+  assert.equal(created.location, null);
+  assert.equal(created.date, null);
+  assert.equal(repository.rows[0].captureDate, null);
+});
+
 test("reloads metadata for only the requested project after a store restart", async () => {
   const repository = new MemoryRepository();
   await new DatabasePanoramaStore(new FakeStorage(), repository).create(upload);

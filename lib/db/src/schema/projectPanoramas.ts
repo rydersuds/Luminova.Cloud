@@ -6,9 +6,9 @@ export const projectPanoramasTable = pgTable("project_panoramas", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
   objectPath: text("object_path").notNull().unique(),
-  label: text("label").notNull(),
-  location: text("location").notNull(),
-  captureDate: date("capture_date", { mode: "string" }).notNull(),
+  label: text("label"),
+  location: text("location"),
+  captureDate: date("capture_date", { mode: "string" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -187,9 +187,12 @@ export interface Photo {
 export interface Panorama {
   id: string;
   url: string;
-  label: string;
-  location: string;
-  date: string;
+  /** @nullable */
+  label: string | null;
+  /** @nullable */
+  location: string | null;
+  /** @nullable */
+  date: string | null;
 }
 
 export type ProjectDetail = Project & {
@@ -358,14 +361,14 @@ export interface PanoramaInput {
      * @minLength 1
      * @maxLength 100
      */
-  label: string;
+  label?: string;
   /**
      * @minLength 1
      * @maxLength 100
      */
-  location: string;
+  location?: string;
   /** @pattern ^\d{4}-\d{2}-\d{2}$ */
-  date: string;
+  date?: string;
 }
 
 export type UploadUrlRequestContentType = typeof UploadUrlRequestContentType[keyof typeof UploadUrlRequestContentType];

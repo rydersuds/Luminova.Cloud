@@ -172,9 +172,9 @@ export const GetProjectResponse = zod.object({
   "panoramas": zod.array(zod.object({
   "id": zod.string(),
   "url": zod.string(),
-  "label": zod.string(),
-  "location": zod.string(),
-  "date": zod.string()
+  "label": zod.string().nullable(),
+  "location": zod.string().nullable(),
+  "date": zod.string().nullable()
 })),
   "activity": zod.array(zod.object({
   "id": zod.string(),
@@ -238,17 +238,17 @@ export const createProjectPanoramaBodyDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\
 
 export const CreateProjectPanoramaBody = zod.object({
   "objectPath": zod.string().min(1).regex(createProjectPanoramaBodyObjectPathRegExp).describe('App Storage object path returned after a direct upload'),
-  "label": zod.string().min(1).max(createProjectPanoramaBodyLabelMax),
-  "location": zod.string().min(1).max(createProjectPanoramaBodyLocationMax),
-  "date": zod.string().regex(createProjectPanoramaBodyDateRegExp)
+  "label": zod.string().min(1).max(createProjectPanoramaBodyLabelMax).optional(),
+  "location": zod.string().min(1).max(createProjectPanoramaBodyLocationMax).optional(),
+  "date": zod.string().regex(createProjectPanoramaBodyDateRegExp).optional()
 })
 
 export const CreateProjectPanoramaResponse = zod.object({
   "id": zod.string(),
   "url": zod.string(),
-  "label": zod.string(),
-  "location": zod.string(),
-  "date": zod.string()
+  "label": zod.string().nullable(),
+  "location": zod.string().nullable(),
+  "date": zod.string().nullable()
 })
 
 
