@@ -43,7 +43,7 @@ function Home() {
   return <>
     <Show when="signed-in"><Dashboard /></Show>
     <Show when="signed-out">
-      <main className="flex min-h-[100dvh] items-center justify-center overflow-hidden bg-sidebar bg-tech-grid p-6 text-sidebar-foreground">
+      <main className="flex min-h-[100dvh] items-center justify-center overflow-hidden bg-sidebar bg-tech-grid-soft p-6 text-sidebar-foreground">
         <div className="relative z-10 max-w-xl text-center">
           <img src="/luminova-logo.png" alt="Luminova Construction" className="mx-auto mb-8 h-32 w-72 object-contain" />
           <p className="font-mono text-xs uppercase tracking-[.24em] text-primary">Secure construction operations</p>
