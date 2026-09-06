@@ -133,6 +133,7 @@ test('explores the full spherical panorama with drag and keyboard controls', asy
   await expect(viewer).toContainText('Drag or use arrow keys to look around');
   await expect(viewer).toHaveAttribute('data-view-yaw', '0.0');
   await expect(viewer).toHaveAttribute('data-view-pitch', '0.0');
+  await expect(viewer).toHaveAttribute('data-field-of-view', '1.15');
   await expect(page.getByRole('dialog', { name: 'Week 24 360 degree panorama' })).toBeVisible();
 
   const initialCanvas = await viewer.locator('canvas').screenshot();
@@ -146,6 +147,19 @@ test('explores the full spherical panorama with drag and keyboard controls', asy
   await expect(viewer).not.toHaveAttribute('data-view-pitch', '0.0');
   const draggedCanvas = await viewer.locator('canvas').screenshot();
   expect(draggedCanvas.equals(initialCanvas)).toBe(false);
+
+  await viewer.hover();
+  await page.mouse.wheel(0, -200);
+  await expect(viewer).not.toHaveAttribute('data-field-of-view', '1.15');
+
+  const zoomIn = page.getByRole('button', { name: 'Zoom in' });
+  const zoomOut = page.getByRole('button', { name: 'Zoom out' });
+  await expect(zoomIn).toBeVisible();
+  await expect(zoomOut).toBeVisible();
+  const fieldOfViewBeforeKeyboard = await viewer.getAttribute('data-field-of-view');
+  await zoomIn.focus();
+  await page.keyboard.press('Enter');
+  await expect(viewer).not.toHaveAttribute('data-field-of-view', fieldOfViewBeforeKeyboard!);
 
   const yawBeforeTouch = await viewer.getAttribute('data-view-yaw');
   await viewer.dispatchEvent('pointerdown', { pointerId: 7, pointerType: 'touch', clientX: 700, clientY: 300 });
@@ -175,6 +189,7 @@ test('explores the full spherical panorama with drag and keyboard controls', asy
   await expect(reopenedViewer).toHaveAttribute('data-render-status', 'ready');
   await expect(reopenedViewer).toHaveAttribute('data-view-yaw', '0.0');
   await expect(reopenedViewer).toHaveAttribute('data-view-pitch', '0.0');
+  await expect(reopenedViewer).toHaveAttribute('data-field-of-view', '1.15');
 });
 
 test.describe('mobile panorama controls', () => {
@@ -204,6 +219,24 @@ test.describe('mobile panorama controls', () => {
 
     await expect(viewer).not.toHaveAttribute('data-view-yaw', '0.0');
     await expect(viewer).not.toHaveAttribute('data-view-pitch', '0.0');
+
+    const fieldOfViewBeforePinch = await viewer.getAttribute('data-field-of-view');
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [
+        { x: box!.x + box!.width * 0.35, y: box!.y + box!.height * 0.5 },
+        { x: box!.x + box!.width * 0.65, y: box!.y + box!.height * 0.5 },
+      ],
+    });
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [
+        { x: box!.x + box!.width * 0.2, y: box!.y + box!.height * 0.5 },
+        { x: box!.x + box!.width * 0.8, y: box!.y + box!.height * 0.5 },
+      ],
+    });
+    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await expect(viewer).not.toHaveAttribute('data-field-of-view', fieldOfViewBeforePinch!);
 
     const dialogBox = await page.getByRole('dialog').boundingBox();
     expect(dialogBox!.width).toBeLessThanOrEqual(390);
