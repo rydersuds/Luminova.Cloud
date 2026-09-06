@@ -511,8 +511,8 @@ export default function Dashboard() {
                     <div className="h-32 bg-black/40 relative overflow-hidden group-hover:bg-black/20 transition-colors">
                       {project.exteriorImage ? (
                         <div className="w-full h-full relative">
-                          <img src={project.exteriorImage} alt={project.name} className="w-full h-full object-cover opacity-80 mix-blend-luminosity group-hover:opacity-100 group-hover:scale-105 transition-all duration-700" />
-                          <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent opacity-80"></div>
+                          <img src={project.exteriorImage} alt={project.name} className="w-full h-full object-cover saturate-110 group-hover:scale-105 transition-transform duration-700" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent"></div>
                         </div>
                       ) : (
                         <div className="w-full h-full flex items-center justify-center tech-grid opacity-30">

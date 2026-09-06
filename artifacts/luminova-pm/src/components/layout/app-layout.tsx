@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter"
 import { 
   Building2, 
+  FolderKanban,
   Users, 
   FileText, 
   MessageSquare, 
@@ -9,15 +10,15 @@ import {
   Menu,
   X,
   Activity,
-  ShieldAlert,
-  Server
+  ShieldAlert
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useHealthCheck } from "@workspace/api-client-react"
 
 const NAV_ITEMS = [
   { href: "/", label: "Command Center", icon: Building2 },
+  { href: "/projects", label: "All Projects", icon: FolderKanban },
   { href: "/trades", label: "Trades & Vendors", icon: Users },
   { href: "/invoices", label: "Financials", icon: FileText },
   { href: "/messages", label: "Communications", icon: MessageSquare },
@@ -27,13 +28,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { data: health } = useHealthCheck()
-  const [currentTime, setCurrentTime] = useState(new Date())
-
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
-    return () => clearInterval(timer)
-  }, [])
-
   return (
     <div className="min-h-[100dvh] flex flex-col md:flex-row bg-background bg-tech-grid text-foreground selection:bg-primary selection:text-primary-foreground">
       {/* Mobile header */}
@@ -60,16 +54,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         sidebarOpen ? "translate-x-0 shadow-2xl shadow-primary/10" : "-translate-x-full md:translate-x-0"
       )}>
         {/* Top Branding Area */}
-        <div className="px-6 py-8 hidden md:flex flex-col gap-4 relative">
+        <div className="px-6 py-8 hidden md:flex flex-col relative">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-50"></div>
           <img src="/luminova-logo.png" alt="Luminova Construction" className="h-14 w-44 object-contain object-left drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" />
-          <div className="flex items-center justify-between text-xs font-mono text-sidebar-foreground/50 border border-sidebar-border/50 rounded-sm px-2 py-1 bg-black/40">
-            <span className="flex items-center gap-1.5 uppercase tracking-wider">
-              <Server className="h-3 w-3 text-primary" />
-              Mainframe
-            </span>
-            <span className="text-primary">{currentTime.toLocaleTimeString('en-US', { hour12: false })}</span>
-          </div>
         </div>
 
         {/* Navigation Links */}
