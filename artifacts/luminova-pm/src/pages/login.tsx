@@ -23,7 +23,7 @@ export default function Login() {
       <div className="w-full max-w-md relative z-10 space-y-8">
         <div className="flex flex-col items-center text-center space-y-4">
           <div className="h-28 w-64 mb-2">
-            <img src="/luminova-logo.avif" alt="Luminova Construction" className="h-full w-full object-contain" />
+            <img src="/luminova-logo.png" alt="Luminova Construction" className="h-full w-full object-contain" />
           </div>
           <h1 className="text-3xl font-heading font-bold text-sidebar-foreground tracking-tight">Construction Operations</h1>
           <p className="text-sidebar-foreground/60 text-sm">Project management workspace</p>

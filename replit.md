@@ -42,6 +42,7 @@ The first build includes a live project dashboard, responsive project workspaces
 
 - Use the supplied Luminova logo on dark chrome and login surfaces.
 - Keep the interface readable in bright outdoor light and fully responsive for field use.
+- Keep realistic demo projects and conversations visible, but never prefill new-project forms or invent missing import values.
 
 ## Gotchas
 
