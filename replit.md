@@ -1,6 +1,6 @@
-# [Project name]
+# Luminova Construction PM
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A responsive construction operations workspace for projects, trades, quotes, budgets, invoices, site photography, and team communication.
 
 ## Run & Operate
 
@@ -22,19 +22,26 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/luminova-pm/` — React/Vite web app and Luminova brand assets
+- `artifacts/api-server/src/routes/luminova.ts` — current project, trade, dashboard, and invoice API behavior
+- `lib/api-spec/openapi.yaml` — source of truth for API contracts and generated client hooks
+- `artifacts/luminova-pm/src/index.css` — exact Luminova design tokens and global theme
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Money values are represented as integer cents throughout the API.
+- Client quotes and trade quotes remain separate concepts and must never share permissions or data shapes.
+- The current first-build API uses seeded in-process demo data; durable database persistence is the next backend milestone.
+- Gold is reserved for brand and primary actions; status indicators use success, warning, danger, and info tokens.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+The first build includes a live project dashboard, responsive project workspaces, trade directory and profiles, invoice intake with automatic budget approval logic, project creation/editing, activity, messaging presentation, and a branded login experience.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Use the supplied Luminova logo on dark chrome and login surfaces.
+- Keep the interface readable in bright outdoor light and fully responsive for field use.
 
 ## Gotchas
 

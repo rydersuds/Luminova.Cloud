@@ -1,0 +1,514 @@
+import * as React from "react"
+import { useLocation, useParams } from "wouter"
+import { AppLayout } from "@/components/layout/app-layout"
+import { 
+  useGetProject, 
+  getGetProjectQueryKey,
+  useUpdateProject,
+  useGetProjectActivity,
+  getGetProjectActivityQueryKey
+} from "@workspace/api-client-react"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { 
+  Building, MapPin, Calendar, DollarSign, ArrowLeft, 
+  Camera, Briefcase, FileText, CheckCircle2, ChevronRight, Activity, Clock
+} from "lucide-react"
+import { cn, formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
+import { useQueryClient } from "@tanstack/react-query"
+
+export default function ProjectDetail() {
+  const params = useParams()
+  const [, setLocation] = useLocation()
+  const projectId = params.id as string
+  const queryClient = useQueryClient()
+  const [isEditOpen, setIsEditOpen] = React.useState(false)
+
+  const { data: project, isLoading } = useGetProject(projectId, {
+    query: {
+      enabled: !!projectId,
+      queryKey: getGetProjectQueryKey(projectId)
+    }
+  })
+
+  const { data: activityList } = useGetProjectActivity(projectId, {
+    query: {
+      enabled: !!projectId,
+      queryKey: getGetProjectActivityQueryKey(projectId)
+    }
+  })
+
+  const updateProject = useUpdateProject()
+
+  const handleUpdate = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+    updateProject.mutate({
+      projectId,
+      data: {
+        name: formData.get("name") as string,
+        status: formData.get("status") as string,
+        progress: Number(formData.get("progress")),
+        targetDate: formData.get("targetDate") as string,
+        description: formData.get("description") as string,
+      }
+    }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) })
+        setIsEditOpen(false)
+      }
+    })
+  }
+
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <div className="flex-1 p-8 flex items-center justify-center">
+          <div className="animate-pulse flex flex-col items-center gap-4">
+            <div className="h-12 w-12 rounded-full bg-muted" />
+            <div className="h-4 w-32 bg-muted rounded" />
+          </div>
+        </div>
+      </AppLayout>
+    )
+  }
+
+  if (!project) {
+    return (
+      <AppLayout>
+        <div className="flex-1 p-8 text-center">
+          <h2 className="text-2xl font-bold mb-4">Project not found</h2>
+          <Button onClick={() => setLocation("/")}>Back to Dashboard</Button>
+        </div>
+      </AppLayout>
+    )
+  }
+
+  const budgetVariance = project.budgeted - project.invoiced
+  const varianceIsPositive = budgetVariance >= 0
+
+  return (
+    <AppLayout>
+      <div className="flex-1 overflow-auto bg-background flex flex-col">
+        {/* Project Header (Dark Chrome) */}
+        <div className="bg-sidebar text-sidebar-foreground shrink-0 border-b border-sidebar-border">
+          <div className="max-w-[1400px] mx-auto p-6 md:p-8 space-y-6">
+            <button 
+              onClick={() => setLocation("/")}
+              className="flex items-center gap-2 text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors text-sm font-medium w-fit"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Projects
+            </button>
+            
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <Badge variant={getStatusColor(project.status) as any} className="capitalize">
+                    {project.status}
+                  </Badge>
+                  <span className="text-sidebar-foreground/60 text-sm font-medium">ID: {project.id}</span>
+                </div>
+                <h1 className="text-3xl md:text-4xl font-heading font-bold">{project.name}</h1>
+                <div className="flex flex-wrap items-center gap-4 md:gap-6 text-sm text-sidebar-foreground/80">
+                  <div className="flex items-center gap-1.5">
+                    <MapPin className="h-4 w-4 text-sidebar-primary" />
+                    {project.address}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="h-4 w-4 text-sidebar-primary" />
+                    Target: {formatDate(project.targetDate)}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Briefcase className="h-4 w-4 text-sidebar-primary" />
+                    Client: {project.clientName}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="bg-transparent border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground">
+                      Edit Project
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Edit Project</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleUpdate} className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Project Name</Label>
+                        <Input id="name" name="name" defaultValue={project.name} required />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="status">Status</Label>
+                          <select 
+                            id="status" 
+                            name="status" 
+                            defaultValue={project.status}
+                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          >
+                            <option value="Active">Active</option>
+                            <option value="Planning">Planning</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Delayed">Delayed</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="progress">Progress (%)</Label>
+                          <Input id="progress" name="progress" type="number" min="0" max="100" defaultValue={project.progress} required />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="targetDate">Target Date</Label>
+                        <Input id="targetDate" name="targetDate" type="date" defaultValue={project.targetDate} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="description">Description</Label>
+                        <Textarea id="description" name="description" defaultValue={project.description} />
+                      </div>
+                      <DialogFooter>
+                        <Button type="submit" disabled={updateProject.isPending}>
+                          {updateProject.isPending ? "Saving..." : "Save Changes"}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+                <Button>Update Progress</Button>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-sidebar-border rounded-lg overflow-hidden border border-sidebar-border">
+              <div className="bg-sidebar p-4 space-y-1">
+                <p className="text-sm text-sidebar-foreground/60">Budgeted</p>
+                <p className="text-xl font-bold tabular-nums">{formatCurrency(project.budgeted)}</p>
+              </div>
+              <div className="bg-sidebar p-4 space-y-1">
+                <p className="text-sm text-sidebar-foreground/60">Invoiced</p>
+                <p className="text-xl font-bold tabular-nums">{formatCurrency(project.invoiced)}</p>
+              </div>
+              <div className="bg-sidebar p-4 space-y-1">
+                <p className="text-sm text-sidebar-foreground/60">Variance</p>
+                <p className={cn("text-xl font-bold tabular-nums", varianceIsPositive ? "text-success" : "text-destructive")}>
+                  {varianceIsPositive ? "+" : ""}{formatCurrency(budgetVariance)}
+                </p>
+              </div>
+              <div className="bg-sidebar p-4 space-y-1">
+                <p className="text-sm text-sidebar-foreground/60">Completion</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xl font-bold tabular-nums">{project.progress}%</p>
+                  <div className="flex-1 h-1.5 bg-sidebar-accent rounded-full overflow-hidden">
+                    <div className="h-full bg-sidebar-primary rounded-full" style={{ width: `${project.progress}%` }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Project Content */}
+        <div className="flex-1 p-6 md:p-8 max-w-[1400px] w-full mx-auto">
+          <Tabs defaultValue="overview" className="w-full">
+            <TabsList className="mb-6 grid w-full grid-cols-3 md:flex md:justify-start h-auto bg-transparent gap-2 p-0">
+              <TabsTrigger value="overview" className="data-[state=active]:bg-card data-[state=active]:shadow border border-transparent data-[state=active]:border-border px-4 py-2">Overview</TabsTrigger>
+              <TabsTrigger value="photos" className="data-[state=active]:bg-card data-[state=active]:shadow border border-transparent data-[state=active]:border-border px-4 py-2">Photos & 360s</TabsTrigger>
+              <TabsTrigger value="budget" className="data-[state=active]:bg-card data-[state=active]:shadow border border-transparent data-[state=active]:border-border px-4 py-2">Budget</TabsTrigger>
+              <TabsTrigger value="trades" className="data-[state=active]:bg-card data-[state=active]:shadow border border-transparent data-[state=active]:border-border px-4 py-2 hidden md:flex">Trades</TabsTrigger>
+              <TabsTrigger value="activity" className="data-[state=active]:bg-card data-[state=active]:shadow border border-transparent data-[state=active]:border-border px-4 py-2 hidden md:flex">Activity</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="md:col-span-2 space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Project Description</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-muted-foreground whitespace-pre-wrap">{project.description || "No description provided."}</p>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <div>
+                        <CardTitle>Recent Trades on Site</CardTitle>
+                        <CardDescription>Vendors scheduled or recently completed work</CardDescription>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => document.querySelector('[value="trades"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))}>View All</Button>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {project.trades.slice(0,3).map(trade => (
+                          <div key={trade.id} className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/20">
+                            <div className="flex items-center gap-3">
+                              <div className="h-10 w-10 rounded-full flex items-center justify-center font-heading font-bold text-sm" style={{ backgroundColor: `${trade.accent}20`, color: trade.accent }}>
+                                {trade.initials}
+                              </div>
+                              <div>
+                                <p className="font-medium">{trade.companyName}</p>
+                                <p className="text-xs text-muted-foreground">{trade.tradeType}</p>
+                              </div>
+                            </div>
+                            <Button variant="ghost" size="icon" onClick={() => setLocation(`/trades/${trade.id}`)}>
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                <div className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Key Contacts</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Project Manager</p>
+                        <div className="flex items-center gap-2">
+                          <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-heading font-bold text-xs">
+                            {project.pmName.charAt(0)}
+                          </div>
+                          <span className="font-medium">{project.pmName}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Client</p>
+                        <div className="flex items-center gap-2">
+                          <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center text-secondary-foreground font-heading font-bold text-xs">
+                            {project.clientName.charAt(0)}
+                          </div>
+                          <span className="font-medium">{project.clientName}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Recent Activity</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="divide-y divide-border">
+                        {activityList?.slice(0, 4).map(act => (
+                          <div key={act.id} className="p-4 text-sm">
+                            <div className="flex justify-between items-start mb-1">
+                              <span className="font-medium">{act.title}</span>
+                              <span className="text-xs text-muted-foreground">{formatDate(act.date)}</span>
+                            </div>
+                            <p className="text-muted-foreground text-xs line-clamp-2">{act.description}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="photos" className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-heading font-semibold">360° Panoramas</h3>
+                <Button variant="outline" className="gap-2">
+                  <Camera className="h-4 w-4" />
+                  Upload 360°
+                </Button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {project.panoramas.map(pano => (
+                  <div key={pano.id} className="group relative rounded-lg overflow-hidden border border-border bg-sidebar h-[250px] cursor-pointer">
+                    <img src={pano.url} alt={pano.label} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="bg-background/90 text-foreground px-4 py-2 rounded-full font-medium shadow-lg flex items-center gap-2">
+                        <Activity className="h-4 w-4" />
+                        View 360°
+                      </div>
+                    </div>
+                    <div className="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-sidebar/90 to-transparent">
+                      <p className="text-sidebar-foreground font-medium">{pano.label}</p>
+                      <div className="flex justify-between text-xs text-sidebar-foreground/70 mt-1">
+                        <span>{pano.location}</span>
+                        <span>{formatDate(pano.date)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <h3 className="text-xl font-heading font-semibold mt-8 mb-4">Standard Photos</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {project.photos.map(photo => (
+                  <div key={photo.id} className="rounded-lg overflow-hidden border border-border group cursor-pointer">
+                    <div className="aspect-square bg-muted relative">
+                      <img src={photo.url} alt={photo.caption} className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-sidebar/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4 text-center">
+                        <p className="text-sidebar-foreground text-sm font-medium">{photo.caption}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="budget" className="space-y-6">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>Budget vs Actual</CardTitle>
+                    <CardDescription>Line item breakdown</CardDescription>
+                  </div>
+                  <Button>Add Line Item</Button>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[100px]">Code</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead className="text-right">Budgeted</TableHead>
+                        <TableHead className="text-right">Invoiced</TableHead>
+                        <TableHead className="text-right">Variance</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {project.lineItems.map(item => (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-mono text-xs">{item.code}</TableCell>
+                          <TableCell className="font-medium">{item.description}</TableCell>
+                          <TableCell className="text-right tabular-nums">{formatCurrency(item.budgeted)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{formatCurrency(item.invoiced)}</TableCell>
+                          <TableCell className={cn("text-right tabular-nums font-medium", item.variance >= 0 ? "text-success" : "text-destructive")}>
+                            {item.variance >= 0 ? "+" : ""}{formatCurrency(item.variance)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Client Quote Detail</CardTitle>
+                  <CardDescription>Revision: {project.clientQuote.revision}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Label</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {project.clientQuote.portions.map(portion => (
+                        <TableRow key={portion.code}>
+                          <TableCell>{portion.label}</TableCell>
+                          <TableCell className="text-right tabular-nums">{formatCurrency(portion.amount)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <div className="flex justify-end pt-4 font-bold text-lg border-t border-border mt-4">
+                    Total: <span className="tabular-nums ml-4">{formatCurrency(project.clientQuote.total)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="trades" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Assigned Trades</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Company</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Rating</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {project.trades.map(trade => (
+                        <TableRow key={trade.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="h-8 w-8 rounded-full flex items-center justify-center font-heading font-bold text-xs" style={{ backgroundColor: `${trade.accent}20`, color: trade.accent }}>
+                                {trade.initials}
+                              </div>
+                              <div>
+                                <p className="font-medium">{trade.companyName}</p>
+                                <p className="text-xs text-muted-foreground">{trade.contactName}</p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{trade.tradeType}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <span className="font-medium">{trade.rating.toFixed(1)}</span>
+                              <span className="text-xs text-muted-foreground">({trade.reviewCount})</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="sm" onClick={() => setLocation(`/trades/${trade.id}`)}>
+                              Profile
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="activity" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Project Activity</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="relative border-l border-border ml-3 space-y-8 pb-4">
+                    {activityList?.map((act, i) => (
+                      <div key={act.id} className="relative pl-6">
+                        <div className="absolute w-3 h-3 bg-primary rounded-full -left-[6.5px] top-1.5 ring-4 ring-background" />
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-medium">{act.title}</h4>
+                            <span className="text-xs text-muted-foreground">{formatDate(act.date)}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{act.description}</p>
+                          <p className="text-xs font-medium text-foreground pt-1">by {act.author}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+          </Tabs>
+        </div>
+      </div>
+    </AppLayout>
+  )
+}
