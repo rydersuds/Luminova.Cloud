@@ -55,18 +55,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Futuristic Sidebar */}
       <aside className={cn(
-        "fixed md:static inset-y-0 left-0 w-72 glass-panel-dark text-sidebar-foreground flex flex-col z-30 transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] border-r border-sidebar-border/50",
-        sidebarOpen ? "translate-x-0 shadow-2xl shadow-primary/10" : "-translate-x-full md:translate-x-0"
+        "fixed md:static inset-y-0 left-0 w-72 glass-panel-dark text-sidebar-foreground flex flex-col z-30 transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] md:m-4 md:rounded-2xl md:h-[calc(100dvh-2rem)]",
+        sidebarOpen ? "translate-x-0 shadow-[0_0_50px_rgba(0,0,0,0.8)]" : "-translate-x-full md:translate-x-0"
       )}>
         {/* Top Branding Area */}
-        <div className="px-6 py-8 hidden md:flex flex-col relative">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-50"></div>
-          <img src="/luminova-logo.png" alt="Luminova Construction" className="h-14 w-44 object-contain object-left drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" />
+        <div className="px-6 py-8 hidden md:flex flex-col relative items-center">
+          <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-primary/10 to-transparent opacity-50"></div>
+          <img src="/luminova-logo.png" alt="Luminova Construction" className="h-16 w-auto object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)] z-10" />
         </div>
 
         {/* Navigation Links */}
-        <nav className="flex-1 px-4 py-6 md:py-2 space-y-2 overflow-y-auto">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-sidebar-foreground/40 mb-4 px-2">System Modules</div>
+        <nav className="flex-1 px-4 py-6 md:py-2 space-y-3 overflow-y-auto">
+          <div className="text-[10px] font-mono uppercase tracking-widest text-sidebar-foreground/40 mb-4 px-2">Operations Center</div>
           {NAV_ITEMS.map((item) => {
             const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href))
             return (
@@ -74,50 +74,49 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 key={item.href} 
                 href={item.href}
                 className={cn(
-                  "group relative flex items-center gap-3 px-3 py-3 rounded-none text-sm font-medium transition-all duration-300 overflow-hidden",
+                  "group relative flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-all duration-300 overflow-hidden shadow-sm",
                   isActive 
-                    ? "text-primary-foreground tech-border bg-primary/90 gold-glow" 
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground hover:pl-5"
+                    ? "text-primary-foreground bg-primary shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),0_4px_15px_-3px_hsl(var(--primary)/0.5)] transform scale-[1.02]" 
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_2px_10px_rgba(0,0,0,0.2)]"
                 )}
                 onClick={() => setSidebarOpen(false)}
               >
-                {isActive && (
-                  <span className="absolute left-0 top-0 bottom-0 w-1 bg-white opacity-50"></span>
-                )}
-                <item.icon size={18} className={cn("transition-transform duration-300", isActive ? "scale-110" : "group-hover:scale-110 group-hover:text-primary")} />
-                <span className="relative z-10 tracking-wide">{item.label}</span>
+                <item.icon size={20} className={cn("transition-transform duration-300 drop-shadow-md", isActive ? "scale-110" : "group-hover:scale-110 group-hover:text-primary")} />
+                <span className="relative z-10 tracking-wide drop-shadow-sm">{item.label}</span>
               </Link>
             )
           })}
         </nav>
 
         {/* User / Status Bottom Area */}
-        <div className="p-4 border-t border-sidebar-border/50 mt-auto bg-black/20 backdrop-blur-md">
-          <button
-            type="button"
-            onClick={() => setProfileOpen((open) => !open)}
-            aria-expanded={profileOpen}
-            className="flex w-full items-center gap-3 px-3 py-3 text-left text-sm text-sidebar-foreground hover:text-white transition-colors cursor-pointer tech-clip bg-sidebar-accent/50 hover:bg-sidebar-accent border border-sidebar-border"
-          >
-            <div className="w-9 h-9 rounded-none bg-primary flex items-center justify-center font-heading font-bold text-primary-foreground shadow-[0_0_10px_rgba(0,0,0,0.5)]">
-              {initials || "PM"}
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <p className="font-medium truncate tracking-wide">{displayName}</p>
-              <p className="text-xs font-mono opacity-60 truncate">{email}</p>
-            </div>
-            <ChevronDown className={cn("h-4 w-4 shrink-0 text-primary transition-transform", profileOpen && "rotate-180")} />
-          </button>
-          {profileOpen && (
+        <div className="p-4 mt-auto">
+          <div className="surface-3d bg-black/40 backdrop-blur-md p-2 rounded-2xl">
             <button
               type="button"
-              onClick={() => void signOut({ redirectUrl: import.meta.env.BASE_URL })}
-              className="mt-2 flex w-full items-center justify-center gap-2 border border-sidebar-border/60 px-3 py-2.5 text-xs font-mono uppercase tracking-wider text-sidebar-foreground/75 transition-colors hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => setProfileOpen((open) => !open)}
+              aria-expanded={profileOpen}
+              className="flex w-full items-center gap-3 px-3 py-3 text-left text-sm text-sidebar-foreground hover:text-white transition-colors cursor-pointer rounded-xl bg-sidebar-accent/50 hover:bg-sidebar-accent shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]"
             >
-              <LogOut className="h-4 w-4" />
-              Sign out
+              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center font-heading font-bold text-primary-foreground shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),0_4px_8px_rgba(0,0,0,0.5)]">
+                {initials || "PM"}
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <p className="font-bold truncate tracking-wide drop-shadow-sm">{displayName}</p>
+                <p className="text-xs font-mono opacity-60 truncate">{email}</p>
+              </div>
+              <ChevronDown className={cn("h-4 w-4 shrink-0 text-primary transition-transform drop-shadow-sm", profileOpen && "rotate-180")} />
             </button>
-          )}
+            {profileOpen && (
+              <button
+                type="button"
+                onClick={() => void signOut({ redirectUrl: import.meta.env.BASE_URL })}
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-destructive/10 border border-destructive/20 px-3 py-3 text-xs font-bold uppercase tracking-wider text-destructive transition-all hover:bg-destructive hover:text-destructive-foreground hover:shadow-[0_4px_10px_rgba(255,0,0,0.3)]"
+              >
+                <LogOut className="h-4 w-4" />
+                Sign out
+              </button>
+            )}
+          </div>
         </div>
       </aside>
 

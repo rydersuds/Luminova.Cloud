@@ -204,14 +204,14 @@ export default function Dashboard() {
 
               <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                 <DialogTrigger asChild>
-                  <Button className="w-full sm:w-auto gap-2 tech-clip gold-glow font-bold tracking-wide shadow-xl bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-5 sm:px-6">
-                    <Plus className="h-4 w-4" />
-                    <span className="sm:hidden">NEW PROJECT</span>
-                    <span className="hidden sm:inline">INITIALIZE PROJECT</span>
+                  <Button className="w-full sm:w-auto gap-2 btn-3d font-bold tracking-wide shadow-xl bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-5 sm:px-6">
+                    <Plus className="h-4 w-4 drop-shadow-sm" />
+                    <span className="sm:hidden drop-shadow-sm">NEW PROJECT</span>
+                    <span className="hidden sm:inline drop-shadow-sm">INITIALIZE PROJECT</span>
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-4xl glass-panel p-0 border-border/50">
-                  <div className="p-6 border-b border-border/50 bg-black/20 flex justify-between items-center">
+                <DialogContent className="max-w-4xl surface-3d p-0 border-border/50">
+                  <div className="p-6 border-b border-border/50 bg-black/20 flex justify-between items-center shadow-[inset_0_-1px_3px_rgba(0,0,0,0.2)]">
                     <div>
                       <DialogTitle className="text-2xl font-heading tracking-tight flex items-center gap-2">
                         <Building className="h-6 w-6 text-primary" />
@@ -249,17 +249,17 @@ export default function Dashboard() {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
                               <Label className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Project Name *</Label>
-                              <Input {...register("name")} className="bg-black/20 border-border/50 focus:border-primary tech-clip rounded-none" />
+                              <Input {...register("name")} className="bg-black/20 focus:border-primary recessed-3d" />
                               {errors.name && <span className="text-[10px] font-mono text-destructive uppercase">{errors.name.message as string}</span>}
                             </div>
                             <div className="space-y-2">
                               <Label className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Client Name *</Label>
-                              <Input {...register("clientName")} className="bg-black/20 border-border/50 focus:border-primary tech-clip rounded-none" />
+                              <Input {...register("clientName")} className="bg-black/20 focus:border-primary recessed-3d" />
                               {errors.clientName && <span className="text-[10px] font-mono text-destructive uppercase">{errors.clientName.message as string}</span>}
                             </div>
                             <div className="space-y-2">
                               <Label className="font-mono text-xs uppercase tracking-wider text-muted-foreground">System Status *</Label>
-                              <select {...register("status")} defaultValue="" className="flex h-10 w-full bg-black/20 border border-border/50 px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:border-primary tech-clip rounded-none">
+                              <select {...register("status")} defaultValue="" className="flex h-10 w-full bg-black/20 border-none px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary recessed-3d">
                                 <option value="" disabled className="bg-background text-muted-foreground">Select Status...</option>
                                 <option value="Active" className="bg-background">Active</option>
                                 <option value="Planning" className="bg-background">Planning</option>
@@ -272,43 +272,43 @@ export default function Dashboard() {
                             </div>
                             <div className="space-y-2">
                               <Label className="font-mono text-xs uppercase tracking-wider text-muted-foreground">PM Assignment *</Label>
-                              <Input {...register("pmName")} placeholder="Assigned Manager ID" className="bg-black/20 border-border/50 focus:border-primary tech-clip rounded-none" />
+                              <Input {...register("pmName")} placeholder="Assigned Manager ID" className="bg-black/20 focus:border-primary recessed-3d" />
                               {errors.pmName && <span className="text-[10px] font-mono text-destructive uppercase">{errors.pmName.message as string}</span>}
                             </div>
                             <div className="space-y-2 md:col-span-2">
                               <Label className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Physical Address *</Label>
-                              <Input {...register("address")} className="bg-black/20 border-border/50 focus:border-primary tech-clip rounded-none" />
+                              <Input {...register("address")} className="bg-black/20 focus:border-primary recessed-3d" />
                               {errors.address && <span className="text-[10px] font-mono text-destructive uppercase">{errors.address.message as string}</span>}
                             </div>
                             <div className="space-y-2">
                               <Label className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Region *</Label>
-                              <Input {...register("region")} className="bg-black/20 border-border/50 focus:border-primary tech-clip rounded-none" />
+                              <Input {...register("region")} className="bg-black/20 focus:border-primary recessed-3d" />
                               {errors.region && <span className="text-[10px] font-mono text-destructive uppercase">{errors.region.message as string}</span>}
                             </div>
                             <div className="space-y-2">
                               <Label className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Target Date *</Label>
-                              <Input {...register("targetDate")} type="date" className="bg-black/20 border-border/50 focus:border-primary tech-clip rounded-none [color-scheme:dark]" />
+                              <Input {...register("targetDate")} type="date" className="bg-black/20 focus:border-primary recessed-3d [color-scheme:dark]" />
                               {errors.targetDate && <span className="text-[10px] font-mono text-destructive uppercase">{errors.targetDate.message as string}</span>}
                             </div>
                             <div className="space-y-2">
                               <Label className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Allocated Budget ($) *</Label>
-                              <Input {...register("budgeted")} type="number" step="0.01" placeholder="e.g. 500000.00" className="bg-black/20 border-border/50 focus:border-primary tech-clip rounded-none font-mono" />
+                              <Input {...register("budgeted")} type="number" step="0.01" placeholder="e.g. 500000.00" className="bg-black/20 focus:border-primary recessed-3d font-mono" />
                               {errors.budgeted && <span className="text-[10px] font-mono text-destructive uppercase">{errors.budgeted.message as string}</span>}
                             </div>
                             <div className="space-y-2">
                               <Label className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Exterior Image URL (Optional)</Label>
-                              <Input {...register("exteriorImage")} placeholder="https://..." className="bg-black/20 border-border/50 focus:border-primary tech-clip rounded-none font-mono text-xs" />
+                              <Input {...register("exteriorImage")} placeholder="https://..." className="bg-black/20 focus:border-primary recessed-3d font-mono text-xs" />
                             </div>
                             <div className="space-y-2 md:col-span-2">
                               <Label className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Mission Description *</Label>
-                              <Textarea {...register("description")} className="bg-black/20 border-border/50 focus:border-primary tech-clip rounded-none min-h-[100px]" />
+                              <Textarea {...register("description")} className="bg-black/20 focus:border-primary recessed-3d min-h-[100px]" />
                               {errors.description && <span className="text-[10px] font-mono text-destructive uppercase">{errors.description.message as string}</span>}
                             </div>
                           </div>
                           
                           <div className="flex justify-end pt-4 border-t border-border/50">
-                            <Button type="submit" disabled={createProject.isPending} className="tech-clip gold-glow font-mono uppercase tracking-widest px-8">
-                              {createProject.isPending ? "Transmitting..." : "Initialize"}
+                            <Button type="submit" disabled={createProject.isPending} className="btn-3d font-mono uppercase tracking-widest px-8">
+                              <span className="drop-shadow-sm">{createProject.isPending ? "Transmitting..." : "Initialize"}</span>
                             </Button>
                           </div>
                         </form>
@@ -320,28 +320,28 @@ export default function Dashboard() {
                               onDragLeave={() => setDragActive(false)}
                               onDrop={handleDrop}
                               className={cn(
-                                "border border-dashed p-12 flex flex-col items-center justify-center text-center transition-all bg-black/10 rounded-sm tech-border",
-                                dragActive ? "border-primary bg-primary/10 scale-[1.01]" : "border-border/50 hover:border-primary/50"
+                                "p-12 flex flex-col items-center justify-center text-center transition-all bg-black/10 rounded-xl recessed-3d",
+                                dragActive ? "border-primary bg-primary/10 scale-[1.01]" : ""
                               )}
                             >
                               <input type="file" accept=".csv,.json" onChange={handleFileInput} className="hidden" id="file-upload" />
                               <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center gap-4">
-                                <div className="h-16 w-16 rounded-full bg-background flex items-center justify-center border border-border shadow-lg">
-                                  <UploadCloud className="h-8 w-8 text-primary" />
+                                <div className="h-20 w-20 rounded-full bg-background flex items-center justify-center surface-3d shadow-xl">
+                                  <UploadCloud className="h-10 w-10 text-primary drop-shadow-sm" />
                                 </div>
                                 <div>
-                                  <p className="text-lg font-heading tracking-tight mb-1">Drag and drop data file</p>
+                                  <p className="text-lg font-heading tracking-tight mb-1 drop-shadow-sm">Drag and drop data file</p>
                                   <p className="text-sm font-mono text-muted-foreground">Supports .csv or .json formatted to protocol standards</p>
                                 </div>
                                 <div className="flex gap-4 mt-4">
-                                  <span className="flex items-center gap-1.5 text-xs font-mono bg-black/40 px-2 py-1 rounded border border-border/50 text-muted-foreground"><FileSpreadsheet className="h-3 w-3" /> CSV</span>
-                                  <span className="flex items-center gap-1.5 text-xs font-mono bg-black/40 px-2 py-1 rounded border border-border/50 text-muted-foreground"><FileJson className="h-3 w-3" /> JSON</span>
+                                  <span className="flex items-center gap-1.5 text-xs font-mono surface-3d px-3 py-1 text-muted-foreground"><FileSpreadsheet className="h-3 w-3" /> CSV</span>
+                                  <span className="flex items-center gap-1.5 text-xs font-mono surface-3d px-3 py-1 text-muted-foreground"><FileJson className="h-3 w-3" /> JSON</span>
                                 </div>
                               </label>
                             </div>
                           ) : (
                             <div className="space-y-4">
-                              <div className="flex items-center justify-between bg-black/30 p-4 border border-border/50">
+                              <div className="flex items-center justify-between bg-black/30 p-4 rounded-xl recessed-3d">
                                 <div className="flex items-center gap-6">
                                   <div className="text-center">
                                     <p className="text-2xl font-mono font-bold text-foreground">{parsedRows.length}</p>
@@ -357,21 +357,21 @@ export default function Dashboard() {
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                  <Button variant="outline" onClick={() => setParsedRows([])} className="font-mono text-xs uppercase" disabled={importStatus !== "idle"}>Reset</Button>
+                                  <Button variant="outline" onClick={() => setParsedRows([])} className="font-mono text-xs uppercase btn-3d" disabled={importStatus !== "idle"}>Reset</Button>
                                   <Button 
                                     onClick={handleImportSubmit} 
                                     disabled={validCount === 0 || importStatus !== "idle"}
-                                    className="tech-clip gold-glow font-mono uppercase tracking-widest bg-primary text-primary-foreground"
+                                    className="btn-3d font-mono uppercase tracking-widest bg-primary text-primary-foreground"
                                   >
-                                    {importStatus === "processing" ? "Processing..." : importStatus === "success" ? "Success" : `Import ${validCount} Valid`}
+                                    <span className="drop-shadow-sm">{importStatus === "processing" ? "Processing..." : importStatus === "success" ? "Success" : `Import ${validCount} Valid`}</span>
                                   </Button>
                                 </div>
                               </div>
 
-                              <div className="border border-border/50 bg-black/20">
+                              <div className="surface-3d bg-black/20 overflow-hidden">
                                 <div className="max-h-[300px] overflow-auto">
                                   <table className="w-full text-sm text-left">
-                                    <thead className="text-xs font-mono uppercase text-muted-foreground bg-black/50 sticky top-0">
+                                    <thead className="text-[10px] font-mono uppercase text-muted-foreground bg-black/50 sticky top-0 z-10 shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
                                       <tr>
                                         <th className="px-4 py-3 font-medium">Row</th>
                                         <th className="px-4 py-3 font-medium">Status</th>
@@ -383,13 +383,13 @@ export default function Dashboard() {
                                     </thead>
                                     <tbody className="divide-y divide-border/30 font-mono text-xs">
                                       {parsedRows.map((row) => (
-                                        <tr key={row.row} className={cn("hover:bg-white/5", !row.valid && "bg-destructive/5")}>
+                                        <tr key={row.row} className={cn("hover:bg-white/5 transition-colors", !row.valid && "bg-destructive/5")}>
                                           <td className="px-4 py-3 font-medium text-muted-foreground">#{row.row}</td>
                                           <td className="px-4 py-3">
                                             {row.valid ? (
-                                              <Badge variant="outline" className="border-success text-success bg-success/10 font-mono rounded-none"><CheckCircle2 className="h-3 w-3 mr-1" /> Valid</Badge>
+                                              <Badge variant="success"><CheckCircle2 className="h-3 w-3 mr-1" /> Valid</Badge>
                                             ) : (
-                                              <Badge variant="outline" className="border-destructive text-destructive bg-destructive/10 font-mono rounded-none"><AlertTriangle className="h-3 w-3 mr-1" /> Invalid</Badge>
+                                              <Badge variant="destructive"><AlertTriangle className="h-3 w-3 mr-1" /> Invalid</Badge>
                                             )}
                                           </td>
                                           <td className="px-4 py-3 truncate max-w-[150px]">{row.original.name || '-'}</td>
@@ -417,65 +417,65 @@ export default function Dashboard() {
 
           {/* Stats Grid - Holographic style */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-            <Card className="glass-panel hover:bg-card/90 transition-colors group">
+            <Card className="surface-3d bg-card hover:bg-card/80 transition-all group">
               <CardContent className="p-6">
                 <div className="flex flex-col justify-between h-full">
                   <div className="flex items-center justify-between mb-4">
-                    <p className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Active Nodes</p>
-                    <div className="h-8 w-8 bg-primary/10 text-primary rounded-none border border-primary/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Building className="h-4 w-4" />
+                    <p className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground drop-shadow-sm">Active Nodes</p>
+                    <div className="h-10 w-10 bg-primary/10 text-primary rounded-full surface-3d flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Building className="h-5 w-5 drop-shadow-sm" />
                     </div>
                   </div>
                   <div>
-                    <p className="text-3xl font-mono font-bold tracking-tighter text-primary group-hover:text-glow transition-colors">{loadingSummary ? "-" : summary?.activeProjects}</p>
+                    <p className="text-3xl font-mono font-bold tracking-tighter text-primary group-hover:text-glow transition-colors drop-shadow-[0_2px_10px_hsl(var(--primary)/0.5)]">{loadingSummary ? "-" : summary?.activeProjects}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
             
-            <Card className="glass-panel hover:bg-card/90 transition-colors group">
+            <Card className="surface-3d bg-card hover:bg-card/80 transition-all group">
               <CardContent className="p-6">
                 <div className="flex flex-col justify-between h-full">
                   <div className="flex items-center justify-between mb-4">
-                    <p className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Pending Auth</p>
-                    <div className="h-8 w-8 bg-warning/10 text-warning rounded-none border border-warning/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Clock className="h-4 w-4" />
+                    <p className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground drop-shadow-sm">Pending Auth</p>
+                    <div className="h-10 w-10 bg-warning/10 text-warning rounded-full surface-3d flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Clock className="h-5 w-5 drop-shadow-sm" />
                     </div>
                   </div>
                   <div>
-                    <p className="text-3xl font-mono font-bold tracking-tighter text-warning drop-shadow-[0_0_8px_rgba(255,165,0,0.3)]">{loadingSummary ? "-" : summary?.awaitingApproval}</p>
+                    <p className="text-3xl font-mono font-bold tracking-tighter text-warning drop-shadow-[0_2px_10px_rgba(255,165,0,0.5)]">{loadingSummary ? "-" : summary?.awaitingApproval}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="glass-panel hover:bg-card/90 transition-colors group">
+            <Card className="surface-3d bg-card hover:bg-card/80 transition-all group">
               <CardContent className="p-6">
                 <div className="flex flex-col justify-between h-full">
                   <div className="flex items-center justify-between mb-4">
-                    <p className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Visual Feeds</p>
-                    <div className="h-8 w-8 bg-info/10 text-info rounded-none border border-info/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Camera className="h-4 w-4" />
+                    <p className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground drop-shadow-sm">Visual Feeds</p>
+                    <div className="h-10 w-10 bg-info/10 text-info rounded-full surface-3d flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Camera className="h-5 w-5 drop-shadow-sm" />
                     </div>
                   </div>
                   <div>
-                    <p className="text-3xl font-mono font-bold tracking-tighter text-info drop-shadow-[0_0_8px_rgba(0,191,255,0.3)]">{loadingSummary ? "-" : summary?.new360Photos}</p>
+                    <p className="text-3xl font-mono font-bold tracking-tighter text-info drop-shadow-[0_2px_10px_rgba(0,191,255,0.5)]">{loadingSummary ? "-" : summary?.new360Photos}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="glass-panel hover:bg-card/90 transition-colors group">
+            <Card className="surface-3d bg-card hover:bg-card/80 transition-all group">
               <CardContent className="p-6">
                 <div className="flex flex-col justify-between h-full">
                   <div className="flex items-center justify-between mb-4">
-                    <p className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Capital Outlay</p>
-                    <div className="h-8 w-8 bg-success/10 text-success rounded-none border border-success/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <DollarSign className="h-4 w-4" />
+                    <p className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground drop-shadow-sm">Capital Outlay</p>
+                    <div className="h-10 w-10 bg-success/10 text-success rounded-full surface-3d flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <DollarSign className="h-5 w-5 drop-shadow-sm" />
                     </div>
                   </div>
                   <div>
-                    <p className="text-3xl font-mono font-bold tracking-tighter text-success drop-shadow-[0_0_8px_rgba(0,255,128,0.3)]">
+                    <p className="text-3xl font-mono font-bold tracking-tighter text-success drop-shadow-[0_2px_10px_rgba(0,255,128,0.5)]">
                       {loadingSummary ? "-" : `$${((summary?.budgeted || 0) / 1000000).toFixed(1)}M`}
                     </p>
                   </div>

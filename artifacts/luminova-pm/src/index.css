@@ -77,78 +77,64 @@
   --elevate-1: rgba(0, 0, 0, 0.03);
   --elevate-2: rgba(0, 0, 0, 0.08);
 
-  /* Luminova Canvas #FAFAF8 */
+  /* Luminova Canvas */
   --background: 60 14% 98%;
-  /* Luminova Text #1A1A18 */
   --foreground: 60 4% 10%;
-  /* Luminova Border #E4E2DC */
   --border: 45 13% 88%;
 
-  /* Luminova Surface #FFFFFF */
+  /* Luminova Surface */
   --card: 0 0% 100%;
   --card-foreground: 60 4% 10%;
   --card-border: 45 13% 88%;
 
-  /* Luminova Dark Chrome (Ink) #121212 */
-  --sidebar: 0 0% 7%;
+  /* Sidebar */
+  --sidebar: 60 4% 12%;
   --sidebar-foreground: 0 0% 100%;
-  --sidebar-border: 60 2% 12%;
-  /* Sidebar uses Gold for primary active */
+  --sidebar-border: 60 4% 9%;
   --sidebar-primary: 49 39% 49%;
   --sidebar-primary-foreground: 0 0% 7%;
-  /* Ink Soft */
-  --sidebar-accent: 60 2% 12%;
+  --sidebar-accent: 60 4% 16%;
   --sidebar-accent-foreground: 0 0% 100%;
-  /* Gold Deep */
   --sidebar-ring: 47 54% 37%;
 
   --popover: 0 0% 100%;
   --popover-foreground: 60 4% 10%;
   --popover-border: 45 13% 88%;
 
-  /* Luminova Gold #AD9C4C */
-  --primary: 49 39% 49%;
-  /* Luminova Ink (never white on gold) */
+  /* Luminova Gold */
+  --primary: 49 46% 56%;
   --primary-foreground: 0 0% 7%;
 
-  /* Luminova Silver #D9D9DA */
+  /* Luminova Silver */
   --secondary: 240 2% 85%;
   --secondary-foreground: 60 4% 10%;
 
-  /* Muted uses a lightened silver/canvas */
   --muted: 45 13% 88%;
-  /* Luminova Text Muted #6B6862 */
   --muted-foreground: 40 5% 40%;
 
-  /* Luminova Gold Light #D4CB7A */
   --accent: 54 50% 65%;
   --accent-foreground: 0 0% 7%;
 
-  /* Luminova Danger #B42318 */
   --destructive: 4 76% 40%;
   --destructive-foreground: 0 0% 100%;
 
-  /* Luminova Success #2E7D4F */
   --success: 145 46% 34%;
   --success-foreground: 0 0% 100%;
 
-  /* Luminova Warning #C2410C */
   --warning: 17 88% 40%;
   --warning-foreground: 0 0% 100%;
 
-  /* Luminova Info #2563EB */
   --info: 221 83% 53%;
   --info-foreground: 0 0% 100%;
 
   --input: 45 13% 88%;
-  /* Gold */
-  --ring: 49 39% 49%;
+  --ring: 49 46% 56%;
 
   --app-font-sans: 'Plus Jakarta Sans', sans-serif;
   --app-font-heading: 'Bricolage Grotesque', sans-serif;
   --app-font-mono: 'Space Mono', Menlo, monospace;
   
-  --radius: 0.375rem; /* 6px */
+  --radius: 0.75rem; /* Smoother, organic corners */
 
   --shadow-2xs: 0px 2px 0px 0px hsl(60 4% 10% / 0.05);
   --shadow-xs: 0px 2px 0px 0px hsl(60 4% 10% / 0.05);
@@ -169,6 +155,7 @@
     0px 20px 25px -5px hsl(60 4% 10% / 0.1),
     0px 8px 10px -6px hsl(60 4% 10% / 0.1);
   --shadow-2xl: 0px 25px 50px -12px hsl(60 4% 10% / 0.25);
+  
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 
@@ -182,36 +169,39 @@
 }
 
 .dark {
-  --background: 0 0% 7%;
+  --background: 60 4% 9%; /* Darker, slightly warm canvas */
   --foreground: 60 14% 98%;
-  --border: 60 2% 12%;
-  --card: 60 4% 10%;
+  --border: 60 4% 15%;
+  --card: 60 4% 12%; /* Elevated slightly */
   --card-foreground: 60 14% 98%;
-  --card-border: 60 2% 12%;
-  --popover: 60 4% 10%;
+  --card-border: 60 4% 17%;
+  --popover: 60 4% 12%;
   --popover-foreground: 60 14% 98%;
-  --popover-border: 60 2% 12%;
-  --primary: 49 39% 49%;
+  --popover-border: 60 4% 17%;
+  
+  --primary: 49 46% 56%; /* Richer gold */
   --primary-foreground: 0 0% 7%;
-  --secondary: 60 2% 12%;
+  
+  --secondary: 60 4% 16%;
   --secondary-foreground: 60 14% 98%;
-  --muted: 60 2% 12%;
-  --muted-foreground: 40 5% 40%;
-  --accent: 47 54% 37%;
+  --muted: 60 4% 15%;
+  --muted-foreground: 45 5% 60%;
+  --accent: 47 54% 45%;
   --accent-foreground: 60 14% 98%;
+  
   --destructive: 4 76% 40%;
   --destructive-foreground: 0 0% 100%;
-  --input: 60 2% 12%;
-  --ring: 49 39% 49%;
+  --input: 60 4% 15%;
+  --ring: 49 46% 56%;
 
-  --sidebar: 0 0% 7%;
+  --sidebar: 60 4% 11%;
   --sidebar-foreground: 0 0% 100%;
-  --sidebar-border: 60 2% 12%;
-  --sidebar-primary: 49 39% 49%;
+  --sidebar-border: 60 4% 15%;
+  --sidebar-primary: 49 46% 56%;
   --sidebar-primary-foreground: 0 0% 7%;
-  --sidebar-accent: 60 2% 12%;
+  --sidebar-accent: 60 4% 16%;
   --sidebar-accent-foreground: 0 0% 100%;
-  --sidebar-ring: 47 54% 37%;
+  --sidebar-ring: 47 54% 45%;
 }
 
 @layer base {
@@ -240,58 +230,95 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* Futuristic Tech Utilities */
+  /* 3D and Futuristic Environments */
+  
+  /* A smooth grid floor */
   .bg-tech-grid {
     background-image: 
-      linear-gradient(to right, hsl(var(--border) / 0.3) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(var(--border) / 0.3) 1px, transparent 1px);
-    background-size: 32px 32px;
+      linear-gradient(to right, hsl(var(--border) / 0.4) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.4) 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-position: center center;
   }
 
   .bg-tech-grid-soft {
     background-image:
-      linear-gradient(to right, hsl(var(--border) / 0.12) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(var(--border) / 0.12) 1px, transparent 1px);
-    background-size: 32px 32px;
-  }
-
-  .bg-tech-grid-dense {
-    background-image: 
       linear-gradient(to right, hsl(var(--border) / 0.2) 1px, transparent 1px),
       linear-gradient(to bottom, hsl(var(--border) / 0.2) 1px, transparent 1px);
-    background-size: 16px 16px;
+    background-size: 40px 40px;
   }
 
-  .glass-panel {
-    @apply bg-background/80 backdrop-blur-xl border border-border/50 shadow-sm relative overflow-hidden;
+  /* Extruded 3D surfaces (cards, panels) */
+  .surface-3d {
+    @apply bg-card border-none rounded-xl overflow-hidden transition-all duration-300;
+    box-shadow: 
+      inset 0 1px 1px hsl(var(--foreground) / 0.1),
+      inset 0 -1px 2px hsl(0 0% 0% / 0.4),
+      0 10px 20px -5px hsl(0 0% 0% / 0.5),
+      0 4px 10px -2px hsl(0 0% 0% / 0.6),
+      0 0 0 1px hsl(var(--border));
+  }
+  
+  .surface-3d:hover {
+    box-shadow: 
+      inset 0 1px 2px hsl(var(--foreground) / 0.15),
+      inset 0 -1px 2px hsl(0 0% 0% / 0.4),
+      0 15px 30px -5px hsl(0 0% 0% / 0.6),
+      0 8px 15px -4px hsl(0 0% 0% / 0.5),
+      0 0 0 1px hsl(var(--border));
+    transform: translateY(-2px);
   }
 
-  .glass-panel::before {
-    content: '';
-    @apply absolute inset-0 pointer-events-none opacity-50;
-    box-shadow: inset 0 0 40px hsl(var(--primary) / 0.05);
+  /* Primary tactile 3D buttons */
+  .btn-3d {
+    @apply relative overflow-hidden transition-all duration-150 rounded-lg font-bold tracking-wide;
+    box-shadow: 
+      inset 0 1px 1px hsl(var(--foreground) / 0.2),
+      inset 0 -2px 4px hsl(0 0% 0% / 0.4),
+      0 4px 8px -2px hsl(0 0% 0% / 0.5),
+      0 0 0 1px hsl(0 0% 0% / 0.2);
+  }
+  
+  .btn-3d:active, .btn-3d[data-state="open"] {
+    box-shadow: 
+      inset 0 2px 4px hsl(0 0% 0% / 0.4),
+      0 0px 0px 0px hsl(0 0% 0% / 0);
+    transform: translateY(2px);
   }
 
-  .glass-panel-dark {
-    @apply bg-sidebar/80 backdrop-blur-xl border border-sidebar-border shadow-md overflow-hidden;
+  /* Secondary tactile 3D buttons */
+  .btn-3d-secondary {
+    @apply relative overflow-hidden transition-all duration-150 rounded-lg;
+    background-color: hsl(var(--secondary));
+    color: hsl(var(--secondary-foreground));
+    box-shadow: 
+      inset 0 1px 1px hsl(var(--foreground) / 0.1),
+      inset 0 -2px 3px hsl(0 0% 0% / 0.3),
+      0 4px 6px -2px hsl(0 0% 0% / 0.4),
+      0 0 0 1px hsl(var(--border));
+  }
+  
+  .btn-3d-secondary:active, .btn-3d-secondary[data-state="open"] {
+    box-shadow: 
+      inset 0 2px 4px hsl(0 0% 0% / 0.4),
+      0 0px 0px 0px hsl(0 0% 0% / 0);
+    transform: translateY(2px);
   }
 
-  .tech-border {
-    position: relative;
+  /* Recessed 3D elements (Inputs, track backgrounds) */
+  .recessed-3d {
+    @apply bg-input/50 rounded-lg border-none;
+    box-shadow: 
+      inset 0 2px 5px hsl(0 0% 0% / 0.5),
+      inset 0 0 0 1px hsl(var(--border)),
+      0 1px 0 hsl(var(--foreground) / 0.05);
   }
-
-  .tech-border::after {
-    content: '';
-    position: absolute;
-    inset: -1px;
-    border: 1px solid hsl(var(--primary) / 0.5);
-    pointer-events: none;
-    clip-path: polygon(
-      0 0, 10px 0, 10px 1px, calc(100% - 10px) 1px, calc(100% - 10px) 0, 100% 0,
-      100% 10px, calc(100% - 1px) 10px, calc(100% - 1px) calc(100% - 10px), 100% calc(100% - 10px),
-      100% 100%, calc(100% - 10px) 100%, calc(100% - 10px) calc(100% - 1px), 10px calc(100% - 1px), 10px 100%, 0 100%,
-      0 calc(100% - 10px), 1px calc(100% - 10px), 1px 10px, 0 10px
-    );
+  
+  .recessed-3d:focus-within {
+    box-shadow: 
+      inset 0 2px 5px hsl(0 0% 0% / 0.5),
+      inset 0 0 0 1px hsl(var(--primary)),
+      0 0 10px hsl(var(--primary) / 0.3);
   }
 
   .gold-glow {
@@ -303,11 +330,19 @@
     box-shadow: 0 0 25px 0px hsl(var(--primary) / 0.6);
   }
 
-  .silver-glow {
-    box-shadow: 0 0 15px -2px hsl(var(--secondary) / 0.4);
+  .glass-panel {
+    @apply bg-background/70 backdrop-blur-xl border-none shadow-xl overflow-hidden rounded-xl;
+    box-shadow: 
+      inset 0 1px 1px hsl(var(--foreground) / 0.1),
+      inset 0 0 0 1px hsl(var(--border)),
+      0 15px 30px -5px hsl(0 0% 0% / 0.5);
   }
 
-  .tech-clip {
-    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  .glass-panel-dark {
+    @apply bg-sidebar/80 backdrop-blur-xl border-none shadow-2xl overflow-hidden rounded-xl;
+    box-shadow: 
+      inset 0 1px 1px hsl(var(--foreground) / 0.1),
+      inset 0 0 0 1px hsl(var(--sidebar-border)),
+      0 15px 30px -5px hsl(0 0% 0% / 0.5);
   }
 }
