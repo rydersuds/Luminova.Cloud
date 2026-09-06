@@ -88,12 +88,12 @@
   --card-border: 45 13% 88%;
 
   /* Sidebar */
-  --sidebar: 60 4% 12%;
+  --sidebar: 0 0% 2%;
   --sidebar-foreground: 0 0% 100%;
-  --sidebar-border: 60 4% 9%;
+  --sidebar-border: 0 0% 18%;
   --sidebar-primary: 49 39% 49%;
   --sidebar-primary-foreground: 0 0% 7%;
-  --sidebar-accent: 60 4% 16%;
+  --sidebar-accent: 0 0% 11%;
   --sidebar-accent-foreground: 0 0% 100%;
   --sidebar-ring: 47 54% 37%;
 
@@ -194,12 +194,12 @@
   --input: 60 4% 15%;
   --ring: 49 46% 56%;
 
-  --sidebar: 60 4% 11%;
+  --sidebar: 0 0% 2%;
   --sidebar-foreground: 0 0% 100%;
-  --sidebar-border: 60 4% 15%;
+  --sidebar-border: 0 0% 18%;
   --sidebar-primary: 49 46% 56%;
   --sidebar-primary-foreground: 0 0% 7%;
-  --sidebar-accent: 60 4% 16%;
+  --sidebar-accent: 0 0% 11%;
   --sidebar-accent-foreground: 0 0% 100%;
   --sidebar-ring: 47 54% 45%;
 }
@@ -339,7 +339,7 @@
   }
 
   .glass-panel-dark {
-    @apply bg-sidebar/80 backdrop-blur-xl border-none shadow-2xl overflow-hidden rounded-xl;
+    @apply bg-sidebar/95 backdrop-blur-xl border-none shadow-2xl overflow-hidden rounded-xl;
     box-shadow: 
       inset 0 1px 1px hsl(var(--foreground) / 0.1),
       inset 0 0 0 1px hsl(var(--sidebar-border)),
