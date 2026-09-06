@@ -18,6 +18,7 @@ import { AppLayoutView } from '@/components/layout/app-layout';
 import { ClerkProvider, Show, useAuth, useClerk } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
+import { ProjectFolderImportProvider } from '@/providers/project-folder-import-provider';
 
 import {
   Route,
@@ -186,11 +187,13 @@ function App() {
         }}
       >
         <QueryClientProvider client={queryClient}>
-          <TooltipProvider>
-            <SessionPolicy />
-            <Router />
-            <Toaster />
-          </TooltipProvider>
+            <ProjectFolderImportProvider>
+              <TooltipProvider>
+                <SessionPolicy />
+                <Router />
+                <Toaster />
+              </TooltipProvider>
+            </ProjectFolderImportProvider>
         </QueryClientProvider>
       </ClerkProvider>
     </WouterRouter>
