@@ -25,6 +25,7 @@ import type {
   GetInvoicesParams,
   GetProjectsParams,
   GetTradesParams,
+  GetVendorQuotesParams,
   HealthStatus,
   Invoice,
   InvoiceInput,
@@ -33,7 +34,10 @@ import type {
   ProjectInput,
   ProjectUpdate,
   Trade,
-  TradeDetail
+  TradeDetail,
+  VendorQuote,
+  VendorQuoteInput,
+  VendorQuoteUpdate
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -913,5 +917,309 @@ export const useCreateInvoice = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCreateInvoiceMutationOptions(options));
+    }
+
+export const getGetVendorQuotesUrl = (params?: GetVendorQuotesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/vendor-quotes?${stringifiedParams}` : `/api/vendor-quotes`
+}
+
+/**
+ * @summary List and filter vendor quotes
+ */
+export const getVendorQuotes = async (params?: GetVendorQuotesParams, options?: Parameters<typeof customFetch>[1]): Promise<VendorQuote[]> => {
+
+  return customFetch<VendorQuote[]>(getGetVendorQuotesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVendorQuotesQueryKey = (params?: GetVendorQuotesParams,) => {
+    return [
+    `/api/vendor-quotes`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetVendorQuotesQueryOptions = <TData = Awaited<ReturnType<typeof getVendorQuotes>>, TError = ErrorType<unknown>>(params?: GetVendorQuotesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVendorQuotes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVendorQuotesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVendorQuotes>>> = ({ signal }) => getVendorQuotes(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVendorQuotes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVendorQuotesQueryResult = NonNullable<Awaited<ReturnType<typeof getVendorQuotes>>>
+export type GetVendorQuotesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List and filter vendor quotes
+ */
+
+export function useGetVendorQuotes<TData = Awaited<ReturnType<typeof getVendorQuotes>>, TError = ErrorType<unknown>>(
+ params?: GetVendorQuotesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVendorQuotes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVendorQuotesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateVendorQuoteUrl = () => {
+
+
+
+
+  return `/api/vendor-quotes`
+}
+
+/**
+ * @summary Create a vendor quote
+ */
+export const createVendorQuote = async (vendorQuoteInput: VendorQuoteInput, options?: Parameters<typeof customFetch>[1]): Promise<VendorQuote> => {
+
+  return customFetch<VendorQuote>(getCreateVendorQuoteUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(vendorQuoteInput)
+  }
+);}
+
+
+
+
+
+export const getCreateVendorQuoteMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVendorQuote>>, TError,{data: BodyType<VendorQuoteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createVendorQuote>>, TError,{data: BodyType<VendorQuoteInput>}, TContext> => {
+
+const mutationKey = ['createVendorQuote'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createVendorQuote>>, {data: BodyType<VendorQuoteInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createVendorQuote(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateVendorQuoteMutationResult = NonNullable<Awaited<ReturnType<typeof createVendorQuote>>>
+    export type CreateVendorQuoteMutationBody = BodyType<VendorQuoteInput>
+    export type CreateVendorQuoteMutationError = ErrorType<void>
+
+    /**
+ * @summary Create a vendor quote
+ */
+export const useCreateVendorQuote = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVendorQuote>>, TError,{data: BodyType<VendorQuoteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createVendorQuote>>,
+        TError,
+        {data: BodyType<VendorQuoteInput>},
+        TContext
+      > => {
+      return useMutation(getCreateVendorQuoteMutationOptions(options));
+    }
+
+export const getGetVendorQuoteUrl = (quoteId: string,) => {
+
+
+
+
+  return `/api/vendor-quotes/${quoteId}`
+}
+
+/**
+ * @summary Get a vendor quote
+ */
+export const getVendorQuote = async (quoteId: string, options?: Parameters<typeof customFetch>[1]): Promise<VendorQuote> => {
+
+  return customFetch<VendorQuote>(getGetVendorQuoteUrl(quoteId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVendorQuoteQueryKey = (quoteId: string,) => {
+    return [
+    `/api/vendor-quotes/${quoteId}`
+    ] as const;
+    }
+
+
+export const getGetVendorQuoteQueryOptions = <TData = Awaited<ReturnType<typeof getVendorQuote>>, TError = ErrorType<void>>(quoteId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVendorQuote>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVendorQuoteQueryKey(quoteId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVendorQuote>>> = ({ signal }) => getVendorQuote(quoteId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: quoteId !== null && quoteId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVendorQuote>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVendorQuoteQueryResult = NonNullable<Awaited<ReturnType<typeof getVendorQuote>>>
+export type GetVendorQuoteQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get a vendor quote
+ */
+
+export function useGetVendorQuote<TData = Awaited<ReturnType<typeof getVendorQuote>>, TError = ErrorType<void>>(
+ quoteId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVendorQuote>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVendorQuoteQueryOptions(quoteId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateVendorQuoteUrl = (quoteId: string,) => {
+
+
+
+
+  return `/api/vendor-quotes/${quoteId}`
+}
+
+/**
+ * @summary Update a vendor quote
+ */
+export const updateVendorQuote = async (quoteId: string,
+    vendorQuoteUpdate: VendorQuoteUpdate, options?: Parameters<typeof customFetch>[1]): Promise<VendorQuote> => {
+
+  return customFetch<VendorQuote>(getUpdateVendorQuoteUrl(quoteId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(vendorQuoteUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateVendorQuoteMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateVendorQuote>>, TError,{quoteId: string;data: BodyType<VendorQuoteUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateVendorQuote>>, TError,{quoteId: string;data: BodyType<VendorQuoteUpdate>}, TContext> => {
+
+const mutationKey = ['updateVendorQuote'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateVendorQuote>>, {quoteId: string;data: BodyType<VendorQuoteUpdate>}> = (props) => {
+          const {quoteId,data} = props ?? {};
+
+          return  updateVendorQuote(quoteId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateVendorQuoteMutationResult = NonNullable<Awaited<ReturnType<typeof updateVendorQuote>>>
+    export type UpdateVendorQuoteMutationBody = BodyType<VendorQuoteUpdate>
+    export type UpdateVendorQuoteMutationError = ErrorType<void>
+
+    /**
+ * @summary Update a vendor quote
+ */
+export const useUpdateVendorQuote = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateVendorQuote>>, TError,{quoteId: string;data: BodyType<VendorQuoteUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateVendorQuote>>,
+        TError,
+        {quoteId: string;data: BodyType<VendorQuoteUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateVendorQuoteMutationOptions(options));
     }
 

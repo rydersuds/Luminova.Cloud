@@ -182,6 +182,107 @@ export interface InvoiceInput {
   lineItem: string;
 }
 
+export type VendorQuoteStatus = typeof VendorQuoteStatus[keyof typeof VendorQuoteStatus];
+
+
+export const VendorQuoteStatus = {
+  Draft: 'Draft',
+  Requested: 'Requested',
+  Received: 'Received',
+  Under_review: 'Under review',
+  Accepted: 'Accepted',
+  Declined: 'Declined',
+  Expired: 'Expired',
+} as const;
+
+export interface VendorQuoteLineItem {
+  id: string;
+  /** @minLength 1 */
+  description: string;
+  /** @exclusiveMinimum 0 */
+  quantity: number;
+  /** @minimum 0 */
+  unitPrice: number;
+  /** @minimum 0 */
+  amount: number;
+}
+
+export interface VendorQuoteLineItemInput {
+  id?: string;
+  /** @minLength 1 */
+  description: string;
+  /** @exclusiveMinimum 0 */
+  quantity: number;
+  /** @minimum 0 */
+  unitPrice: number;
+}
+
+export interface VendorQuote {
+  id: string;
+  quoteNumber: string;
+  projectId: string;
+  projectName: string;
+  vendorId: string;
+  vendorName: string;
+  trade: string;
+  status: VendorQuoteStatus;
+  /** @minimum 1 */
+  revision: number;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  issueDate: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  dueDate: string;
+  notes: string;
+  /** @minItems 1 */
+  lineItems: VendorQuoteLineItem[];
+  /** @minimum 0 */
+  total: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VendorQuoteInput {
+  /** @minLength 1 */
+  quoteNumber: string;
+  /** @minLength 1 */
+  projectId: string;
+  /** @minLength 1 */
+  vendorId: string;
+  /** @minLength 1 */
+  trade: string;
+  status: VendorQuoteStatus;
+  /** @minimum 1 */
+  revision: number;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  issueDate: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  dueDate: string;
+  notes: string;
+  /** @minItems 1 */
+  lineItems: VendorQuoteLineItemInput[];
+}
+
+export interface VendorQuoteUpdate {
+  /** @minLength 1 */
+  quoteNumber?: string;
+  /** @minLength 1 */
+  projectId?: string;
+  /** @minLength 1 */
+  vendorId?: string;
+  /** @minLength 1 */
+  trade?: string;
+  status?: VendorQuoteStatus;
+  /** @minimum 1 */
+  revision?: number;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  issueDate?: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  dueDate?: string;
+  notes?: string;
+  /** @minItems 1 */
+  lineItems?: VendorQuoteLineItemInput[];
+}
+
 export type GetProjectsParams = {
 status?: string;
 search?: string;
@@ -196,5 +297,13 @@ region?: string;
 
 export type GetInvoicesParams = {
 status?: string;
+};
+
+export type GetVendorQuotesParams = {
+search?: string;
+projectId?: string;
+vendorId?: string;
+trade?: string;
+status?: VendorQuoteStatus;
 };
 

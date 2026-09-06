@@ -356,3 +356,262 @@ export const CreateInvoiceResponse = zod.object({
 })
 
 
+/**
+ * @summary List and filter vendor quotes
+ */
+export const GetVendorQuotesQueryParams = zod.object({
+  "search": zod.coerce.string().optional(),
+  "projectId": zod.coerce.string().optional(),
+  "vendorId": zod.coerce.string().optional(),
+  "trade": zod.coerce.string().optional(),
+  "status": zod.enum(['Draft', 'Requested', 'Received', 'Under review', 'Accepted', 'Declined', 'Expired']).optional()
+})
+
+
+export const getVendorQuotesResponseIssueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getVendorQuotesResponseDueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+export const getVendorQuotesResponseLineItemsItemQuantityExclusiveMin = 0;
+
+export const getVendorQuotesResponseLineItemsItemUnitPriceMin = 0;
+
+export const getVendorQuotesResponseLineItemsItemAmountMin = 0;
+
+
+export const getVendorQuotesResponseTotalMin = 0;
+
+
+
+export const GetVendorQuotesResponseItem = zod.object({
+  "id": zod.string(),
+  "quoteNumber": zod.string(),
+  "projectId": zod.string(),
+  "projectName": zod.string(),
+  "vendorId": zod.string(),
+  "vendorName": zod.string(),
+  "trade": zod.string(),
+  "status": zod.enum(['Draft', 'Requested', 'Received', 'Under review', 'Accepted', 'Declined', 'Expired']),
+  "revision": zod.number().int().min(1),
+  "issueDate": zod.string().regex(getVendorQuotesResponseIssueDateRegExp),
+  "dueDate": zod.string().regex(getVendorQuotesResponseDueDateRegExp),
+  "notes": zod.string(),
+  "lineItems": zod.array(zod.object({
+  "id": zod.string(),
+  "description": zod.string().min(1),
+  "quantity": zod.number().gt(getVendorQuotesResponseLineItemsItemQuantityExclusiveMin),
+  "unitPrice": zod.number().int().min(getVendorQuotesResponseLineItemsItemUnitPriceMin),
+  "amount": zod.number().int().min(getVendorQuotesResponseLineItemsItemAmountMin)
+})).min(1),
+  "total": zod.number().int().min(getVendorQuotesResponseTotalMin),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+export const GetVendorQuotesResponse = zod.array(GetVendorQuotesResponseItem)
+
+
+/**
+ * @summary Create a vendor quote
+ */
+
+
+
+
+
+export const createVendorQuoteBodyIssueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createVendorQuoteBodyDueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+export const createVendorQuoteBodyLineItemsItemQuantityExclusiveMin = 0;
+
+export const createVendorQuoteBodyLineItemsItemUnitPriceMin = 0;
+
+
+
+
+export const CreateVendorQuoteBody = zod.object({
+  "quoteNumber": zod.string().min(1),
+  "projectId": zod.string().min(1),
+  "vendorId": zod.string().min(1),
+  "trade": zod.string().min(1),
+  "status": zod.enum(['Draft', 'Requested', 'Received', 'Under review', 'Accepted', 'Declined', 'Expired']),
+  "revision": zod.number().int().min(1),
+  "issueDate": zod.string().regex(createVendorQuoteBodyIssueDateRegExp),
+  "dueDate": zod.string().regex(createVendorQuoteBodyDueDateRegExp),
+  "notes": zod.string(),
+  "lineItems": zod.array(zod.object({
+  "id": zod.string().optional(),
+  "description": zod.string().min(1),
+  "quantity": zod.number().gt(createVendorQuoteBodyLineItemsItemQuantityExclusiveMin),
+  "unitPrice": zod.number().int().min(createVendorQuoteBodyLineItemsItemUnitPriceMin)
+})).min(1)
+})
+
+
+export const createVendorQuoteResponseIssueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createVendorQuoteResponseDueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+export const createVendorQuoteResponseLineItemsItemQuantityExclusiveMin = 0;
+
+export const createVendorQuoteResponseLineItemsItemUnitPriceMin = 0;
+
+export const createVendorQuoteResponseLineItemsItemAmountMin = 0;
+
+
+export const createVendorQuoteResponseTotalMin = 0;
+
+
+
+export const CreateVendorQuoteResponse = zod.object({
+  "id": zod.string(),
+  "quoteNumber": zod.string(),
+  "projectId": zod.string(),
+  "projectName": zod.string(),
+  "vendorId": zod.string(),
+  "vendorName": zod.string(),
+  "trade": zod.string(),
+  "status": zod.enum(['Draft', 'Requested', 'Received', 'Under review', 'Accepted', 'Declined', 'Expired']),
+  "revision": zod.number().int().min(1),
+  "issueDate": zod.string().regex(createVendorQuoteResponseIssueDateRegExp),
+  "dueDate": zod.string().regex(createVendorQuoteResponseDueDateRegExp),
+  "notes": zod.string(),
+  "lineItems": zod.array(zod.object({
+  "id": zod.string(),
+  "description": zod.string().min(1),
+  "quantity": zod.number().gt(createVendorQuoteResponseLineItemsItemQuantityExclusiveMin),
+  "unitPrice": zod.number().int().min(createVendorQuoteResponseLineItemsItemUnitPriceMin),
+  "amount": zod.number().int().min(createVendorQuoteResponseLineItemsItemAmountMin)
+})).min(1),
+  "total": zod.number().int().min(createVendorQuoteResponseTotalMin),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Get a vendor quote
+ */
+export const GetVendorQuoteParams = zod.object({
+  "quoteId": zod.coerce.string()
+})
+
+
+export const getVendorQuoteResponseIssueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getVendorQuoteResponseDueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+export const getVendorQuoteResponseLineItemsItemQuantityExclusiveMin = 0;
+
+export const getVendorQuoteResponseLineItemsItemUnitPriceMin = 0;
+
+export const getVendorQuoteResponseLineItemsItemAmountMin = 0;
+
+
+export const getVendorQuoteResponseTotalMin = 0;
+
+
+
+export const GetVendorQuoteResponse = zod.object({
+  "id": zod.string(),
+  "quoteNumber": zod.string(),
+  "projectId": zod.string(),
+  "projectName": zod.string(),
+  "vendorId": zod.string(),
+  "vendorName": zod.string(),
+  "trade": zod.string(),
+  "status": zod.enum(['Draft', 'Requested', 'Received', 'Under review', 'Accepted', 'Declined', 'Expired']),
+  "revision": zod.number().int().min(1),
+  "issueDate": zod.string().regex(getVendorQuoteResponseIssueDateRegExp),
+  "dueDate": zod.string().regex(getVendorQuoteResponseDueDateRegExp),
+  "notes": zod.string(),
+  "lineItems": zod.array(zod.object({
+  "id": zod.string(),
+  "description": zod.string().min(1),
+  "quantity": zod.number().gt(getVendorQuoteResponseLineItemsItemQuantityExclusiveMin),
+  "unitPrice": zod.number().int().min(getVendorQuoteResponseLineItemsItemUnitPriceMin),
+  "amount": zod.number().int().min(getVendorQuoteResponseLineItemsItemAmountMin)
+})).min(1),
+  "total": zod.number().int().min(getVendorQuoteResponseTotalMin),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Update a vendor quote
+ */
+export const UpdateVendorQuoteParams = zod.object({
+  "quoteId": zod.coerce.string()
+})
+
+
+
+
+
+
+export const updateVendorQuoteBodyIssueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateVendorQuoteBodyDueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+export const updateVendorQuoteBodyLineItemsItemQuantityExclusiveMin = 0;
+
+export const updateVendorQuoteBodyLineItemsItemUnitPriceMin = 0;
+
+
+
+
+export const UpdateVendorQuoteBody = zod.object({
+  "quoteNumber": zod.string().min(1).optional(),
+  "projectId": zod.string().min(1).optional(),
+  "vendorId": zod.string().min(1).optional(),
+  "trade": zod.string().min(1).optional(),
+  "status": zod.enum(['Draft', 'Requested', 'Received', 'Under review', 'Accepted', 'Declined', 'Expired']).optional(),
+  "revision": zod.number().int().min(1).optional(),
+  "issueDate": zod.string().regex(updateVendorQuoteBodyIssueDateRegExp).optional(),
+  "dueDate": zod.string().regex(updateVendorQuoteBodyDueDateRegExp).optional(),
+  "notes": zod.string().optional(),
+  "lineItems": zod.array(zod.object({
+  "id": zod.string().optional(),
+  "description": zod.string().min(1),
+  "quantity": zod.number().gt(updateVendorQuoteBodyLineItemsItemQuantityExclusiveMin),
+  "unitPrice": zod.number().int().min(updateVendorQuoteBodyLineItemsItemUnitPriceMin)
+})).min(1).optional()
+})
+
+
+export const updateVendorQuoteResponseIssueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateVendorQuoteResponseDueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+export const updateVendorQuoteResponseLineItemsItemQuantityExclusiveMin = 0;
+
+export const updateVendorQuoteResponseLineItemsItemUnitPriceMin = 0;
+
+export const updateVendorQuoteResponseLineItemsItemAmountMin = 0;
+
+
+export const updateVendorQuoteResponseTotalMin = 0;
+
+
+
+export const UpdateVendorQuoteResponse = zod.object({
+  "id": zod.string(),
+  "quoteNumber": zod.string(),
+  "projectId": zod.string(),
+  "projectName": zod.string(),
+  "vendorId": zod.string(),
+  "vendorName": zod.string(),
+  "trade": zod.string(),
+  "status": zod.enum(['Draft', 'Requested', 'Received', 'Under review', 'Accepted', 'Declined', 'Expired']),
+  "revision": zod.number().int().min(1),
+  "issueDate": zod.string().regex(updateVendorQuoteResponseIssueDateRegExp),
+  "dueDate": zod.string().regex(updateVendorQuoteResponseDueDateRegExp),
+  "notes": zod.string(),
+  "lineItems": zod.array(zod.object({
+  "id": zod.string(),
+  "description": zod.string().min(1),
+  "quantity": zod.number().gt(updateVendorQuoteResponseLineItemsItemQuantityExclusiveMin),
+  "unitPrice": zod.number().int().min(updateVendorQuoteResponseLineItemsItemUnitPriceMin),
+  "amount": zod.number().int().min(updateVendorQuoteResponseLineItemsItemAmountMin)
+})).min(1),
+  "total": zod.number().int().min(updateVendorQuoteResponseTotalMin),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+

@@ -137,6 +137,9 @@ export default function ProjectDetail() {
               </div>
               
               <div className="flex items-center gap-3">
+                <Button variant="outline" className="bg-transparent border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground" onClick={() => setLocation(`/quotes?projectId=${project.id}`)}>
+                  Vendor Quotes
+                </Button>
                 <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
                   <DialogTrigger asChild>
                     <Button variant="outline" className="bg-transparent border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground">

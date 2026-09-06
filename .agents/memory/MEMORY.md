@@ -1,0 +1,1 @@
+- [Date-only OpenAPI fields](date-only-openapi-fields.md) — preserve editable calendar values as validated date-only strings instead of generated Date objects.

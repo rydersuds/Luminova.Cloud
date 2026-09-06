@@ -88,7 +88,7 @@ export default function TradeDetail() {
               </div>
 
               <div className="flex flex-col w-full md:w-auto gap-3">
-                <Button className="w-full">Request Bid</Button>
+                <Button className="w-full" onClick={() => setLocation(`/quotes?vendorId=${trade.id}`)}>View Vendor Quotes</Button>
                 <Button variant="outline" className="w-full gap-2">
                   <MessageSquare className="h-4 w-4" />
                   Message

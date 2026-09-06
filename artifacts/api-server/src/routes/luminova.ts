@@ -20,6 +20,15 @@ import {
   UpdateProjectBody,
   UpdateProjectParams,
   UpdateProjectResponse,
+  CreateVendorQuoteBody,
+  CreateVendorQuoteResponse,
+  GetVendorQuoteParams,
+  GetVendorQuoteResponse,
+  GetVendorQuotesQueryParams,
+  GetVendorQuotesResponse,
+  UpdateVendorQuoteBody,
+  UpdateVendorQuoteParams,
+  UpdateVendorQuoteResponse,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -108,6 +117,101 @@ let invoices = [
   { id: "inv-2", invoiceNumber: "PFM-889", projectId: "riverstone", projectName: "Riverstone Residence", vendor: "Prairie Flow Mechanical", amount: 932500, date: "2026-09-03", status: "Pending approval", lineItem: "22 00 00 · Plumbing", overage: 128500 },
   { id: "inv-3", invoiceNumber: "CL-4421", projectId: "ridge-house", projectName: "Ridge House", vendor: "Clearline Interiors", amount: 2760000, date: "2026-09-01", status: "Auto-approved", lineItem: "09 29 00 · Drywall", overage: 0 },
   { id: "inv-4", invoiceNumber: "AE-1062", projectId: "ridge-house", projectName: "Ridge House", vendor: "Altitude Exteriors", amount: 4125000, date: "2026-08-28", status: "Approved", lineItem: "07 31 00 · Roofing", overage: 375000 },
+];
+
+const calculateQuoteLineItems = (lineItems: Array<{ id?: string; description: string; quantity: number; unitPrice: number }>) =>
+  lineItems.map((item, index) => ({
+    ...item,
+    id: item.id || `quote-line-${Date.now()}-${index}`,
+    amount: Math.round(item.quantity * item.unitPrice),
+  }));
+
+const dateOnly = (value: string | Date) =>
+  value instanceof Date ? value.toISOString().slice(0, 10) : value;
+
+let vendorQuotes = [
+  {
+    id: "vq-1001",
+    quoteNumber: "NE-RS-026",
+    projectId: "riverstone",
+    projectName: "Riverstone Residence",
+    vendorId: "trade-1",
+    vendorName: "Northline Electric",
+    trade: "Electrical",
+    status: "Under review",
+    revision: 2,
+    issueDate: "2026-08-28",
+    dueDate: "2026-09-12",
+    notes: "Includes fixtures allowance and temporary power.",
+    lineItems: [
+      { id: "vql-1", description: "Electrical rough-in", quantity: 1, unitPrice: 1825000, amount: 1825000 },
+      { id: "vql-2", description: "Fixtures allowance", quantity: 1, unitPrice: 480000, amount: 480000 },
+    ],
+    total: 2305000,
+    createdAt: "2026-08-20T16:00:00.000Z",
+    updatedAt: "2026-08-28T16:00:00.000Z",
+  },
+  {
+    id: "vq-1002",
+    quoteNumber: "PFM-889-Q",
+    projectId: "riverstone",
+    projectName: "Riverstone Residence",
+    vendorId: "trade-2",
+    vendorName: "Prairie Flow Mechanical",
+    trade: "Plumbing",
+    status: "Received",
+    revision: 1,
+    issueDate: "2026-09-01",
+    dueDate: "2026-09-10",
+    notes: "Pricing valid for 30 days.",
+    lineItems: [
+      { id: "vql-3", description: "Plumbing rough-in package", quantity: 1, unitPrice: 3120000, amount: 3120000 },
+    ],
+    total: 3120000,
+    createdAt: "2026-09-01T14:00:00.000Z",
+    updatedAt: "2026-09-01T14:00:00.000Z",
+  },
+  {
+    id: "vq-1003",
+    quoteNumber: "SFF-RH-114",
+    projectId: "ridge-house",
+    projectName: "Ridge House",
+    vendorId: "trade-3",
+    vendorName: "Summit Frame & Form",
+    trade: "Framing",
+    status: "Accepted",
+    revision: 3,
+    issueDate: "2026-08-14",
+    dueDate: "2026-08-31",
+    notes: "Final negotiated framing scope.",
+    lineItems: [
+      { id: "vql-4", description: "Labour and supervision", quantity: 1, unitPrice: 5840000, amount: 5840000 },
+      { id: "vql-5", description: "Lumber package", quantity: 1, unitPrice: 9460000, amount: 9460000 },
+    ],
+    total: 15300000,
+    createdAt: "2026-08-04T18:30:00.000Z",
+    updatedAt: "2026-08-14T18:30:00.000Z",
+  },
+  {
+    id: "vq-1004",
+    quoteNumber: "AE-RH-208",
+    projectId: "ridge-house",
+    projectName: "Ridge House",
+    vendorId: "trade-4",
+    vendorName: "Altitude Exteriors",
+    trade: "Roofing",
+    status: "Requested",
+    revision: 1,
+    issueDate: "2026-09-03",
+    dueDate: "2026-09-18",
+    notes: "",
+    lineItems: [
+      { id: "vql-6", description: "Standing seam roofing", quantity: 1, unitPrice: 0, amount: 0 },
+    ],
+    total: 0,
+    createdAt: "2026-09-03T15:10:00.000Z",
+    updatedAt: "2026-09-03T15:10:00.000Z",
+  },
 ];
 
 const detailsFor = (project: (typeof projects)[number]) => ({
@@ -309,6 +413,121 @@ router.post("/invoices", (req, res) => {
   };
   invoices = [invoice, ...invoices];
   res.status(201).json(CreateInvoiceResponse.parse(invoice));
+});
+
+router.get("/vendor-quotes", (req, res) => {
+  const parsed = GetVendorQuotesQueryParams.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const { search, projectId, vendorId, trade, status } = parsed.data;
+  const normalizedSearch = search?.trim().toLowerCase();
+  const result = vendorQuotes.filter((quote) =>
+    (!projectId || quote.projectId === projectId) &&
+    (!vendorId || quote.vendorId === vendorId) &&
+    (!trade || quote.trade === trade) &&
+    (!status || quote.status === status) &&
+    (!normalizedSearch || `${quote.quoteNumber} ${quote.projectName} ${quote.vendorName} ${quote.trade} ${quote.notes}`.toLowerCase().includes(normalizedSearch)),
+  );
+  res.json(GetVendorQuotesResponse.parse(result));
+});
+
+router.post("/vendor-quotes", (req, res) => {
+  const parsed = CreateVendorQuoteBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const project = projects.find((item) => item.id === parsed.data.projectId);
+  const vendor = trades.find((item) => item.id === parsed.data.vendorId);
+  if (!project || !vendor) {
+    res.status(404).json({ error: !project ? "Project not found" : "Vendor not found" });
+    return;
+  }
+  const issueDate = dateOnly(parsed.data.issueDate);
+  const dueDate = dateOnly(parsed.data.dueDate);
+  if (dueDate < issueDate) {
+    res.status(400).json({ error: "Due date cannot be before issue date" });
+    return;
+  }
+  const lineItems = calculateQuoteLineItems(parsed.data.lineItems);
+  const now = new Date().toISOString();
+  const quote = {
+    ...parsed.data,
+    id: `vq-${Date.now()}`,
+    projectName: project.name,
+    vendorName: vendor.companyName,
+    trade: vendor.tradeType,
+    issueDate,
+    dueDate,
+    lineItems,
+    total: lineItems.reduce((sum, item) => sum + item.amount, 0),
+    createdAt: now,
+    updatedAt: now,
+  };
+  vendorQuotes = [quote, ...vendorQuotes];
+  res.status(201).json(CreateVendorQuoteResponse.parse(quote));
+});
+
+router.get("/vendor-quotes/:quoteId", (req, res) => {
+  const parsed = GetVendorQuoteParams.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const quote = vendorQuotes.find((item) => item.id === parsed.data.quoteId);
+  if (!quote) {
+    res.status(404).json({ error: "Vendor quote not found" });
+    return;
+  }
+  res.json(GetVendorQuoteResponse.parse(quote));
+});
+
+router.patch("/vendor-quotes/:quoteId", (req, res) => {
+  const params = UpdateVendorQuoteParams.safeParse(req.params);
+  const body = UpdateVendorQuoteBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: "Invalid vendor quote update" });
+    return;
+  }
+  const index = vendorQuotes.findIndex((item) => item.id === params.data.quoteId);
+  if (index === -1) {
+    res.status(404).json({ error: "Vendor quote not found" });
+    return;
+  }
+  const current = vendorQuotes[index];
+  const projectId = body.data.projectId ?? current.projectId;
+  const vendorId = body.data.vendorId ?? current.vendorId;
+  const project = projects.find((item) => item.id === projectId);
+  const vendor = trades.find((item) => item.id === vendorId);
+  if (!project || !vendor) {
+    res.status(404).json({ error: !project ? "Project not found" : "Vendor not found" });
+    return;
+  }
+  const issueDate = dateOnly(body.data.issueDate ?? current.issueDate);
+  const dueDate = dateOnly(body.data.dueDate ?? current.dueDate);
+  if (dueDate < issueDate) {
+    res.status(400).json({ error: "Due date cannot be before issue date" });
+    return;
+  }
+  const lineItems = body.data.lineItems ? calculateQuoteLineItems(body.data.lineItems) : current.lineItems;
+  const updated = {
+    ...current,
+    ...body.data,
+    projectId,
+    projectName: project.name,
+    vendorId,
+    vendorName: vendor.companyName,
+    trade: vendor.tradeType,
+    issueDate,
+    dueDate,
+    lineItems,
+    total: lineItems.reduce((sum, item) => sum + item.amount, 0),
+    updatedAt: new Date().toISOString(),
+  };
+  vendorQuotes[index] = updated;
+  res.json(UpdateVendorQuoteResponse.parse(updated));
 });
 
 export default router;

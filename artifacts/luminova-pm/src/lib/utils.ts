@@ -20,6 +20,14 @@ export function formatDate(dateString: string) {
   }).format(new Date(dateString))
 }
 
+export function formatDateOnly(dateString: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(`${dateString}T00:00:00`))
+}
+
 export function getStatusColor(status: string) {
   switch (status.toLowerCase()) {
     case "active":

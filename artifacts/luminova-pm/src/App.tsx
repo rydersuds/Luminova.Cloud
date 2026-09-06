@@ -27,6 +27,7 @@ import {
   useLocation,
   Router as WouterRouter,
 } from 'wouter';
+import Quotes from '@/pages/quotes';
 
 const queryClient = new QueryClient();
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -105,6 +106,7 @@ function Router() {
         <Route path="/trades"><Protected><TradesDirectory /></Protected></Route>
         <Route path="/trades/:id"><Protected><TradeDetail /></Protected></Route>
         <Route path="/invoices"><Protected><Invoices /></Protected></Route>
+        <Route path="/quotes"><Protected><Quotes /></Protected></Route>
         <Route path="/messages"><Protected><Messages /></Protected></Route>
         <Route path="/users"><Protected><Users /></Protected></Route>
         <Route component={NotFound} />
