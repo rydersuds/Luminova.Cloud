@@ -137,6 +137,20 @@ function SessionPolicy() {
 }
 
 function App() {
+  if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/messages')) {
+    return (
+      <WouterRouter base={basePath}>
+        <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl}>
+          <QueryClientProvider client={queryClient}>
+            <TooltipProvider>
+              <Messages />
+            </TooltipProvider>
+          </QueryClientProvider>
+        </ClerkProvider>
+      </WouterRouter>
+    );
+  }
+
   if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/project-panorama')) {
     return (
       <WouterRouter base={basePath}>
