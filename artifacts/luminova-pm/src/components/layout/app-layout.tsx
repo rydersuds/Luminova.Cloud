@@ -35,6 +35,7 @@ type AppLayoutViewProps = {
   initialSidebarOpen?: boolean
   initialProfileOpen?: boolean
   hoveredHref?: string
+  onNavigate?: (href: string) => void
 }
 
 export function AppLayoutView({
@@ -46,6 +47,7 @@ export function AppLayoutView({
   initialSidebarOpen = false,
   initialProfileOpen = false,
   hoveredHref,
+  onNavigate,
 }: AppLayoutViewProps) {
   const [sidebarOpen, setSidebarOpen] = useState(initialSidebarOpen)
   const [profileOpen, setProfileOpen] = useState(initialProfileOpen)
@@ -55,6 +57,7 @@ export function AppLayoutView({
   const navRef = useRef<HTMLElement>(null)
   const activeLinkRef = useRef<HTMLAnchorElement>(null)
   const hasPositionedIndicator = useRef(false)
+  const previousIndicatorLocation = useRef(location)
   const [indicator, setIndicator] = useState({ top: 0, height: 0, ready: false, animate: false })
   const initials = displayName.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()
 
@@ -115,6 +118,7 @@ export function AppLayoutView({
     const nav = navRef.current
     const activeLink = activeLinkRef.current
     if (!nav || !activeLink) return
+    const shouldAnimate = hasPositionedIndicator.current && previousIndicatorLocation.current !== location
 
     const positionIndicator = () => {
       const navRect = nav.getBoundingClientRect()
@@ -124,9 +128,10 @@ export function AppLayoutView({
         top: linkRect.top - navRect.top + nav.scrollTop - navPaddingTop,
         height: linkRect.height,
         ready: true,
-        animate: hasPositionedIndicator.current,
+        animate: shouldAnimate,
       })
       hasPositionedIndicator.current = true
+      previousIndicatorLocation.current = location
     }
 
     positionIndicator()
@@ -190,13 +195,14 @@ export function AppLayoutView({
         <nav ref={navRef} className="relative flex-1 px-4 py-6 md:py-2 space-y-3 overflow-y-auto">
           <div
             data-testid="sidebar-selection-indicator"
+            data-animate={indicator.animate ? "true" : "false"}
             aria-hidden="true"
             className={cn(
-              "pointer-events-none absolute left-4 right-4 z-0 rounded-xl bg-primary shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),0_4px_15px_-3px_hsl(var(--primary)/0.5)]",
-              indicator.animate && "transition-[transform,height] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none",
+              "pointer-events-none absolute left-4 right-4 z-0 rounded-xl bg-primary shadow-[inset_0_1px_2px_rgba(255,255,255,0.38),0_5px_18px_-3px_hsl(var(--primary)/0.72)] will-change-transform",
+              indicator.animate && "transition-[transform,height,box-shadow] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
               !indicator.ready && "opacity-0",
             )}
-            style={{ height: indicator.height, transform: `translateY(${indicator.top}px) scale(1.02)` }}
+            style={{ height: indicator.height, transform: `translateY(${indicator.top}px) scale(1.025)` }}
           />
           <div data-contrast-label="navigation section label" className="relative z-10 text-[10px] font-mono uppercase tracking-widest text-sidebar-foreground/60 mb-4 px-2">Operations Center</div>
           {NAV_ITEMS.map((item) => {
@@ -210,16 +216,37 @@ export function AppLayoutView({
                 aria-current={isActive ? "page" : undefined}
                 data-contrast-label={`navigation link "${item.label}"`}
                 className={cn(
-                  "group relative z-10 flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-[color,background-color,box-shadow,transform] duration-300 overflow-hidden shadow-sm motion-reduce:transition-none",
+                  "group relative z-10 flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-[color,background-color,box-shadow,transform] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden shadow-sm motion-reduce:transition-none",
                   isActive
-                    ? "text-primary-foreground transform scale-[1.02]"
+                    ? "text-primary-foreground transform scale-[1.025]"
                     : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_2px_10px_rgba(0,0,0,0.2)]",
                   isForcedHover && "bg-sidebar-accent text-sidebar-foreground shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_2px_10px_rgba(0,0,0,0.2)]",
                 )}
-                onClick={closeSidebar}
+                onClick={(event) => {
+                  if (onNavigate) {
+                    event.preventDefault()
+                    onNavigate(item.href)
+                    return
+                  }
+                  closeSidebar()
+                }}
               >
-                <item.icon size={20} className={cn("relative z-10 transition-transform duration-300 drop-shadow-md motion-reduce:transition-none", isActive ? "scale-110" : "group-hover:scale-110 group-hover:text-primary", isForcedHover && "scale-110 text-primary")} />
-                <span className="relative z-10 tracking-wide drop-shadow-sm">{item.label}</span>
+                <item.icon
+                  size={20}
+                  className={cn(
+                    "relative z-10 transition-[transform,color,filter] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] drop-shadow-md motion-reduce:transition-none",
+                    isActive ? "scale-[1.18] -rotate-3 drop-shadow-[0_2px_5px_rgba(0,0,0,0.35)]" : "group-hover:scale-110 group-hover:text-primary",
+                    isForcedHover && "scale-110 text-primary",
+                  )}
+                />
+                <span
+                  className={cn(
+                    "relative z-10 tracking-wide drop-shadow-sm transition-[transform,letter-spacing] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
+                    isActive && "translate-x-1 tracking-[0.035em]",
+                  )}
+                >
+                  {item.label}
+                </span>
               </Link>
             )
           })}

@@ -138,27 +138,7 @@ function SessionPolicy() {
 
 function App() {
   if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/sidebar')) {
-    const params = new URLSearchParams(window.location.search);
-    const activeLocation = `/${params.get('active') || 'projects'}`;
-    return (
-      <WouterRouter base={basePath}>
-        <AppLayoutView
-          location={activeLocation}
-          displayName="Morgan Reyes"
-          email="morgan@luminova.test"
-          onSignOut={() => undefined}
-          initialSidebarOpen={params.get('drawer') === 'open'}
-          initialProfileOpen={params.get('profile') === 'open'}
-          hoveredHref={params.get('hover') === 'trades' ? '/trades' : undefined}
-        >
-          <section className="m-4 min-h-64 rounded-2xl bg-sidebar p-8 text-sidebar-foreground shadow-xl" data-testid="shared-dark-surface">
-            <p className="font-mono text-xs uppercase tracking-widest text-sidebar-foreground/60">Shared dark surface</p>
-            <h1 className="mt-3 text-3xl font-bold">Project controls stay readable.</h1>
-            <div className="mt-6 border-t border-sidebar-border pt-4 text-sidebar-foreground/70">Divider and secondary label token check</div>
-          </section>
-        </AppLayoutView>
-      </WouterRouter>
-    );
+    return <SidebarVisualHarness />;
   }
 
   return (
@@ -184,6 +164,32 @@ function App() {
           </TooltipProvider>
         </QueryClientProvider>
       </ClerkProvider>
+    </WouterRouter>
+  );
+}
+
+function SidebarVisualHarness() {
+  const params = new URLSearchParams(window.location.search);
+  const [activeLocation, setActiveLocation] = useState(`/${params.get('active') || 'projects'}`);
+
+  return (
+    <WouterRouter base={basePath}>
+      <AppLayoutView
+        location={activeLocation}
+        displayName="Morgan Reyes"
+        email="morgan@luminova.test"
+        onSignOut={() => undefined}
+        onNavigate={setActiveLocation}
+        initialSidebarOpen={params.get('drawer') === 'open'}
+        initialProfileOpen={params.get('profile') === 'open'}
+        hoveredHref={params.get('hover') === 'trades' ? '/trades' : undefined}
+      >
+        <section className="m-4 min-h-64 rounded-2xl bg-sidebar p-8 text-sidebar-foreground shadow-xl" data-testid="shared-dark-surface">
+          <p className="font-mono text-xs uppercase tracking-widest text-sidebar-foreground/60">Shared dark surface</p>
+          <h1 className="mt-3 text-3xl font-bold">Project controls stay readable.</h1>
+          <div className="mt-6 border-t border-sidebar-border pt-4 text-sidebar-foreground/70">Divider and secondary label token check</div>
+        </section>
+      </AppLayoutView>
     </WouterRouter>
   );
 }

@@ -196,3 +196,48 @@ test.describe('navigation contrast', () => {
     await expect(page.getByRole('button', { name: 'Open navigation' })).toBeFocused();
   });
 });
+
+test.describe('navigation selection motion', () => {
+  test('positions immediately on load, then animates desktop route changes', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await stabilize(page);
+
+    const indicator = page.getByTestId('sidebar-selection-indicator');
+    await expect(indicator).toHaveAttribute('data-animate', 'false');
+    await expect(indicator).toHaveCSS('transition-duration', '0s');
+    const initialTransform = await indicator.evaluate((element) => getComputedStyle(element).transform);
+
+    await page.getByRole('link', { name: 'Communications' }).click();
+    await expect(page.getByRole('link', { name: 'Communications' })).toHaveAttribute('aria-current', 'page');
+    await expect(indicator).toHaveAttribute('data-animate', 'true');
+    await expect(indicator).toHaveCSS('transition-duration', '0.5s');
+    await expect.poll(() => indicator.evaluate((element) => getComputedStyle(element).transform))
+      .not.toBe(initialTransform);
+  });
+
+  test('uses the same emphasized motion in the open mobile drawer', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/__visual/sidebar?drawer=open');
+    await expect(page.getByRole('dialog', { name: 'Main navigation' })).toBeVisible();
+
+    const indicator = page.getByTestId('sidebar-selection-indicator');
+    await expect(indicator).toHaveAttribute('data-animate', 'false');
+    await page.getByRole('link', { name: 'Vendor Quotes' }).click();
+    await expect(page.getByRole('link', { name: 'Vendor Quotes' })).toHaveAttribute('aria-current', 'page');
+    await expect(indicator).toHaveAttribute('data-animate', 'true');
+    await expect(indicator).toHaveCSS('transition-duration', '0.5s');
+    await expect(page.getByRole('dialog', { name: 'Main navigation' })).toBeVisible();
+  });
+
+  test('changes selection immediately when reduced motion is preferred', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await stabilize(page);
+
+    const indicator = page.getByTestId('sidebar-selection-indicator');
+    await page.getByRole('link', { name: 'Financials' }).click();
+    await expect(page.getByRole('link', { name: 'Financials' })).toHaveAttribute('aria-current', 'page');
+    await expect(indicator).toHaveAttribute('data-animate', 'true');
+    await expect(indicator).toHaveCSS('transition-duration', '0s');
+  });
+});
