@@ -139,10 +139,11 @@ function SessionPolicy() {
 function App() {
   if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/sidebar')) {
     const params = new URLSearchParams(window.location.search);
+    const activeLocation = `/${params.get('active') || 'projects'}`;
     return (
       <WouterRouter base={basePath}>
         <AppLayoutView
-          location="/projects"
+          location={activeLocation}
           displayName="Morgan Reyes"
           email="morgan@luminova.test"
           onSignOut={() => undefined}

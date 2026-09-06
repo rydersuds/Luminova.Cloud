@@ -13,7 +13,7 @@ import {
   LogOut,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useClerk, useUser } from "@clerk/react"
 
 const NAV_ITEMS = [
@@ -52,6 +52,10 @@ export function AppLayoutView({
   const [isMobile, setIsMobile] = useState(false)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const sidebarRef = useRef<HTMLElement>(null)
+  const navRef = useRef<HTMLElement>(null)
+  const activeLinkRef = useRef<HTMLAnchorElement>(null)
+  const hasPositionedIndicator = useRef(false)
+  const [indicator, setIndicator] = useState({ top: 0, height: 0, ready: false, animate: false })
   const initials = displayName.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()
 
   const closeSidebar = useCallback(() => {
@@ -107,6 +111,36 @@ export function AppLayoutView({
     return () => document.removeEventListener("keydown", handleKeyDown)
   }, [closeSidebar, isMobile, sidebarOpen])
 
+  useLayoutEffect(() => {
+    const nav = navRef.current
+    const activeLink = activeLinkRef.current
+    if (!nav || !activeLink) return
+
+    const positionIndicator = () => {
+      const navRect = nav.getBoundingClientRect()
+      const linkRect = activeLink.getBoundingClientRect()
+      const navPaddingTop = Number.parseFloat(window.getComputedStyle(nav).paddingTop)
+      setIndicator({
+        top: linkRect.top - navRect.top + nav.scrollTop - navPaddingTop,
+        height: linkRect.height,
+        ready: true,
+        animate: hasPositionedIndicator.current,
+      })
+      hasPositionedIndicator.current = true
+    }
+
+    positionIndicator()
+    const observer = new ResizeObserver(positionIndicator)
+    observer.observe(nav)
+    observer.observe(activeLink)
+    window.addEventListener("resize", positionIndicator)
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener("resize", positionIndicator)
+    }
+  }, [location, sidebarOpen])
+
   return (
     <div data-testid="app-layout" className="min-h-[100dvh] flex flex-col md:flex-row bg-background bg-tech-grid text-foreground selection:bg-primary selection:text-primary-foreground">
       <div className="md:hidden flex items-center justify-between p-4 glass-panel-dark text-sidebar-foreground z-30 relative border-b border-sidebar-border shadow-md">
@@ -153,8 +187,18 @@ export function AppLayoutView({
           <img src="/luminova-logo.png" alt="Luminova Construction" className="h-16 w-auto object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)] z-10" />
         </div>
 
-        <nav className="flex-1 px-4 py-6 md:py-2 space-y-3 overflow-y-auto">
-          <div data-contrast-label="navigation section label" className="text-[10px] font-mono uppercase tracking-widest text-sidebar-foreground/60 mb-4 px-2">Operations Center</div>
+        <nav ref={navRef} className="relative flex-1 px-4 py-6 md:py-2 space-y-3 overflow-y-auto">
+          <div
+            data-testid="sidebar-selection-indicator"
+            aria-hidden="true"
+            className={cn(
+              "pointer-events-none absolute left-4 right-4 z-0 rounded-xl bg-primary shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),0_4px_15px_-3px_hsl(var(--primary)/0.5)]",
+              indicator.animate && "transition-[transform,height] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none",
+              !indicator.ready && "opacity-0",
+            )}
+            style={{ height: indicator.height, transform: `translateY(${indicator.top}px) scale(1.02)` }}
+          />
+          <div data-contrast-label="navigation section label" className="relative z-10 text-[10px] font-mono uppercase tracking-widest text-sidebar-foreground/60 mb-4 px-2">Operations Center</div>
           {NAV_ITEMS.map((item) => {
             const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href))
             const isForcedHover = hoveredHref === item.href && !isActive
@@ -162,17 +206,19 @@ export function AppLayoutView({
               <Link
                 key={item.href}
                 href={item.href}
+                ref={isActive ? activeLinkRef : undefined}
+                aria-current={isActive ? "page" : undefined}
                 data-contrast-label={`navigation link "${item.label}"`}
                 className={cn(
-                  "group relative flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-all duration-300 overflow-hidden shadow-sm",
+                  "group relative z-10 flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-[color,background-color,box-shadow,transform] duration-300 overflow-hidden shadow-sm motion-reduce:transition-none",
                   isActive
-                    ? "text-primary-foreground bg-primary shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),0_4px_15px_-3px_hsl(var(--primary)/0.5)] transform scale-[1.02]"
+                    ? "text-primary-foreground transform scale-[1.02]"
                     : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_2px_10px_rgba(0,0,0,0.2)]",
                   isForcedHover && "bg-sidebar-accent text-sidebar-foreground shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_2px_10px_rgba(0,0,0,0.2)]",
                 )}
                 onClick={closeSidebar}
               >
-                <item.icon size={20} className={cn("transition-transform duration-300 drop-shadow-md", isActive ? "scale-110" : "group-hover:scale-110 group-hover:text-primary", isForcedHover && "scale-110 text-primary")} />
+                <item.icon size={20} className={cn("relative z-10 transition-transform duration-300 drop-shadow-md motion-reduce:transition-none", isActive ? "scale-110" : "group-hover:scale-110 group-hover:text-primary", isForcedHover && "scale-110 text-primary")} />
                 <span className="relative z-10 tracking-wide drop-shadow-sm">{item.label}</span>
               </Link>
             )

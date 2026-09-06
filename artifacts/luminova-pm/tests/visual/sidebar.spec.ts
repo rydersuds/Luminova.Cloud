@@ -83,7 +83,13 @@ const assertNavigationContrast = async (
       })
       .map((element) => {
         const style = getComputedStyle(element);
-        const background = renderedBackground(element);
+        const indicator = document.querySelector('[data-testid="sidebar-selection-indicator"]');
+        const background = element.getAttribute('aria-current') === 'page' && indicator
+          ? composite(
+              parseColor(getComputedStyle(indicator).backgroundColor),
+              renderedBackground(indicator.parentElement ?? indicator),
+            )
+          : renderedBackground(element);
         const opacity = Number(style.opacity);
         const declaredForeground = parseColor(style.color);
         const foreground = composite(
@@ -131,6 +137,10 @@ test.describe('navigation contrast', () => {
     await expect(page.getByTestId('app-layout')).toBeVisible();
     await assertNavigationContrast(page, 'desktop hover');
     await expect(page).toHaveScreenshot('desktop-hover.png', { animations: 'disabled' });
+
+    await page.goto('/__visual/sidebar?active=messages');
+    await expect(page.getByRole('link', { name: 'Communications' })).toHaveAttribute('aria-current', 'page');
+    await expect(page).toHaveScreenshot('desktop-active-messages.png', { animations: 'disabled' });
   });
 
   test('desktop profile-expanded and sign-out states', async ({ page }) => {
@@ -159,6 +169,10 @@ test.describe('navigation contrast', () => {
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
     await assertNavigationContrast(page, 'mobile drawer profile expanded');
     await expect(page).toHaveScreenshot('mobile-drawer-overlay.png', { animations: 'disabled' });
+
+    await page.goto('/__visual/sidebar?drawer=open&active=quotes');
+    await expect(page.getByRole('link', { name: 'Vendor Quotes' })).toHaveAttribute('aria-current', 'page');
+    await expect(page).toHaveScreenshot('mobile-drawer-active-quotes.png', { animations: 'disabled' });
   });
 
   test('mobile drawer supports keyboard navigation and dismissal', async ({ page }) => {
