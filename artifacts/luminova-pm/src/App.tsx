@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -59,11 +59,20 @@ function Home() {
 function Intro() {
   const [, setLocation] = useLocation();
   const [leaving, setLeaving] = useState(false);
+  const [ready, setReady] = useState(false);
+  const frameRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
+    const onReady = (event: MessageEvent) => {
+      if (event.source === frameRef.current?.contentWindow && event.data?.type === "luminova-intro-ready") {
+        setReady(true);
+      }
+    };
+    window.addEventListener("message", onReady);
     const fadeTimer = window.setTimeout(() => setLeaving(true), 3500);
     const routeTimer = window.setTimeout(() => setLocation("/", { replace: true }), 4000);
     return () => {
+      window.removeEventListener("message", onReady);
       window.clearTimeout(fadeTimer);
       window.clearTimeout(routeTimer);
     };
@@ -72,9 +81,10 @@ function Intro() {
   return (
     <div className={`fixed inset-0 z-[100] bg-black transition-opacity duration-500 ${leaving ? "opacity-0" : "opacity-100"}`}>
       <iframe
-        src={`${basePath}/luminova-intro-animation.html`}
+        ref={frameRef}
+        src={`${basePath}/luminova-intro-animation.html?v=6`}
         title="Luminova Construction introduction"
-        className="h-full w-full border-0 bg-black"
+        className={`h-full w-full border-0 bg-black transition-opacity duration-150 ${ready ? "opacity-100" : "opacity-0"}`}
         allow="autoplay"
       />
     </div>

@@ -315,7 +315,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Force the unpacked document itself to black before it replaces this shell.
     template = template.replace(
       /<\/head>/i,
-      '<style>html,body,[ref]{background:#000!important;}[ref]>div{width:min(40vw,400px)!important;}@media(max-width:640px){[ref]>div{width:min(64vw,320px)!important;}}</style></head>'
+      '<style>html,body,x-dc,x-dc>div{background:#000!important;}x-dc>div>div{width:min(24vw,240px)!important;}@media(max-width:640px){x-dc>div>div{width:min(44vw,220px)!important;}}</style></head>'
+    );
+    template = template.replace(
+      'width: min(76vw, 800px)',
+      'width: min(24vw, 240px)'
     );
 
     // Parse the template and swap the root element. Scripts inserted via
@@ -380,6 +384,9 @@ document.addEventListener('DOMContentLoaded', async function() {
       });
     }, 50);
     setTimeout(function () { clearInterval(speedUp); }, 1000);
+    setTimeout(function () {
+      window.parent.postMessage({ type: 'luminova-intro-ready' }, '*');
+    }, 180);
   } catch (err) {
     setStatus('Error unpacking: ' + err.message);
     console.error('Bundle unpack error:', err);
