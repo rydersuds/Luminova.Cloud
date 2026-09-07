@@ -330,6 +330,20 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Activity"
+  /projects/{projectId}/organize-files:
+    post:
+      operationId: organizeProjectFiles
+      tags: [projects]
+      summary: Organize imported project files with AI
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Files organized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizeProjectFilesResult"
   /trades:
     get:
       operationId: getTrades
@@ -840,7 +854,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/Project"
         - type: object
-          required: [startDate, clientQuote, lineItems, invoices, trades, photos, panoramas, activity]
+          required: [startDate, clientQuote, lineItems, invoices, trades, photos, files, panoramas, activity]
           properties:
             startDate: { type: string }
             clientQuote: { $ref: "#/components/schemas/ClientQuote" }
@@ -860,6 +874,10 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/Photo"
+            files:
+              type: array
+              items:
+                $ref: "#/components/schemas/ProjectFile"
             panoramas:
               type: array
               items:
@@ -1070,6 +1088,27 @@ components:
         caption: { type: string }
         phase: { type: string }
         date: { type: string }
+    ProjectFile:
+      type: object
+      required: [id, name, relativePath, url, contentType, classification, collection]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        relativePath: { type: string }
+        url: { type: string }
+        contentType: { type: string }
+        classification: { type: string }
+        collection: { type: string }
+        linkedEntityType: { type: [string, "null"] }
+        linkedEntityId: { type: [string, "null"] }
+        aiConfidence: { type: [integer, "null"], minimum: 0, maximum: 100 }
+    OrganizeProjectFilesResult:
+      type: object
+      required: [filesOrganized, collectionsCreated, attachmentsMatched]
+      properties:
+        filesOrganized: { type: integer }
+        collectionsCreated: { type: integer }
+        attachmentsMatched: { type: integer }
     Panorama:
       type: object
       required: [id, url, label, location, date]

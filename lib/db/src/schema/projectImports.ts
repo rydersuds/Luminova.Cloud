@@ -23,6 +23,10 @@ export const projectDocumentsTable = pgTable("project_documents", {
   contentType: text("content_type").notNull(),
   size: integer("size").notNull(),
   classification: text("classification").notNull(),
+  collection: text("collection").notNull().default(""),
+  linkedEntityType: text("linked_entity_type"),
+  linkedEntityId: text("linked_entity_id"),
+  aiConfidence: integer("ai_confidence"),
   textSnippet: text("text_snippet"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [

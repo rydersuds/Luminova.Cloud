@@ -184,6 +184,26 @@ export interface Photo {
   date: string;
 }
 
+export interface ProjectFile {
+  id: string;
+  name: string;
+  relativePath: string;
+  url: string;
+  contentType: string;
+  classification: string;
+  collection: string;
+  /** @nullable */
+  linkedEntityType?: string | null;
+  /** @nullable */
+  linkedEntityId?: string | null;
+  /**
+     * @minimum 0
+     * @maximum 100
+     * @nullable
+     */
+  aiConfidence?: number | null;
+}
+
 export interface Panorama {
   id: string;
   url: string;
@@ -202,6 +222,7 @@ export type ProjectDetail = Project & {
   invoices: Invoice[];
   trades: Trade[];
   photos: Photo[];
+  files: ProjectFile[];
   panoramas: Panorama[];
   activity: Activity[];
 };
@@ -348,6 +369,12 @@ export interface VendorQuoteUpdate {
   notes?: string;
   /** @minItems 1 */
   lineItems?: VendorQuoteLineItemInput[];
+}
+
+export interface OrganizeProjectFilesResult {
+  filesOrganized: number;
+  collectionsCreated: number;
+  attachmentsMatched: number;
 }
 
 export interface PanoramaInput {

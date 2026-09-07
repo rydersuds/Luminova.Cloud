@@ -12,6 +12,7 @@ import type { Invoice } from './invoice';
 import type { Panorama } from './panorama';
 import type { Photo } from './photo';
 import type { Project } from './project';
+import type { ProjectFile } from './projectFile';
 import type { Trade } from './trade';
 
 export type ProjectDetail = Project & {
@@ -21,6 +22,7 @@ export type ProjectDetail = Project & {
   invoices: Invoice[];
   trades: Trade[];
   photos: Photo[];
+  files: ProjectFile[];
   panoramas: Panorama[];
   activity: Activity[];
 };

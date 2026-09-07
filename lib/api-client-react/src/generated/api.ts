@@ -30,6 +30,7 @@ import type {
   HealthStatus,
   Invoice,
   InvoiceInput,
+  OrganizeProjectFilesResult,
   Panorama,
   PanoramaInput,
   PanoramaUpdate,
@@ -1261,6 +1262,77 @@ export function useGetProjectActivity<TData = Awaited<ReturnType<typeof getProje
 
 
 
+
+export const getOrganizeProjectFilesUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/organize-files`
+}
+
+/**
+ * @summary Organize imported project files with AI
+ */
+export const organizeProjectFiles = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<OrganizeProjectFilesResult> => {
+
+  return customFetch<OrganizeProjectFilesResult>(getOrganizeProjectFilesUrl(projectId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getOrganizeProjectFilesMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof organizeProjectFiles>>, TError,{projectId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof organizeProjectFiles>>, TError,{projectId: string}, TContext> => {
+
+const mutationKey = ['organizeProjectFiles'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof organizeProjectFiles>>, {projectId: string}> = (props) => {
+          const {projectId} = props ?? {};
+
+          return  organizeProjectFiles(projectId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type OrganizeProjectFilesMutationResult = NonNullable<Awaited<ReturnType<typeof organizeProjectFiles>>>
+
+    export type OrganizeProjectFilesMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Organize imported project files with AI
+ */
+export const useOrganizeProjectFiles = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof organizeProjectFiles>>, TError,{projectId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof organizeProjectFiles>>,
+        TError,
+        {projectId: string},
+        TContext
+      > => {
+      return useMutation(getOrganizeProjectFilesMutationOptions(options));
+    }
 
 export const getGetTradesUrl = (params?: GetTradesParams,) => {
   const normalizedParams = new URLSearchParams();

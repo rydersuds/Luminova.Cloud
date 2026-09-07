@@ -8,6 +8,7 @@ import {
   useUpdateProjectPanorama,
   useUpdateProject,
   useGetProjectActivity,
+  useOrganizeProjectFiles,
   getGetProjectActivityQueryKey
 } from "@workspace/api-client-react"
 import { Badge } from "@/components/ui/badge"
@@ -53,6 +54,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const [activePanorama, setActivePanorama] = React.useState<ProjectPanorama | null>(null)
   const [editingPanorama, setEditingPanorama] = React.useState<ProjectPanorama | null>(null)
   const [panoramaEditError, setPanoramaEditError] = React.useState("")
+  const organizeFiles = useOrganizeProjectFiles()
   const panoramaName = (label: string | null) => label || "Untitled panorama"
 
   const { data: project, isLoading } = useGetProject(projectId, {
@@ -72,6 +74,27 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const updateProject = useUpdateProject()
   const createPanorama = useCreateProjectPanorama()
   const updatePanorama = useUpdateProjectPanorama()
+  const photoCollections = React.useMemo(() => {
+    if (!project) return []
+    const grouped = new Map<string, typeof project.photos>()
+    for (const photo of project.photos) {
+      const label = photo.phase || "Project photos"
+      grouped.set(label, [...(grouped.get(label) || []), photo])
+    }
+    return [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))
+  }, [project])
+  const invoiceFiles = project?.files.filter((file) => file.classification === "invoice") || []
+  const quoteFiles = project?.files.filter((file) => file.classification === "quote") || []
+
+  const handleOrganizeFiles = async () => {
+    try {
+      const result = await organizeFiles.mutateAsync({ projectId })
+      await queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) })
+      toast({ title: "Files organized", description: `${result.filesOrganized} files sorted into ${result.collectionsCreated} collections.` })
+    } catch {
+      toast({ title: "Organization failed", description: "The AI organizer could not complete this project.", variant: "destructive" })
+    }
+  }
 
   const resetPanoramaForm = () => {
     setPanoramaImage(null)
@@ -575,9 +598,22 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                 ))}
               </div>
 
-              <h3 className="text-xl font-heading font-semibold mt-8 mb-4">Standard Photos</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {project.photos.map((photo, index) => (
+              <div className="mt-8 flex items-center justify-between gap-4">
+                <h3 className="text-xl font-heading font-semibold">Standard Photos</h3>
+                <Button type="button" onClick={handleOrganizeFiles} disabled={organizeFiles.isPending}>
+                  {organizeFiles.isPending ? "Organizing…" : "Organize with AI"}
+                </Button>
+              </div>
+              {photoCollections.map(([collection, photos]) => (
+                <section key={collection} className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-heading text-lg font-semibold">{collection}</h4>
+                    <Badge variant="secondary">{photos.length}</Badge>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {photos.map((photo) => {
+                    const index = project.photos.findIndex((item) => item.id === photo.id)
+                    return (
                   <button
                     type="button"
                     key={photo.id}
@@ -594,8 +630,11 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                       </div>
                     </div>
                   </button>
-                ))}
-              </div>
+                    )
+                  })}
+                  </div>
+                </section>
+              ))}
 
               <Dialog open={photoIndex !== null} onOpenChange={(open) => !open && setPhotoIndex(null)}>
                 <DialogContent className="h-[92dvh] w-[96vw] !max-w-6xl overflow-hidden border-white/15 bg-black p-0 text-white">
@@ -704,6 +743,26 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
             </TabsContent>
 
             <TabsContent value="budget" className="space-y-6">
+              {(invoiceFiles.length > 0 || quoteFiles.length > 0) && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Source Files</CardTitle>
+                    <CardDescription>Original uploaded invoice and quote documents</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-3 md:grid-cols-2">
+                    {[...invoiceFiles, ...quoteFiles].map((file) => (
+                      <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-lg border p-3 hover:bg-muted">
+                        <FileText className="h-5 w-5 shrink-0 text-primary" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium">{file.name}</span>
+                          <span className="block truncate text-xs text-muted-foreground">{file.collection}</span>
+                        </span>
+                        <Badge variant="outline">{file.classification}</Badge>
+                      </a>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
@@ -795,6 +854,16 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                               <div>
                                 <p className="font-medium">{trade.companyName}</p>
                                 <p className="text-xs text-muted-foreground">{trade.contactName}</p>
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {project.files
+                                    .filter((file) => file.linkedEntityId === trade.id || file.relativePath.toLowerCase().includes(trade.companyName.toLowerCase()))
+                                    .slice(0, 4)
+                                    .map((file) => (
+                                      <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">
+                                        {file.name}
+                                      </a>
+                                    ))}
+                                </div>
                               </div>
                             </div>
                           </TableCell>

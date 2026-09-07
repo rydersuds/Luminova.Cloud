@@ -105,6 +105,11 @@ export const GetProjectParams = zod.object({
   "projectId": zod.coerce.string()
 })
 
+export const getProjectResponseTwoFilesItemAiConfidenceMin = 0;
+export const getProjectResponseTwoFilesItemAiConfidenceMax = 100;
+
+
+
 export const GetProjectResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
@@ -168,6 +173,18 @@ export const GetProjectResponse = zod.object({
   "caption": zod.string(),
   "phase": zod.string(),
   "date": zod.string()
+})),
+  "files": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "relativePath": zod.string(),
+  "url": zod.string(),
+  "contentType": zod.string(),
+  "classification": zod.string(),
+  "collection": zod.string(),
+  "linkedEntityType": zod.string().nullish(),
+  "linkedEntityId": zod.string().nullish(),
+  "aiConfidence": zod.number().int().min(getProjectResponseTwoFilesItemAiConfidenceMin).max(getProjectResponseTwoFilesItemAiConfidenceMax).nullish()
 })),
   "panoramas": zod.array(zod.object({
   "id": zod.string(),
@@ -578,6 +595,20 @@ export const GetProjectActivityResponseItem = zod.object({
   "date": zod.string()
 })
 export const GetProjectActivityResponse = zod.array(GetProjectActivityResponseItem)
+
+
+/**
+ * @summary Organize imported project files with AI
+ */
+export const OrganizeProjectFilesParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+export const OrganizeProjectFilesResponse = zod.object({
+  "filesOrganized": zod.number().int(),
+  "collectionsCreated": zod.number().int(),
+  "attachmentsMatched": zod.number().int()
+})
 
 
 /**
