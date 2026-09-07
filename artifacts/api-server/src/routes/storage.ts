@@ -6,9 +6,19 @@ import { and, eq } from "drizzle-orm";
 import { db, projectImportBatchesTable } from "@workspace/db";
 
 type AuthenticatedRequest = Request & { userId?: string };
+type ImportManifestDocument = { relativePath: string; name: string; size: number; contentType: string };
 const router: IRouter = Router();
 const storage = new ObjectStorageService();
-const supportedExtensions = new Set(["pdf", "doc", "docx", "xls", "xlsx", "csv", "txt", "md", "json", "rtf", "jpg", "jpeg", "png", "webp", "heic", "tif", "tiff"]);
+
+export const uploadMatchesImportManifest = (
+  upload: { relativePath?: string; name: string; size: number; contentType: string },
+  manifest: ImportManifestDocument[],
+) => manifest.some((document) =>
+  document.relativePath === upload.relativePath &&
+  document.name === upload.name &&
+  document.size === upload.size &&
+  document.contentType === upload.contentType
+);
 
 router.post("/storage/uploads/request-url", async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   if (!req.userId) {
@@ -17,20 +27,22 @@ router.post("/storage/uploads/request-url", async (req: AuthenticatedRequest, re
   }
   const parsed = RequestUploadUrlBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Choose a non-empty supported construction document or image with valid upload metadata." });
-    return;
-  }
-  const extension = parsed.data.name.split(".").pop()?.toLowerCase();
-  if (!extension || !supportedExtensions.has(extension)) {
-    res.status(400).json({ error: "This file type is not supported for project imports." });
+    res.status(400).json({ error: "Choose a non-empty file with valid upload metadata." });
     return;
   }
   const importId = typeof req.body?.importId === "string" ? req.body.importId : null;
   if (importId) {
-    const [session] = await db.select({ id: projectImportBatchesTable.id }).from(projectImportBatchesTable)
+    const [session] = await db.select({
+      id: projectImportBatchesTable.id,
+      manifest: projectImportBatchesTable.manifest,
+    }).from(projectImportBatchesTable)
       .where(and(eq(projectImportBatchesTable.id, importId), eq(projectImportBatchesTable.ownerId, req.userId))).limit(1);
     if (!session) {
       res.status(404).json({ error: "Import session not found." });
+      return;
+    }
+    if (!uploadMatchesImportManifest(parsed.data, session.manifest as ImportManifestDocument[])) {
+      res.status(400).json({ error: "This file metadata does not match the import session." });
       return;
     }
   }

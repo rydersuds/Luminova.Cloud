@@ -1,8 +1,3 @@
-const SUPPORTED_EXTENSIONS = new Set([
-  "pdf", "doc", "docx", "xls", "xlsx", "csv", "txt", "md", "json", "rtf",
-  "jpg", "jpeg", "png", "webp", "heic", "tif", "tiff",
-])
-
 const TEXT_EXTENSIONS = new Set(["csv", "txt", "md", "json", "rtf"])
 
 export type FolderCandidate = {
@@ -73,9 +68,29 @@ export const extensionFor = (name: string) => name.split(".").pop()?.toLowerCase
 
 export const folderFileIssue = (file: File, relativePath: string): string | null => {
   if (!normalizeRelativePath(relativePath)) return "Unsafe relative path"
-  if (!SUPPORTED_EXTENSIONS.has(extensionFor(file.name))) return "Unsupported file type"
   if (!Number.isSafeInteger(file.size) || file.size < 1) return "File must not be empty"
   return null
+}
+
+export const collectFolderCandidates = (files: File[]): {
+  accepted: FolderCandidate[]
+  skipped: SkippedFolderFile[]
+} => {
+  const seen = new Set<string>()
+  const accepted: FolderCandidate[] = []
+  const skipped: SkippedFolderFile[] = []
+  files.forEach((file) => {
+    const rawPath = file.webkitRelativePath || file.name
+    const relativePath = normalizeRelativePath(rawPath)
+    const issue = relativePath ? folderFileIssue(file, relativePath) : "Unsafe relative path"
+    if (!relativePath || issue) skipped.push({ name: rawPath, reason: issue || "Unsafe relative path" })
+    else if (seen.has(relativePath.toLowerCase())) skipped.push({ name: rawPath, reason: "Collides with another relative path" })
+    else {
+      seen.add(relativePath.toLowerCase())
+      accepted.push({ file, relativePath })
+    }
+  })
+  return { accepted, skipped }
 }
 
 export const isBrowserExtractableText = (file: File) => TEXT_EXTENSIONS.has(extensionFor(file.name))

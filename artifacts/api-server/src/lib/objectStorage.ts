@@ -95,11 +95,9 @@ export class ObjectStorageService {
   async verifyConstructionDocument(input: { objectPath: string; name: string; size: number; contentType: string }): Promise<void> {
     const file = await this.getObjectEntityFile(input.objectPath);
     const [metadata] = await file.getMetadata();
-    const extension = input.name.split(".").pop()?.toLowerCase();
-    const allowedExtensions = new Set(["pdf", "doc", "docx", "xls", "xlsx", "csv", "txt", "md", "json", "rtf", "jpg", "jpeg", "png", "webp", "heic", "tif", "tiff"]);
-    if (!extension || !allowedExtensions.has(extension) || Number(metadata.size) !== input.size ||
+    if (Number(metadata.size) !== input.size ||
       String(metadata.contentType || "application/octet-stream") !== input.contentType) {
-      throw new Error("Stored object metadata does not match a supported project document");
+      throw new Error("Stored object metadata does not match the project file");
     }
   }
 

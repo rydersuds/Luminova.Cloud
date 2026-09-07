@@ -538,7 +538,8 @@ router.post("/project-import-sessions/:importId/documents", async (req, res): Pr
   }
   const manifest = batch.manifest as ImportManifestDocument[];
   const expected = manifest.find((item) => item.relativePath === parsed.data.relativePath);
-  if (!expected || expected.name !== parsed.data.name || expected.size !== parsed.data.size) {
+  if (!expected || expected.name !== parsed.data.name || expected.size !== parsed.data.size ||
+    expected.contentType !== parsed.data.contentType) {
     res.status(400).json({ error: "This document is not part of the import session." });
     return;
   }

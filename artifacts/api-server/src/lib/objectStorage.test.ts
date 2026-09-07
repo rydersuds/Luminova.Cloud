@@ -32,7 +32,24 @@ test("construction document verification accepts matching objects larger than 20
   }));
 });
 
-test("construction document verification still rejects mismatched or unsupported objects", async () => {
+test("project file verification accepts video, uncommon, and extensionless objects", async () => {
+  const cases = [
+    { name: "walkthrough.mp4", contentType: "video/mp4" },
+    { name: "point-cloud.las", contentType: "application/octet-stream" },
+    { name: "SITE_NOTES", contentType: "application/octet-stream" },
+  ];
+  for (const candidate of cases) {
+    const storage = new ConstructionDocumentStorage({ size: "1024", contentType: candidate.contentType });
+    await assert.doesNotReject(storage.verifyConstructionDocument({
+      objectPath: "/objects/uploads/arbitrary-file",
+      name: candidate.name,
+      size: 1024,
+      contentType: candidate.contentType,
+    }));
+  }
+});
+
+test("project file verification still rejects mismatched object metadata", async () => {
   const storage = new ConstructionDocumentStorage({
     size: "1024",
     contentType: "application/pdf",
@@ -46,9 +63,9 @@ test("construction document verification still rejects mismatched or unsupported
   }));
 
   await assert.rejects(storage.verifyConstructionDocument({
-    objectPath: "/objects/uploads/unsupported-plans",
-    name: "plans.exe",
+    objectPath: "/objects/uploads/wrong-content-type",
+    name: "plans.pdf",
     size: 1024,
-    contentType: "application/pdf",
+    contentType: "application/octet-stream",
   }));
 });

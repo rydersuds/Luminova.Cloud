@@ -4,7 +4,7 @@ import { getGetDashboardSummaryQueryKey, getGetProjectsQueryKey } from "@workspa
 import { useAuth } from "@clerk/react"
 import { CheckCircle2, ChevronDown, ChevronUp, LoaderCircle, UploadCloud, XCircle } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
-import { boundedTextSnippet, folderFileIssue, normalizeRelativePath, readBatchImportResponse, type FolderCandidate, type SkippedFolderFile } from "@/lib/project-folder-import"
+import { boundedTextSnippet, collectFolderCandidates, readBatchImportResponse, type FolderCandidate, type SkippedFolderFile } from "@/lib/project-folder-import"
 
 export type FolderImportStatus = "idle" | "uploading" | "building" | "success" | "error"
 type FolderImportProgress = { uploaded: number; failed: number }
@@ -88,20 +88,7 @@ export function ProjectFolderImportProvider({
 
   const collectFolderFiles = React.useCallback((files: File[]) => {
     if (activeImportRef.current) return
-    const seen = new Set<string>()
-    const accepted: FolderCandidate[] = []
-    const skipped: SkippedFolderFile[] = []
-    files.forEach((file) => {
-      const rawPath = file.webkitRelativePath || file.name
-      const relativePath = normalizeRelativePath(rawPath)
-      const issue = relativePath ? folderFileIssue(file, relativePath) : "Unsafe relative path"
-      if (!relativePath || issue) skipped.push({ name: rawPath, reason: issue || "Unsafe relative path" })
-      else if (seen.has(relativePath.toLocaleLowerCase())) skipped.push({ name: rawPath, reason: "Collides with another relative path" })
-      else {
-        seen.add(relativePath.toLocaleLowerCase())
-        accepted.push({ file, relativePath })
-      }
-    })
+    const { accepted, skipped } = collectFolderCandidates(files)
     folderFilesRef.current = accepted
     setFolderFiles(accepted)
     setSkippedFolderFiles(skipped)

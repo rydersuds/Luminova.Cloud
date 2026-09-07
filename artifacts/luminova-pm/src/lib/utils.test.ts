@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { formatDateOnly } from "./utils.ts"
-import { folderFileIssue, normalizeRelativePath, readBatchImportResponse } from "./project-folder-import.ts"
+import { boundedTextSnippet, collectFolderCandidates, folderFileIssue, normalizeRelativePath, readBatchImportResponse } from "./project-folder-import.ts"
 
 test("formatDateOnly preserves the calendar day west of UTC", () => {
   assert.equal(formatDateOnly("2026-09-12"), "Sep 12, 2026")
@@ -19,13 +19,42 @@ test("project documents larger than 200 MB pass folder validation", () => {
   assert.equal(folderFileIssue(largeDocument, "Estimates/estimate.pdf"), null)
 })
 
-test("project folder validation still rejects empty, unsafe, and unsupported files", () => {
+test("project folder validation accepts arbitrary, video, and extensionless files", () => {
+  const candidates = [
+    { name: "walkthrough.mp4", size: 2048, type: "video/mp4" },
+    { name: "survey.las", size: 1024, type: "application/octet-stream" },
+    { name: "SITE_NOTES", size: 512, type: "" },
+  ] as File[]
+  for (const file of candidates) {
+    assert.equal(folderFileIssue(file, `Records/${file.name}`), null)
+  }
+})
+
+test("project folder validation still rejects empty and unsafe files", () => {
   const emptyDocument = { name: "estimate.pdf", size: 0 } as File
-  const unsupportedDocument = { name: "estimate.exe", size: 1024 } as File
   const validDocument = { name: "estimate.pdf", size: 1024 } as File
   assert.equal(folderFileIssue(emptyDocument, "Estimates/estimate.pdf"), "File must not be empty")
-  assert.equal(folderFileIssue(unsupportedDocument, "Estimates/estimate.exe"), "Unsupported file type")
   assert.equal(folderFileIssue(validDocument, "../estimate.pdf"), "Unsafe relative path")
+})
+
+test("project folder collection rejects case-insensitive relative path collisions", () => {
+  const first = { name: "walkthrough.mp4", size: 1024, type: "video/mp4", webkitRelativePath: "Records/walkthrough.mp4" } as File
+  const duplicate = { name: "WALKTHROUGH.mp4", size: 1024, type: "video/mp4", webkitRelativePath: "records/WALKTHROUGH.mp4" } as File
+  const result = collectFolderCandidates([first, duplicate])
+  assert.deepEqual(result.accepted.map(({ relativePath }) => relativePath), ["Records/walkthrough.mp4"])
+  assert.deepEqual(result.skipped, [{
+    name: "records/WALKTHROUGH.mp4",
+    reason: "Collides with another relative path",
+  }])
+})
+
+test("browser text extraction remains limited to explicitly supported formats", async () => {
+  const text = new File(["site notes"], "notes.txt", { type: "text/plain" })
+  const video = new File(["binary"], "walkthrough.mp4", { type: "video/mp4" })
+  const extensionless = new File(["opaque"], "README", { type: "text/plain" })
+  assert.equal(await boundedTextSnippet(text), "site notes")
+  assert.equal(await boundedTextSnippet(video), undefined)
+  assert.equal(await boundedTextSnippet(extensionless), undefined)
 })
 
 test("batch import response reader accepts successful JSON", async () => {
