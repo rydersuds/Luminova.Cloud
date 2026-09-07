@@ -397,10 +397,7 @@ export interface UploadUrlRequest {
      * @maxLength 255
      */
   name: string;
-  /**
-     * @minimum 1
-     * @maximum 209715200
-     */
+  /** @minimum 1 */
   size: number;
   /** @maxLength 255 */
   contentType: string;
@@ -430,10 +427,7 @@ export interface ProjectImportDocument {
      * @maxLength 255
      */
   name: string;
-  /**
-     * @minimum 1
-     * @maximum 209715200
-     */
+  /** @minimum 1 */
   size: number;
   /**
      * @minLength 1
@@ -455,10 +449,7 @@ export interface ProjectImportManifestDocument {
      * @maxLength 255
      */
   name: string;
-  /**
-     * @minimum 1
-     * @maximum 209715200
-     */
+  /** @minimum 1 */
   size: number;
   /**
      * @minLength 1

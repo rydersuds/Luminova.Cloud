@@ -380,7 +380,7 @@ export default function Dashboard() {
                                 </div>
                                 <div>
                                   <p className="text-lg font-heading tracking-tight mb-1 drop-shadow-sm">Drop a project folder</p>
-                                  <p className="text-sm font-mono text-muted-foreground">Or choose a folder. Supported construction documents and images are uploaded privately; max 200 MB each.</p>
+                                  <p className="text-sm font-mono text-muted-foreground">Or choose a folder. Supported construction documents and images are uploaded privately.</p>
                                 </div>
                                 <div className="flex gap-4 mt-4">
                                   <span className="flex items-center gap-1.5 text-xs font-mono surface-3d px-3 py-1 text-muted-foreground"><FileText className="h-3 w-3" /> Documents</span>

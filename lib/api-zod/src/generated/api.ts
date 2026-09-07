@@ -291,7 +291,6 @@ export const UpdateProjectPanoramaResponse = zod.object({
 
 export const requestUploadUrlBodyNameMax = 255;
 
-export const requestUploadUrlBodySizeMax = 209715200;
 
 export const requestUploadUrlBodyContentTypeMax = 255;
 
@@ -302,7 +301,7 @@ export const requestUploadUrlBodyRelativePathMax = 1024;
 export const RequestUploadUrlBody = zod.object({
   "importId": zod.string().min(1).optional(),
   "name": zod.string().min(1).max(requestUploadUrlBodyNameMax),
-  "size": zod.number().int().min(1).max(requestUploadUrlBodySizeMax),
+  "size": zod.number().int().min(1),
   "contentType": zod.string().max(requestUploadUrlBodyContentTypeMax),
   "relativePath": zod.string().min(1).max(requestUploadUrlBodyRelativePathMax).optional()
 })
@@ -310,7 +309,6 @@ export const RequestUploadUrlBody = zod.object({
 
 export const requestUploadUrlResponseMetadataNameMax = 255;
 
-export const requestUploadUrlResponseMetadataSizeMax = 209715200;
 
 export const requestUploadUrlResponseMetadataContentTypeMax = 255;
 
@@ -324,7 +322,7 @@ export const RequestUploadUrlResponse = zod.object({
   "metadata": zod.object({
   "importId": zod.string().min(1).optional(),
   "name": zod.string().min(1).max(requestUploadUrlResponseMetadataNameMax),
-  "size": zod.number().int().min(1).max(requestUploadUrlResponseMetadataSizeMax),
+  "size": zod.number().int().min(1),
   "contentType": zod.string().max(requestUploadUrlResponseMetadataContentTypeMax),
   "relativePath": zod.string().min(1).max(requestUploadUrlResponseMetadataRelativePathMax).optional()
 }).optional()
@@ -349,7 +347,6 @@ export const createProjectImportBodyDocumentsItemRelativePathMax = 1024;
 export const createProjectImportBodyDocumentsItemObjectPathRegExp = new RegExp('^/objects/uploads/[A-Za-z0-9-]+$');
 export const createProjectImportBodyDocumentsItemNameMax = 255;
 
-export const createProjectImportBodyDocumentsItemSizeMax = 209715200;
 
 export const createProjectImportBodyDocumentsItemContentTypeMax = 255;
 
@@ -364,7 +361,7 @@ export const CreateProjectImportBody = zod.object({
   "relativePath": zod.string().min(1).max(createProjectImportBodyDocumentsItemRelativePathMax),
   "objectPath": zod.string().regex(createProjectImportBodyDocumentsItemObjectPathRegExp),
   "name": zod.string().min(1).max(createProjectImportBodyDocumentsItemNameMax),
-  "size": zod.number().int().min(1).max(createProjectImportBodyDocumentsItemSizeMax),
+  "size": zod.number().int().min(1),
   "contentType": zod.string().min(1).max(createProjectImportBodyDocumentsItemContentTypeMax),
   "textSnippet": zod.string().max(createProjectImportBodyDocumentsItemTextSnippetMax).optional()
 })).min(1).max(createProjectImportBodyDocumentsMax)
@@ -402,7 +399,6 @@ export const createProjectImportSessionBodyDocumentsItemRelativePathMax = 1024;
 
 export const createProjectImportSessionBodyDocumentsItemNameMax = 255;
 
-export const createProjectImportSessionBodyDocumentsItemSizeMax = 209715200;
 
 export const createProjectImportSessionBodyDocumentsItemContentTypeMax = 255;
 
@@ -414,7 +410,7 @@ export const CreateProjectImportSessionBody = zod.object({
   "documents": zod.array(zod.object({
   "relativePath": zod.string().min(1).max(createProjectImportSessionBodyDocumentsItemRelativePathMax),
   "name": zod.string().min(1).max(createProjectImportSessionBodyDocumentsItemNameMax),
-  "size": zod.number().int().min(1).max(createProjectImportSessionBodyDocumentsItemSizeMax),
+  "size": zod.number().int().min(1),
   "contentType": zod.string().min(1).max(createProjectImportSessionBodyDocumentsItemContentTypeMax)
 })).min(1).max(createProjectImportSessionBodyDocumentsMax)
 })
@@ -423,7 +419,6 @@ export const createProjectImportSessionResponseDocumentsItemRelativePathMax = 10
 
 export const createProjectImportSessionResponseDocumentsItemNameMax = 255;
 
-export const createProjectImportSessionResponseDocumentsItemSizeMax = 209715200;
 
 export const createProjectImportSessionResponseDocumentsItemContentTypeMax = 255;
 
@@ -435,7 +430,7 @@ export const CreateProjectImportSessionResponse = zod.object({
   "documents": zod.array(zod.object({
   "relativePath": zod.string().min(1).max(createProjectImportSessionResponseDocumentsItemRelativePathMax),
   "name": zod.string().min(1).max(createProjectImportSessionResponseDocumentsItemNameMax),
-  "size": zod.number().int().min(1).max(createProjectImportSessionResponseDocumentsItemSizeMax),
+  "size": zod.number().int().min(1),
   "contentType": zod.string().min(1).max(createProjectImportSessionResponseDocumentsItemContentTypeMax)
 })),
   "uploadedPaths": zod.array(zod.string()),
@@ -455,7 +450,6 @@ export const getActiveProjectImportSessionResponseOneDocumentsItemRelativePathMa
 
 export const getActiveProjectImportSessionResponseOneDocumentsItemNameMax = 255;
 
-export const getActiveProjectImportSessionResponseOneDocumentsItemSizeMax = 209715200;
 
 export const getActiveProjectImportSessionResponseOneDocumentsItemContentTypeMax = 255;
 
@@ -467,7 +461,7 @@ export const GetActiveProjectImportSessionResponse = zod.union([zod.object({
   "documents": zod.array(zod.object({
   "relativePath": zod.string().min(1).max(getActiveProjectImportSessionResponseOneDocumentsItemRelativePathMax),
   "name": zod.string().min(1).max(getActiveProjectImportSessionResponseOneDocumentsItemNameMax),
-  "size": zod.number().int().min(1).max(getActiveProjectImportSessionResponseOneDocumentsItemSizeMax),
+  "size": zod.number().int().min(1),
   "contentType": zod.string().min(1).max(getActiveProjectImportSessionResponseOneDocumentsItemContentTypeMax)
 })),
   "uploadedPaths": zod.array(zod.string()),
@@ -492,7 +486,6 @@ export const attachProjectImportDocumentBodyRelativePathMax = 1024;
 export const attachProjectImportDocumentBodyObjectPathRegExp = new RegExp('^/objects/uploads/[A-Za-z0-9-]+$');
 export const attachProjectImportDocumentBodyNameMax = 255;
 
-export const attachProjectImportDocumentBodySizeMax = 209715200;
 
 export const attachProjectImportDocumentBodyContentTypeMax = 255;
 
@@ -504,7 +497,7 @@ export const AttachProjectImportDocumentBody = zod.object({
   "relativePath": zod.string().min(1).max(attachProjectImportDocumentBodyRelativePathMax),
   "objectPath": zod.string().regex(attachProjectImportDocumentBodyObjectPathRegExp),
   "name": zod.string().min(1).max(attachProjectImportDocumentBodyNameMax),
-  "size": zod.number().int().min(1).max(attachProjectImportDocumentBodySizeMax),
+  "size": zod.number().int().min(1),
   "contentType": zod.string().min(1).max(attachProjectImportDocumentBodyContentTypeMax),
   "textSnippet": zod.string().max(attachProjectImportDocumentBodyTextSnippetMax).optional()
 })
@@ -513,7 +506,6 @@ export const attachProjectImportDocumentResponseDocumentsItemRelativePathMax = 1
 
 export const attachProjectImportDocumentResponseDocumentsItemNameMax = 255;
 
-export const attachProjectImportDocumentResponseDocumentsItemSizeMax = 209715200;
 
 export const attachProjectImportDocumentResponseDocumentsItemContentTypeMax = 255;
 
@@ -525,7 +517,7 @@ export const AttachProjectImportDocumentResponse = zod.object({
   "documents": zod.array(zod.object({
   "relativePath": zod.string().min(1).max(attachProjectImportDocumentResponseDocumentsItemRelativePathMax),
   "name": zod.string().min(1).max(attachProjectImportDocumentResponseDocumentsItemNameMax),
-  "size": zod.number().int().min(1).max(attachProjectImportDocumentResponseDocumentsItemSizeMax),
+  "size": zod.number().int().min(1),
   "contentType": zod.string().min(1).max(attachProjectImportDocumentResponseDocumentsItemContentTypeMax)
 })),
   "uploadedPaths": zod.array(zod.string()),

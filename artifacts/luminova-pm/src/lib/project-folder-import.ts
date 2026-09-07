@@ -1,5 +1,3 @@
-export const MAX_PROJECT_DOCUMENT_BYTES = 200 * 1024 * 1024
-
 const SUPPORTED_EXTENSIONS = new Set([
   "pdf", "doc", "docx", "xls", "xlsx", "csv", "txt", "md", "json", "rtf",
   "jpg", "jpeg", "png", "webp", "heic", "tif", "tiff",
@@ -31,7 +29,7 @@ export const extensionFor = (name: string) => name.split(".").pop()?.toLowerCase
 export const folderFileIssue = (file: File, relativePath: string): string | null => {
   if (!normalizeRelativePath(relativePath)) return "Unsafe relative path"
   if (!SUPPORTED_EXTENSIONS.has(extensionFor(file.name))) return "Unsupported file type"
-  if (file.size > MAX_PROJECT_DOCUMENT_BYTES) return "Exceeds 200 MB per-file limit"
+  if (!Number.isSafeInteger(file.size) || file.size < 1) return "File must not be empty"
   return null
 }
 

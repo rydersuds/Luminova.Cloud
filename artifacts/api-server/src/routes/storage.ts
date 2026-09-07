@@ -17,7 +17,7 @@ router.post("/storage/uploads/request-url", async (req: AuthenticatedRequest, re
   }
   const parsed = RequestUploadUrlBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Choose a supported construction document or image up to 200 MB." });
+    res.status(400).json({ error: "Choose a non-empty supported construction document or image with valid upload metadata." });
     return;
   }
   const extension = parsed.data.name.split(".").pop()?.toLowerCase();

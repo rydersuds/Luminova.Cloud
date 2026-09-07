@@ -19,10 +19,7 @@ export interface ProjectImportDocument {
      * @maxLength 255
      */
   name: string;
-  /**
-     * @minimum 1
-     * @maximum 209715200
-     */
+  /** @minimum 1 */
   size: number;
   /**
      * @minLength 1

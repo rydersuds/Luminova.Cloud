@@ -98,7 +98,7 @@ export class ObjectStorageService {
     const extension = input.name.split(".").pop()?.toLowerCase();
     const allowedExtensions = new Set(["pdf", "doc", "docx", "xls", "xlsx", "csv", "txt", "md", "json", "rtf", "jpg", "jpeg", "png", "webp", "heic", "tif", "tiff"]);
     if (!extension || !allowedExtensions.has(extension) || Number(metadata.size) !== input.size ||
-      String(metadata.contentType || "application/octet-stream") !== input.contentType || input.size > 200 * 1024 * 1024) {
+      String(metadata.contentType || "application/octet-stream") !== input.contentType) {
       throw new Error("Stored object metadata does not match a supported project document");
     }
   }
