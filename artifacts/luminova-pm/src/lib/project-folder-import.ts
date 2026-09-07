@@ -15,6 +15,51 @@ export type SkippedFolderFile = {
   reason: string
 }
 
+type BatchImportResponseContext = {
+  operation: string
+  fileName?: string
+  expectsJson?: boolean
+}
+
+const payloadLimitPattern = /\b(?:413|content too large|entity too large|payload too large|request too large|max(?:imum)? (?:request|body|payload|upload|file) size|size limit)\b/i
+
+const responseSubject = ({ operation, fileName }: BatchImportResponseContext) =>
+  fileName ? `${operation} for "${fileName}"` : operation
+
+export async function readBatchImportResponse<T>(
+  response: Response,
+  context: BatchImportResponseContext,
+): Promise<T> {
+  const text = await response.text()
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? ""
+  const expectsJson = context.expectsJson !== false
+  const subject = responseSubject(context)
+  let body: unknown
+
+  if (text && (contentType.includes("application/json") || contentType.includes("+json"))) {
+    try {
+      body = JSON.parse(text)
+    } catch {
+      throw new Error(`${subject} returned an unreadable response. Please retry the import.`)
+    }
+  }
+
+  if (!response.ok) {
+    if (body && typeof body === "object" && "error" in body && typeof body.error === "string" && body.error.trim()) {
+      throw new Error(body.error)
+    }
+    if (response.status === 413 || payloadLimitPattern.test(text)) {
+      throw new Error(`${subject} was blocked by an external platform size limit. Try a smaller file or retry after checking the hosting upload limits.`)
+    }
+    throw new Error(`${subject} failed (HTTP ${response.status}). Please retry the import.`)
+  }
+
+  if (!expectsJson) return undefined as T
+  if (!text) throw new Error(`${subject} returned an empty response. Please retry the import.`)
+  if (body === undefined) throw new Error(`${subject} returned an unexpected response. Please retry the import.`)
+  return body as T
+}
+
 export const normalizeRelativePath = (value: string): string | null => {
   if (!value || /[\u0000-\u001f\u007f]/.test(value)) return null
   const path = value.replace(/\\/g, "/")

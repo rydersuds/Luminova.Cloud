@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { formatDateOnly } from "./utils.ts"
-import { folderFileIssue, normalizeRelativePath } from "./project-folder-import.ts"
+import { folderFileIssue, normalizeRelativePath, readBatchImportResponse } from "./project-folder-import.ts"
 
 test("formatDateOnly preserves the calendar day west of UTC", () => {
   assert.equal(formatDateOnly("2026-09-12"), "Sep 12, 2026")
@@ -26,4 +26,46 @@ test("project folder validation still rejects empty, unsafe, and unsupported fil
   assert.equal(folderFileIssue(emptyDocument, "Estimates/estimate.pdf"), "File must not be empty")
   assert.equal(folderFileIssue(unsupportedDocument, "Estimates/estimate.exe"), "Unsupported file type")
   assert.equal(folderFileIssue(validDocument, "../estimate.pdf"), "Unsafe relative path")
+})
+
+test("batch import response reader accepts successful JSON", async () => {
+  const body = await readBatchImportResponse<{ importId: string }>(
+    new Response(JSON.stringify({ importId: "import-1" }), { headers: { "Content-Type": "application/json" } }),
+    { operation: "Creating the import session" },
+  )
+  assert.equal(body.importId, "import-1")
+})
+
+test("batch import response reader preserves JSON API errors", async () => {
+  await assert.rejects(
+    readBatchImportResponse(
+      new Response(JSON.stringify({ error: "Import session expired." }), { status: 409, headers: { "Content-Type": "application/json" } }),
+      { operation: "Restoring the import session" },
+    ),
+    /Import session expired\./,
+  )
+})
+
+test("batch import response reader hides HTML and identifies size-limit files", async () => {
+  await assert.rejects(
+    readBatchImportResponse(
+      new Response("<html><h1>Request Entity Too Large</h1></html>", { status: 413, headers: { "Content-Type": "text/html" } }),
+      { operation: "Uploading", fileName: "Plans/site-plan.pdf", expectsJson: false },
+    ),
+    (error: Error) => error.message.includes("site-plan.pdf") && error.message.includes("external platform size limit") && !error.message.includes("<html>"),
+  )
+})
+
+test("batch import response reader handles empty and malformed JSON without parser errors", async () => {
+  await assert.rejects(
+    readBatchImportResponse(new Response(null, { status: 502 }), { operation: "Building the imported project" }),
+    (error: Error) => error.message.includes("Building the imported project") && !error.message.includes("Unexpected"),
+  )
+  await assert.rejects(
+    readBatchImportResponse(
+      new Response("{broken", { status: 502, headers: { "Content-Type": "application/json" } }),
+      { operation: "Checking project build status" },
+    ),
+    (error: Error) => error.message.includes("unreadable response") && !error.message.includes("Unexpected"),
+  )
 })

@@ -4,7 +4,7 @@ import { getGetDashboardSummaryQueryKey, getGetProjectsQueryKey } from "@workspa
 import { useAuth } from "@clerk/react"
 import { CheckCircle2, ChevronDown, ChevronUp, LoaderCircle, UploadCloud, XCircle } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
-import { boundedTextSnippet, folderFileIssue, normalizeRelativePath, type FolderCandidate, type SkippedFolderFile } from "@/lib/project-folder-import"
+import { boundedTextSnippet, folderFileIssue, normalizeRelativePath, readBatchImportResponse, type FolderCandidate, type SkippedFolderFile } from "@/lib/project-folder-import"
 
 export type FolderImportStatus = "idle" | "uploading" | "building" | "success" | "error"
 type FolderImportProgress = { uploaded: number; failed: number }
@@ -125,8 +125,7 @@ export function ProjectFolderImportProvider({
             relativePath, name: file.name, size: file.size, contentType: file.type || "application/octet-stream",
           })) }),
         })
-        const body = await created.json() as ImportSession & { error?: string }
-        if (!created.ok) throw new Error(body.error || "Could not create the import session")
+        const body = await readBatchImportResponse<ImportSession>(created, { operation: "Creating the import session" })
         session = body
         sessionRef.current = body
         await saveImportFiles(body.importId, candidates)
@@ -147,23 +146,28 @@ export function ProjectFolderImportProvider({
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name: candidate.file.name, size: candidate.file.size, contentType: candidate.file.type || "application/octet-stream", relativePath: candidate.relativePath, importId: session.importId }),
         })
-        const signed = await request.json() as { uploadURL?: string; objectPath?: string; error?: string }
-        if (!request.ok || !signed.uploadURL || !signed.objectPath) throw new Error(signed.error || "Could not start upload")
+        const signed = await readBatchImportResponse<{ uploadURL?: string; objectPath?: string }>(request, {
+          operation: "Requesting an upload URL",
+          fileName: candidate.relativePath,
+        })
+        if (!signed.uploadURL || !signed.objectPath) throw new Error(`Requesting an upload URL for "${candidate.relativePath}" returned incomplete data. Please retry the import.`)
         const put = await fetch(signed.uploadURL, { method: "PUT", headers: { "Content-Type": candidate.file.type || "application/octet-stream" }, body: candidate.file })
-        if (!put.ok) throw new Error("Storage upload failed")
+        await readBatchImportResponse<void>(put, { operation: "Uploading", fileName: candidate.relativePath, expectsJson: false })
         const attached = await fetch(`/api/project-import-sessions/${session.importId}/documents`, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ relativePath: candidate.relativePath, objectPath: signed.objectPath, name: candidate.file.name, size: candidate.file.size, contentType: candidate.file.type || "application/octet-stream", textSnippet: await boundedTextSnippet(candidate.file) }),
         })
-        const attachedBody = await attached.json() as ImportSession & { error?: string }
-        if (!attached.ok) throw new Error(attachedBody.error || "Could not preserve the completed upload")
+        const attachedBody = await readBatchImportResponse<ImportSession>(attached, {
+          operation: "Saving the completed upload",
+          fileName: candidate.relativePath,
+        })
         uploadedPaths.add(candidate.relativePath)
         sessionRef.current = attachedBody
         setFolderProgress((current) => ({ ...current, uploaded: current.uploaded + 1 }))
       } catch (error) {
         try {
           const recovery = await fetch("/api/project-import-sessions")
-          const recovered = recovery.ok ? await recovery.json() as ImportSession | null : null
+          const recovered = await readBatchImportResponse<ImportSession | null>(recovery, { operation: "Checking upload recovery" })
           if (recovered?.importId === session.importId && recovered.uploadedPaths.includes(candidate.relativePath)) {
             uploadedPaths.add(candidate.relativePath)
             sessionRef.current = recovered
@@ -193,8 +197,8 @@ export function ProjectFolderImportProvider({
     setFolderStatus("building")
     try {
       const response = await fetch(`/api/project-import-sessions/${session.importId}/build`, { method: "POST" })
-      const body = await response.json() as { project?: { id: string }; error?: string }
-      if (!response.ok || !body.project) throw new Error(body.error || "The project could not be built")
+      const body = await readBatchImportResponse<{ project?: { id: string } }>(response, { operation: "Building the imported project" })
+      if (!body.project) throw new Error("Building the imported project returned incomplete data. Please retry the import.")
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: getGetProjectsQueryKey() }),
         queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() }),
@@ -219,8 +223,7 @@ export function ProjectFolderImportProvider({
     const restore = async () => {
       try {
         const response = await fetch("/api/project-import-sessions")
-        if (!response.ok) return
-        const session = await response.json() as ImportSession | null
+        const session = await readBatchImportResponse<ImportSession | null>(response, { operation: "Restoring the import session" })
         if (!session || cancelled) return
         sessionRef.current = session
         const restored = (await Promise.all(session.documents.map(async (document) => {
@@ -234,8 +237,18 @@ export function ProjectFolderImportProvider({
           setFolderStatus("building")
           poll = window.setInterval(async () => {
             const statusResponse = await fetch("/api/project-import-sessions")
-            if (!statusResponse.ok) return
-            const active = await statusResponse.json() as ImportSession | null
+            let active: ImportSession | null
+            try {
+              active = await readBatchImportResponse<ImportSession | null>(statusResponse, { operation: "Checking project build status" })
+            } catch (error) {
+              window.clearInterval(poll)
+              if (!cancelled) {
+                sessionRef.current = session
+                setFolderStatus("error")
+                setFolderError(error instanceof Error ? error.message : "Checking project build status failed. Please retry the import.")
+              }
+              return
+            }
             if (active?.importId === session.importId && active.status === "building") return
             window.clearInterval(poll)
             if (cancelled) return
@@ -262,8 +275,11 @@ export function ProjectFolderImportProvider({
           setFolderStatus("error")
           setFolderError(session.error || "Select only the missing files to continue this import.")
         }
-      } catch {
-        // Recovery is best-effort; a new import remains available.
+      } catch (error) {
+        if (!cancelled) {
+          setFolderStatus("error")
+          setFolderError(error instanceof Error ? error.message : "Restoring the import session failed. Start a new import or retry.")
+        }
       }
     }
     void restore()
