@@ -288,6 +288,7 @@ export const UpdateProjectPanoramaResponse = zod.object({
 /**
  * @summary Request a direct upload URL
  */
+
 export const requestUploadUrlBodyNameMax = 255;
 
 export const requestUploadUrlBodySizeMax = 209715200;
@@ -299,11 +300,13 @@ export const requestUploadUrlBodyRelativePathMax = 1024;
 
 
 export const RequestUploadUrlBody = zod.object({
+  "importId": zod.string().min(1).optional(),
   "name": zod.string().min(1).max(requestUploadUrlBodyNameMax),
   "size": zod.number().int().min(1).max(requestUploadUrlBodySizeMax),
   "contentType": zod.string().max(requestUploadUrlBodyContentTypeMax),
   "relativePath": zod.string().min(1).max(requestUploadUrlBodyRelativePathMax).optional()
 })
+
 
 export const requestUploadUrlResponseMetadataNameMax = 255;
 
@@ -319,6 +322,7 @@ export const RequestUploadUrlResponse = zod.object({
   "uploadURL": zod.string().url(),
   "objectPath": zod.string(),
   "metadata": zod.object({
+  "importId": zod.string().min(1).optional(),
   "name": zod.string().min(1).max(requestUploadUrlResponseMetadataNameMax),
   "size": zod.number().int().min(1).max(requestUploadUrlResponseMetadataSizeMax),
   "contentType": zod.string().max(requestUploadUrlResponseMetadataContentTypeMax),
@@ -367,6 +371,181 @@ export const CreateProjectImportBody = zod.object({
 })
 
 export const CreateProjectImportResponse = zod.object({
+  "project": zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "address": zod.string(),
+  "region": zod.string(),
+  "status": zod.string(),
+  "progress": zod.number().int(),
+  "pmName": zod.string(),
+  "clientName": zod.string(),
+  "targetDate": zod.string(),
+  "budgeted": zod.number().int(),
+  "invoiced": zod.number().int(),
+  "exteriorImage": zod.string(),
+  "description": zod.string()
+}),
+  "importId": zod.string(),
+  "documentsImported": zod.number().int(),
+  "documentsFailed": zod.number().int(),
+  "vendorsCreated": zod.number().int(),
+  "quotesCreated": zod.number().int(),
+  "invoicesCreated": zod.number().int()
+})
+
+
+/**
+ * @summary Create a durable folder import session before uploading
+ */
+export const createProjectImportSessionBodyDocumentsItemRelativePathMax = 1024;
+
+export const createProjectImportSessionBodyDocumentsItemNameMax = 255;
+
+export const createProjectImportSessionBodyDocumentsItemSizeMax = 209715200;
+
+export const createProjectImportSessionBodyDocumentsItemContentTypeMax = 255;
+
+export const createProjectImportSessionBodyDocumentsMax = 1000;
+
+
+
+export const CreateProjectImportSessionBody = zod.object({
+  "documents": zod.array(zod.object({
+  "relativePath": zod.string().min(1).max(createProjectImportSessionBodyDocumentsItemRelativePathMax),
+  "name": zod.string().min(1).max(createProjectImportSessionBodyDocumentsItemNameMax),
+  "size": zod.number().int().min(1).max(createProjectImportSessionBodyDocumentsItemSizeMax),
+  "contentType": zod.string().min(1).max(createProjectImportSessionBodyDocumentsItemContentTypeMax)
+})).min(1).max(createProjectImportSessionBodyDocumentsMax)
+})
+
+export const createProjectImportSessionResponseDocumentsItemRelativePathMax = 1024;
+
+export const createProjectImportSessionResponseDocumentsItemNameMax = 255;
+
+export const createProjectImportSessionResponseDocumentsItemSizeMax = 209715200;
+
+export const createProjectImportSessionResponseDocumentsItemContentTypeMax = 255;
+
+
+
+export const CreateProjectImportSessionResponse = zod.object({
+  "importId": zod.string(),
+  "status": zod.enum(['uploading', 'ready', 'building', 'completed', 'failed']),
+  "documents": zod.array(zod.object({
+  "relativePath": zod.string().min(1).max(createProjectImportSessionResponseDocumentsItemRelativePathMax),
+  "name": zod.string().min(1).max(createProjectImportSessionResponseDocumentsItemNameMax),
+  "size": zod.number().int().min(1).max(createProjectImportSessionResponseDocumentsItemSizeMax),
+  "contentType": zod.string().min(1).max(createProjectImportSessionResponseDocumentsItemContentTypeMax)
+})),
+  "uploadedPaths": zod.array(zod.string()),
+  "uploaded": zod.number().int(),
+  "failed": zod.number().int(),
+  "error": zod.string().nullish(),
+  "projectId": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Restore the latest unfinished folder import
+ */
+export const getActiveProjectImportSessionResponseOneDocumentsItemRelativePathMax = 1024;
+
+export const getActiveProjectImportSessionResponseOneDocumentsItemNameMax = 255;
+
+export const getActiveProjectImportSessionResponseOneDocumentsItemSizeMax = 209715200;
+
+export const getActiveProjectImportSessionResponseOneDocumentsItemContentTypeMax = 255;
+
+
+
+export const GetActiveProjectImportSessionResponse = zod.union([zod.object({
+  "importId": zod.string(),
+  "status": zod.enum(['uploading', 'ready', 'building', 'completed', 'failed']),
+  "documents": zod.array(zod.object({
+  "relativePath": zod.string().min(1).max(getActiveProjectImportSessionResponseOneDocumentsItemRelativePathMax),
+  "name": zod.string().min(1).max(getActiveProjectImportSessionResponseOneDocumentsItemNameMax),
+  "size": zod.number().int().min(1).max(getActiveProjectImportSessionResponseOneDocumentsItemSizeMax),
+  "contentType": zod.string().min(1).max(getActiveProjectImportSessionResponseOneDocumentsItemContentTypeMax)
+})),
+  "uploadedPaths": zod.array(zod.string()),
+  "uploaded": zod.number().int(),
+  "failed": zod.number().int(),
+  "error": zod.string().nullish(),
+  "projectId": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),zod.null()])
+
+
+
+
+
+export const AttachProjectImportDocumentParams = zod.object({
+  "importId": zod.coerce.string().min(1)
+})
+
+export const attachProjectImportDocumentBodyRelativePathMax = 1024;
+
+export const attachProjectImportDocumentBodyObjectPathRegExp = new RegExp('^/objects/uploads/[A-Za-z0-9-]+$');
+export const attachProjectImportDocumentBodyNameMax = 255;
+
+export const attachProjectImportDocumentBodySizeMax = 209715200;
+
+export const attachProjectImportDocumentBodyContentTypeMax = 255;
+
+export const attachProjectImportDocumentBodyTextSnippetMax = 24000;
+
+
+
+export const AttachProjectImportDocumentBody = zod.object({
+  "relativePath": zod.string().min(1).max(attachProjectImportDocumentBodyRelativePathMax),
+  "objectPath": zod.string().regex(attachProjectImportDocumentBodyObjectPathRegExp),
+  "name": zod.string().min(1).max(attachProjectImportDocumentBodyNameMax),
+  "size": zod.number().int().min(1).max(attachProjectImportDocumentBodySizeMax),
+  "contentType": zod.string().min(1).max(attachProjectImportDocumentBodyContentTypeMax),
+  "textSnippet": zod.string().max(attachProjectImportDocumentBodyTextSnippetMax).optional()
+})
+
+export const attachProjectImportDocumentResponseDocumentsItemRelativePathMax = 1024;
+
+export const attachProjectImportDocumentResponseDocumentsItemNameMax = 255;
+
+export const attachProjectImportDocumentResponseDocumentsItemSizeMax = 209715200;
+
+export const attachProjectImportDocumentResponseDocumentsItemContentTypeMax = 255;
+
+
+
+export const AttachProjectImportDocumentResponse = zod.object({
+  "importId": zod.string(),
+  "status": zod.enum(['uploading', 'ready', 'building', 'completed', 'failed']),
+  "documents": zod.array(zod.object({
+  "relativePath": zod.string().min(1).max(attachProjectImportDocumentResponseDocumentsItemRelativePathMax),
+  "name": zod.string().min(1).max(attachProjectImportDocumentResponseDocumentsItemNameMax),
+  "size": zod.number().int().min(1).max(attachProjectImportDocumentResponseDocumentsItemSizeMax),
+  "contentType": zod.string().min(1).max(attachProjectImportDocumentResponseDocumentsItemContentTypeMax)
+})),
+  "uploadedPaths": zod.array(zod.string()),
+  "uploaded": zod.number().int(),
+  "failed": zod.number().int(),
+  "error": zod.string().nullish(),
+  "projectId": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+
+
+
+export const BuildProjectImportSessionParams = zod.object({
+  "importId": zod.coerce.string().min(1)
+})
+
+export const BuildProjectImportSessionResponse = zod.object({
   "project": zod.object({
   "id": zod.string(),
   "name": zod.string(),

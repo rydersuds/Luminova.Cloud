@@ -8,6 +8,15 @@ import { boundedTextSnippet, folderFileIssue, normalizeRelativePath, type Folder
 
 export type FolderImportStatus = "idle" | "uploading" | "building" | "success" | "error"
 type FolderImportProgress = { uploaded: number; failed: number }
+type ImportSession = {
+  importId: string
+  status: "uploading" | "ready" | "building" | "completed" | "failed"
+  documents: Array<{ relativePath: string; name: string; size: number; contentType: string }>
+  uploadedPaths: string[]
+  uploaded: number
+  failed: number
+  error?: string | null
+}
 type FolderImportContextValue = {
   folderFiles: FolderCandidate[]
   skippedFolderFiles: SkippedFolderFile[]
@@ -21,9 +30,35 @@ type FolderImportContextValue = {
 }
 
 const ProjectFolderImportContext = React.createContext<FolderImportContextValue | null>(null)
+const importFileDatabase = "luminova-folder-imports"
+
+async function withImportFiles<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest<T> | void): Promise<T | undefined> {
+  const database = await new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open(importFileDatabase, 1)
+    request.onupgradeneeded = () => request.result.createObjectStore("files")
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+  return new Promise<T | undefined>((resolve, reject) => {
+    const transaction = database.transaction("files", mode)
+    const request = run(transaction.objectStore("files"))
+    transaction.oncomplete = () => { database.close(); resolve(request?.result) }
+    transaction.onerror = () => { database.close(); reject(transaction.error) }
+  })
+}
+
+const saveImportFiles = (importId: string, files: FolderCandidate[]) =>
+  Promise.all(files.map(({ file, relativePath }) => withImportFiles("readwrite", (store) => store.put(file, `${importId}:${relativePath}`))))
+
+const loadImportFile = (importId: string, relativePath: string) =>
+  withImportFiles<File>("readonly", (store) => store.get(`${importId}:${relativePath}`))
+
+const clearImportFiles = (importId: string, paths: string[]) =>
+  Promise.all(paths.map((path) => withImportFiles("readwrite", (store) => store.delete(`${importId}:${path}`))))
 
 export function ProjectFolderImportProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient()
+  const { isLoaded, isSignedIn } = useAuth()
   const [folderFiles, setFolderFiles] = React.useState<FolderCandidate[]>([])
   const [skippedFolderFiles, setSkippedFolderFiles] = React.useState<SkippedFolderFile[]>([])
   const [folderStatus, setFolderStatus] = React.useState<FolderImportStatus>("idle")
@@ -32,6 +67,7 @@ export function ProjectFolderImportProvider({ children }: { children: React.Reac
   const isActive = folderStatus === "uploading" || folderStatus === "building"
   const activeImportRef = React.useRef(false)
   const folderFilesRef = React.useRef<FolderCandidate[]>([])
+  const sessionRef = React.useRef<ImportSession | null>(null)
 
   const clearFolderImport = React.useCallback(() => {
     if (activeImportRef.current) return
@@ -71,26 +107,65 @@ export function ProjectFolderImportProvider({ children }: { children: React.Reac
     const candidates = [...folderFilesRef.current]
     if (activeImportRef.current || !candidates.length) return
     activeImportRef.current = true
-    // Keep the File objects and paths used by this job stable if the dashboard unmounts.
     setFolderStatus("uploading")
     setFolderError("")
-    setFolderProgress({ uploaded: 0, failed: 0 })
-    const uploaded: Array<{ relativePath: string; objectPath: string; name: string; size: number; contentType: string; textSnippet?: string }> = []
+    let session = sessionRef.current
+    try {
+      if (!session) {
+        const created = await fetch("/api/project-import-sessions", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ documents: candidates.map(({ file, relativePath }) => ({
+            relativePath, name: file.name, size: file.size, contentType: file.type || "application/octet-stream",
+          })) }),
+        })
+        const body = await created.json() as ImportSession & { error?: string }
+        if (!created.ok) throw new Error(body.error || "Could not create the import session")
+        session = body
+        sessionRef.current = body
+        await saveImportFiles(body.importId, candidates)
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not preserve the import session."
+      setFolderStatus("error"); setFolderError(message); activeImportRef.current = false
+      return
+    }
+    const uploadedPaths = new Set(session.uploadedPaths)
+    setFolderProgress({ uploaded: uploadedPaths.size, failed: 0 })
     const failures: SkippedFolderFile[] = []
     let cursor = 0
     const uploadOne = async (candidate: FolderCandidate) => {
+      if (uploadedPaths.has(candidate.relativePath)) return
       try {
         const request = await fetch("/api/storage/uploads/request-url", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: candidate.file.name, size: candidate.file.size, contentType: candidate.file.type || "application/octet-stream", relativePath: candidate.relativePath }),
+          body: JSON.stringify({ name: candidate.file.name, size: candidate.file.size, contentType: candidate.file.type || "application/octet-stream", relativePath: candidate.relativePath, importId: session.importId }),
         })
         const signed = await request.json() as { uploadURL?: string; objectPath?: string; error?: string }
         if (!request.ok || !signed.uploadURL || !signed.objectPath) throw new Error(signed.error || "Could not start upload")
         const put = await fetch(signed.uploadURL, { method: "PUT", headers: { "Content-Type": candidate.file.type || "application/octet-stream" }, body: candidate.file })
         if (!put.ok) throw new Error("Storage upload failed")
-        uploaded.push({ relativePath: candidate.relativePath, objectPath: signed.objectPath, name: candidate.file.name, size: candidate.file.size, contentType: candidate.file.type || "application/octet-stream", textSnippet: await boundedTextSnippet(candidate.file) })
+        const attached = await fetch(`/api/project-import-sessions/${session.importId}/documents`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ relativePath: candidate.relativePath, objectPath: signed.objectPath, name: candidate.file.name, size: candidate.file.size, contentType: candidate.file.type || "application/octet-stream", textSnippet: await boundedTextSnippet(candidate.file) }),
+        })
+        const attachedBody = await attached.json() as ImportSession & { error?: string }
+        if (!attached.ok) throw new Error(attachedBody.error || "Could not preserve the completed upload")
+        uploadedPaths.add(candidate.relativePath)
+        sessionRef.current = attachedBody
         setFolderProgress((current) => ({ ...current, uploaded: current.uploaded + 1 }))
       } catch (error) {
+        try {
+          const recovery = await fetch("/api/project-import-sessions")
+          const recovered = recovery.ok ? await recovery.json() as ImportSession | null : null
+          if (recovered?.importId === session.importId && recovered.uploadedPaths.includes(candidate.relativePath)) {
+            uploadedPaths.add(candidate.relativePath)
+            sessionRef.current = recovered
+            setFolderProgress((current) => ({ ...current, uploaded: current.uploaded + 1 }))
+            return
+          }
+        } catch {
+          // Record the original upload error below.
+        }
         failures.push({ name: candidate.relativePath, reason: error instanceof Error ? error.message : "Upload failed" })
         setFolderProgress((current) => ({ ...current, failed: current.failed + 1 }))
       }
@@ -100,8 +175,9 @@ export function ProjectFolderImportProvider({ children }: { children: React.Reac
     }
     await Promise.all(Array.from({ length: Math.min(4, candidates.length) }, worker))
     setSkippedFolderFiles((current) => [...current, ...failures])
-    if (!uploaded.length) {
-      const message = "No supported files could be uploaded. Review the per-file results and try again."
+    if (uploadedPaths.size !== session.documents.length) {
+      const missing = session.documents.length - uploadedPaths.size
+      const message = `${missing} file${missing === 1 ? "" : "s"} still need to be uploaded. Retry only the failed or missing files.`
       setFolderStatus("error"); setFolderError(message)
       activeImportRef.current = false
       toast({ variant: "destructive", title: "Project folder import failed", description: message })
@@ -109,14 +185,7 @@ export function ProjectFolderImportProvider({ children }: { children: React.Reac
     }
     setFolderStatus("building")
     try {
-      let remainingSnippetCharacters = 250_000
-      const documents = uploaded.map((document) => {
-        if (!document.textSnippet || remainingSnippetCharacters <= 0) return { ...document, textSnippet: undefined }
-        const textSnippet = document.textSnippet.slice(0, remainingSnippetCharacters)
-        remainingSnippetCharacters -= textSnippet.length
-        return { ...document, textSnippet }
-      })
-      const response = await fetch("/api/project-imports", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documents }) })
+      const response = await fetch(`/api/project-import-sessions/${session.importId}/build`, { method: "POST" })
       const body = await response.json() as { project?: { id: string }; error?: string }
       if (!response.ok || !body.project) throw new Error(body.error || "The project could not be built")
       await Promise.all([
@@ -124,6 +193,8 @@ export function ProjectFolderImportProvider({ children }: { children: React.Reac
         queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() }),
       ])
       setFolderStatus("success")
+      await clearImportFiles(session.importId, session.documents.map((item) => item.relativePath))
+      sessionRef.current = null
       activeImportRef.current = false
       toast({ title: "Project initialized", description: "The folder was uploaded and the project build completed." })
     } catch (error) {
@@ -133,6 +204,67 @@ export function ProjectFolderImportProvider({ children }: { children: React.Reac
       toast({ variant: "destructive", title: "Project folder import failed", description: message })
     }
   }, [queryClient])
+
+  React.useEffect(() => {
+    if (!isLoaded || !isSignedIn) return
+    let cancelled = false
+    let poll: number | undefined
+    const restore = async () => {
+      try {
+        const response = await fetch("/api/project-import-sessions")
+        if (!response.ok) return
+        const session = await response.json() as ImportSession | null
+        if (!session || cancelled) return
+        sessionRef.current = session
+        const restored = (await Promise.all(session.documents.map(async (document) => {
+          const file = await loadImportFile(session.importId, document.relativePath)
+          return file ? { file, relativePath: document.relativePath } : null
+        }))).filter((item): item is FolderCandidate => item !== null)
+        folderFilesRef.current = restored
+        setFolderFiles(restored)
+        setFolderProgress({ uploaded: session.uploaded, failed: Math.max(session.documents.length - session.uploaded - restored.filter((item) => !session.uploadedPaths.includes(item.relativePath)).length, 0) })
+        if (session.status === "building") {
+          setFolderStatus("building")
+          poll = window.setInterval(async () => {
+            const statusResponse = await fetch("/api/project-import-sessions")
+            if (!statusResponse.ok) return
+            const active = await statusResponse.json() as ImportSession | null
+            if (active?.importId === session.importId && active.status === "building") return
+            window.clearInterval(poll)
+            if (cancelled) return
+            if (active?.importId === session.importId && active.status === "failed") {
+              sessionRef.current = active
+              setFolderStatus("error")
+              setFolderError(active.error || "The project could not be built. Retry when ready.")
+              return
+            }
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: getGetProjectsQueryKey() }),
+              queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() }),
+            ])
+            await clearImportFiles(session.importId, session.documents.map((item) => item.relativePath))
+            sessionRef.current = null
+            setFolderStatus("success")
+          }, 2000)
+          return
+        }
+        if (restored.length) {
+          setFolderStatus("idle")
+          queueMicrotask(() => { if (!cancelled) void startFolderImport() })
+        } else {
+          setFolderStatus("error")
+          setFolderError(session.error || "Select only the missing files to continue this import.")
+        }
+      } catch {
+        // Recovery is best-effort; a new import remains available.
+      }
+    }
+    void restore()
+    return () => {
+      cancelled = true
+      if (poll !== undefined) window.clearInterval(poll)
+    }
+  }, [isLoaded, isSignedIn, queryClient, startFolderImport])
 
   return <ProjectFolderImportContext.Provider value={{ folderFiles, skippedFolderFiles, folderStatus, folderProgress, folderError, collectFolderFiles, startFolderImport, clearFolderImport, isActive }}>
     {children}

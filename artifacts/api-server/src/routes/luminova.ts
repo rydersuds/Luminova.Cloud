@@ -1,9 +1,16 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import {
   CreateInvoiceBody,
   CreateInvoiceResponse,
   CreateProjectImportBody,
   CreateProjectImportResponse,
+  CreateProjectImportSessionBody,
+  CreateProjectImportSessionResponse,
+  GetActiveProjectImportSessionResponse,
+  AttachProjectImportDocumentBody,
+  AttachProjectImportDocumentParams,
+  AttachProjectImportDocumentResponse,
+  BuildProjectImportSessionParams,
   CreateProjectBody,
   CreateProjectResponse,
   CreateProjectPanoramaBody,
@@ -48,7 +55,7 @@ import {
   projectDocumentsTable,
   projectImportBatchesTable,
 } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import OpenAI from "openai";
 import { z } from "zod";
@@ -437,7 +444,122 @@ router.post("/projects", (req, res) => {
   res.status(201).json(CreateProjectResponse.parse(project));
 });
 
-router.post("/project-imports", async (req, res): Promise<void> => {
+type ImportManifestDocument = { relativePath: string; name: string; size: number; contentType: string };
+
+const importSessionResponse = async (batch: typeof projectImportBatchesTable.$inferSelect) => {
+  const uploaded = await db.select({ relativePath: projectDocumentsTable.relativePath })
+    .from(projectDocumentsTable)
+    .where(eq(projectDocumentsTable.importBatchId, batch.id));
+  return {
+    importId: batch.id,
+    status: batch.status,
+    documents: batch.manifest as ImportManifestDocument[],
+    uploadedPaths: uploaded.map((item) => item.relativePath),
+    uploaded: uploaded.length,
+    failed: 0,
+    error: batch.error,
+    projectId: batch.projectId,
+    createdAt: batch.createdAt.toISOString(),
+    updatedAt: batch.updatedAt.toISOString(),
+  };
+};
+
+router.post("/project-import-sessions", async (req, res): Promise<void> => {
+  const parsed = CreateProjectImportSessionBody.safeParse(req.body);
+  const ownerId = String((req as typeof req & { userId?: string }).userId ?? "");
+  if (!ownerId) {
+    res.status(401).json({ error: "Authentication is required to import a project." });
+    return;
+  }
+  if (!parsed.success) {
+    res.status(400).json({ error: "Provide one or more valid project documents." });
+    return;
+  }
+  const normalized = new Set<string>();
+  for (const document of parsed.data.documents) {
+    const path = normalizeRelativePath(document.relativePath);
+    if (!path || path !== document.relativePath || normalized.has(path.toLowerCase())) {
+      res.status(400).json({ error: "Document paths must be unique, normalized relative paths." });
+      return;
+    }
+    normalized.add(path.toLowerCase());
+  }
+  const [batch] = await db.insert(projectImportBatchesTable).values({
+    id: `import-${randomUUID()}`,
+    ownerId,
+    status: "uploading",
+    manifest: parsed.data.documents,
+  }).returning();
+  res.status(201).json(CreateProjectImportSessionResponse.parse(await importSessionResponse(batch)));
+});
+
+router.get("/project-import-sessions", async (req, res): Promise<void> => {
+  const ownerId = String((req as typeof req & { userId?: string }).userId ?? "");
+  if (!ownerId) {
+    res.status(401).json({ error: "Authentication is required to restore an import." });
+    return;
+  }
+  const staleBefore = new Date(Date.now() - 30 * 60 * 1000);
+  await db.update(projectImportBatchesTable).set({
+    status: "failed",
+    error: "The previous build was interrupted. Retry to continue.",
+    updatedAt: new Date(),
+  }).where(and(
+    eq(projectImportBatchesTable.ownerId, ownerId),
+    eq(projectImportBatchesTable.status, "building"),
+    lt(projectImportBatchesTable.updatedAt, staleBefore),
+  ));
+  const [batch] = await db.select().from(projectImportBatchesTable)
+    .where(and(eq(projectImportBatchesTable.ownerId, ownerId), inArray(projectImportBatchesTable.status, ["uploading", "building"])))
+    .orderBy(desc(projectImportBatchesTable.updatedAt)).limit(1);
+  if (!batch) {
+    const [recoverable] = await db.select().from(projectImportBatchesTable)
+      .where(and(eq(projectImportBatchesTable.ownerId, ownerId), eq(projectImportBatchesTable.status, "failed")))
+      .orderBy(desc(projectImportBatchesTable.updatedAt)).limit(1);
+    res.json(GetActiveProjectImportSessionResponse.parse(recoverable ? await importSessionResponse(recoverable) : null));
+    return;
+  }
+  res.json(GetActiveProjectImportSessionResponse.parse(await importSessionResponse(batch)));
+});
+
+router.post("/project-import-sessions/:importId/documents", async (req, res): Promise<void> => {
+  const params = AttachProjectImportDocumentParams.safeParse(req.params);
+  const parsed = AttachProjectImportDocumentBody.safeParse(req.body);
+  const ownerId = String((req as typeof req & { userId?: string }).userId ?? "");
+  if (!params.success || !parsed.success || !ownerId) {
+    res.status(400).json({ error: "Provide valid uploaded document metadata." });
+    return;
+  }
+  const [batch] = await db.select().from(projectImportBatchesTable)
+    .where(and(eq(projectImportBatchesTable.id, params.data.importId), eq(projectImportBatchesTable.ownerId, ownerId))).limit(1);
+  if (!batch || !["uploading", "failed"].includes(batch.status)) {
+    res.status(404).json({ error: "Import session not found." });
+    return;
+  }
+  const manifest = batch.manifest as ImportManifestDocument[];
+  const expected = manifest.find((item) => item.relativePath === parsed.data.relativePath);
+  if (!expected || expected.name !== parsed.data.name || expected.size !== parsed.data.size) {
+    res.status(400).json({ error: "This document is not part of the import session." });
+    return;
+  }
+  const [existing] = await db.select().from(projectDocumentsTable)
+    .where(and(eq(projectDocumentsTable.importBatchId, batch.id), eq(projectDocumentsTable.relativePath, parsed.data.relativePath))).limit(1);
+  if (!existing) {
+    await storage.verifyConstructionDocument(parsed.data);
+    await storage.setAcl(parsed.data.objectPath, { owner: ownerId, visibility: "private" });
+    await db.insert(projectDocumentsTable).values({
+      id: `doc-${randomUUID()}`, importBatchId: batch.id, projectId: null, ownerId,
+      objectPath: parsed.data.objectPath, relativePath: parsed.data.relativePath, name: parsed.data.name,
+      contentType: parsed.data.contentType, size: parsed.data.size, classification: "other",
+      textSnippet: parsed.data.textSnippet,
+    }).onConflictDoNothing();
+  }
+  const [updated] = await db.update(projectImportBatchesTable).set({ status: "uploading", error: null, updatedAt: new Date() })
+    .where(eq(projectImportBatchesTable.id, batch.id)).returning();
+  res.json(AttachProjectImportDocumentResponse.parse(await importSessionResponse(updated)));
+});
+
+const createProjectImportHandler = async (req: Request, res: Response): Promise<void> => {
   const parsed = CreateProjectImportBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Provide one or more valid uploaded project documents." });
@@ -541,11 +663,17 @@ router.post("/project-imports", async (req, res): Promise<void> => {
     invoicesCreated++;
   }
 
-  const importId = `import-${randomUUID()}`;
+  const sessionImportId = typeof req.params.importId === "string" ? req.params.importId : null;
+  const importId = sessionImportId ?? `import-${randomUUID()}`;
   const classifications = new Map(analysis.documents.map((item) => [item.relativePath, item.classification]));
   try {
     await db.transaction(async (tx) => {
-      await tx.insert(projectImportBatchesTable).values({ id: importId, projectId: project.id, ownerId, status: "completed", analysis });
+      if (sessionImportId) {
+        await tx.update(projectImportBatchesTable).set({ projectId: project.id, status: "completed", analysis, error: null, updatedAt: new Date() })
+          .where(and(eq(projectImportBatchesTable.id, importId), eq(projectImportBatchesTable.ownerId, ownerId)));
+      } else {
+        await tx.insert(projectImportBatchesTable).values({ id: importId, projectId: project.id, ownerId, status: "completed", analysis, manifest: parsed.data.documents });
+      }
       await tx.insert(importedProjectsTable).values({ id: project.id, importBatchId: importId, ownerId, data: project });
       if (importedVendors.length) {
         await tx.insert(importedVendorsTable).values(importedVendors.map((vendor) => ({ id: vendor.id, importBatchId: importId, ownerId, data: vendor })));
@@ -556,11 +684,22 @@ router.post("/project-imports", async (req, res): Promise<void> => {
       if (importedInvoices.length) {
         await tx.insert(importedInvoicesTable).values(importedInvoices.map((invoice) => ({ id: invoice.id, importBatchId: importId, ownerId, data: invoice })));
       }
-      await tx.insert(projectDocumentsTable).values(parsed.data.documents.map((document) => ({
-        id: `doc-${randomUUID()}`, importBatchId: importId, projectId: project.id, ownerId, objectPath: document.objectPath,
-        relativePath: document.relativePath, name: document.name, contentType: document.contentType, size: document.size,
-        classification: classifications.get(document.relativePath) ?? documentClassification(document.relativePath),
-      })));
+      if (sessionImportId) {
+        for (const document of parsed.data.documents) {
+          await tx.update(projectDocumentsTable).set({
+            projectId: project.id,
+            classification: classifications.get(document.relativePath) ?? documentClassification(document.relativePath),
+          }).where(and(eq(projectDocumentsTable.importBatchId, importId), eq(projectDocumentsTable.relativePath, document.relativePath)));
+        }
+      } else {
+        await tx.insert(projectImportBatchesTable).values({ id: importId, projectId: project.id, ownerId, status: "completed", analysis, manifest: parsed.data.documents });
+        await tx.insert(projectDocumentsTable).values(parsed.data.documents.map((document) => ({
+          id: `doc-${randomUUID()}`, importBatchId: importId, projectId: project.id, ownerId, objectPath: document.objectPath,
+          relativePath: document.relativePath, name: document.name, contentType: document.contentType, size: document.size,
+          classification: classifications.get(document.relativePath) ?? documentClassification(document.relativePath),
+          textSnippet: document.textSnippet,
+        })));
+      }
     });
   } catch (error) {
     req.log.error({ err: error, projectId: project.id }, "Project import metadata persistence failed");
@@ -570,6 +709,52 @@ router.post("/project-imports", async (req, res): Promise<void> => {
   res.status(201).json(CreateProjectImportResponse.parse({
     project, importId, documentsImported: parsed.data.documents.length, documentsFailed: 0, vendorsCreated, quotesCreated, invoicesCreated,
   }));
+};
+
+router.post("/project-imports", createProjectImportHandler);
+
+router.post("/project-import-sessions/:importId/build", async (req, res): Promise<void> => {
+  const params = BuildProjectImportSessionParams.safeParse(req.params);
+  const ownerId = String((req as typeof req & { userId?: string }).userId ?? "");
+  if (!params.success || !ownerId) {
+    res.status(400).json({ error: "Invalid import session." });
+    return;
+  }
+  const [batch] = await db.select().from(projectImportBatchesTable)
+    .where(and(eq(projectImportBatchesTable.id, params.data.importId), eq(projectImportBatchesTable.ownerId, ownerId))).limit(1);
+  if (!batch) {
+    res.status(404).json({ error: "Import session not found." });
+    return;
+  }
+  const documents = await db.select().from(projectDocumentsTable).where(eq(projectDocumentsTable.importBatchId, batch.id));
+  const manifest = batch.manifest as ImportManifestDocument[];
+  if (!documents.length || documents.length !== manifest.length) {
+    res.status(409).json({ error: `${manifest.length - documents.length} files still need to be uploaded.` });
+    return;
+  }
+  const [locked] = await db.update(projectImportBatchesTable).set({ status: "building", error: null, updatedAt: new Date() })
+    .where(and(eq(projectImportBatchesTable.id, batch.id), inArray(projectImportBatchesTable.status, ["uploading", "failed"]))).returning();
+  if (!locked) {
+    res.status(409).json({ error: batch.status === "completed" ? "This import has already completed." : "This import is already being built." });
+    return;
+  }
+  req.body = { documents: documents.map((document) => ({
+    relativePath: document.relativePath, objectPath: document.objectPath, name: document.name,
+    size: document.size, contentType: document.contentType, textSnippet: document.textSnippet ?? undefined,
+  })) };
+  try {
+    await createProjectImportHandler(req, res);
+    if (res.statusCode >= 400) {
+      await db.update(projectImportBatchesTable).set({
+        status: "failed", error: "The project could not be built. Retry when ready.", updatedAt: new Date(),
+      }).where(eq(projectImportBatchesTable.id, batch.id));
+    }
+  } catch (error) {
+    await db.update(projectImportBatchesTable).set({
+      status: "failed", error: "The project could not be built. Retry when ready.", updatedAt: new Date(),
+    }).where(eq(projectImportBatchesTable.id, batch.id));
+    throw error;
+  }
 });
 
 router.get("/projects/:projectId", async (req, res): Promise<void> => {

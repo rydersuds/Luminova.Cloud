@@ -390,6 +390,8 @@ export interface PanoramaUpdate {
 }
 
 export interface UploadUrlRequest {
+  /** @minLength 1 */
+  importId?: string;
   /**
      * @minLength 1
      * @maxLength 255
@@ -440,6 +442,63 @@ export interface ProjectImportDocument {
   contentType: string;
   /** @maxLength 24000 */
   textSnippet?: string;
+}
+
+export interface ProjectImportManifestDocument {
+  /**
+     * @minLength 1
+     * @maxLength 1024
+     */
+  relativePath: string;
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  name: string;
+  /**
+     * @minimum 1
+     * @maximum 209715200
+     */
+  size: number;
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  contentType: string;
+}
+
+export interface ProjectImportSessionInput {
+  /**
+     * @minItems 1
+     * @maxItems 1000
+     */
+  documents: ProjectImportManifestDocument[];
+}
+
+export type ProjectImportSessionStatus = typeof ProjectImportSessionStatus[keyof typeof ProjectImportSessionStatus];
+
+
+export const ProjectImportSessionStatus = {
+  uploading: 'uploading',
+  ready: 'ready',
+  building: 'building',
+  completed: 'completed',
+  failed: 'failed',
+} as const;
+
+export interface ProjectImportSession {
+  importId: string;
+  status: ProjectImportSessionStatus;
+  documents: ProjectImportManifestDocument[];
+  uploadedPaths: string[];
+  uploaded: number;
+  failed: number;
+  /** @nullable */
+  error?: string | null;
+  /** @nullable */
+  projectId?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ProjectImportInput {

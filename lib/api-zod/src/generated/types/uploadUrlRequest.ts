@@ -7,6 +7,8 @@
  */
 
 export interface UploadUrlRequest {
+  /** @minLength 1 */
+  importId?: string;
   /**
      * @minLength 1
      * @maxLength 255

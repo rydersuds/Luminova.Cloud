@@ -36,7 +36,10 @@ import type {
   Project,
   ProjectDetail,
   ProjectImport,
+  ProjectImportDocument,
   ProjectImportInput,
+  ProjectImportSession,
+  ProjectImportSessionInput,
   ProjectInput,
   ProjectUpdate,
   Trade,
@@ -901,6 +904,285 @@ export const useCreateProjectImport = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getCreateProjectImportMutationOptions(options));
+    }
+
+export const getCreateProjectImportSessionUrl = () => {
+
+
+
+
+  return `/api/project-import-sessions`
+}
+
+/**
+ * @summary Create a durable folder import session before uploading
+ */
+export const createProjectImportSession = async (projectImportSessionInput: ProjectImportSessionInput, options?: Parameters<typeof customFetch>[1]): Promise<ProjectImportSession> => {
+
+  return customFetch<ProjectImportSession>(getCreateProjectImportSessionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(projectImportSessionInput)
+  }
+);}
+
+
+
+
+
+export const getCreateProjectImportSessionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProjectImportSession>>, TError,{data: BodyType<ProjectImportSessionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createProjectImportSession>>, TError,{data: BodyType<ProjectImportSessionInput>}, TContext> => {
+
+const mutationKey = ['createProjectImportSession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createProjectImportSession>>, {data: BodyType<ProjectImportSessionInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createProjectImportSession(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateProjectImportSessionMutationResult = NonNullable<Awaited<ReturnType<typeof createProjectImportSession>>>
+    export type CreateProjectImportSessionMutationBody = BodyType<ProjectImportSessionInput>
+    export type CreateProjectImportSessionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a durable folder import session before uploading
+ */
+export const useCreateProjectImportSession = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProjectImportSession>>, TError,{data: BodyType<ProjectImportSessionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createProjectImportSession>>,
+        TError,
+        {data: BodyType<ProjectImportSessionInput>},
+        TContext
+      > => {
+      return useMutation(getCreateProjectImportSessionMutationOptions(options));
+    }
+
+export const getGetActiveProjectImportSessionUrl = () => {
+
+
+
+
+  return `/api/project-import-sessions`
+}
+
+/**
+ * @summary Restore the latest unfinished folder import
+ */
+export const getActiveProjectImportSession = async ( options?: Parameters<typeof customFetch>[1]): Promise<ProjectImportSession | null> => {
+
+  return customFetch<ProjectImportSession | null>(getGetActiveProjectImportSessionUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetActiveProjectImportSessionQueryKey = () => {
+    return [
+    `/api/project-import-sessions`
+    ] as const;
+    }
+
+
+export const getGetActiveProjectImportSessionQueryOptions = <TData = Awaited<ReturnType<typeof getActiveProjectImportSession>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getActiveProjectImportSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetActiveProjectImportSessionQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getActiveProjectImportSession>>> = ({ signal }) => getActiveProjectImportSession({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getActiveProjectImportSession>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetActiveProjectImportSessionQueryResult = NonNullable<Awaited<ReturnType<typeof getActiveProjectImportSession>>>
+export type GetActiveProjectImportSessionQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Restore the latest unfinished folder import
+ */
+
+export function useGetActiveProjectImportSession<TData = Awaited<ReturnType<typeof getActiveProjectImportSession>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getActiveProjectImportSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetActiveProjectImportSessionQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAttachProjectImportDocumentUrl = (importId: string,) => {
+
+
+
+
+  return `/api/project-import-sessions/${importId}/documents`
+}
+
+export const attachProjectImportDocument = async (importId: string,
+    projectImportDocument: ProjectImportDocument, options?: Parameters<typeof customFetch>[1]): Promise<ProjectImportSession> => {
+
+  return customFetch<ProjectImportSession>(getAttachProjectImportDocumentUrl(importId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(projectImportDocument)
+  }
+);}
+
+
+
+
+
+export const getAttachProjectImportDocumentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof attachProjectImportDocument>>, TError,{importId: string;data: BodyType<ProjectImportDocument>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof attachProjectImportDocument>>, TError,{importId: string;data: BodyType<ProjectImportDocument>}, TContext> => {
+
+const mutationKey = ['attachProjectImportDocument'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof attachProjectImportDocument>>, {importId: string;data: BodyType<ProjectImportDocument>}> = (props) => {
+          const {importId,data} = props ?? {};
+
+          return  attachProjectImportDocument(importId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AttachProjectImportDocumentMutationResult = NonNullable<Awaited<ReturnType<typeof attachProjectImportDocument>>>
+    export type AttachProjectImportDocumentMutationBody = BodyType<ProjectImportDocument>
+    export type AttachProjectImportDocumentMutationError = ErrorType<unknown>
+
+    export const useAttachProjectImportDocument = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof attachProjectImportDocument>>, TError,{importId: string;data: BodyType<ProjectImportDocument>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof attachProjectImportDocument>>,
+        TError,
+        {importId: string;data: BodyType<ProjectImportDocument>},
+        TContext
+      > => {
+      return useMutation(getAttachProjectImportDocumentMutationOptions(options));
+    }
+
+export const getBuildProjectImportSessionUrl = (importId: string,) => {
+
+
+
+
+  return `/api/project-import-sessions/${importId}/build`
+}
+
+export const buildProjectImportSession = async (importId: string, options?: Parameters<typeof customFetch>[1]): Promise<ProjectImport> => {
+
+  return customFetch<ProjectImport>(getBuildProjectImportSessionUrl(importId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getBuildProjectImportSessionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof buildProjectImportSession>>, TError,{importId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof buildProjectImportSession>>, TError,{importId: string}, TContext> => {
+
+const mutationKey = ['buildProjectImportSession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof buildProjectImportSession>>, {importId: string}> = (props) => {
+          const {importId} = props ?? {};
+
+          return  buildProjectImportSession(importId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BuildProjectImportSessionMutationResult = NonNullable<Awaited<ReturnType<typeof buildProjectImportSession>>>
+
+    export type BuildProjectImportSessionMutationError = ErrorType<unknown>
+
+    export const useBuildProjectImportSession = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof buildProjectImportSession>>, TError,{importId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof buildProjectImportSession>>,
+        TError,
+        {importId: string},
+        TContext
+      > => {
+      return useMutation(getBuildProjectImportSessionMutationOptions(options));
     }
 
 export const getGetProjectActivityUrl = (projectId: string,) => {
