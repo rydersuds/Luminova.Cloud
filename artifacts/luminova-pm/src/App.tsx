@@ -18,7 +18,7 @@ import { AppLayoutView } from '@/components/layout/app-layout';
 import { ClerkProvider, Show, useAuth, useClerk } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
-import { ProjectFolderImportProvider } from '@/providers/project-folder-import-provider';
+import { ProjectFolderImportProvider, useProjectFolderImport } from '@/providers/project-folder-import-provider';
 
 import {
   Route,
@@ -171,6 +171,18 @@ function App() {
     return <SidebarVisualHarness />;
   }
 
+  if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/folder-import')) {
+    return (
+      <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl}>
+        <QueryClientProvider client={queryClient}>
+          <ProjectFolderImportProvider authState={{ isLoaded: true, isSignedIn: true }}>
+            <FolderImportVisualHarness />
+          </ProjectFolderImportProvider>
+        </QueryClientProvider>
+      </ClerkProvider>
+    );
+  }
+
   return (
     <WouterRouter base={basePath}>
       <ClerkProvider
@@ -197,6 +209,24 @@ function App() {
         </QueryClientProvider>
       </ClerkProvider>
     </WouterRouter>
+  );
+}
+
+function FolderImportVisualHarness() {
+  const folderImport = useProjectFolderImport();
+  return (
+    <main className="p-8">
+      <input
+        aria-label="Project folder files"
+        type="file"
+        multiple
+        onChange={(event) => folderImport.collectFolderFiles(Array.from(event.target.files || []))}
+      />
+      <button type="button" onClick={() => void folderImport.startFolderImport()}>Start import</button>
+      <output aria-label="Import status">{folderImport.folderStatus}</output>
+      <output aria-label="Uploaded files">{folderImport.folderProgress.uploaded}</output>
+      {folderImport.folderError && <p role="alert">{folderImport.folderError}</p>}
+    </main>
   );
 }
 

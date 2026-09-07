@@ -56,9 +56,16 @@ const loadImportFile = (importId: string, relativePath: string) =>
 const clearImportFiles = (importId: string, paths: string[]) =>
   Promise.all(paths.map((path) => withImportFiles("readwrite", (store) => store.delete(`${importId}:${path}`))))
 
-export function ProjectFolderImportProvider({ children }: { children: React.ReactNode }) {
+export function ProjectFolderImportProvider({
+  children,
+  authState,
+}: {
+  children: React.ReactNode
+  authState?: { isLoaded: boolean; isSignedIn: boolean }
+}) {
   const queryClient = useQueryClient()
-  const { isLoaded, isSignedIn } = useAuth()
+  const clerkAuth = useAuth()
+  const { isLoaded, isSignedIn } = authState ?? clerkAuth
   const [folderFiles, setFolderFiles] = React.useState<FolderCandidate[]>([])
   const [skippedFolderFiles, setSkippedFolderFiles] = React.useState<SkippedFolderFile[]>([])
   const [folderStatus, setFolderStatus] = React.useState<FolderImportStatus>("idle")
