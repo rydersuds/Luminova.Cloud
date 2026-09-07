@@ -83,12 +83,12 @@ test('selects a standard photo as the exterior photo and keeps it selected after
   await openGallery(page);
   await page.getByRole('button', { name: 'Make Front elevation exterior photo' }).click();
   await expect(page.getByText('Exterior photo updated', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Front elevation is the exterior photo' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Remove Front elevation as exterior photo' })).toBeEnabled();
   await expect(page.getByText('Exterior photo', { exact: true })).toBeVisible();
 
   await page.reload();
   await page.getByRole('tab', { name: 'Photos & 360s' }).click();
-  await expect(page.getByRole('button', { name: 'Front elevation is the exterior photo' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Remove Front elevation as exterior photo' })).toBeEnabled();
 
   await page.route('**/api/projects', route => route.fulfill({ json: [current] }));
   await page.route('**/api/dashboard/summary', route => route.fulfill({
@@ -130,7 +130,7 @@ test('reports exterior photo update failures and allows retry', async ({ page })
   await expect(page.getByRole('alert')).toHaveText('Could not make Front elevation the exterior photo. Try again.');
   await expect(choose).toBeEnabled();
   await choose.click();
-  await expect(page.getByRole('button', { name: 'Front elevation is the exterior photo' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Remove Front elevation as exterior photo' })).toBeEnabled();
 });
 
 test('opens the accessible upload form and validates missing input', async ({ page }) => {

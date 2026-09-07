@@ -217,7 +217,7 @@ export const UpdateProjectBody = zod.object({
   "progress": zod.number().int().optional(),
   "targetDate": zod.string().optional(),
   "description": zod.string().optional(),
-  "exteriorImage": zod.string().optional().describe('URL of an existing standard photo belonging to this project')
+  "exteriorImage": zod.string().nullish().describe('URL of an existing standard photo belonging to this project, or null to clear the exterior photo')
 })
 
 export const UpdateProjectResponse = zod.object({

@@ -1122,21 +1122,27 @@ router.patch("/projects/:projectId", async (req: AuthenticatedRequest, res): Pro
   }
   const currentProject = index === -1 ? imported.data as Project : await findProject(params.data.projectId) as Project;
   const ownerId = index === -1 ? req.userId : "seeded-project";
-  if (body.data.exteriorImage !== undefined) {
+  const { exteriorImage: requestedExteriorImage, ...projectFields } = body.data;
+  const normalizedUpdate = {
+    ...projectFields,
+    ...(requestedExteriorImage !== undefined ? { exteriorImage: requestedExteriorImage ?? "" } : {}),
+  };
+  if (requestedExteriorImage !== undefined) {
+    const exteriorImage = normalizedUpdate.exteriorImage as string;
     const standardPhotos = (await detailsFor(currentProject)).photos;
-    if (!standardPhotos.some((photo) => photo.url === body.data.exteriorImage)) {
+    if (exteriorImage && !standardPhotos.some((photo) => photo.url === exteriorImage)) {
       res.status(400).json({ error: "Choose a standard photo from this project." });
       return;
     }
     await db.insert(projectExteriorPhotosTable)
-      .values({ projectId: currentProject.id, ownerId, exteriorImage: body.data.exteriorImage })
+      .values({ projectId: currentProject.id, ownerId, exteriorImage })
       .onConflictDoUpdate({
         target: projectExteriorPhotosTable.projectId,
-        set: { ownerId, exteriorImage: body.data.exteriorImage, updatedAt: new Date() },
+        set: { ownerId, exteriorImage, updatedAt: new Date() },
       });
   }
   if (index === -1) {
-    const updated = { ...(imported.data as Project), ...body.data };
+    const updated = { ...(imported.data as Project), ...normalizedUpdate };
     await db.update(importedProjectsTable).set({ data: updated }).where(and(
       eq(importedProjectsTable.id, params.data.projectId),
       eq(importedProjectsTable.ownerId, req.userId),
@@ -1144,7 +1150,7 @@ router.patch("/projects/:projectId", async (req: AuthenticatedRequest, res): Pro
     res.json(UpdateProjectResponse.parse(updated));
     return;
   }
-  projects[index] = { ...projects[index], ...body.data };
+  projects[index] = { ...projects[index], ...normalizedUpdate };
   res.json(UpdateProjectResponse.parse(projects[index]));
 });
 

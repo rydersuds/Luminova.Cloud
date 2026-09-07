@@ -13,7 +13,7 @@ import {
 } from "@workspace/db";
 import luminovaRouter from "./luminova";
 
-test("only an imported project's owner can persist its exterior photo", async (t) => {
+test("only an imported project's owner can persist and clear its exterior photo", async (t) => {
   const suffix = randomUUID();
   const projectId = `exterior-photo-${suffix}`;
   const importBatchId = `exterior-batch-${suffix}`;
@@ -101,4 +101,76 @@ test("only an imported project's owner can persist its exterior photo", async (t
   assert.equal(refreshed.status, 200);
   const refreshedProject = await refreshed.json() as { exteriorImage: string };
   assert.equal(refreshedProject.exteriorImage, exteriorImage);
+
+  const cleared = await fetch(`http://127.0.0.1:${port}/projects/${projectId}`, {
+    method: "PATCH",
+    headers: {
+      "content-type": "application/json",
+      "x-test-user": ownerId,
+    },
+    body: JSON.stringify({ exteriorImage: null }),
+  });
+  assert.equal(cleared.status, 200);
+  assert.equal((await cleared.json() as { exteriorImage: string }).exteriorImage, "");
+
+  const refreshedAfterClear = await fetch(`http://127.0.0.1:${port}/projects/${projectId}`, {
+    headers: { "x-test-user": ownerId },
+  });
+  assert.equal(refreshedAfterClear.status, 200);
+  assert.equal((await refreshedAfterClear.json() as { exteriorImage: string }).exteriorImage, "");
+
+  const [savedClear] = await db.select().from(projectExteriorPhotosTable).where(and(
+    eq(projectExteriorPhotosTable.projectId, projectId),
+    eq(projectExteriorPhotosTable.ownerId, ownerId),
+  ));
+  assert.equal(savedClear?.exteriorImage, "");
+});
+
+test("a seeded project's cleared exterior photo persists", async (t) => {
+  const projectId = "riverstone";
+  const [previousOverride] = await db.select().from(projectExteriorPhotosTable)
+    .where(eq(projectExteriorPhotosTable.projectId, projectId));
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => {
+    Object.assign(req, {
+      userId: "seeded-project-test-user",
+      log: { error: () => undefined },
+    });
+    next();
+  });
+  app.use(luminovaRouter);
+  const server = app.listen(0);
+  await new Promise<void>((resolve) => server.once("listening", resolve));
+  const { port } = server.address() as AddressInfo;
+
+  t.after(async () => {
+    server.close();
+    if (previousOverride) {
+      await db.insert(projectExteriorPhotosTable).values(previousOverride).onConflictDoUpdate({
+        target: projectExteriorPhotosTable.projectId,
+        set: previousOverride,
+      });
+    } else {
+      await db.delete(projectExteriorPhotosTable).where(eq(projectExteriorPhotosTable.projectId, projectId));
+    }
+  });
+
+  const cleared = await fetch(`http://127.0.0.1:${port}/projects/${projectId}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ exteriorImage: null }),
+  });
+  assert.equal(cleared.status, 200);
+  assert.equal((await cleared.json() as { exteriorImage: string }).exteriorImage, "");
+
+  const refreshed = await fetch(`http://127.0.0.1:${port}/projects/${projectId}`);
+  assert.equal(refreshed.status, 200);
+  assert.equal((await refreshed.json() as { exteriorImage: string }).exteriorImage, "");
+
+  const [saved] = await db.select().from(projectExteriorPhotosTable).where(and(
+    eq(projectExteriorPhotosTable.projectId, projectId),
+    eq(projectExteriorPhotosTable.ownerId, "seeded-project"),
+  ));
+  assert.equal(saved?.exteriorImage, "");
 });

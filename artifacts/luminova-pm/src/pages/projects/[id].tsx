@@ -24,7 +24,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { 
   Building, MapPin, Calendar, DollarSign, ArrowLeft, 
   Camera, Briefcase, FileText, CheckCircle2, ChevronRight, Activity, Clock,
-  Maximize2, ChevronLeft, ChevronDown, Pencil
+  Maximize2, ChevronLeft, ChevronDown, Pencil, Trash2
 } from "lucide-react"
 import { cn, formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
@@ -57,6 +57,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const [panoramaEditError, setPanoramaEditError] = React.useState("")
   const [collapsedPhotoCollections, setCollapsedPhotoCollections] = React.useState<Set<string>>(new Set())
   const [exteriorPhotoError, setExteriorPhotoError] = React.useState("")
+  const [exteriorPhotoStatus, setExteriorPhotoStatus] = React.useState("")
   const [savingExteriorPhotoId, setSavingExteriorPhotoId] = React.useState<string | null>(null)
   const organizeFiles = useOrganizeProjectFiles()
   const panoramaName = (label: string | null) => label || "Untitled panorama"
@@ -258,6 +259,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const handleExteriorPhoto = async (photo: { id: string; url: string; caption: string }) => {
     if (savingExteriorPhotoId || project?.exteriorImage === photo.url) return
     setExteriorPhotoError("")
+    setExteriorPhotoStatus("")
     setSavingExteriorPhotoId(photo.id)
     try {
       await updateProject.mutateAsync({
@@ -274,6 +276,46 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
       })
     } catch {
       setExteriorPhotoError(`Could not make ${photo.caption} the exterior photo. Try again.`)
+    } finally {
+      setSavingExteriorPhotoId(null)
+    }
+  }
+
+  const handleRemoveExteriorPhoto = async () => {
+    if (savingExteriorPhotoId || !project?.exteriorImage) return
+    const projectQueryKey = getGetProjectQueryKey(projectId)
+    const projectsQueryKey = getGetProjectsQueryKey()
+    const previousProject = queryClient.getQueryData(projectQueryKey)
+    const previousProjects = queryClient.getQueryData(projectsQueryKey)
+
+    setExteriorPhotoError("")
+    setExteriorPhotoStatus("")
+    setSavingExteriorPhotoId("remove")
+    queryClient.setQueryData(projectQueryKey, { ...project, exteriorImage: "" })
+    queryClient.setQueryData(projectsQueryKey, (current: typeof previousProjects) =>
+      Array.isArray(current)
+        ? current.map((item) => item.id === projectId ? { ...item, exteriorImage: "" } : item)
+        : current
+    )
+
+    try {
+      await updateProject.mutateAsync({
+        projectId,
+        data: { exteriorImage: null },
+      })
+      setExteriorPhotoStatus("Exterior photo removed. The default project placeholder is now shown.")
+      toast({
+        title: "Exterior photo removed",
+        description: "The default project placeholder is now shown.",
+      })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: projectQueryKey }),
+        queryClient.invalidateQueries({ queryKey: projectsQueryKey }),
+      ])
+    } catch {
+      queryClient.setQueryData(projectQueryKey, previousProject)
+      queryClient.setQueryData(projectsQueryKey, previousProjects)
+      setExteriorPhotoError("Could not remove the exterior photo. Try again.")
     } finally {
       setSavingExteriorPhotoId(null)
     }
@@ -634,17 +676,31 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                 ))}
               </div>
 
-              <div className="mt-8 flex items-center justify-between gap-4">
+              <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
                 <h3 className="text-xl font-heading font-semibold">Standard Photos</h3>
-                <Button type="button" onClick={handleOrganizeFiles} disabled={organizeFiles.isPending}>
-                  {organizeFiles.isPending ? "Organizing…" : "Organize with AI"}
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  {project.exteriorImage && (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      onClick={() => void handleRemoveExteriorPhoto()}
+                      disabled={savingExteriorPhotoId !== null}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      {savingExteriorPhotoId === "remove" ? "Removing…" : "Remove exterior photo"}
+                    </Button>
+                  )}
+                  <Button type="button" onClick={handleOrganizeFiles} disabled={organizeFiles.isPending}>
+                    {organizeFiles.isPending ? "Organizing…" : "Organize with AI"}
+                  </Button>
+                </div>
               </div>
               {exteriorPhotoError && (
                 <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   {exteriorPhotoError}
                 </p>
               )}
+              <p role="status" aria-live="polite" className="sr-only">{exteriorPhotoStatus}</p>
               {photoCollections.map(([collection, photos]) => (
                 <section key={collection} className="space-y-3">
                   <button
@@ -697,16 +753,18 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                       <Button
                         type="button"
                         size="sm"
-                        variant={project.exteriorImage === photo.url ? "secondary" : "outline"}
+                        variant={project.exteriorImage === photo.url ? "destructive" : "outline"}
                         className="w-full"
-                        disabled={savingExteriorPhotoId !== null || project.exteriorImage === photo.url}
-                        onClick={() => void handleExteriorPhoto(photo)}
-                        aria-label={project.exteriorImage === photo.url ? `${photo.caption} is the exterior photo` : `Make ${photo.caption} exterior photo`}
+                        disabled={savingExteriorPhotoId !== null}
+                        onClick={() => void (project.exteriorImage === photo.url ? handleRemoveExteriorPhoto() : handleExteriorPhoto(photo))}
+                        aria-label={project.exteriorImage === photo.url ? `Remove ${photo.caption} as exterior photo` : `Make ${photo.caption} exterior photo`}
                       >
-                        {savingExteriorPhotoId === photo.id
+                        {savingExteriorPhotoId === "remove" && project.exteriorImage === photo.url
+                          ? "Removing…"
+                          : savingExteriorPhotoId === photo.id
                           ? "Saving…"
                           : project.exteriorImage === photo.url
-                            ? "Current exterior photo"
+                            ? <><Trash2 className="mr-2 h-3.5 w-3.5" />Remove exterior photo</>
                             : "Make exterior photo"}
                       </Button>
                     </div>

@@ -127,8 +127,11 @@ export interface ProjectUpdate {
   progress?: number;
   targetDate?: string;
   description?: string;
-  /** URL of an existing standard photo belonging to this project */
-  exteriorImage?: string;
+  /**
+     * URL of an existing standard photo belonging to this project, or null to clear the exterior photo
+     * @nullable
+     */
+  exteriorImage?: string | null;
 }
 
 export interface QuotePortion {

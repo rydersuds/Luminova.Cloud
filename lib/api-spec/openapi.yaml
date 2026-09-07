@@ -851,8 +851,8 @@ components:
         targetDate: { type: string }
         description: { type: string }
         exteriorImage:
-          type: string
-          description: URL of an existing standard photo belonging to this project
+          type: [string, "null"]
+          description: URL of an existing standard photo belonging to this project, or null to clear the exterior photo
     ProjectDetail:
       allOf:
         - $ref: "#/components/schemas/Project"
