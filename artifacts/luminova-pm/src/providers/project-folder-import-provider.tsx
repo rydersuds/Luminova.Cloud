@@ -75,6 +75,17 @@ export function ProjectFolderImportProvider({
   const activeImportRef = React.useRef(false)
   const folderFilesRef = React.useRef<FolderCandidate[]>([])
   const sessionRef = React.useRef<ImportSession | null>(null)
+  const authenticatedFetch = React.useCallback(async (input: RequestInfo | URL, init: RequestInit = {}) => {
+    const send = async (token: string | null) => {
+      const headers = new Headers(init.headers)
+      if (token) headers.set("Authorization", `Bearer ${token}`)
+      return fetch(input, { ...init, headers, credentials: "same-origin" })
+    }
+    const response = await send(await clerkAuth.getToken())
+    if (response.status !== 401) return response
+    const refreshedToken = await clerkAuth.getToken({ skipCache: true })
+    return refreshedToken ? send(refreshedToken) : response
+  }, [clerkAuth.getToken])
 
   const clearFolderImport = React.useCallback(() => {
     if (activeImportRef.current) return
@@ -106,7 +117,7 @@ export function ProjectFolderImportProvider({
     let session = sessionRef.current
     try {
       if (!session) {
-        const created = await fetch("/api/project-import-sessions", {
+        const created = await authenticatedFetch("/api/project-import-sessions", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ documents: candidates.map(({ file, relativePath }) => ({
             relativePath, name: file.name, size: file.size, contentType: file.type || "application/octet-stream",
@@ -132,7 +143,7 @@ export function ProjectFolderImportProvider({
     const uploadOne = async (candidate: FolderCandidate) => {
       if (uploadedPaths.has(candidate.relativePath)) return
       try {
-        const request = await fetch("/api/storage/uploads/request-url", {
+        const request = await authenticatedFetch("/api/storage/uploads/request-url", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name: candidate.file.name, size: candidate.file.size, contentType: candidate.file.type || "application/octet-stream", relativePath: candidate.relativePath, importId: session.importId }),
         })
@@ -143,7 +154,7 @@ export function ProjectFolderImportProvider({
         if (!signed.uploadURL || !signed.objectPath) throw new Error(`Requesting an upload URL for "${candidate.relativePath}" returned incomplete data. Please retry the import.`)
         const put = await fetch(signed.uploadURL, { method: "PUT", headers: { "Content-Type": candidate.file.type || "application/octet-stream" }, body: candidate.file })
         await readBatchImportResponse<void>(put, { operation: "Uploading", fileName: candidate.relativePath, expectsJson: false })
-        const attached = await fetch(`/api/project-import-sessions/${session.importId}/documents`, {
+        const attached = await authenticatedFetch(`/api/project-import-sessions/${session.importId}/documents`, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ relativePath: candidate.relativePath, objectPath: signed.objectPath, name: candidate.file.name, size: candidate.file.size, contentType: candidate.file.type || "application/octet-stream", textSnippet: await boundedTextSnippet(candidate.file) }),
         })
@@ -156,7 +167,7 @@ export function ProjectFolderImportProvider({
         setFolderProgress((current) => ({ ...current, uploaded: current.uploaded + 1 }))
       } catch (error) {
         try {
-          const recovery = await fetch("/api/project-import-sessions")
+          const recovery = await authenticatedFetch("/api/project-import-sessions")
           const recovered = await readBatchImportResponse<ImportSession | null>(recovery, { operation: "Checking upload recovery" })
           if (recovered?.importId === session.importId && recovered.uploadedPaths.includes(candidate.relativePath)) {
             uploadedPaths.add(candidate.relativePath)
@@ -185,26 +196,51 @@ export function ProjectFolderImportProvider({
       return
     }
     setFolderStatus("building")
-    try {
-      const response = await fetch(`/api/project-import-sessions/${session.importId}/build`, { method: "POST" })
-      const body = await readBatchImportResponse<{ project?: { id: string } }>(response, { operation: "Building the imported project" })
-      if (!body.project) throw new Error("Building the imported project returned incomplete data. Please retry the import.")
+    const finishImport = async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: getGetProjectsQueryKey() }),
         queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() }),
       ])
       setFolderStatus("success")
+      setFolderError("")
       await clearImportFiles(session.importId, session.documents.map((item) => item.relativePath))
       sessionRef.current = null
       activeImportRef.current = false
       toast({ title: "Project initialized", description: "The folder was uploaded and the project build completed." })
+    }
+    try {
+      const response = await authenticatedFetch(`/api/project-import-sessions/${session.importId}/build`, { method: "POST" })
+      const body = await readBatchImportResponse<{ project?: { id: string } }>(response, { operation: "Building the imported project" })
+      if (!body.project) throw new Error("Building the imported project returned incomplete data. Please retry the import.")
+      await finishImport()
     } catch (error) {
+      // The preview proxy can time out while the server continues a large AI build.
+      // Follow the durable session until it completes instead of showing a false failure.
+      for (let attempt = 0; attempt < 90; attempt++) {
+        try {
+          const statusResponse = await authenticatedFetch("/api/project-import-sessions")
+          const active = await readBatchImportResponse<ImportSession | null>(statusResponse, { operation: "Checking project build status" })
+          if (!active) {
+            await finishImport()
+            return
+          }
+          if (active.importId !== session.importId || active.status === "failed") break
+          if (active.status === "completed") {
+            await finishImport()
+            return
+          }
+          setFolderStatus("building")
+          await new Promise((resolve) => window.setTimeout(resolve, 2000))
+        } catch {
+          break
+        }
+      }
       const message = error instanceof Error ? error.message : "The uploaded documents could not be analyzed."
       setFolderStatus("error"); setFolderError(message)
       activeImportRef.current = false
       toast({ variant: "destructive", title: "Project folder import failed", description: message })
     }
-  }, [queryClient])
+  }, [authenticatedFetch, queryClient])
 
   React.useEffect(() => {
     if (!isLoaded || !isSignedIn) return
@@ -212,7 +248,7 @@ export function ProjectFolderImportProvider({
     let poll: number | undefined
     const restore = async () => {
       try {
-        const response = await fetch("/api/project-import-sessions")
+        const response = await authenticatedFetch("/api/project-import-sessions")
         const session = await readBatchImportResponse<ImportSession | null>(response, { operation: "Restoring the import session" })
         if (!session || cancelled) return
         sessionRef.current = session
@@ -226,7 +262,7 @@ export function ProjectFolderImportProvider({
         if (session.status === "building") {
           setFolderStatus("building")
           poll = window.setInterval(async () => {
-            const statusResponse = await fetch("/api/project-import-sessions")
+            const statusResponse = await authenticatedFetch("/api/project-import-sessions")
             let active: ImportSession | null
             try {
               active = await readBatchImportResponse<ImportSession | null>(statusResponse, { operation: "Checking project build status" })
@@ -277,7 +313,7 @@ export function ProjectFolderImportProvider({
       cancelled = true
       if (poll !== undefined) window.clearInterval(poll)
     }
-  }, [isLoaded, isSignedIn, queryClient, startFolderImport])
+  }, [authenticatedFetch, isLoaded, isSignedIn, queryClient, startFolderImport])
 
   return <ProjectFolderImportContext.Provider value={{ folderFiles, skippedFolderFiles, folderStatus, folderProgress, folderError, collectFolderFiles, startFolderImport, clearFolderImport, isActive }}>
     {children}
