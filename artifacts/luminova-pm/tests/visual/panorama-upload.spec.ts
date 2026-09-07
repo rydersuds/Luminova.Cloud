@@ -20,6 +20,7 @@ const project = {
   invoices: [],
   trades: [],
   photos: [],
+  files: [],
   panoramas: [{
     id: 'pano-1',
     url: '/panorama-test-fixture.svg',
@@ -58,6 +59,78 @@ test.beforeEach(async ({ page }) => {
     }
     await route.fallback();
   });
+});
+
+test('selects a standard photo as the exterior photo and keeps it selected after refresh', async ({ page }) => {
+  let current = {
+    ...structuredClone(project),
+    photos: [
+      { id: 'photo-1', url: '/site-front.jpg', caption: 'Front elevation', phase: 'Exterior', date: '2026-09-04' },
+      { id: 'photo-2', url: '/site-rear.jpg', caption: 'Rear elevation', phase: 'Exterior', date: '2026-09-05' },
+    ],
+  };
+  await page.unroute('**/api/projects/riverstone');
+  await page.route('**/api/projects/riverstone', async route => {
+    if (route.request().method() === 'PATCH') {
+      expect(route.request().postDataJSON()).toEqual({ exteriorImage: '/site-front.jpg' });
+      current = { ...current, exteriorImage: '/site-front.jpg' };
+      await route.fulfill({ json: current });
+      return;
+    }
+    await route.fulfill({ json: current });
+  });
+
+  await openGallery(page);
+  await page.getByRole('button', { name: 'Make Front elevation exterior photo' }).click();
+  await expect(page.getByText('Exterior photo updated', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Front elevation is the exterior photo' })).toBeDisabled();
+  await expect(page.getByText('Exterior photo', { exact: true })).toBeVisible();
+
+  await page.reload();
+  await page.getByRole('tab', { name: 'Photos & 360s' }).click();
+  await expect(page.getByRole('button', { name: 'Front elevation is the exterior photo' })).toBeDisabled();
+
+  await page.route('**/api/projects', route => route.fulfill({ json: [current] }));
+  await page.route('**/api/dashboard/summary', route => route.fulfill({
+    json: {
+      activeProjects: 1,
+      awaitingApproval: 0,
+      unreadMessages: 0,
+      new360Photos: 0,
+      budgeted: current.budgeted,
+      invoiced: current.invoiced,
+      recentActivity: [],
+    },
+  }));
+  await page.goto('/__visual/project-cards');
+  await expect(page.getByRole('img', { name: 'Riverstone Residence' })).toHaveAttribute('src', '/site-front.jpg');
+  await page.goto('/__visual/dashboard-cards');
+  await expect(page.getByRole('img', { name: 'Riverstone Residence' })).toHaveAttribute('src', '/site-front.jpg');
+});
+
+test('reports exterior photo update failures and allows retry', async ({ page }) => {
+  const current = {
+    ...structuredClone(project),
+    photos: [{ id: 'photo-1', url: '/site-front.jpg', caption: 'Front elevation', phase: 'Exterior', date: '2026-09-04' }],
+  };
+  let attempts = 0;
+  await page.unroute('**/api/projects/riverstone');
+  await page.route('**/api/projects/riverstone', async route => {
+    if (route.request().method() === 'PATCH') {
+      attempts += 1;
+      await route.fulfill(attempts === 1 ? { status: 500, json: { error: 'Save failed' } } : { json: { ...current, exteriorImage: '/site-front.jpg' } });
+      return;
+    }
+    await route.fulfill({ json: attempts > 1 ? { ...current, exteriorImage: '/site-front.jpg' } : current });
+  });
+
+  await openGallery(page);
+  const choose = page.getByRole('button', { name: 'Make Front elevation exterior photo' });
+  await choose.click();
+  await expect(page.getByRole('alert')).toHaveText('Could not make Front elevation the exterior photo. Try again.');
+  await expect(choose).toBeEnabled();
+  await choose.click();
+  await expect(page.getByRole('button', { name: 'Front elevation is the exterior photo' })).toBeDisabled();
 });
 
 test('opens the accessible upload form and validates missing input', async ({ page }) => {

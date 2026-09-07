@@ -167,6 +167,36 @@ function App() {
     );
   }
 
+  if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/project-cards')) {
+    return (
+      <WouterRouter base={basePath}>
+        <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl}>
+          <QueryClientProvider client={queryClient}>
+            <TooltipProvider>
+              <Projects />
+            </TooltipProvider>
+          </QueryClientProvider>
+        </ClerkProvider>
+      </WouterRouter>
+    );
+  }
+
+  if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/dashboard-cards')) {
+    return (
+      <WouterRouter base={basePath}>
+        <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl}>
+          <QueryClientProvider client={queryClient}>
+            <ProjectFolderImportProvider authState={{ isLoaded: true, isSignedIn: true }}>
+              <TooltipProvider>
+                <Dashboard />
+              </TooltipProvider>
+            </ProjectFolderImportProvider>
+          </QueryClientProvider>
+        </ClerkProvider>
+      </WouterRouter>
+    );
+  }
+
   if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/sidebar')) {
     return <SidebarVisualHarness />;
   }

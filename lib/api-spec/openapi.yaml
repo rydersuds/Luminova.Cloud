@@ -850,6 +850,9 @@ components:
         progress: { type: integer }
         targetDate: { type: string }
         description: { type: string }
+        exteriorImage:
+          type: string
+          description: URL of an existing standard photo belonging to this project
     ProjectDetail:
       allOf:
         - $ref: "#/components/schemas/Project"
@@ -1246,4 +1249,3 @@ components:
         description: { type: string }
         author: { type: string }
         date: { type: string }
-

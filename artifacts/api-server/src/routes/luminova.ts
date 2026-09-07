@@ -55,6 +55,7 @@ import {
   importedVendorQuotesTable,
   importedVendorsTable,
   projectDocumentsTable,
+  projectExteriorPhotosTable,
   projectImportBatchesTable,
 } from "@workspace/db";
 import { and, desc, eq, inArray, lt } from "drizzle-orm";
@@ -438,7 +439,23 @@ type VendorQuote = (typeof vendorQuotes)[number];
 const durableData = async <T>(table: typeof importedProjectsTable | typeof importedVendorsTable | typeof importedVendorQuotesTable | typeof importedInvoicesTable) =>
   (await db.select({ data: table.data }).from(table)).map((row) => row.data as T);
 
-const allProjects = async () => [...await durableData<Project>(importedProjectsTable), ...projects];
+const allProjects = async () => {
+  const [importedProjectRows, exteriorPhotos] = await Promise.all([
+    db.select({ data: importedProjectsTable.data, ownerId: importedProjectsTable.ownerId }).from(importedProjectsTable),
+    db.select().from(projectExteriorPhotosTable),
+  ]);
+  const exteriorPhotoByProject = new Map(exteriorPhotos.map((item) => [item.projectId, item]));
+  const importedProjects = importedProjectRows.map((row) => {
+    const project = row.data as Project;
+    const exteriorPhoto = exteriorPhotoByProject.get(project.id);
+    return exteriorPhoto?.ownerId === row.ownerId ? { ...project, exteriorImage: exteriorPhoto.exteriorImage } : project;
+  });
+  const seededProjects = projects.map((project) => {
+    const exteriorPhoto = exteriorPhotoByProject.get(project.id);
+    return exteriorPhoto?.ownerId === "seeded-project" ? { ...project, exteriorImage: exteriorPhoto.exteriorImage } : project;
+  });
+  return [...importedProjects, ...seededProjects];
+};
 const allInvoices = async () => [...await durableData<Invoice>(importedInvoicesTable), ...invoices];
 const allTrades = async () => [...await durableData<Trade>(importedVendorsTable), ...trades];
 const allVendorQuotes = async () => [...await durableData<VendorQuote>(importedVendorQuotesTable), ...vendorQuotes];
@@ -1081,22 +1098,49 @@ router.patch("/projects/:projectId/panoramas/:panoramaId", async (req, res): Pro
   }
 });
 
-router.patch("/projects/:projectId", async (req, res) => {
+router.patch("/projects/:projectId", async (req: AuthenticatedRequest, res): Promise<void> => {
   const params = UpdateProjectParams.safeParse(req.params);
   const body = UpdateProjectBody.safeParse(req.body);
   if (!params.success || !body.success) {
     res.status(400).json({ error: "Invalid project update" });
     return;
   }
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
   const index = projects.findIndex((project) => project.id === params.data.projectId);
-  if (index === -1) {
-    const imported = await db.select({ data: importedProjectsTable.data }).from(importedProjectsTable).where(eq(importedProjectsTable.id, params.data.projectId)).limit(1);
-    if (!imported[0]) {
-      res.status(404).json({ error: "Project not found" });
+  const [imported] = index === -1
+    ? await db.select().from(importedProjectsTable).where(and(
+        eq(importedProjectsTable.id, params.data.projectId),
+        eq(importedProjectsTable.ownerId, req.userId),
+      )).limit(1)
+    : [];
+  if (index === -1 && !imported) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+  const currentProject = index === -1 ? imported.data as Project : await findProject(params.data.projectId) as Project;
+  const ownerId = index === -1 ? req.userId : "seeded-project";
+  if (body.data.exteriorImage !== undefined) {
+    const standardPhotos = (await detailsFor(currentProject)).photos;
+    if (!standardPhotos.some((photo) => photo.url === body.data.exteriorImage)) {
+      res.status(400).json({ error: "Choose a standard photo from this project." });
       return;
     }
-    const updated = { ...(imported[0].data as Project), ...body.data };
-    await db.update(importedProjectsTable).set({ data: updated }).where(eq(importedProjectsTable.id, params.data.projectId));
+    await db.insert(projectExteriorPhotosTable)
+      .values({ projectId: currentProject.id, ownerId, exteriorImage: body.data.exteriorImage })
+      .onConflictDoUpdate({
+        target: projectExteriorPhotosTable.projectId,
+        set: { ownerId, exteriorImage: body.data.exteriorImage, updatedAt: new Date() },
+      });
+  }
+  if (index === -1) {
+    const updated = { ...(imported.data as Project), ...body.data };
+    await db.update(importedProjectsTable).set({ data: updated }).where(and(
+      eq(importedProjectsTable.id, params.data.projectId),
+      eq(importedProjectsTable.ownerId, req.userId),
+    ));
     res.json(UpdateProjectResponse.parse(updated));
     return;
   }

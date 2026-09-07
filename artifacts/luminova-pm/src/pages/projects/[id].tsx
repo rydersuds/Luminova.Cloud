@@ -4,6 +4,7 @@ import { AppLayout } from "@/components/layout/app-layout"
 import { 
   useGetProject, 
   getGetProjectQueryKey,
+  getGetProjectsQueryKey,
   useCreateProjectPanorama,
   useUpdateProjectPanorama,
   useUpdateProject,
@@ -54,6 +55,8 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const [activePanorama, setActivePanorama] = React.useState<ProjectPanorama | null>(null)
   const [editingPanorama, setEditingPanorama] = React.useState<ProjectPanorama | null>(null)
   const [panoramaEditError, setPanoramaEditError] = React.useState("")
+  const [exteriorPhotoError, setExteriorPhotoError] = React.useState("")
+  const [savingExteriorPhotoId, setSavingExteriorPhotoId] = React.useState<string | null>(null)
   const organizeFiles = useOrganizeProjectFiles()
   const panoramaName = (label: string | null) => label || "Untitled panorama"
 
@@ -241,6 +244,30 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
         setIsEditOpen(false)
       }
     })
+  }
+
+  const handleExteriorPhoto = async (photo: { id: string; url: string; caption: string }) => {
+    if (savingExteriorPhotoId || project?.exteriorImage === photo.url) return
+    setExteriorPhotoError("")
+    setSavingExteriorPhotoId(photo.id)
+    try {
+      await updateProject.mutateAsync({
+        projectId,
+        data: { exteriorImage: photo.url },
+      })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) }),
+        queryClient.invalidateQueries({ queryKey: getGetProjectsQueryKey() }),
+      ])
+      toast({
+        title: "Exterior photo updated",
+        description: `${photo.caption} is now the project cover.`,
+      })
+    } catch {
+      setExteriorPhotoError(`Could not make ${photo.caption} the exterior photo. Try again.`)
+    } finally {
+      setSavingExteriorPhotoId(null)
+    }
   }
 
   if (isLoading) {
@@ -604,6 +631,11 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                   {organizeFiles.isPending ? "Organizing…" : "Organize with AI"}
                 </Button>
               </div>
+              {exteriorPhotoError && (
+                <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {exteriorPhotoError}
+                </p>
+              )}
               {photoCollections.map(([collection, photos]) => (
                 <section key={collection} className="space-y-3">
                   <div className="flex items-center gap-2">
@@ -614,14 +646,27 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                   {photos.map((photo) => {
                     const index = project.photos.findIndex((item) => item.id === photo.id)
                     return (
-                  <button
-                    type="button"
+                  <div
                     key={photo.id}
-                    onClick={() => setPhotoIndex(index)}
-                    className="group overflow-hidden rounded-lg border border-border text-left cursor-zoom-in"
+                    className={cn(
+                      "group overflow-hidden rounded-lg border bg-card text-left",
+                      project.exteriorImage === photo.url ? "border-primary ring-2 ring-primary/30" : "border-border",
+                    )}
                   >
+                    <button
+                      type="button"
+                      onClick={() => setPhotoIndex(index)}
+                      className="block w-full cursor-zoom-in text-left"
+                      aria-label={`View ${photo.caption}`}
+                    >
                     <div className="aspect-square bg-muted relative">
                       <img src={photo.url} alt={photo.caption} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                      {project.exteriorImage === photo.url && (
+                        <Badge className="absolute left-2 top-2 gap-1.5">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Exterior photo
+                        </Badge>
+                      )}
                       <div className="absolute inset-0 bg-sidebar/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4 text-center">
                         <div className="text-sidebar-foreground">
                           <Maximize2 className="mx-auto mb-2 h-5 w-5" />
@@ -629,7 +674,25 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                         </div>
                       </div>
                     </div>
-                  </button>
+                    </button>
+                    <div className="border-t p-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={project.exteriorImage === photo.url ? "secondary" : "outline"}
+                        className="w-full"
+                        disabled={savingExteriorPhotoId !== null || project.exteriorImage === photo.url}
+                        onClick={() => void handleExteriorPhoto(photo)}
+                        aria-label={project.exteriorImage === photo.url ? `${photo.caption} is the exterior photo` : `Make ${photo.caption} exterior photo`}
+                      >
+                        {savingExteriorPhotoId === photo.id
+                          ? "Saving…"
+                          : project.exteriorImage === photo.url
+                            ? "Current exterior photo"
+                            : "Make exterior photo"}
+                      </Button>
+                    </div>
+                  </div>
                     )
                   })}
                   </div>

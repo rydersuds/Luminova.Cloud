@@ -127,6 +127,8 @@ export interface ProjectUpdate {
   progress?: number;
   targetDate?: string;
   description?: string;
+  /** URL of an existing standard photo belonging to this project */
+  exteriorImage?: string;
 }
 
 export interface QuotePortion {
@@ -560,4 +562,3 @@ vendorId?: string;
 trade?: string;
 status?: VendorQuoteStatus;
 };
-

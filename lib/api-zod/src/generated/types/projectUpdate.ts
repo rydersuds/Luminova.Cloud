@@ -12,4 +12,6 @@ export interface ProjectUpdate {
   progress?: number;
   targetDate?: string;
   description?: string;
+  /** URL of an existing standard photo belonging to this project */
+  exteriorImage?: string;
 }
