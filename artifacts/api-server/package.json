@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
+    "dev": "pnpm --filter @workspace/db run push && NODE_ENV=development tsx watch src/index.ts",
     "build": "node ./build.mjs",
     "prestart": "pnpm --filter @workspace/db run push",
     "start": "node --enable-source-maps ./dist/index.mjs",
