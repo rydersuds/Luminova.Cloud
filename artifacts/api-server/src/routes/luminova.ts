@@ -39,7 +39,16 @@ import {
   UpdateVendorQuoteResponse,
 } from "@workspace/api-zod";
 import { DatabasePanoramaStore } from "../lib/panoramaStore";
-import { db, projectDocumentsTable, projectImportBatchesTable } from "@workspace/db";
+import {
+  db,
+  importedInvoicesTable,
+  importedProjectsTable,
+  importedVendorQuotesTable,
+  importedVendorsTable,
+  projectDocumentsTable,
+  projectImportBatchesTable,
+} from "@workspace/db";
+import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import OpenAI from "openai";
 import { z } from "zod";
@@ -323,7 +332,21 @@ let vendorQuotes = [
   },
 ];
 
-const detailsFor = async (project: (typeof projects)[number]) => ({
+type Project = (typeof projects)[number];
+type Invoice = (typeof invoices)[number];
+type Trade = (typeof trades)[number];
+type VendorQuote = (typeof vendorQuotes)[number];
+
+const durableData = async <T>(table: typeof importedProjectsTable | typeof importedVendorsTable | typeof importedVendorQuotesTable | typeof importedInvoicesTable) =>
+  (await db.select({ data: table.data }).from(table)).map((row) => row.data as T);
+
+const allProjects = async () => [...await durableData<Project>(importedProjectsTable), ...projects];
+const allInvoices = async () => [...await durableData<Invoice>(importedInvoicesTable), ...invoices];
+const allTrades = async () => [...await durableData<Trade>(importedVendorsTable), ...trades];
+const allVendorQuotes = async () => [...await durableData<VendorQuote>(importedVendorQuotesTable), ...vendorQuotes];
+const findProject = async (projectId: string) => (await allProjects()).find((project) => project.id === projectId);
+
+const detailsFor = async (project: Project) => ({
   ...project,
   startDate: "2026-03-18",
   clientQuote: {
@@ -344,8 +367,8 @@ const detailsFor = async (project: (typeof projects)[number]) => ({
     { id: "line-4", code: "26 00 00", description: "Electrical", budgeted: 26110000, invoiced: 18450000, variance: 7660000 },
     { id: "line-5", code: "09 00 00", description: "Interiors & finishes", budgeted: 65275000, invoiced: 0, variance: 65275000 },
   ],
-  invoices: invoices.filter((invoice) => invoice.projectId === project.id),
-  trades: trades.slice(0, 4),
+  invoices: (await allInvoices()).filter((invoice) => invoice.projectId === project.id),
+  trades: (await allTrades()).slice(0, 4),
   photos: [
     { id: "photo-1", url: "https://images.pexels.com/photos/1216589/pexels-photo-1216589.jpeg?auto=compress&cs=tinysrgb&w=1200", caption: "Second-floor framing walkthrough", phase: "Framing", date: "2026-09-04" },
     { id: "photo-2", url: "https://images.pexels.com/photos/209251/pexels-photo-209251.jpeg?auto=compress&cs=tinysrgb&w=1200", caption: "Mechanical rough-in progress", phase: "Rough-in", date: "2026-09-03" },
@@ -359,31 +382,42 @@ const detailsFor = async (project: (typeof projects)[number]) => ({
   activity: activities,
 });
 
-router.get("/dashboard/summary", (_req, res) => {
-  res.json(GetDashboardSummaryResponse.parse({
-    activeProjects: projects.filter((project) => project.status === "In progress").length,
-    awaitingApproval: invoices.filter((invoice) => invoice.status === "Pending approval").length,
-    unreadMessages: 7,
-    new360Photos: 3,
-    budgeted: projects.reduce((sum, project) => sum + project.budgeted, 0),
-    invoiced: projects.reduce((sum, project) => sum + project.invoiced, 0),
-    recentActivity: activities,
-  }));
+router.get("/dashboard/summary", async (req, res) => {
+  try {
+    const [projectRecords, invoiceRecords] = await Promise.all([allProjects(), allInvoices()]);
+    res.json(GetDashboardSummaryResponse.parse({
+      activeProjects: projectRecords.filter((project) => project.status === "In progress").length,
+      awaitingApproval: invoiceRecords.filter((invoice) => invoice.status === "Pending approval").length,
+      unreadMessages: 7,
+      new360Photos: 3,
+      budgeted: projectRecords.reduce((sum, project) => sum + project.budgeted, 0),
+      invoiced: projectRecords.reduce((sum, project) => sum + project.invoiced, 0),
+      recentActivity: activities,
+    }));
+  } catch (error) {
+    req.log.error({ err: error }, "Failed to load dashboard records");
+    res.status(500).json({ error: "Dashboard data could not be loaded." });
+  }
 });
 
-router.get("/projects", (req, res) => {
+router.get("/projects", async (req, res) => {
   const parsed = GetProjectsQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
   const { status, search, region } = parsed.data;
-  const result = projects.filter((project) =>
-    (!status || project.status === status) &&
-    (!region || project.region === region) &&
-    (!search || `${project.name} ${project.address} ${project.clientName}`.toLowerCase().includes(search.toLowerCase())),
-  );
-  res.json(GetProjectsResponse.parse(result));
+  try {
+    const result = (await allProjects()).filter((project) =>
+      (!status || project.status === status) &&
+      (!region || project.region === region) &&
+      (!search || `${project.name} ${project.address} ${project.clientName}`.toLowerCase().includes(search.toLowerCase())),
+    );
+    res.json(GetProjectsResponse.parse(result));
+  } catch (error) {
+    req.log.error({ err: error }, "Failed to load projects");
+    res.status(500).json({ error: "Projects could not be loaded." });
+  }
 });
 
 router.post("/projects", (req, res) => {
@@ -462,46 +496,47 @@ router.post("/project-imports", async (req, res): Promise<void> => {
     exteriorImage: "",
     description: analysis.project.description || "Project initialized from imported documents.",
   };
-  projects = [project, ...projects];
-
-  const vendorByName = new Map(trades.map((trade) => [trade.companyName.toLowerCase(), trade]));
+  const vendorByName = new Map((await allTrades()).map((trade) => [trade.companyName.toLowerCase(), trade]));
+  const importedVendors: Trade[] = [];
   let vendorsCreated = 0;
   for (const vendor of analysis.vendors) {
     const key = vendor.companyName.toLowerCase();
     if (vendorByName.has(key)) continue;
     const initials = vendor.companyName.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "VN";
     const created = { id: `trade-${Date.now()}-${vendorsCreated}`, companyName: vendor.companyName, contactName: vendor.contactName || "Contact to be confirmed", tradeType: vendor.tradeType || "General", region: vendor.region || project.region, rating: 0, reviewCount: 0, completedJobs: 0, initials, accent: "#64748B" };
-    trades.push(created);
+    importedVendors.push(created);
     vendorByName.set(key, created);
     vendorsCreated++;
   }
 
   let quotesCreated = 0;
+  const importedQuotes: VendorQuote[] = [];
   for (const extracted of analysis.quotes) {
     const vendor = vendorByName.get(extracted.vendorName.toLowerCase());
     if (!vendor) continue;
     const issueDate = extracted.issueDate && isValidCalendarDate(extracted.issueDate) ? extracted.issueDate : today;
     const dueDate = extracted.dueDate && isValidCalendarDate(extracted.dueDate) && extracted.dueDate >= issueDate ? extracted.dueDate : issueDate;
     const lineItems = calculateQuoteLineItems([{ description: "Imported quote total", quantity: 1, unitPrice: Math.round(extracted.amountDollars * 100) }]);
-    vendorQuotes = [{
+    importedQuotes.push({
       id: `vq-${Date.now()}-${quotesCreated}`, quoteNumber: extracted.quoteNumber, projectId: project.id, projectName: project.name,
       vendorId: vendor.id, vendorName: vendor.companyName, trade: extracted.trade || vendor.tradeType, status: "Received", revision: 1,
       issueDate, dueDate, notes: extracted.notes, lineItems, total: lineItems.reduce((sum, line) => sum + line.amount, 0),
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-    }, ...vendorQuotes];
+    });
     quotesCreated++;
   }
 
   let invoicesCreated = 0;
+  const importedInvoices: Invoice[] = [];
   for (const extracted of analysis.invoices) {
     const amount = Math.round(extracted.amountDollars * 100);
     const remaining = Math.max(project.budgeted - project.invoiced, 0);
     const overage = Math.max(amount - remaining, 0);
-    invoices = [{
+    importedInvoices.push({
       id: `inv-${Date.now()}-${invoicesCreated}`, invoiceNumber: extracted.invoiceNumber, projectId: project.id, projectName: project.name,
       vendor: extracted.vendor, amount, date: extracted.date && isValidCalendarDate(extracted.date) ? extracted.date : today,
       status: overage > 0 ? "Pending approval" : "Auto-approved", lineItem: extracted.lineItem, overage,
-    }, ...invoices];
+    });
     project.invoiced += amount;
     invoicesCreated++;
   }
@@ -511,6 +546,16 @@ router.post("/project-imports", async (req, res): Promise<void> => {
   try {
     await db.transaction(async (tx) => {
       await tx.insert(projectImportBatchesTable).values({ id: importId, projectId: project.id, ownerId, status: "completed", analysis });
+      await tx.insert(importedProjectsTable).values({ id: project.id, importBatchId: importId, ownerId, data: project });
+      if (importedVendors.length) {
+        await tx.insert(importedVendorsTable).values(importedVendors.map((vendor) => ({ id: vendor.id, importBatchId: importId, ownerId, data: vendor })));
+      }
+      if (importedQuotes.length) {
+        await tx.insert(importedVendorQuotesTable).values(importedQuotes.map((quote) => ({ id: quote.id, importBatchId: importId, ownerId, data: quote })));
+      }
+      if (importedInvoices.length) {
+        await tx.insert(importedInvoicesTable).values(importedInvoices.map((invoice) => ({ id: invoice.id, importBatchId: importId, ownerId, data: invoice })));
+      }
       await tx.insert(projectDocumentsTable).values(parsed.data.documents.map((document) => ({
         id: `doc-${randomUUID()}`, importBatchId: importId, projectId: project.id, ownerId, objectPath: document.objectPath,
         relativePath: document.relativePath, name: document.name, contentType: document.contentType, size: document.size,
@@ -519,7 +564,7 @@ router.post("/project-imports", async (req, res): Promise<void> => {
     });
   } catch (error) {
     req.log.error({ err: error, projectId: project.id }, "Project import metadata persistence failed");
-    res.status(500).json({ error: "Project was initialized but document metadata could not be saved." });
+    res.status(500).json({ error: "Project could not be initialized. No import records were saved." });
     return;
   }
   res.status(201).json(CreateProjectImportResponse.parse({
@@ -533,7 +578,7 @@ router.get("/projects/:projectId", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const project = projects.find((item) => item.id === parsed.data.projectId);
+  const project = await findProject(parsed.data.projectId);
   if (!project) {
     res.status(404).json({ error: "Project not found" });
     return;
@@ -553,7 +598,7 @@ router.post("/projects/:projectId/panoramas", async (req, res): Promise<void> =>
     return;
   }
 
-  const project = projects.find((item) => item.id === params.data.projectId);
+  const project = await findProject(params.data.projectId);
   if (!project) {
     res.status(404).json({ error: "Project not found" });
     return;
@@ -594,7 +639,7 @@ router.patch("/projects/:projectId/panoramas/:panoramaId", async (req, res): Pro
     return;
   }
 
-  const project = projects.find((item) => item.id === params.data.projectId);
+  const project = await findProject(params.data.projectId);
   if (!project) {
     res.status(404).json({ error: "Project not found" });
     return;
@@ -628,7 +673,7 @@ router.patch("/projects/:projectId/panoramas/:panoramaId", async (req, res): Pro
   }
 });
 
-router.patch("/projects/:projectId", (req, res) => {
+router.patch("/projects/:projectId", async (req, res) => {
   const params = UpdateProjectParams.safeParse(req.params);
   const body = UpdateProjectBody.safeParse(req.body);
   if (!params.success || !body.success) {
@@ -637,7 +682,14 @@ router.patch("/projects/:projectId", (req, res) => {
   }
   const index = projects.findIndex((project) => project.id === params.data.projectId);
   if (index === -1) {
-    res.status(404).json({ error: "Project not found" });
+    const imported = await db.select({ data: importedProjectsTable.data }).from(importedProjectsTable).where(eq(importedProjectsTable.id, params.data.projectId)).limit(1);
+    if (!imported[0]) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+    const updated = { ...(imported[0].data as Project), ...body.data };
+    await db.update(importedProjectsTable).set({ data: updated }).where(eq(importedProjectsTable.id, params.data.projectId));
+    res.json(UpdateProjectResponse.parse(updated));
     return;
   }
   projects[index] = { ...projects[index], ...body.data };
@@ -653,14 +705,14 @@ router.get("/projects/:projectId/activity", (req, res) => {
   res.json(GetProjectActivityResponse.parse(activities));
 });
 
-router.get("/trades", (req, res) => {
+router.get("/trades", async (req, res) => {
   const parsed = GetTradesQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
   const { search, tradeType, region } = parsed.data;
-  const result = trades.filter((trade) =>
+  const result = (await allTrades()).filter((trade) =>
     (!tradeType || trade.tradeType === tradeType) &&
     (!region || trade.region === region) &&
     (!search || `${trade.companyName} ${trade.contactName} ${trade.tradeType}`.toLowerCase().includes(search.toLowerCase())),
@@ -668,13 +720,13 @@ router.get("/trades", (req, res) => {
   res.json(GetTradesResponse.parse(result));
 });
 
-router.get("/trades/:tradeId", (req, res) => {
+router.get("/trades/:tradeId", async (req, res) => {
   const parsed = GetTradeParams.safeParse(req.params);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const trade = trades.find((item) => item.id === parsed.data.tradeId);
+  const trade = (await allTrades()).find((item) => item.id === parsed.data.tradeId);
   if (!trade) {
     res.status(404).json({ error: "Trade not found" });
     return;
@@ -702,23 +754,24 @@ router.get("/trades/:tradeId", (req, res) => {
   }));
 });
 
-router.get("/invoices", (req, res) => {
+router.get("/invoices", async (req, res) => {
   const parsed = GetInvoicesQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const result = parsed.data.status ? invoices.filter((invoice) => invoice.status === parsed.data.status) : invoices;
+  const records = await allInvoices();
+  const result = parsed.data.status ? records.filter((invoice) => invoice.status === parsed.data.status) : records;
   res.json(GetInvoicesResponse.parse(result));
 });
 
-router.post("/invoices", (req, res) => {
+router.post("/invoices", async (req, res) => {
   const parsed = CreateInvoiceBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const project = projects.find((item) => item.id === parsed.data.projectId);
+  const project = await findProject(parsed.data.projectId);
   if (!project) {
     res.status(404).json({ error: "Project not found" });
     return;
@@ -736,7 +789,7 @@ router.post("/invoices", (req, res) => {
   res.status(201).json(CreateInvoiceResponse.parse(invoice));
 });
 
-router.get("/vendor-quotes", (req, res) => {
+router.get("/vendor-quotes", async (req, res) => {
   const parsed = GetVendorQuotesQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -744,7 +797,7 @@ router.get("/vendor-quotes", (req, res) => {
   }
   const { search, projectId, vendorId, trade, status } = parsed.data;
   const normalizedSearch = search?.trim().toLowerCase();
-  const result = vendorQuotes.filter((quote) =>
+  const result = (await allVendorQuotes()).filter((quote) =>
     (!projectId || quote.projectId === projectId) &&
     (!vendorId || quote.vendorId === vendorId) &&
     (!trade || quote.trade === trade) &&
@@ -754,14 +807,16 @@ router.get("/vendor-quotes", (req, res) => {
   res.json(GetVendorQuotesResponse.parse(result));
 });
 
-router.post("/vendor-quotes", (req, res) => {
+router.post("/vendor-quotes", async (req, res) => {
   const parsed = CreateVendorQuoteBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const project = projects.find((item) => item.id === parsed.data.projectId);
-  const vendor = trades.find((item) => item.id === parsed.data.vendorId);
+  const [project, vendor] = await Promise.all([
+    findProject(parsed.data.projectId),
+    allTrades().then((records) => records.find((item) => item.id === parsed.data.vendorId)),
+  ]);
   if (!project || !vendor) {
     res.status(404).json({ error: !project ? "Project not found" : "Vendor not found" });
     return;
@@ -791,13 +846,13 @@ router.post("/vendor-quotes", (req, res) => {
   res.status(201).json(CreateVendorQuoteResponse.parse(quote));
 });
 
-router.get("/vendor-quotes/:quoteId", (req, res) => {
+router.get("/vendor-quotes/:quoteId", async (req, res) => {
   const parsed = GetVendorQuoteParams.safeParse(req.params);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const quote = vendorQuotes.find((item) => item.id === parsed.data.quoteId);
+  const quote = (await allVendorQuotes()).find((item) => item.id === parsed.data.quoteId);
   if (!quote) {
     res.status(404).json({ error: "Vendor quote not found" });
     return;
@@ -805,7 +860,7 @@ router.get("/vendor-quotes/:quoteId", (req, res) => {
   res.json(GetVendorQuoteResponse.parse(quote));
 });
 
-router.patch("/vendor-quotes/:quoteId", (req, res) => {
+router.patch("/vendor-quotes/:quoteId", async (req, res) => {
   const params = UpdateVendorQuoteParams.safeParse(req.params);
   const body = UpdateVendorQuoteBody.safeParse(req.body);
   if (!params.success || !body.success) {
@@ -814,14 +869,41 @@ router.patch("/vendor-quotes/:quoteId", (req, res) => {
   }
   const index = vendorQuotes.findIndex((item) => item.id === params.data.quoteId);
   if (index === -1) {
-    res.status(404).json({ error: "Vendor quote not found" });
+    const imported = await db.select({ data: importedVendorQuotesTable.data }).from(importedVendorQuotesTable).where(eq(importedVendorQuotesTable.id, params.data.quoteId)).limit(1);
+    if (!imported[0]) {
+      res.status(404).json({ error: "Vendor quote not found" });
+      return;
+    }
+    const current = imported[0].data as VendorQuote;
+    const projectId = body.data.projectId ?? current.projectId;
+    const vendorId = body.data.vendorId ?? current.vendorId;
+    const [project, vendor] = await Promise.all([
+      findProject(projectId),
+      allTrades().then((records) => records.find((item) => item.id === vendorId)),
+    ]);
+    if (!project || !vendor) {
+      res.status(404).json({ error: !project ? "Project not found" : "Vendor not found" });
+      return;
+    }
+    const issueDate = dateOnly(body.data.issueDate ?? current.issueDate);
+    const dueDate = dateOnly(body.data.dueDate ?? current.dueDate);
+    if (dueDate < issueDate) {
+      res.status(400).json({ error: "Due date cannot be before issue date" });
+      return;
+    }
+    const lineItems = body.data.lineItems ? calculateQuoteLineItems(body.data.lineItems) : current.lineItems;
+    const updated = { ...current, ...body.data, projectId, projectName: project.name, vendorId, vendorName: vendor.companyName, trade: vendor.tradeType, issueDate, dueDate, lineItems, total: lineItems.reduce((sum, item) => sum + item.amount, 0), updatedAt: new Date().toISOString() };
+    await db.update(importedVendorQuotesTable).set({ data: updated }).where(eq(importedVendorQuotesTable.id, params.data.quoteId));
+    res.json(UpdateVendorQuoteResponse.parse(updated));
     return;
   }
   const current = vendorQuotes[index];
   const projectId = body.data.projectId ?? current.projectId;
   const vendorId = body.data.vendorId ?? current.vendorId;
-  const project = projects.find((item) => item.id === projectId);
-  const vendor = trades.find((item) => item.id === vendorId);
+  const [project, vendor] = await Promise.all([
+    findProject(projectId),
+    allTrades().then((records) => records.find((item) => item.id === vendorId)),
+  ]);
   if (!project || !vendor) {
     res.status(404).json({ error: !project ? "Project not found" : "Vendor not found" });
     return;
