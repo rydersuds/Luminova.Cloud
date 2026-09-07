@@ -24,7 +24,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { 
   Building, MapPin, Calendar, DollarSign, ArrowLeft, 
   Camera, Briefcase, FileText, CheckCircle2, ChevronRight, Activity, Clock,
-  Maximize2, ChevronLeft, Pencil
+  Maximize2, ChevronLeft, ChevronDown, Pencil
 } from "lucide-react"
 import { cn, formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
@@ -55,6 +55,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const [activePanorama, setActivePanorama] = React.useState<ProjectPanorama | null>(null)
   const [editingPanorama, setEditingPanorama] = React.useState<ProjectPanorama | null>(null)
   const [panoramaEditError, setPanoramaEditError] = React.useState("")
+  const [collapsedPhotoCollections, setCollapsedPhotoCollections] = React.useState<Set<string>>(new Set())
   const [exteriorPhotoError, setExteriorPhotoError] = React.useState("")
   const [savingExteriorPhotoId, setSavingExteriorPhotoId] = React.useState<string | null>(null)
   const organizeFiles = useOrganizeProjectFiles()
@@ -97,6 +98,14 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
     } catch {
       toast({ title: "Organization failed", description: "The AI organizer could not complete this project.", variant: "destructive" })
     }
+  }
+  const togglePhotoCollection = (collection: string) => {
+    setCollapsedPhotoCollections((current) => {
+      const next = new Set(current)
+      if (next.has(collection)) next.delete(collection)
+      else next.add(collection)
+      return next
+    })
   }
 
   const resetPanoramaForm = () => {
@@ -638,11 +647,20 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
               )}
               {photoCollections.map(([collection, photos]) => (
                 <section key={collection} className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-heading text-lg font-semibold">{collection}</h4>
+                  <button
+                    type="button"
+                    onClick={() => togglePhotoCollection(collection)}
+                    className="flex w-full items-center gap-2 rounded-lg border bg-card px-4 py-3 text-left transition-colors hover:bg-muted"
+                    aria-expanded={!collapsedPhotoCollections.has(collection)}
+                  >
+                    {collapsedPhotoCollections.has(collection)
+                      ? <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      : <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                    <h4 className="min-w-0 flex-1 truncate font-heading text-lg font-semibold">{collection}</h4>
                     <Badge variant="secondary">{photos.length}</Badge>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  </button>
+                  {!collapsedPhotoCollections.has(collection) && (
+                    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                   {photos.map((photo) => {
                     const index = project.photos.findIndex((item) => item.id === photo.id)
                     return (
@@ -695,7 +713,8 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                   </div>
                     )
                   })}
-                  </div>
+                    </div>
+                  )}
                 </section>
               ))}
 

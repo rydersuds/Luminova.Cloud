@@ -562,3 +562,4 @@ vendorId?: string;
 trade?: string;
 status?: VendorQuoteStatus;
 };
+
