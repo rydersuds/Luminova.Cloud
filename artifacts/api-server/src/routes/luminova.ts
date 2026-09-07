@@ -208,7 +208,7 @@ async function analyzeProjectImport(documents: Array<{ relativePath: string; nam
     vendors: analysis.vendors.map((vendor) => ({
       ...vendor,
       contactName: vendor.contactName ?? "",
-      tradeType: vendor.tradeType ?? "General",
+      tradeType: vendor.tradeType ?? "",
       region: vendor.region ?? "",
     })),
     quotes: analysis.quotes.map((quote) => ({
@@ -221,7 +221,7 @@ async function analyzeProjectImport(documents: Array<{ relativePath: string; nam
     invoices: analysis.invoices.map((invoice) => ({
       ...invoice,
       date: invoice.date ?? undefined,
-      lineItem: invoice.lineItem ?? "Imported document",
+      lineItem: invoice.lineItem ?? "",
     })),
   });
 }
@@ -426,41 +426,83 @@ const allTrades = async () => [...await durableData<Trade>(importedVendorsTable)
 const allVendorQuotes = async () => [...await durableData<VendorQuote>(importedVendorQuotesTable), ...vendorQuotes];
 const findProject = async (projectId: string) => (await allProjects()).find((project) => project.id === projectId);
 
-const detailsFor = async (project: Project) => ({
-  ...project,
-  startDate: "2026-03-18",
-  clientQuote: {
-    total: project.budgeted,
-    revision: "Revision 3 · August 21, 2026",
-    portions: [
-      { code: "03 00 00", label: "Concrete", amount: Math.round(project.budgeted * 0.16) },
-      { code: "06 10 00", label: "Framing", amount: Math.round(project.budgeted * 0.22) },
-      { code: "22 00 00", label: "Plumbing", amount: Math.round(project.budgeted * 0.13) },
-      { code: "26 00 00", label: "Electrical", amount: Math.round(project.budgeted * 0.14) },
-      { code: "09 00 00", label: "Interiors & finishes", amount: Math.round(project.budgeted * 0.35) },
+const detailsFor = async (project: Project) => {
+  const [importedProject] = await db.select({ importBatchId: importedProjectsTable.importBatchId })
+    .from(importedProjectsTable)
+    .where(eq(importedProjectsTable.id, project.id))
+    .limit(1);
+
+  if (importedProject) {
+    const [projectInvoices, vendorRows, documents, panoramas] = await Promise.all([
+      allInvoices().then((records) => records.filter((invoice) => invoice.projectId === project.id)),
+      db.select({ data: importedVendorsTable.data }).from(importedVendorsTable)
+        .where(eq(importedVendorsTable.importBatchId, importedProject.importBatchId)),
+      db.select().from(projectDocumentsTable).where(eq(projectDocumentsTable.projectId, project.id)),
+      panoramaStore.list(project.id),
+    ]);
+    const photos = documents
+      .filter((document) => document.contentType.toLowerCase().startsWith("image/"))
+      .map((document) => {
+        const pathParts = document.relativePath.split("/");
+        const parentFolder = pathParts.length > 1 ? pathParts.at(-2) ?? "" : "";
+        return {
+          id: document.id,
+          url: `/api/storage${document.objectPath}`,
+          caption: document.relativePath,
+          phase: parentFolder,
+          date: "",
+        };
+      });
+
+    return {
+      ...project,
+      startDate: "",
+      clientQuote: { total: project.budgeted, revision: "", portions: [] },
+      lineItems: [],
+      invoices: projectInvoices,
+      trades: vendorRows.map((row) => row.data as Trade),
+      photos,
+      panoramas,
+      activity: [],
+    };
+  }
+
+  return {
+    ...project,
+    startDate: "2026-03-18",
+    clientQuote: {
+      total: project.budgeted,
+      revision: "Revision 3 · August 21, 2026",
+      portions: [
+        { code: "03 00 00", label: "Concrete", amount: Math.round(project.budgeted * 0.16) },
+        { code: "06 10 00", label: "Framing", amount: Math.round(project.budgeted * 0.22) },
+        { code: "22 00 00", label: "Plumbing", amount: Math.round(project.budgeted * 0.13) },
+        { code: "26 00 00", label: "Electrical", amount: Math.round(project.budgeted * 0.14) },
+        { code: "09 00 00", label: "Interiors & finishes", amount: Math.round(project.budgeted * 0.35) },
+      ],
+    },
+    lineItems: [
+      { id: "line-1", code: "03 00 00", description: "Concrete", budgeted: 29840000, invoiced: 27150000, variance: 2690000 },
+      { id: "line-2", code: "06 10 00", description: "Rough carpentry", budgeted: 41030000, invoiced: 43820000, variance: -2790000 },
+      { id: "line-3", code: "22 00 00", description: "Plumbing", budgeted: 24245000, invoiced: 23440000, variance: 805000 },
+      { id: "line-4", code: "26 00 00", description: "Electrical", budgeted: 26110000, invoiced: 18450000, variance: 7660000 },
+      { id: "line-5", code: "09 00 00", description: "Interiors & finishes", budgeted: 65275000, invoiced: 0, variance: 65275000 },
     ],
-  },
-  lineItems: [
-    { id: "line-1", code: "03 00 00", description: "Concrete", budgeted: 29840000, invoiced: 27150000, variance: 2690000 },
-    { id: "line-2", code: "06 10 00", description: "Rough carpentry", budgeted: 41030000, invoiced: 43820000, variance: -2790000 },
-    { id: "line-3", code: "22 00 00", description: "Plumbing", budgeted: 24245000, invoiced: 23440000, variance: 805000 },
-    { id: "line-4", code: "26 00 00", description: "Electrical", budgeted: 26110000, invoiced: 18450000, variance: 7660000 },
-    { id: "line-5", code: "09 00 00", description: "Interiors & finishes", budgeted: 65275000, invoiced: 0, variance: 65275000 },
-  ],
-  invoices: (await allInvoices()).filter((invoice) => invoice.projectId === project.id),
-  trades: (await allTrades()).slice(0, 4),
-  photos: [
-    { id: "photo-1", url: "https://images.pexels.com/photos/1216589/pexels-photo-1216589.jpeg?auto=compress&cs=tinysrgb&w=1200", caption: "Second-floor framing walkthrough", phase: "Framing", date: "2026-09-04" },
-    { id: "photo-2", url: "https://images.pexels.com/photos/209251/pexels-photo-209251.jpeg?auto=compress&cs=tinysrgb&w=1200", caption: "Mechanical rough-in progress", phase: "Rough-in", date: "2026-09-03" },
-    { id: "photo-3", url: "https://images.pexels.com/photos/159306/construction-site-build-construction-work-159306.jpeg?auto=compress&cs=tinysrgb&w=1200", caption: "Exterior envelope inspection", phase: "Envelope", date: "2026-08-29" },
-  ],
-  panoramas: [
-    { id: "pano-1", url: "https://images.pexels.com/photos/37347/office-sitting-room-executive-sitting.jpg?auto=compress&cs=tinysrgb&w=1600", label: "Week 24", location: "Main floor", date: "2026-09-03" },
-    { id: "pano-2", url: "https://images.pexels.com/photos/271667/pexels-photo-271667.jpeg?auto=compress&cs=tinysrgb&w=1600", label: "Week 20", location: "Great room", date: "2026-08-06" },
-    ...await panoramaStore.list(project.id),
-  ],
-  activity: activities,
-});
+    invoices: (await allInvoices()).filter((invoice) => invoice.projectId === project.id),
+    trades: (await allTrades()).slice(0, 4),
+    photos: [
+      { id: "photo-1", url: "https://images.pexels.com/photos/1216589/pexels-photo-1216589.jpeg?auto=compress&cs=tinysrgb&w=1200", caption: "Second-floor framing walkthrough", phase: "Framing", date: "2026-09-04" },
+      { id: "photo-2", url: "https://images.pexels.com/photos/209251/pexels-photo-209251.jpeg?auto=compress&cs=tinysrgb&w=1200", caption: "Mechanical rough-in progress", phase: "Rough-in", date: "2026-09-03" },
+      { id: "photo-3", url: "https://images.pexels.com/photos/159306/construction-site-build-construction-work-159306.jpeg?auto=compress&cs=tinysrgb&w=1200", caption: "Exterior envelope inspection", phase: "Envelope", date: "2026-08-29" },
+    ],
+    panoramas: [
+      { id: "pano-1", url: "https://images.pexels.com/photos/37347/office-sitting-room-executive-sitting.jpg?auto=compress&cs=tinysrgb&w=1600", label: "Week 24", location: "Main floor", date: "2026-09-03" },
+      { id: "pano-2", url: "https://images.pexels.com/photos/271667/pexels-photo-271667.jpeg?auto=compress&cs=tinysrgb&w=1600", label: "Week 20", location: "Great room", date: "2026-08-06" },
+      ...await panoramaStore.list(project.id),
+    ],
+    activity: activities,
+  };
+};
 
 router.get("/dashboard/summary", async (req, res) => {
   try {
@@ -685,22 +727,20 @@ const createProjectImportHandler = async (req: Request, res: Response): Promise<
     return;
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  const defaultTarget = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const project = {
     id: `${analysis.project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "imported-project"}-${Date.now()}`,
     name: analysis.project.name,
-    address: analysis.project.address || "Address to be confirmed",
-    region: analysis.project.region || "Region to be confirmed",
+    address: analysis.project.address,
+    region: analysis.project.region,
     status: "Planning",
     progress: 0,
-    pmName: analysis.project.pmName || "Unassigned",
-    clientName: analysis.project.clientName || "Client to be confirmed",
-    targetDate: analysis.project.targetDate && isValidCalendarDate(analysis.project.targetDate) ? analysis.project.targetDate : defaultTarget,
+    pmName: analysis.project.pmName,
+    clientName: analysis.project.clientName,
+    targetDate: analysis.project.targetDate && isValidCalendarDate(analysis.project.targetDate) ? analysis.project.targetDate : "",
     budgeted: Math.round((analysis.project.budgetDollars ?? 0) * 100),
     invoiced: 0,
     exteriorImage: "",
-    description: analysis.project.description || "Project initialized from imported documents.",
+    description: analysis.project.description,
   };
   const vendorByName = new Map((await allTrades()).map((trade) => [trade.companyName.toLowerCase(), trade]));
   const importedVendors: Trade[] = [];
@@ -709,7 +749,7 @@ const createProjectImportHandler = async (req: Request, res: Response): Promise<
     const key = vendor.companyName.toLowerCase();
     if (vendorByName.has(key)) continue;
     const initials = vendor.companyName.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "VN";
-    const created = { id: `trade-${Date.now()}-${vendorsCreated}`, companyName: vendor.companyName, contactName: vendor.contactName || "Contact to be confirmed", tradeType: vendor.tradeType || "General", region: vendor.region || project.region, rating: 0, reviewCount: 0, completedJobs: 0, initials, accent: "#64748B" };
+    const created = { id: `trade-${Date.now()}-${vendorsCreated}`, companyName: vendor.companyName, contactName: vendor.contactName, tradeType: vendor.tradeType, region: vendor.region, rating: 0, reviewCount: 0, completedJobs: 0, initials, accent: "#64748B" };
     importedVendors.push(created);
     vendorByName.set(key, created);
     vendorsCreated++;
@@ -718,10 +758,11 @@ const createProjectImportHandler = async (req: Request, res: Response): Promise<
   let quotesCreated = 0;
   const importedQuotes: VendorQuote[] = [];
   for (const extracted of analysis.quotes) {
+    if (extracted.amountDollars <= 0) continue;
     const vendor = vendorByName.get(extracted.vendorName.toLowerCase());
     if (!vendor) continue;
-    const issueDate = extracted.issueDate && isValidCalendarDate(extracted.issueDate) ? extracted.issueDate : today;
-    const dueDate = extracted.dueDate && isValidCalendarDate(extracted.dueDate) && extracted.dueDate >= issueDate ? extracted.dueDate : issueDate;
+    const issueDate = extracted.issueDate && isValidCalendarDate(extracted.issueDate) ? extracted.issueDate : "";
+    const dueDate = extracted.dueDate && isValidCalendarDate(extracted.dueDate) && (!issueDate || extracted.dueDate >= issueDate) ? extracted.dueDate : "";
     const lineItems = calculateQuoteLineItems([{ description: "Imported quote total", quantity: 1, unitPrice: Math.round(extracted.amountDollars * 100) }]);
     importedQuotes.push({
       id: `vq-${Date.now()}-${quotesCreated}`, quoteNumber: extracted.quoteNumber, projectId: project.id, projectName: project.name,
@@ -735,12 +776,13 @@ const createProjectImportHandler = async (req: Request, res: Response): Promise<
   let invoicesCreated = 0;
   const importedInvoices: Invoice[] = [];
   for (const extracted of analysis.invoices) {
+    if (extracted.amountDollars <= 0) continue;
     const amount = Math.round(extracted.amountDollars * 100);
     const remaining = Math.max(project.budgeted - project.invoiced, 0);
     const overage = Math.max(amount - remaining, 0);
     importedInvoices.push({
       id: `inv-${Date.now()}-${invoicesCreated}`, invoiceNumber: extracted.invoiceNumber, projectId: project.id, projectName: project.name,
-      vendor: extracted.vendor, amount, date: extracted.date && isValidCalendarDate(extracted.date) ? extracted.date : today,
+      vendor: extracted.vendor, amount, date: extracted.date && isValidCalendarDate(extracted.date) ? extracted.date : "",
       status: overage > 0 ? "Pending approval" : "Auto-approved", lineItem: extracted.lineItem, overage,
     });
     project.invoiced += amount;
@@ -968,13 +1010,15 @@ router.patch("/projects/:projectId", async (req, res) => {
   res.json(UpdateProjectResponse.parse(projects[index]));
 });
 
-router.get("/projects/:projectId/activity", (req, res) => {
+router.get("/projects/:projectId/activity", async (req, res) => {
   const parsed = GetProjectActivityParams.safeParse(req.params);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  res.json(GetProjectActivityResponse.parse(activities));
+  const [importedProject] = await db.select({ id: importedProjectsTable.id }).from(importedProjectsTable)
+    .where(eq(importedProjectsTable.id, parsed.data.projectId)).limit(1);
+  res.json(GetProjectActivityResponse.parse(importedProject ? [] : activities));
 });
 
 router.get("/trades", async (req, res) => {

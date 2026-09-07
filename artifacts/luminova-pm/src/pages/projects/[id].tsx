@@ -585,7 +585,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                     className="group overflow-hidden rounded-lg border border-border text-left cursor-zoom-in"
                   >
                     <div className="aspect-square bg-muted relative">
-                      <img src={photo.url} alt={photo.caption} className="w-full h-full object-cover" />
+                      <img src={photo.url} alt={photo.caption} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                       <div className="absolute inset-0 bg-sidebar/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4 text-center">
                         <div className="text-sidebar-foreground">
                           <Maximize2 className="mx-auto mb-2 h-5 w-5" />
