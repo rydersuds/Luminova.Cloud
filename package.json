@@ -8,6 +8,7 @@
     "setup:playwright": "node scripts/ensure-playwright-browser.mjs",
     "test:visual": "pnpm run setup:playwright && PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/ms-playwright\" playwright test",
     "test:visual:update": "pnpm run setup:playwright && PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/ms-playwright\" playwright test --update-snapshots",
+    "test:folder-import-integration": "pnpm --filter @workspace/api-spec run codegen && pnpm --filter @workspace/api-server run test:folder-import-integration",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
   },

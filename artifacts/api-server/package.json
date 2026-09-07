@@ -9,6 +9,7 @@
     "prestart": "pnpm --filter @workspace/db run push",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "test": "tsx --test src/**/*.test.ts",
+    "test:folder-import-integration": "tsx test/integration/folderImportRecovery.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -27,6 +28,7 @@
     "openai": "^6.49.0",
     "pino": "^9.14.0",
     "pino-http": "^10.5.0",
+    "pg": "^8.22.0",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -34,6 +36,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "catalog:",
+    "@types/pg": "^8.20.3",
     "esbuild": "0.27.3",
     "esbuild-plugin-pino": "^2.3.3",
     "pino-pretty": "^13.1.3",
