@@ -138,6 +138,7 @@ export default function Dashboard() {
     setDragActive(false)
     const files = await readDroppedEntries(event.dataTransfer.items)
     collectFolderFiles(files.length ? files : Array.from(event.dataTransfer.files))
+    void startFolderImport()
   }
 
   const handleFile = async (file: File) => {
@@ -365,7 +366,10 @@ export default function Dashboard() {
                                 type="file"
                                 className="hidden"
                                 id="folder-upload"
-                                onChange={(event) => collectFolderFiles(Array.from(event.target.files || []))}
+                                onChange={(event) => {
+                                  collectFolderFiles(Array.from(event.target.files || []))
+                                  void startFolderImport()
+                                }}
                                 disabled={isFolderImportActive}
                                 {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
                               />
@@ -401,8 +405,8 @@ export default function Dashboard() {
                                 </div>
                                 <div className="flex gap-3">
                                   <Button variant="outline" onClick={clearFolderImport} disabled={isFolderImportActive} className="font-mono text-xs uppercase btn-3d">Reset</Button>
-                                  <Button onClick={() => void startFolderImport()} disabled={isFolderImportActive} className="btn-3d font-mono uppercase tracking-widest bg-primary text-primary-foreground">
-                                    {folderStatus === "uploading" ? `Uploading ${folderProgress.uploaded + folderProgress.failed}/${folderFiles.length}` : folderStatus === "building" ? "Analyzing documents..." : folderStatus === "success" ? "Project initialized" : "Upload & build project"}
+                                  <Button onClick={() => void startFolderImport()} disabled={isFolderImportActive || folderStatus === "success"} className="btn-3d font-mono uppercase tracking-widest bg-primary text-primary-foreground">
+                                    {folderStatus === "uploading" ? `Uploading ${folderProgress.uploaded + folderProgress.failed}/${folderFiles.length}` : folderStatus === "building" ? "Analyzing documents..." : folderStatus === "success" ? "Project initialized" : folderStatus === "error" ? "Retry upload" : "Starting upload..."}
                                   </Button>
                                 </div>
                               </div>

@@ -31,9 +31,11 @@ export function ProjectFolderImportProvider({ children }: { children: React.Reac
   const [folderError, setFolderError] = React.useState("")
   const isActive = folderStatus === "uploading" || folderStatus === "building"
   const activeImportRef = React.useRef(false)
+  const folderFilesRef = React.useRef<FolderCandidate[]>([])
 
   const clearFolderImport = React.useCallback(() => {
     if (activeImportRef.current) return
+    folderFilesRef.current = []
     setFolderFiles([])
     setSkippedFolderFiles([])
     setFolderProgress({ uploaded: 0, failed: 0 })
@@ -57,6 +59,7 @@ export function ProjectFolderImportProvider({ children }: { children: React.Reac
         accepted.push({ file, relativePath })
       }
     })
+    folderFilesRef.current = accepted
     setFolderFiles(accepted)
     setSkippedFolderFiles(skipped)
     setFolderProgress({ uploaded: 0, failed: 0 })
@@ -65,10 +68,10 @@ export function ProjectFolderImportProvider({ children }: { children: React.Reac
   }, [isActive])
 
   const startFolderImport = React.useCallback(async () => {
-    if (activeImportRef.current || !folderFiles.length) return
+    const candidates = [...folderFilesRef.current]
+    if (activeImportRef.current || !candidates.length) return
     activeImportRef.current = true
     // Keep the File objects and paths used by this job stable if the dashboard unmounts.
-    const candidates = [...folderFiles]
     setFolderStatus("uploading")
     setFolderError("")
     setFolderProgress({ uploaded: 0, failed: 0 })
@@ -129,7 +132,7 @@ export function ProjectFolderImportProvider({ children }: { children: React.Reac
       activeImportRef.current = false
       toast({ variant: "destructive", title: "Project folder import failed", description: message })
     }
-  }, [folderFiles, isActive, queryClient])
+  }, [queryClient])
 
   return <ProjectFolderImportContext.Provider value={{ folderFiles, skippedFolderFiles, folderStatus, folderProgress, folderError, collectFolderFiles, startFolderImport, clearFolderImport, isActive }}>
     {children}
