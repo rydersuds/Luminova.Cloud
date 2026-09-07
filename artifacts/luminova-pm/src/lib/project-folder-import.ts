@@ -14,6 +14,7 @@ type BatchImportResponseContext = {
   operation: string
   fileName?: string
   expectsJson?: boolean
+  requestPath?: string
 }
 
 const payloadLimitPattern = /\b(?:413|content too large|entity too large|payload too large|request too large|max(?:imum)? (?:request|body|payload|upload|file) size|size limit)\b/i
@@ -42,6 +43,13 @@ export async function readBatchImportResponse<T>(
   if (!response.ok) {
     if (body && typeof body === "object" && "error" in body && typeof body.error === "string" && body.error.trim()) {
       throw new Error(body.error)
+    }
+    if (response.status === 401 || response.status === 403) {
+      throw new Error(`${subject} requires authentication (HTTP ${response.status}). Sign in again, then retry the import.`)
+    }
+    if (response.status === 404 && expectsJson && !contentType.includes("application/json") && !contentType.includes("+json")) {
+      const destination = context.requestPath ? ` at ${context.requestPath}` : ""
+      throw new Error(`${subject} could not reach the API route${destination} (HTTP 404). The preview routed the request to the wrong service. Retry after the preview services restart.`)
     }
     if (response.status === 413 || payloadLimitPattern.test(text)) {
       throw new Error(`${subject} was blocked by an external platform size limit. Try a smaller file or retry after checking the hosting upload limits.`)

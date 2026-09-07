@@ -2,3 +2,4 @@
 - [WebGL resize observers](webgl-resize-observers.md) — schedule canvas resizing outside ResizeObserver callbacks to avoid generic browser runtime errors.
 - [Resumable browser imports](resumable-browser-imports.md) — persist selected blobs locally, but treat server-attached paths as the authoritative upload progress.
 - [Drizzle integration isolation](drizzle-integration-isolation.md) — use temporary databases, not search_path-only schemas, for drizzle-kit integration tests.
+- [Merged route reloads](merged-route-reloads.md) — force a watcher event after post-merge API builds so managed previews cannot keep an old route table.

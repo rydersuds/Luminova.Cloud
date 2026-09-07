@@ -75,6 +75,25 @@ test("batch import response reader preserves JSON API errors", async () => {
   )
 })
 
+test("batch import response reader distinguishes authentication from preview routing failures", async () => {
+  await assert.rejects(
+    readBatchImportResponse(
+      new Response("<!doctype html><div id=\"root\"></div>", { status: 404, headers: { "Content-Type": "text/html" } }),
+      { operation: "Creating the import session", requestPath: "/api/project-import-sessions" },
+    ),
+    (error: Error) =>
+      error.message.includes("could not reach the API route at /api/project-import-sessions") &&
+      error.message.includes("wrong service"),
+  )
+  await assert.rejects(
+    readBatchImportResponse(
+      new Response(null, { status: 401 }),
+      { operation: "Creating the import session", requestPath: "/api/project-import-sessions" },
+    ),
+    (error: Error) => error.message.includes("requires authentication") && !error.message.includes("wrong service"),
+  )
+})
+
 test("batch import response reader hides HTML and identifies size-limit files", async () => {
   await assert.rejects(
     readBatchImportResponse(

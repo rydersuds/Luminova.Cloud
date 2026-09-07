@@ -112,7 +112,10 @@ export function ProjectFolderImportProvider({
             relativePath, name: file.name, size: file.size, contentType: file.type || "application/octet-stream",
           })) }),
         })
-        const body = await readBatchImportResponse<ImportSession>(created, { operation: "Creating the import session" })
+        const body = await readBatchImportResponse<ImportSession>(created, {
+          operation: "Creating the import session",
+          requestPath: "/api/project-import-sessions",
+        })
         session = body
         sessionRef.current = body
         await saveImportFiles(body.importId, candidates)
