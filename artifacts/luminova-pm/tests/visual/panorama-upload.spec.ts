@@ -40,6 +40,8 @@ async function openGallery(page: Page) {
   await page.goto('/__visual/project-panorama');
   await expect(page.getByRole('heading', { name: 'Riverstone Residence' })).toBeVisible();
   await page.getByRole('tab', { name: 'Photos & 360s' }).click();
+  const photoCollection = page.getByRole('button', { name: /^Project photos \d+$/ });
+  if (await photoCollection.isVisible()) await photoCollection.click();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -65,8 +67,8 @@ test('selects a standard photo as the exterior photo and keeps it selected after
   let current = {
     ...structuredClone(project),
     photos: [
-      { id: 'photo-1', url: '/site-front.jpg', caption: 'Front elevation', phase: 'Exterior', date: '2026-09-04' },
-      { id: 'photo-2', url: '/site-rear.jpg', caption: 'Rear elevation', phase: 'Exterior', date: '2026-09-05' },
+      { id: 'photo-1', url: '/site-front.jpg', caption: 'Front elevation', phase: 'Exterior', date: '2026-09-04', visualCaption: 'Front exterior elevation.', visualTags: ['front elevation', 'exterior'] },
+      { id: 'photo-2', url: '/site-rear.jpg', caption: 'Rear elevation', phase: 'Exterior', date: '2026-09-05', visualCaption: 'Rear exterior elevation.', visualTags: ['rear elevation', 'exterior'] },
     ],
   };
   await page.unroute('**/api/projects/riverstone');
@@ -88,6 +90,7 @@ test('selects a standard photo as the exterior photo and keeps it selected after
 
   await page.reload();
   await page.getByRole('tab', { name: 'Photos & 360s' }).click();
+  await page.getByRole('button', { name: 'Project photos 2' }).click();
   await expect(page.getByRole('button', { name: 'Remove Front elevation as exterior photo' })).toBeEnabled();
 
   await page.route('**/api/projects', route => route.fulfill({ json: [current] }));
@@ -111,7 +114,7 @@ test('selects a standard photo as the exterior photo and keeps it selected after
 test('reports exterior photo update failures and allows retry', async ({ page }) => {
   const current = {
     ...structuredClone(project),
-    photos: [{ id: 'photo-1', url: '/site-front.jpg', caption: 'Front elevation', phase: 'Exterior', date: '2026-09-04' }],
+    photos: [{ id: 'photo-1', url: '/site-front.jpg', caption: 'Front elevation', phase: 'Exterior', date: '2026-09-04', visualCaption: 'Front exterior elevation.', visualTags: ['front elevation', 'exterior'] }],
   };
   let attempts = 0;
   await page.unroute('**/api/projects/riverstone');

@@ -1084,13 +1084,17 @@ components:
             $ref: "#/components/schemas/VendorQuoteLineItemInput"
     Photo:
       type: object
-      required: [id, url, caption, phase, date]
+      required: [id, url, caption, phase, date, visualCaption, visualTags]
       properties:
         id: { type: string }
         url: { type: string }
         caption: { type: string }
         phase: { type: string }
         date: { type: string }
+        visualCaption: { type: string }
+        visualTags:
+          type: array
+          items: { type: string }
     ProjectFile:
       type: object
       required: [id, name, relativePath, url, contentType, classification, collection]

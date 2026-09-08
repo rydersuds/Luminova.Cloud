@@ -28,6 +28,8 @@ export const projectDocumentsTable = pgTable("project_documents", {
   linkedEntityId: text("linked_entity_id"),
   aiConfidence: integer("ai_confidence"),
   textSnippet: text("text_snippet"),
+  visualCaption: text("visual_caption"),
+  visualTags: jsonb("visual_tags").$type<string[]>().notNull().default([]),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("project_documents_import_path_unique").on(table.importBatchId, table.relativePath),

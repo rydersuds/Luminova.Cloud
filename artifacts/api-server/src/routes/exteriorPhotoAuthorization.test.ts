@@ -54,6 +54,8 @@ test("only an imported project's owner can persist and clear its exterior photo"
     contentType: "image/jpeg",
     size: 100,
     classification: "photo",
+    visualCaption: "Front elevation with installed windows and unfinished cladding.",
+    visualTags: ["front elevation", "windows", "unfinished cladding", "exterior"],
   });
 
   const app = express();
@@ -87,6 +89,9 @@ test("only an imported project's owner can persist and clear its exterior photo"
 
   assert.equal((await update()).status, 401);
   assert.equal((await update(`other-${suffix}`)).status, 404);
+  assert.equal((await fetch(`http://127.0.0.1:${port}/projects/${projectId}`, {
+    headers: { "x-test-user": `other-${suffix}` },
+  })).status, 404);
   assert.equal((await update(ownerId)).status, 200);
 
   const [saved] = await db.select().from(projectExteriorPhotosTable).where(and(
@@ -99,8 +104,20 @@ test("only an imported project's owner can persist and clear its exterior photo"
     headers: { "x-test-user": ownerId },
   });
   assert.equal(refreshed.status, 200);
-  const refreshedProject = await refreshed.json() as { exteriorImage: string };
+  const refreshedProject = await refreshed.json() as {
+    exteriorImage: string;
+    photos: Array<{ url: string; visualCaption: string; visualTags: string[] }>;
+  };
   assert.equal(refreshedProject.exteriorImage, exteriorImage);
+  assert.deepEqual(refreshedProject.photos[0], {
+    url: exteriorImage,
+    visualCaption: "Front elevation with installed windows and unfinished cladding.",
+    visualTags: ["front elevation", "windows", "unfinished cladding", "exterior"],
+    id: `document-${suffix}`,
+    caption: "Photos/front.jpg",
+    phase: "Photos",
+    date: "",
+  });
 
   const cleared = await fetch(`http://127.0.0.1:${port}/projects/${projectId}`, {
     method: "PATCH",

@@ -40,7 +40,15 @@ type ProjectPanorama = {
   location: string | null
   date: string | null
 }
-type ProjectPhoto = { id: string; url: string; caption: string; phase: string; date: string }
+type ProjectPhoto = {
+  id: string
+  url: string
+  caption: string
+  phase: string
+  date: string
+  visualCaption: string
+  visualTags: string[]
+}
 type PhotoFolderNode = {
   name: string
   path: string
@@ -122,7 +130,10 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
     if (!project) return []
     const query = photoSearch.trim().toLowerCase()
     const photos = query
-      ? project.photos.filter((photo) => photo.caption.toLowerCase().includes(query) || photo.phase.toLowerCase().includes(query))
+      ? project.photos.filter((photo) =>
+          [photo.caption, photo.phase, photo.visualCaption, ...photo.visualTags]
+            .some((value) => value.toLowerCase().includes(query))
+        )
       : project.photos
     return buildPhotoFolderTree(photos)
   }, [project, photoSearch])
@@ -816,7 +827,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                   type="search"
                   value={photoSearch}
                   onChange={(event) => setPhotoSearch(event.target.value)}
-                  placeholder="Search photos by folder or filename…"
+                  placeholder="Search photos by what’s visible, folder, or filename…"
                   className="pl-9"
                   aria-label="Search project photos"
                 />
@@ -826,7 +837,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                 <div className="rounded-lg border border-dashed px-6 py-12 text-center">
                   <Search className="mx-auto h-7 w-7 text-muted-foreground" />
                   <p className="mt-3 font-medium">No photos found</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Try a unit number, folder name, date, or filename.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Try an object, room, construction phase, condition, folder, or filename.</p>
                 </div>
               )}
 

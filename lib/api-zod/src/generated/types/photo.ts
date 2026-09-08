@@ -12,4 +12,6 @@ export interface Photo {
   caption: string;
   phase: string;
   date: string;
+  visualCaption: string;
+  visualTags: string[];
 }

@@ -172,7 +172,9 @@ export const GetProjectResponse = zod.object({
   "url": zod.string(),
   "caption": zod.string(),
   "phase": zod.string(),
-  "date": zod.string()
+  "date": zod.string(),
+  "visualCaption": zod.string(),
+  "visualTags": zod.array(zod.string())
 })),
   "files": zod.array(zod.object({
   "id": zod.string(),
