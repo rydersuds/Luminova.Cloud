@@ -46,8 +46,8 @@ type ProjectPhoto = {
   caption: string
   phase: string
   date: string
-  visualCaption: string
-  visualTags: string[]
+  visualCaption?: string
+  visualTags?: string[]
 }
 type PhotoFolderNode = {
   name: string
@@ -56,10 +56,13 @@ type PhotoFolderNode = {
   children: PhotoFolderNode[]
 }
 
-function buildPhotoFolderTree(photos: ProjectPhoto[]): PhotoFolderNode[] {
+function buildPhotoFolderTree(photos: ProjectPhoto[], hiddenRootFolder?: string): PhotoFolderNode[] {
   const root = new Map<string, PhotoFolderNode & { childMap: Map<string, PhotoFolderNode & { childMap: Map<string, never> }> }>()
   for (const photo of photos) {
-    const parts = photo.caption.split("/").filter(Boolean)
+    const captionParts = photo.caption.split("/").filter(Boolean)
+    const parts = hiddenRootFolder && captionParts[0] === hiddenRootFolder
+      ? captionParts.slice(1)
+      : captionParts
     const folders = parts.length > 1 ? parts.slice(0, -1) : ["Project photos"]
     let level = root as Map<string, any>
     let node: any
@@ -128,14 +131,24 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const updatePanorama = useUpdateProjectPanorama()
   const photoFolderTree = React.useMemo(() => {
     if (!project) return []
+    const photoPaths = project.photos.map((photo) => photo.caption.split("/").filter(Boolean))
+    const rootFolder = photoPaths[0]?.length > 1 &&
+      photoPaths.every((parts) => parts.length > 1 && parts[0] === photoPaths[0][0])
+      ? photoPaths[0][0]
+      : undefined
     const query = photoSearch.trim().toLowerCase()
     const photos = query
       ? project.photos.filter((photo) =>
-          [photo.caption, photo.phase, photo.visualCaption, ...photo.visualTags]
+          [
+            photo.caption,
+            photo.phase,
+            (photo as ProjectPhoto).visualCaption ?? "",
+            ...((photo as ProjectPhoto).visualTags ?? []),
+          ]
             .some((value) => value.toLowerCase().includes(query))
         )
       : project.photos
-    return buildPhotoFolderTree(photos)
+    return buildPhotoFolderTree(photos, rootFolder)
   }, [project, photoSearch])
   React.useEffect(() => {
     if (!project || photoSearch || initializedPhotoFoldersForProject.current === projectId) return
