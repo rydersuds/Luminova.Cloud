@@ -24,7 +24,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { 
   Building, MapPin, Calendar, DollarSign, ArrowLeft, 
   Camera, Briefcase, FileText, CheckCircle2, ChevronRight, Activity, Clock,
-  Maximize2, ChevronLeft, ChevronDown, Pencil, Trash2
+  Maximize2, ChevronLeft, ChevronDown, Pencil, Search, Trash2
 } from "lucide-react"
 import { cn, formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
@@ -39,6 +39,43 @@ type ProjectPanorama = {
   label: string | null
   location: string | null
   date: string | null
+}
+type ProjectPhoto = { id: string; url: string; caption: string; phase: string; date: string }
+type PhotoFolderNode = {
+  name: string
+  path: string
+  photos: ProjectPhoto[]
+  children: PhotoFolderNode[]
+}
+
+function buildPhotoFolderTree(photos: ProjectPhoto[]): PhotoFolderNode[] {
+  const root = new Map<string, PhotoFolderNode & { childMap: Map<string, PhotoFolderNode & { childMap: Map<string, never> }> }>()
+  for (const photo of photos) {
+    const parts = photo.caption.split("/").filter(Boolean)
+    const folders = parts.length > 1 ? parts.slice(0, -1) : ["Project photos"]
+    let level = root as Map<string, any>
+    let node: any
+    let path = ""
+    for (const folder of folders) {
+      path = path ? `${path}/${folder}` : folder
+      node = level.get(folder)
+      if (!node) {
+        node = { name: folder, path, photos: [], children: [], childMap: new Map() }
+        level.set(folder, node)
+      }
+      level = node.childMap
+    }
+    node.photos.push(photo)
+  }
+  const finalize = (nodes: Map<string, any>): PhotoFolderNode[] =>
+    [...nodes.values()]
+      .map((node) => ({ name: node.name, path: node.path, photos: node.photos, children: finalize(node.childMap) }))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+  return finalize(root)
+}
+
+function countFolderPhotos(folder: PhotoFolderNode): number {
+  return folder.photos.length + folder.children.reduce((total, child) => total + countFolderPhotos(child), 0)
 }
 
 export default function ProjectDetail({ projectIdOverride }: { projectIdOverride?: string } = {}) {
@@ -56,6 +93,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const [editingPanorama, setEditingPanorama] = React.useState<ProjectPanorama | null>(null)
   const [panoramaEditError, setPanoramaEditError] = React.useState("")
   const [collapsedPhotoCollections, setCollapsedPhotoCollections] = React.useState<Set<string>>(new Set())
+  const [photoSearch, setPhotoSearch] = React.useState("")
   const [exteriorPhotoError, setExteriorPhotoError] = React.useState("")
   const [exteriorPhotoStatus, setExteriorPhotoStatus] = React.useState("")
   const [savingExteriorPhotoId, setSavingExteriorPhotoId] = React.useState<string | null>(null)
@@ -79,15 +117,14 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const updateProject = useUpdateProject()
   const createPanorama = useCreateProjectPanorama()
   const updatePanorama = useUpdateProjectPanorama()
-  const photoCollections = React.useMemo(() => {
+  const photoFolderTree = React.useMemo(() => {
     if (!project) return []
-    const grouped = new Map<string, typeof project.photos>()
-    for (const photo of project.photos) {
-      const label = photo.phase || "Project photos"
-      grouped.set(label, [...(grouped.get(label) || []), photo])
-    }
-    return [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))
-  }, [project])
+    const query = photoSearch.trim().toLowerCase()
+    const photos = query
+      ? project.photos.filter((photo) => photo.caption.toLowerCase().includes(query) || photo.phase.toLowerCase().includes(query))
+      : project.photos
+    return buildPhotoFolderTree(photos)
+  }, [project, photoSearch])
   const invoiceFiles = project?.files.filter((file) => file.classification === "invoice") || []
   const quoteFiles = project?.files.filter((file) => file.classification === "quote") || []
 
@@ -347,6 +384,64 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
 
   const budgetVariance = project.budgeted - project.invoiced
   const varianceIsPositive = budgetVariance >= 0
+  const renderPhotoCard = (photo: ProjectPhoto) => {
+    const index = project.photos.findIndex((item) => item.id === photo.id)
+    return (
+      <div key={photo.id} className={cn("group overflow-hidden rounded-lg border bg-card text-left", project.exteriorImage === photo.url ? "border-primary ring-2 ring-primary/30" : "border-border")}>
+        <button type="button" onClick={() => setPhotoIndex(index)} className="block w-full cursor-zoom-in text-left" aria-label={`View ${photo.caption}`}>
+          <div className="aspect-square bg-muted relative">
+            <img src={photo.url} alt={photo.caption} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+            {project.exteriorImage === photo.url && <Badge className="absolute left-2 top-2 gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" />Exterior photo</Badge>}
+            <div className="absolute inset-0 bg-sidebar/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4 text-center">
+              <div className="text-sidebar-foreground"><Maximize2 className="mx-auto mb-2 h-5 w-5" /><p className="text-sm font-medium">{photo.caption}</p></div>
+            </div>
+          </div>
+        </button>
+        <div className="border-t p-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={project.exteriorImage === photo.url ? "destructive" : "outline"}
+            className="w-full"
+            disabled={savingExteriorPhotoId !== null}
+            onClick={() => void (project.exteriorImage === photo.url ? handleRemoveExteriorPhoto() : handleExteriorPhoto(photo))}
+            aria-label={project.exteriorImage === photo.url ? `Remove ${photo.caption} as exterior photo` : `Make ${photo.caption} exterior photo`}
+          >
+            {savingExteriorPhotoId === "remove" && project.exteriorImage === photo.url
+              ? "Removing…"
+              : savingExteriorPhotoId === photo.id
+                ? "Saving…"
+                : project.exteriorImage === photo.url
+                  ? <><Trash2 className="mr-2 h-3.5 w-3.5" />Remove exterior photo</>
+                  : "Make exterior photo"}
+          </Button>
+        </div>
+      </div>
+    )
+  }
+  const renderPhotoFolder = (folder: PhotoFolderNode, depth = 0): React.ReactNode => {
+    const isCollapsed = !photoSearch.trim() && collapsedPhotoCollections.has(folder.path)
+    return (
+      <section key={folder.path} className="space-y-3" style={{ marginLeft: depth ? Math.min(depth * 16, 48) : undefined }}>
+        <button
+          type="button"
+          onClick={() => togglePhotoCollection(folder.path)}
+          className="flex w-full items-center gap-2 rounded-lg border bg-card px-4 py-3 text-left transition-colors hover:bg-muted"
+          aria-expanded={!isCollapsed}
+        >
+          {isCollapsed ? <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />}
+          <h4 className="min-w-0 flex-1 truncate font-heading text-lg font-semibold">{folder.name}</h4>
+          <Badge variant="secondary">{countFolderPhotos(folder)}</Badge>
+        </button>
+        {!isCollapsed && (
+          <div className="space-y-3">
+            {folder.photos.length > 0 && <div className="grid grid-cols-2 gap-4 md:grid-cols-4">{folder.photos.map(renderPhotoCard)}</div>}
+            {folder.children.map((child) => renderPhotoFolder(child, depth + 1))}
+          </div>
+        )}
+      </section>
+    )
+  }
 
   return (
     <AppLayout>
@@ -701,80 +796,25 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                 </p>
               )}
               <p role="status" aria-live="polite" className="sr-only">{exteriorPhotoStatus}</p>
-              {photoCollections.map(([collection, photos]) => (
-                <section key={collection} className="space-y-3">
-                  <button
-                    type="button"
-                    onClick={() => togglePhotoCollection(collection)}
-                    className="flex w-full items-center gap-2 rounded-lg border bg-card px-4 py-3 text-left transition-colors hover:bg-muted"
-                    aria-expanded={!collapsedPhotoCollections.has(collection)}
-                  >
-                    {collapsedPhotoCollections.has(collection)
-                      ? <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      : <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />}
-                    <h4 className="min-w-0 flex-1 truncate font-heading text-lg font-semibold">{collection}</h4>
-                    <Badge variant="secondary">{photos.length}</Badge>
-                  </button>
-                  {!collapsedPhotoCollections.has(collection) && (
-                    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                  {photos.map((photo) => {
-                    const index = project.photos.findIndex((item) => item.id === photo.id)
-                    return (
-                  <div
-                    key={photo.id}
-                    className={cn(
-                      "group overflow-hidden rounded-lg border bg-card text-left",
-                      project.exteriorImage === photo.url ? "border-primary ring-2 ring-primary/30" : "border-border",
-                    )}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setPhotoIndex(index)}
-                      className="block w-full cursor-zoom-in text-left"
-                      aria-label={`View ${photo.caption}`}
-                    >
-                    <div className="aspect-square bg-muted relative">
-                      <img src={photo.url} alt={photo.caption} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-                      {project.exteriorImage === photo.url && (
-                        <Badge className="absolute left-2 top-2 gap-1.5">
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          Exterior photo
-                        </Badge>
-                      )}
-                      <div className="absolute inset-0 bg-sidebar/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4 text-center">
-                        <div className="text-sidebar-foreground">
-                          <Maximize2 className="mx-auto mb-2 h-5 w-5" />
-                          <p className="text-sm font-medium">{photo.caption}</p>
-                        </div>
-                      </div>
-                    </div>
-                    </button>
-                    <div className="border-t p-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={project.exteriorImage === photo.url ? "destructive" : "outline"}
-                        className="w-full"
-                        disabled={savingExteriorPhotoId !== null}
-                        onClick={() => void (project.exteriorImage === photo.url ? handleRemoveExteriorPhoto() : handleExteriorPhoto(photo))}
-                        aria-label={project.exteriorImage === photo.url ? `Remove ${photo.caption} as exterior photo` : `Make ${photo.caption} exterior photo`}
-                      >
-                        {savingExteriorPhotoId === "remove" && project.exteriorImage === photo.url
-                          ? "Removing…"
-                          : savingExteriorPhotoId === photo.id
-                          ? "Saving…"
-                          : project.exteriorImage === photo.url
-                            ? <><Trash2 className="mr-2 h-3.5 w-3.5" />Remove exterior photo</>
-                            : "Make exterior photo"}
-                      </Button>
-                    </div>
-                  </div>
-                    )
-                  })}
-                    </div>
-                  )}
-                </section>
-              ))}
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="search"
+                  value={photoSearch}
+                  onChange={(event) => setPhotoSearch(event.target.value)}
+                  placeholder="Search photos by folder or filename…"
+                  className="pl-9"
+                  aria-label="Search project photos"
+                />
+              </div>
+              {photoFolderTree.map((folder) => renderPhotoFolder(folder))}
+              {photoFolderTree.length === 0 && (
+                <div className="rounded-lg border border-dashed px-6 py-12 text-center">
+                  <Search className="mx-auto h-7 w-7 text-muted-foreground" />
+                  <p className="mt-3 font-medium">No photos found</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Try a unit number, folder name, date, or filename.</p>
+                </div>
+              )}
 
               <Dialog open={photoIndex !== null} onOpenChange={(open) => !open && setPhotoIndex(null)}>
                 <DialogContent className="h-[92dvh] w-[96vw] !max-w-6xl overflow-hidden border-white/15 bg-black p-0 text-white">
