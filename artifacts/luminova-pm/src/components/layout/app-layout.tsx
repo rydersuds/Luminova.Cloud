@@ -278,7 +278,7 @@ export function AppLayoutView({
         aria-hidden={isMobile && !sidebarOpen ? true : undefined}
         tabIndex={isMobile ? -1 : undefined}
         className={cn(
-        "fixed md:static inset-y-0 left-0 w-72 glass-panel-dark text-sidebar-foreground flex flex-col z-30 transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] md:m-4 md:rounded-2xl md:h-[calc(100dvh-2rem)]",
+        "fixed md:sticky md:top-4 md:self-start inset-y-0 left-0 w-72 glass-panel-dark text-sidebar-foreground flex flex-col z-30 transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] md:m-4 md:rounded-2xl md:h-[calc(100dvh-2rem)]",
         sidebarOpen ? "translate-x-0 shadow-[0_0_50px_rgba(0,0,0,0.8)]" : "-translate-x-full md:translate-x-0",
       )}>
         <div className="px-6 py-8 hidden md:flex flex-col relative items-center">
