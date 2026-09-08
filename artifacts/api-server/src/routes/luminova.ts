@@ -436,6 +436,13 @@ type Invoice = (typeof invoices)[number];
 type Trade = (typeof trades)[number];
 type VendorQuote = (typeof vendorQuotes)[number];
 
+// Demo fixtures define the local record shapes above, but must never enter the live product.
+activities.length = 0;
+trades.length = 0;
+projects.length = 0;
+invoices.length = 0;
+vendorQuotes.length = 0;
+
 const durableData = async <T>(table: typeof importedProjectsTable | typeof importedVendorsTable | typeof importedVendorQuotesTable | typeof importedInvoicesTable) =>
   (await db.select({ data: table.data }).from(table)).map((row) => row.data as T);
 
@@ -579,39 +586,15 @@ const detailsFor = async (project: Project) => {
 
   return {
     ...project,
-    startDate: "2026-03-18",
-    clientQuote: {
-      total: project.budgeted,
-      revision: "Revision 3 · August 21, 2026",
-      portions: [
-        { code: "03 00 00", label: "Concrete", amount: Math.round(project.budgeted * 0.16) },
-        { code: "06 10 00", label: "Framing", amount: Math.round(project.budgeted * 0.22) },
-        { code: "22 00 00", label: "Plumbing", amount: Math.round(project.budgeted * 0.13) },
-        { code: "26 00 00", label: "Electrical", amount: Math.round(project.budgeted * 0.14) },
-        { code: "09 00 00", label: "Interiors & finishes", amount: Math.round(project.budgeted * 0.35) },
-      ],
-    },
-    lineItems: [
-      { id: "line-1", code: "03 00 00", description: "Concrete", budgeted: 29840000, invoiced: 27150000, variance: 2690000 },
-      { id: "line-2", code: "06 10 00", description: "Rough carpentry", budgeted: 41030000, invoiced: 43820000, variance: -2790000 },
-      { id: "line-3", code: "22 00 00", description: "Plumbing", budgeted: 24245000, invoiced: 23440000, variance: 805000 },
-      { id: "line-4", code: "26 00 00", description: "Electrical", budgeted: 26110000, invoiced: 18450000, variance: 7660000 },
-      { id: "line-5", code: "09 00 00", description: "Interiors & finishes", budgeted: 65275000, invoiced: 0, variance: 65275000 },
-    ],
+    startDate: "",
+    clientQuote: { total: project.budgeted, revision: "", portions: [] },
+    lineItems: [],
     invoices: (await allInvoices()).filter((invoice) => invoice.projectId === project.id),
-    trades: (await allTrades()).slice(0, 4),
-    photos: [
-      { id: "photo-1", url: "https://images.pexels.com/photos/1216589/pexels-photo-1216589.jpeg?auto=compress&cs=tinysrgb&w=1200", caption: "Second-floor framing walkthrough", phase: "Framing", date: "2026-09-04" },
-      { id: "photo-2", url: "https://images.pexels.com/photos/209251/pexels-photo-209251.jpeg?auto=compress&cs=tinysrgb&w=1200", caption: "Mechanical rough-in progress", phase: "Rough-in", date: "2026-09-03" },
-      { id: "photo-3", url: "https://images.pexels.com/photos/159306/construction-site-build-construction-work-159306.jpeg?auto=compress&cs=tinysrgb&w=1200", caption: "Exterior envelope inspection", phase: "Envelope", date: "2026-08-29" },
-    ],
+    trades: [],
+    photos: [],
     files: [],
-    panoramas: [
-      { id: "pano-1", url: "https://images.pexels.com/photos/37347/office-sitting-room-executive-sitting.jpg?auto=compress&cs=tinysrgb&w=1600", label: "Week 24", location: "Main floor", date: "2026-09-03" },
-      { id: "pano-2", url: "https://images.pexels.com/photos/271667/pexels-photo-271667.jpeg?auto=compress&cs=tinysrgb&w=1600", label: "Week 20", location: "Great room", date: "2026-08-06" },
-      ...await panoramaStore.list(project.id),
-    ],
-    activity: activities,
+    panoramas: await panoramaStore.list(project.id),
+    activity: [],
   };
 };
 
