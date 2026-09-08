@@ -650,6 +650,30 @@ const allVendorQuotes = async () => [
 ];
 const findProject = async (projectId: string) => (await allProjects()).find((project) => project.id === projectId);
 
+const latestClientQuoteDetail = async (projectId: string) => {
+  const latestQuote = (await allVendorQuotes())
+    .filter((quote) => quote.projectId === projectId && quote.direction === "luminova_to_client")
+    .sort((a, b) => {
+      const issueDateDifference = b.issueDate.localeCompare(a.issueDate);
+      if (issueDateDifference !== 0) return issueDateDifference;
+      return b.createdAt.localeCompare(a.createdAt);
+    })[0];
+
+  if (!latestQuote) {
+    return { total: 0, revision: "", portions: [] };
+  }
+
+  return {
+    total: latestQuote.total,
+    revision: latestQuote.quoteNumber,
+    portions: latestQuote.lineItems.map((lineItem) => ({
+      code: lineItem.id,
+      label: lineItem.description,
+      amount: lineItem.amount,
+    })),
+  };
+};
+
 export const analyzeImportedQuoteDirections = async (projectId: string, ownerId: string) => {
   const [projectRow] = await db.select({ data: importedProjectsTable.data, importBatchId: importedProjectsTable.importBatchId })
     .from(importedProjectsTable)
@@ -813,12 +837,13 @@ const detailsFor = async (project: Project, ownerId?: string) => {
     .limit(1);
 
   if (importedProject) {
-    const [projectInvoices, vendorRows, documents, panoramas] = await Promise.all([
+    const [projectInvoices, vendorRows, documents, panoramas, clientQuote] = await Promise.all([
       allInvoices().then((records) => records.filter((invoice) => invoice.projectId === project.id)),
       db.select({ data: importedVendorsTable.data }).from(importedVendorsTable)
         .where(eq(importedVendorsTable.importBatchId, importedProject.importBatchId)),
       db.select().from(projectDocumentsTable).where(eq(projectDocumentsTable.projectId, project.id)),
       panoramaStore.list(project.id),
+      latestClientQuoteDetail(project.id),
     ]);
     const photos = documents
       .filter((document) => document.contentType.toLowerCase().startsWith("image/") && document.classification === "photo")
@@ -839,7 +864,7 @@ const detailsFor = async (project: Project, ownerId?: string) => {
     return {
       ...project,
       startDate: "",
-      clientQuote: { total: project.budgeted, revision: "", portions: [] },
+      clientQuote,
       lineItems: [],
       invoices: projectInvoices,
       trades: vendorRows.map((row) => row.data as Trade),
@@ -861,10 +886,11 @@ const detailsFor = async (project: Project, ownerId?: string) => {
     };
   }
 
+  const clientQuote = await latestClientQuoteDetail(project.id);
   return {
     ...project,
     startDate: "",
-    clientQuote: { total: project.budgeted, revision: "", portions: [] },
+    clientQuote,
     lineItems: [],
     invoices: (await allInvoices()).filter((invoice) => invoice.projectId === project.id),
     trades: [],
