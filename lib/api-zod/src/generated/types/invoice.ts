@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { QuoteDirection } from './quoteDirection';
 
 export interface Invoice {
   id: string;
@@ -12,6 +13,7 @@ export interface Invoice {
   projectId: string;
   projectName: string;
   vendor: string;
+  direction?: QuoteDirection;
   amount: number;
   date: string;
   status: string;

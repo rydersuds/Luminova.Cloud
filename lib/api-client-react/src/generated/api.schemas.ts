@@ -155,12 +155,21 @@ export interface BudgetLineItem {
   variance: number;
 }
 
+export type QuoteDirection = typeof QuoteDirection[keyof typeof QuoteDirection];
+
+
+export const QuoteDirection = {
+  luminova_to_client: 'luminova_to_client',
+  company_to_luminova: 'company_to_luminova',
+} as const;
+
 export interface Invoice {
   id: string;
   invoiceNumber: string;
   projectId: string;
   projectName: string;
   vendor: string;
+  direction?: QuoteDirection;
   amount: number;
   date: string;
   status: string;
@@ -290,14 +299,6 @@ export const VendorQuoteStatus = {
   Expired: 'Expired',
 } as const;
 
-export type QuoteDirection = typeof QuoteDirection[keyof typeof QuoteDirection];
-
-
-export const QuoteDirection = {
-  luminova_to_client: 'luminova_to_client',
-  company_to_luminova: 'company_to_luminova',
-} as const;
-
 export interface VendorQuoteLineItem {
   id: string;
   /** @minLength 1 */
@@ -328,6 +329,7 @@ export interface VendorQuote {
   vendorId: string;
   vendorName: string;
   direction: QuoteDirection;
+  isProjectTotal?: boolean;
   trade: string;
   status: VendorQuoteStatus;
   /** @minimum 1 */

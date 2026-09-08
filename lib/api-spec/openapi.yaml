@@ -992,6 +992,7 @@ components:
         projectId: { type: string }
         projectName: { type: string }
         vendor: { type: string }
+        direction: { $ref: "#/components/schemas/QuoteDirection" }
         amount: { type: number }
         date: { type: string }
         status: { type: string }
@@ -1041,6 +1042,7 @@ components:
         vendorId: { type: string }
         vendorName: { type: string }
         direction: { $ref: "#/components/schemas/QuoteDirection" }
+        isProjectTotal: { type: boolean }
         trade: { type: string }
         status: { $ref: "#/components/schemas/VendorQuoteStatus" }
         revision: { type: integer, minimum: 1 }

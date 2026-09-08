@@ -4,3 +4,4 @@
 - [Drizzle integration isolation](drizzle-integration-isolation.md) — use temporary databases, not search_path-only schemas, for drizzle-kit integration tests.
 - [Merged route reloads](merged-route-reloads.md) — force a watcher event after post-merge API builds so managed previews cannot keep an old route table.
 - [Photo analysis isolation](photo-analysis-isolation.md) — keep private visual analysis bounded and per-photo so one AI or decoder failure never rolls back a valid import.
+- [Workspace-scoped package installs](workspace-scoped-package-installs.md) — when package tooling cannot target a pnpm child package, edit its manifest and install from the workspace root.

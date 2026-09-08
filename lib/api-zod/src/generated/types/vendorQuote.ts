@@ -17,6 +17,7 @@ export interface VendorQuote {
   vendorId: string;
   vendorName: string;
   direction: QuoteDirection;
+  isProjectTotal?: boolean;
   trade: string;
   status: VendorQuoteStatus;
   /** @minimum 1 */
