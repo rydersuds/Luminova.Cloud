@@ -1197,6 +1197,19 @@ router.get("/trades/:tradeId", async (req, res) => {
     res.status(404).json({ error: "Trade not found" });
     return;
   }
+  const bids = (await allVendorQuotes())
+    .filter((quote) => quote.vendorId === trade.id)
+    .map((quote) => ({
+      projectName: quote.projectName,
+      scope: quote.trade,
+      amount: quote.total,
+      date: quote.issueDate,
+      outcome: quote.status === "Accepted"
+        ? "Won"
+        : quote.status === "Rejected"
+          ? "Lost"
+          : "Pending",
+    }));
   res.json(GetTradeResponse.parse({
     ...trade,
     phone: "403-555-0188",
@@ -1213,10 +1226,7 @@ router.get("/trades/:tradeId", async (req, res) => {
       { projectName: "Riverstone Residence", date: "2026", amount: 26850000 },
       { projectName: "Elbow Park Renovation", date: "2025", amount: 14900000 },
     ],
-    bids: [
-      { projectName: "Riverstone Residence", scope: trade.tradeType, amount: 26850000, date: "2026-02-12", outcome: "Won" },
-      { projectName: "Ridge House", scope: trade.tradeType, amount: 34200000, date: "2026-06-08", outcome: "Pending" },
-    ],
+    bids,
   }));
 });
 
