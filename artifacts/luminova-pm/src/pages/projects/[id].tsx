@@ -422,6 +422,10 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
 
   const budgetVariance = project.budgeted - project.invoiced
   const varianceIsPositive = budgetVariance >= 0
+  const clientQuoteRemaining = project.clientQuote.total - project.invoiced
+  const clientQuoteInvoicedPercent = project.clientQuote.total > 0
+    ? Math.min((project.invoiced / project.clientQuote.total) * 100, 100)
+    : 0
   const renderPhotoCard = (photo: ProjectPhoto) => {
     const index = project.photos.findIndex((item) => item.id === photo.id)
     return (
@@ -981,6 +985,63 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                   </CardContent>
                 </Card>
               )}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Quoted vs Invoiced</CardTitle>
+                  <CardDescription>Client billing issued to Weidner against the current project quote</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div className="rounded-lg border bg-muted/30 p-4">
+                      <p className="text-sm text-muted-foreground">Quoted to Weidner</p>
+                      <p className="mt-1 text-2xl font-bold tabular-nums">{formatCurrency(project.clientQuote.total)}</p>
+                    </div>
+                    <div className="rounded-lg border bg-muted/30 p-4">
+                      <p className="text-sm text-muted-foreground">Invoiced to Weidner</p>
+                      <p className="mt-1 text-2xl font-bold tabular-nums">{formatCurrency(project.invoiced)}</p>
+                    </div>
+                    <div className="rounded-lg border bg-muted/30 p-4">
+                      <p className="text-sm text-muted-foreground">Remaining to invoice</p>
+                      <p className={cn("mt-1 text-2xl font-bold tabular-nums", clientQuoteRemaining < 0 && "text-destructive")}>
+                        {formatCurrency(clientQuoteRemaining)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Invoice progress</span>
+                      <span className="font-medium tabular-nums">{clientQuoteInvoicedPercent.toFixed(1)}%</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-muted">
+                      <div className="h-full rounded-full bg-primary" style={{ width: `${clientQuoteInvoicedPercent}%` }} />
+                    </div>
+                  </div>
+                  {project.invoices.length > 0 && (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Invoice</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {[...project.invoices]
+                          .sort((a, b) => b.date.localeCompare(a.date))
+                          .map((invoice) => (
+                            <TableRow key={invoice.id}>
+                              <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
+                              <TableCell>{formatDate(invoice.date)}</TableCell>
+                              <TableCell><Badge variant="outline">{invoice.status}</Badge></TableCell>
+                              <TableCell className="text-right tabular-nums">{formatCurrency(invoice.amount)}</TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>

@@ -828,8 +828,8 @@ components:
         pmName: { type: string }
         clientName: { type: string }
         targetDate: { type: string }
-        budgeted: { type: integer }
-        invoiced: { type: integer }
+        budgeted: { type: number }
+        invoiced: { type: number }
         exteriorImage: { type: string }
         description: { type: string }
     ProjectInput:
@@ -992,11 +992,11 @@ components:
         projectId: { type: string }
         projectName: { type: string }
         vendor: { type: string }
-        amount: { type: integer }
+        amount: { type: number }
         date: { type: string }
         status: { type: string }
         lineItem: { type: string }
-        overage: { type: integer }
+        overage: { type: number }
     InvoiceInput:
       type: object
       required: [invoiceNumber, projectId, vendor, amount, date, lineItem]
@@ -1004,7 +1004,7 @@ components:
         invoiceNumber: { type: string }
         projectId: { type: string }
         vendor: { type: string }
-        amount: { type: integer }
+        amount: { type: number }
         date: { type: string }
         lineItem: { type: string }
     VendorQuoteStatus:

@@ -57,8 +57,8 @@ export const GetProjectsResponseItem = zod.object({
   "pmName": zod.string(),
   "clientName": zod.string(),
   "targetDate": zod.string(),
-  "budgeted": zod.number().int(),
-  "invoiced": zod.number().int(),
+  "budgeted": zod.number(),
+  "invoiced": zod.number(),
   "exteriorImage": zod.string(),
   "description": zod.string()
 })
@@ -91,8 +91,8 @@ export const CreateProjectResponse = zod.object({
   "pmName": zod.string(),
   "clientName": zod.string(),
   "targetDate": zod.string(),
-  "budgeted": zod.number().int(),
-  "invoiced": zod.number().int(),
+  "budgeted": zod.number(),
+  "invoiced": zod.number(),
   "exteriorImage": zod.string(),
   "description": zod.string()
 })
@@ -120,8 +120,8 @@ export const GetProjectResponse = zod.object({
   "pmName": zod.string(),
   "clientName": zod.string(),
   "targetDate": zod.string(),
-  "budgeted": zod.number().int(),
-  "invoiced": zod.number().int(),
+  "budgeted": zod.number(),
+  "invoiced": zod.number(),
   "exteriorImage": zod.string(),
   "description": zod.string()
 }).and(zod.object({
@@ -149,11 +149,11 @@ export const GetProjectResponse = zod.object({
   "projectId": zod.string(),
   "projectName": zod.string(),
   "vendor": zod.string(),
-  "amount": zod.number().int(),
+  "amount": zod.number(),
   "date": zod.string(),
   "status": zod.string(),
   "lineItem": zod.string(),
-  "overage": zod.number().int()
+  "overage": zod.number()
 })),
   "trades": zod.array(zod.object({
   "id": zod.string(),
@@ -232,8 +232,8 @@ export const UpdateProjectResponse = zod.object({
   "pmName": zod.string(),
   "clientName": zod.string(),
   "targetDate": zod.string(),
-  "budgeted": zod.number().int(),
-  "invoiced": zod.number().int(),
+  "budgeted": zod.number(),
+  "invoiced": zod.number(),
   "exteriorImage": zod.string(),
   "description": zod.string()
 })
@@ -398,8 +398,8 @@ export const CreateProjectImportResponse = zod.object({
   "pmName": zod.string(),
   "clientName": zod.string(),
   "targetDate": zod.string(),
-  "budgeted": zod.number().int(),
-  "invoiced": zod.number().int(),
+  "budgeted": zod.number(),
+  "invoiced": zod.number(),
   "exteriorImage": zod.string(),
   "description": zod.string()
 }),
@@ -568,8 +568,8 @@ export const BuildProjectImportSessionResponse = zod.object({
   "pmName": zod.string(),
   "clientName": zod.string(),
   "targetDate": zod.string(),
-  "budgeted": zod.number().int(),
-  "invoiced": zod.number().int(),
+  "budgeted": zod.number(),
+  "invoiced": zod.number(),
   "exteriorImage": zod.string(),
   "description": zod.string()
 }),
@@ -698,11 +698,11 @@ export const GetInvoicesResponseItem = zod.object({
   "projectId": zod.string(),
   "projectName": zod.string(),
   "vendor": zod.string(),
-  "amount": zod.number().int(),
+  "amount": zod.number(),
   "date": zod.string(),
   "status": zod.string(),
   "lineItem": zod.string(),
-  "overage": zod.number().int()
+  "overage": zod.number()
 })
 export const GetInvoicesResponse = zod.array(GetInvoicesResponseItem)
 
@@ -714,7 +714,7 @@ export const CreateInvoiceBody = zod.object({
   "invoiceNumber": zod.string(),
   "projectId": zod.string(),
   "vendor": zod.string(),
-  "amount": zod.number().int(),
+  "amount": zod.number(),
   "date": zod.string(),
   "lineItem": zod.string()
 })
@@ -725,11 +725,11 @@ export const CreateInvoiceResponse = zod.object({
   "projectId": zod.string(),
   "projectName": zod.string(),
   "vendor": zod.string(),
-  "amount": zod.number().int(),
+  "amount": zod.number(),
   "date": zod.string(),
   "status": zod.string(),
   "lineItem": zod.string(),
-  "overage": zod.number().int()
+  "overage": zod.number()
 })
 
 
