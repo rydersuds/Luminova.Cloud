@@ -505,7 +505,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div>
-                    <p className="text-3xl font-mono font-bold tracking-tighter text-primary group-hover:text-glow transition-colors drop-shadow-[0_2px_10px_hsl(var(--primary)/0.5)]">{loadingSummary ? "-" : summary?.activeProjects}</p>
+                    <p className="text-3xl font-mono font-bold tracking-tighter text-primary transition-colors">{loadingSummary ? "-" : summary?.activeProjects}</p>
                   </div>
                 </div>
               </CardContent>
@@ -521,7 +521,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div>
-                    <p className="text-3xl font-mono font-bold tracking-tighter text-warning drop-shadow-[0_2px_10px_rgba(255,165,0,0.5)]">{loadingSummary ? "-" : summary?.awaitingApproval}</p>
+                    <p className="text-3xl font-mono font-bold tracking-tighter text-warning">{loadingSummary ? "-" : summary?.awaitingApproval}</p>
                   </div>
                 </div>
               </CardContent>
@@ -537,7 +537,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div>
-                    <p className="text-3xl font-mono font-bold tracking-tighter text-info drop-shadow-[0_2px_10px_rgba(0,191,255,0.5)]">{loadingSummary ? "-" : summary?.new360Photos}</p>
+                    <p className="text-3xl font-mono font-bold tracking-tighter text-info">{loadingSummary ? "-" : summary?.new360Photos}</p>
                   </div>
                 </div>
               </CardContent>
@@ -553,7 +553,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div>
-                    <p className="text-3xl font-mono font-bold tracking-tighter text-success drop-shadow-[0_2px_10px_rgba(0,255,128,0.5)]">
+                    <p className="text-3xl font-mono font-bold tracking-tighter text-success">
                       {loadingSummary ? "-" : `$${((summary?.budgeted || 0) / 1000000).toFixed(1)}M`}
                     </p>
                   </div>
