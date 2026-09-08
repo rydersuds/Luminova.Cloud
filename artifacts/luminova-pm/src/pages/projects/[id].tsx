@@ -602,11 +602,11 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                 </p>
               </div>
               <div className="bg-sidebar p-4 space-y-1">
-                <p className="text-sm text-sidebar-foreground/60">Completion</p>
+                <p className="text-sm text-sidebar-foreground/60">Total Progress</p>
                 <div className="flex items-center gap-2">
-                  <p className="text-xl font-bold tabular-nums">{project.progress}%</p>
+                  <p className="text-xl font-bold tabular-nums">{clientQuoteInvoicedPercent.toFixed(1)}%</p>
                   <div className="flex-1 h-1.5 bg-sidebar-accent rounded-full overflow-hidden">
-                    <div className="h-full bg-sidebar-primary rounded-full" style={{ width: `${project.progress}%` }} />
+                    <div className="h-full bg-sidebar-primary rounded-full" style={{ width: `${clientQuoteInvoicedPercent}%` }} />
                   </div>
                 </div>
               </div>
@@ -1009,7 +1009,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Invoice progress</span>
+                      <span className="text-muted-foreground">Total progress</span>
                       <span className="font-medium tabular-nums">{clientQuoteInvoicedPercent.toFixed(1)}%</span>
                     </div>
                     <div className="h-2 overflow-hidden rounded-full bg-muted">
