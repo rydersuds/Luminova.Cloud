@@ -290,6 +290,14 @@ export const VendorQuoteStatus = {
   Expired: 'Expired',
 } as const;
 
+export type QuoteDirection = typeof QuoteDirection[keyof typeof QuoteDirection];
+
+
+export const QuoteDirection = {
+  luminova_to_client: 'luminova_to_client',
+  company_to_luminova: 'company_to_luminova',
+} as const;
+
 export interface VendorQuoteLineItem {
   id: string;
   /** @minLength 1 */
@@ -319,6 +327,7 @@ export interface VendorQuote {
   projectName: string;
   vendorId: string;
   vendorName: string;
+  direction: QuoteDirection;
   trade: string;
   status: VendorQuoteStatus;
   /** @minimum 1 */
@@ -343,6 +352,7 @@ export interface VendorQuoteInput {
   projectId: string;
   /** @minLength 1 */
   vendorId: string;
+  direction: QuoteDirection;
   /** @minLength 1 */
   trade: string;
   status: VendorQuoteStatus;
@@ -364,6 +374,7 @@ export interface VendorQuoteUpdate {
   projectId?: string;
   /** @minLength 1 */
   vendorId?: string;
+  direction?: QuoteDirection;
   /** @minLength 1 */
   trade?: string;
   status?: VendorQuoteStatus;
@@ -566,5 +577,6 @@ projectId?: string;
 vendorId?: string;
 trade?: string;
 status?: VendorQuoteStatus;
+direction?: QuoteDirection;
 };
 

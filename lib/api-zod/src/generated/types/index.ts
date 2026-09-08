@@ -35,6 +35,7 @@ export * from './projectImportSessionInput';
 export * from './projectImportSessionStatus';
 export * from './projectInput';
 export * from './projectUpdate';
+export * from './quoteDirection';
 export * from './quotePortion';
 export * from './review';
 export * from './trade';

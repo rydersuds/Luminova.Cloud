@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { QuoteDirection } from './quoteDirection';
 import type { VendorQuoteLineItemInput } from './vendorQuoteLineItemInput';
 import type { VendorQuoteStatus } from './vendorQuoteStatus';
 
@@ -15,6 +16,7 @@ export interface VendorQuoteInput {
   projectId: string;
   /** @minLength 1 */
   vendorId: string;
+  direction: QuoteDirection;
   /** @minLength 1 */
   trade: string;
   status: VendorQuoteStatus;

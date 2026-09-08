@@ -741,7 +741,8 @@ export const GetVendorQuotesQueryParams = zod.object({
   "projectId": zod.coerce.string().optional(),
   "vendorId": zod.coerce.string().optional(),
   "trade": zod.coerce.string().optional(),
-  "status": zod.enum(['Draft', 'Requested', 'Received', 'Under review', 'Accepted', 'Declined', 'Expired']).optional()
+  "status": zod.enum(['Draft', 'Requested', 'Received', 'Under review', 'Accepted', 'Declined', 'Expired']).optional(),
+  "direction": zod.enum(['luminova_to_client', 'company_to_luminova']).optional()
 })
 
 
@@ -766,6 +767,7 @@ export const GetVendorQuotesResponseItem = zod.object({
   "projectName": zod.string(),
   "vendorId": zod.string(),
   "vendorName": zod.string(),
+  "direction": zod.enum(['luminova_to_client', 'company_to_luminova']),
   "trade": zod.string(),
   "status": zod.enum(['Draft', 'Requested', 'Received', 'Under review', 'Accepted', 'Declined', 'Expired']),
   "revision": zod.number().int().min(1),
@@ -808,6 +810,7 @@ export const CreateVendorQuoteBody = zod.object({
   "quoteNumber": zod.string().min(1),
   "projectId": zod.string().min(1),
   "vendorId": zod.string().min(1),
+  "direction": zod.enum(['luminova_to_client', 'company_to_luminova']),
   "trade": zod.string().min(1),
   "status": zod.enum(['Draft', 'Requested', 'Received', 'Under review', 'Accepted', 'Declined', 'Expired']),
   "revision": zod.number().int().min(1),
@@ -844,6 +847,7 @@ export const CreateVendorQuoteResponse = zod.object({
   "projectName": zod.string(),
   "vendorId": zod.string(),
   "vendorName": zod.string(),
+  "direction": zod.enum(['luminova_to_client', 'company_to_luminova']),
   "trade": zod.string(),
   "status": zod.enum(['Draft', 'Requested', 'Received', 'Under review', 'Accepted', 'Declined', 'Expired']),
   "revision": zod.number().int().min(1),
@@ -892,6 +896,7 @@ export const GetVendorQuoteResponse = zod.object({
   "projectName": zod.string(),
   "vendorId": zod.string(),
   "vendorName": zod.string(),
+  "direction": zod.enum(['luminova_to_client', 'company_to_luminova']),
   "trade": zod.string(),
   "status": zod.enum(['Draft', 'Requested', 'Received', 'Under review', 'Accepted', 'Declined', 'Expired']),
   "revision": zod.number().int().min(1),
@@ -937,6 +942,7 @@ export const UpdateVendorQuoteBody = zod.object({
   "quoteNumber": zod.string().min(1).optional(),
   "projectId": zod.string().min(1).optional(),
   "vendorId": zod.string().min(1).optional(),
+  "direction": zod.enum(['luminova_to_client', 'company_to_luminova']).optional(),
   "trade": zod.string().min(1).optional(),
   "status": zod.enum(['Draft', 'Requested', 'Received', 'Under review', 'Accepted', 'Declined', 'Expired']).optional(),
   "revision": zod.number().int().min(1).optional(),
@@ -973,6 +979,7 @@ export const UpdateVendorQuoteResponse = zod.object({
   "projectName": zod.string(),
   "vendorId": zod.string(),
   "vendorName": zod.string(),
+  "direction": zod.enum(['luminova_to_client', 'company_to_luminova']),
   "trade": zod.string(),
   "status": zod.enum(['Draft', 'Requested', 'Received', 'Under review', 'Accepted', 'Declined', 'Expired']),
   "revision": zod.number().int().min(1),

@@ -8,6 +8,7 @@ import {
   useGetTrades,
   useGetVendorQuotes,
   useUpdateVendorQuote,
+  type QuoteDirection,
   type VendorQuote,
   type VendorQuoteStatus,
 } from "@workspace/api-client-react"
@@ -24,6 +25,12 @@ import { cn, formatCurrency, formatDateOnly, getStatusColor } from "@/lib/utils"
 import { Building2, CalendarClock, FilePenLine, FolderKanban, Layers3, Plus, Search, Trash2, Users, X } from "lucide-react"
 
 const STATUSES: VendorQuoteStatus[] = ["Draft", "Requested", "Received", "Under review", "Accepted", "Declined", "Expired"]
+const DIRECTIONS: Array<[QuoteDirection, string]> = [
+  ["luminova_to_client", "Luminova → Client"],
+  ["company_to_luminova", "Company → Luminova"],
+]
+const directionLabel = (direction: QuoteDirection) =>
+  DIRECTIONS.find(([value]) => value === direction)?.[1] ?? direction
 type GroupMode = "all" | "project" | "vendor" | "trade"
 type FormLine = { id: string; description: string; quantity: number; unitPrice: number }
 
@@ -40,6 +47,7 @@ export default function Quotes() {
   const [vendorId, setVendorId] = React.useState(initialVendor)
   const [trade, setTrade] = React.useState("")
   const [status, setStatus] = React.useState<VendorQuoteStatus | "">("")
+  const [direction, setDirection] = React.useState<QuoteDirection | "">("")
   const [groupMode, setGroupMode] = React.useState<GroupMode>("all")
   const [editing, setEditing] = React.useState<VendorQuote | null | undefined>(undefined)
 
@@ -49,6 +57,7 @@ export default function Quotes() {
     vendorId: vendorId || undefined,
     trade: trade || undefined,
     status: status || undefined,
+    direction: direction || undefined,
   }
   const quotesQuery = useGetVendorQuotes(params, { query: { queryKey: getGetVendorQuotesQueryKey(params) } })
   const { data: projects } = useGetProjects()
@@ -78,6 +87,7 @@ export default function Quotes() {
     setVendorId("")
     setTrade("")
     setStatus("")
+    setDirection("")
   }
 
   return (
@@ -91,7 +101,7 @@ export default function Quotes() {
                 <span className="font-mono text-xs uppercase tracking-[0.22em] text-primary">Vendor pricing</span>
               </div>
               <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Quote Workspace</h1>
-              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Collect and compare subcontractor and supplier pricing without mixing it with customer-facing project quotes.</p>
+              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Review client-facing Luminova proposals separately from subcontractor and supplier pricing.</p>
             </div>
             <Button onClick={() => setEditing(null)} className="gap-2 self-start lg:self-auto"><Plus className="h-4 w-4" /> New vendor quote</Button>
           </header>
@@ -103,7 +113,7 @@ export default function Quotes() {
           </section>
 
           <section className="glass-panel tech-border space-y-4 p-4 sm:p-5">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_repeat(4,180px)_auto]">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_repeat(5,170px)_auto]">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Quote, project, vendor, notes" className="bg-background/70 pl-9" />
@@ -112,6 +122,7 @@ export default function Quotes() {
               <FilterSelect value={vendorId} onChange={setVendorId} label="All vendors" options={vendors?.map((vendor) => [vendor.id, vendor.companyName]) ?? []} />
               <FilterSelect value={trade} onChange={setTrade} label="All trades" options={tradeOptions.map((item) => [item, item])} />
               <FilterSelect value={status} onChange={(value) => setStatus(value as VendorQuoteStatus | "")} label="All statuses" options={STATUSES.map((item) => [item, item])} />
+              <FilterSelect value={direction} onChange={(value) => setDirection(value as QuoteDirection | "")} label="All directions" options={DIRECTIONS} />
               <Button variant="outline" onClick={clearFilters} className="gap-2"><X className="h-4 w-4" /> Clear</Button>
             </div>
             <div className="flex flex-wrap items-center gap-2 border-t border-border/50 pt-4">
@@ -171,11 +182,18 @@ function QuoteCard({ quote, onEdit, onProject, onVendor }: { quote: VendorQuote;
       <CardContent className="p-0">
         <div className="flex items-start justify-between gap-4 border-b border-border/50 p-5">
           <div><p className="font-mono text-xs text-primary">{quote.quoteNumber} · REV {quote.revision}</p><h3 className="mt-1 text-lg font-bold">{quote.trade}</h3></div>
-          <Badge variant={getStatusColor(quote.status) as any}>{quote.status}</Badge>
+          <div className="flex flex-col items-end gap-2">
+            <Badge variant={getStatusColor(quote.status) as any}>{quote.status}</Badge>
+            <Badge variant="outline">{directionLabel(quote.direction)}</Badge>
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-x-5 gap-y-4 p-5 text-sm">
           <button onClick={onProject} className="text-left hover:text-primary"><span className="mb-1 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground"><FolderKanban className="h-3.5 w-3.5" />Project</span><strong>{quote.projectName}</strong></button>
-          <button onClick={onVendor} className="text-left hover:text-primary"><span className="mb-1 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground"><Users className="h-3.5 w-3.5" />Vendor</span><strong>{quote.vendorName}</strong></button>
+          {quote.direction === "company_to_luminova" ? (
+            <button onClick={onVendor} className="text-left hover:text-primary"><span className="mb-1 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground"><Users className="h-3.5 w-3.5" />From company</span><strong>{quote.vendorName}</strong></button>
+          ) : (
+            <div><span className="mb-1 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground"><Users className="h-3.5 w-3.5" />From</span><strong>Luminova Construction</strong></div>
+          )}
           <div><span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Due date</span><p className="mt-1 font-medium">{formatDateOnly(quote.dueDate)}</p></div>
           <div><span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Quote total</span><p className="mt-1 text-lg font-bold tabular-nums">{formatCurrency(quote.total)}</p></div>
         </div>
@@ -197,6 +215,7 @@ function QuoteDialog({ quote, open, onOpenChange, projects, vendors, onSaved }: 
   const [quoteNumber, setQuoteNumber] = React.useState("")
   const [trade, setTrade] = React.useState("")
   const [status, setStatus] = React.useState<VendorQuoteStatus>("Draft")
+  const [direction, setDirection] = React.useState<QuoteDirection>("company_to_luminova")
   const [revision, setRevision] = React.useState(1)
   const [issueDate, setIssueDate] = React.useState(today())
   const [dueDate, setDueDate] = React.useState(today())
@@ -211,6 +230,7 @@ function QuoteDialog({ quote, open, onOpenChange, projects, vendors, onSaved }: 
     setQuoteNumber(quote?.quoteNumber ?? "")
     setTrade(quote?.trade ?? "")
     setStatus(quote?.status ?? "Draft")
+    setDirection(quote?.direction ?? "company_to_luminova")
     setRevision(quote?.revision ?? 1)
     setIssueDate(quote?.issueDate ?? today())
     setDueDate(quote?.dueDate ?? today())
@@ -223,7 +243,7 @@ function QuoteDialog({ quote, open, onOpenChange, projects, vendors, onSaved }: 
   const pending = createQuote.isPending || updateQuote.isPending
   const save = (event: React.FormEvent) => {
     event.preventDefault()
-    if (!projectId || !vendorId || !quoteNumber.trim() || !trade.trim() || lines.some((line) => !line.description.trim() || line.quantity <= 0 || line.unitPrice < 0)) {
+    if (!projectId || (direction === "company_to_luminova" && !vendorId) || !quoteNumber.trim() || !trade.trim() || lines.some((line) => !line.description.trim() || line.quantity <= 0 || line.unitPrice < 0)) {
       setValidation("Complete all required fields and add valid line item values.")
       return
     }
@@ -231,7 +251,19 @@ function QuoteDialog({ quote, open, onOpenChange, projects, vendors, onSaved }: 
       setValidation("Due date cannot be before the issue date.")
       return
     }
-    const data = { quoteNumber: quoteNumber.trim(), projectId, vendorId, trade: trade.trim(), status, revision, issueDate, dueDate, notes, lineItems: lines.map(({ id, ...line }) => ({ ...line, id })) }
+    const data = {
+      quoteNumber: quoteNumber.trim(),
+      projectId,
+      vendorId: direction === "luminova_to_client" ? "luminova-construction" : vendorId,
+      direction,
+      trade: trade.trim(),
+      status,
+      revision,
+      issueDate,
+      dueDate,
+      notes,
+      lineItems: lines.map(({ id, ...line }) => ({ ...line, id })),
+    }
     const options = {
       onSuccess: () => { toast({ title: quote ? "Quote updated" : "Quote created", description: `${quoteNumber} was saved successfully.` }); onSaved() },
       onError: () => setValidation("The quote could not be saved. Review the fields and try again."),
@@ -246,8 +278,15 @@ function QuoteDialog({ quote, open, onOpenChange, projects, vendors, onSaved }: 
         <DialogHeader><DialogTitle>{quote ? "Edit vendor quote" : "Create vendor quote"}</DialogTitle></DialogHeader>
         <form onSubmit={save} className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Quote direction"><select value={direction} onChange={(e) => setDirection(e.target.value as QuoteDirection)} className="h-10 w-full border border-input bg-background px-3 text-sm">{DIRECTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
             <Field label="Project"><select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="h-10 w-full border border-input bg-background px-3 text-sm"><option value="">Select project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></Field>
-            <Field label="Vendor / company"><select value={vendorId} onChange={(e) => { setVendorId(e.target.value); const vendor = vendors.find((item) => item.id === e.target.value); if (vendor) setTrade(vendor.tradeType) }} className="h-10 w-full border border-input bg-background px-3 text-sm"><option value="">Select vendor</option>{vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.companyName}</option>)}</select></Field>
+            <Field label={direction === "luminova_to_client" ? "From company" : "Vendor / company"}>
+              {direction === "luminova_to_client" ? (
+                <Input value="Luminova Construction" readOnly className="bg-muted/40" />
+              ) : (
+                <select value={vendorId} onChange={(e) => { setVendorId(e.target.value); const vendor = vendors.find((item) => item.id === e.target.value); if (vendor) setTrade(vendor.tradeType) }} className="h-10 w-full border border-input bg-background px-3 text-sm"><option value="">Select vendor</option>{vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.companyName}</option>)}</select>
+              )}
+            </Field>
             <Field label="Quote number"><Input value={quoteNumber} onChange={(e) => setQuoteNumber(e.target.value)} /></Field>
             <Field label="Trade"><Input value={trade} readOnly className="bg-muted/40" /></Field>
             <Field label="Status"><select value={status} onChange={(e) => setStatus(e.target.value as VendorQuoteStatus)} className="h-10 w-full border border-input bg-background px-3 text-sm">{STATUSES.map((item) => <option key={item}>{item}</option>)}</select></Field>

@@ -443,6 +443,10 @@ paths:
           in: query
           schema:
             $ref: "#/components/schemas/VendorQuoteStatus"
+        - name: direction
+          in: query
+          schema:
+            $ref: "#/components/schemas/QuoteDirection"
       responses:
         "200":
           description: Vendor quote list
@@ -1006,6 +1010,9 @@ components:
     VendorQuoteStatus:
       type: string
       enum: [Draft, Requested, Received, Under review, Accepted, Declined, Expired]
+    QuoteDirection:
+      type: string
+      enum: [luminova_to_client, company_to_luminova]
     VendorQuoteLineItem:
       type: object
       required: [id, description, quantity, unitPrice, amount]
@@ -1025,7 +1032,7 @@ components:
         unitPrice: { type: integer, minimum: 0 }
     VendorQuote:
       type: object
-      required: [id, quoteNumber, projectId, projectName, vendorId, vendorName, trade, status, revision, issueDate, dueDate, notes, lineItems, total, createdAt, updatedAt]
+      required: [id, quoteNumber, projectId, projectName, vendorId, vendorName, direction, trade, status, revision, issueDate, dueDate, notes, lineItems, total, createdAt, updatedAt]
       properties:
         id: { type: string }
         quoteNumber: { type: string }
@@ -1033,6 +1040,7 @@ components:
         projectName: { type: string }
         vendorId: { type: string }
         vendorName: { type: string }
+        direction: { $ref: "#/components/schemas/QuoteDirection" }
         trade: { type: string }
         status: { $ref: "#/components/schemas/VendorQuoteStatus" }
         revision: { type: integer, minimum: 1 }
@@ -1049,11 +1057,12 @@ components:
         updatedAt: { type: string }
     VendorQuoteInput:
       type: object
-      required: [quoteNumber, projectId, vendorId, trade, status, revision, issueDate, dueDate, notes, lineItems]
+      required: [quoteNumber, projectId, vendorId, direction, trade, status, revision, issueDate, dueDate, notes, lineItems]
       properties:
         quoteNumber: { type: string, minLength: 1 }
         projectId: { type: string, minLength: 1 }
         vendorId: { type: string, minLength: 1 }
+        direction: { $ref: "#/components/schemas/QuoteDirection" }
         trade: { type: string, minLength: 1 }
         status: { $ref: "#/components/schemas/VendorQuoteStatus" }
         revision: { type: integer, minimum: 1 }
@@ -1071,6 +1080,7 @@ components:
         quoteNumber: { type: string, minLength: 1 }
         projectId: { type: string, minLength: 1 }
         vendorId: { type: string, minLength: 1 }
+        direction: { $ref: "#/components/schemas/QuoteDirection" }
         trade: { type: string, minLength: 1 }
         status: { $ref: "#/components/schemas/VendorQuoteStatus" }
         revision: { type: integer, minimum: 1 }

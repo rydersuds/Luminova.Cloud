@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { QuoteDirection } from './quoteDirection';
 import type { VendorQuoteStatus } from './vendorQuoteStatus';
 
 export type GetVendorQuotesParams = {
@@ -13,4 +14,5 @@ projectId?: string;
 vendorId?: string;
 trade?: string;
 status?: VendorQuoteStatus;
+direction?: QuoteDirection;
 };
