@@ -2,6 +2,20 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { formatDateOnly } from "./utils.ts"
 import { boundedTextSnippet, collectFolderCandidates, folderFileIssue, normalizeRelativePath, readBatchImportResponse } from "./project-folder-import.ts"
+import { LEGAL_CONSENT_LABEL, PRIVACY_PATH, TERMS_PATH, canSubmitSignIn } from "./legal-consent.ts"
+
+test("sign-in eligibility requires affirmative legal consent", () => {
+  assert.equal(canSubmitSignIn(false, false), false)
+  assert.equal(canSubmitSignIn(true, false), true)
+  assert.equal(canSubmitSignIn(true, true), false)
+})
+
+test("legal consent names and links both public policies", () => {
+  assert.match(LEGAL_CONSENT_LABEL, /Terms & Conditions/)
+  assert.match(LEGAL_CONSENT_LABEL, /Privacy Policy/)
+  assert.equal(TERMS_PATH, "/terms")
+  assert.equal(PRIVACY_PATH, "/privacy")
+})
 
 test("formatDateOnly preserves the calendar day west of UTC", () => {
   assert.equal(formatDateOnly("2026-09-12"), "Sep 12, 2026")

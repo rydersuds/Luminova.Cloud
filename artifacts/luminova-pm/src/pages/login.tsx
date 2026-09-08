@@ -1,6 +1,7 @@
 import { SignUp, useSignIn } from "@clerk/react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Link, useLocation } from "wouter"
+import { LEGAL_CONSENT_LABEL, PRIVACY_PATH, TERMS_PATH, canSubmitSignIn } from "@/lib/legal-consent"
 
 export default function Login() {
   const { signIn, fetchStatus } = useSignIn()
@@ -8,10 +9,15 @@ export default function Login() {
   const [identifier, setIdentifier] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+  const [consentAccepted, setConsentAccepted] = useState(false)
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
     setError("")
+    if (!consentAccepted) {
+      setError("You must agree to the Terms & Conditions and acknowledge the Privacy Policy before signing in.")
+      return
+    }
     const result = await signIn.create({ identifier: identifier.trim(), password })
     if (result.error) {
       setError(result.error.longMessage || result.error.message || "Unable to sign in. Check your details and try again.")
@@ -61,12 +67,38 @@ export default function Login() {
           </label>
         </div>
 
+        <div className="mt-5 flex items-start gap-3">
+          <input
+            id="legal-consent"
+            type="checkbox"
+            checked={consentAccepted}
+            onChange={(event) => {
+              setConsentAccepted(event.target.checked)
+              if (event.target.checked) setError("")
+            }}
+            required
+            aria-describedby="legal-consent-description"
+            className="mt-1 h-4 w-4 shrink-0 accent-[#b59c3f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#dac56c] focus-visible:ring-offset-2 focus-visible:ring-offset-[#202020]"
+          />
+          <label id="legal-consent-description" htmlFor="legal-consent" className="text-sm leading-6 text-white/75">
+            {LEGAL_CONSENT_LABEL.split("Terms & Conditions")[0]}
+            <Link href={TERMS_PATH} target="_blank" rel="noreferrer" className="font-semibold text-[#dac56c] underline underline-offset-2 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#dac56c]">
+              Terms &amp; Conditions
+            </Link>
+            {" and acknowledge the "}
+            <Link href={PRIVACY_PATH} target="_blank" rel="noreferrer" className="font-semibold text-[#dac56c] underline underline-offset-2 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#dac56c]">
+              Privacy Policy
+            </Link>
+            .
+          </label>
+        </div>
+
         {error && <p role="alert" className="mt-4 text-sm text-red-400">{error}</p>}
 
         <button
           type="submit"
-          disabled={fetchStatus === "fetching"}
-          className="mt-6 flex h-11 w-full items-center justify-center bg-[#b59c3f] font-semibold text-black transition-colors hover:bg-[#c8ae4b] disabled:cursor-wait disabled:opacity-60"
+          disabled={!canSubmitSignIn(consentAccepted, fetchStatus === "fetching")}
+          className="mt-6 flex h-11 w-full items-center justify-center bg-[#b59c3f] font-semibold text-black transition-colors hover:bg-[#c8ae4b] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {fetchStatus === "fetching" ? "Signing in…" : "Sign in"}
         </button>

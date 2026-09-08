@@ -29,6 +29,7 @@ import {
   Router as WouterRouter,
 } from 'wouter';
 import Quotes from '@/pages/quotes';
+import { PrivacyPage, TermsPage } from '@/pages/legal';
 
 const queryClient = new QueryClient();
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -100,6 +101,8 @@ function Router() {
         <Route path="/sign-in/*?" component={Login} />
         <Route path="/sign-up/*?" component={SignUpPage} />
         <Route path="/login" component={Login} />
+        <Route path="/terms" component={TermsPage} />
+        <Route path="/privacy" component={PrivacyPage} />
         <Route path="/" component={Home} />
         <Route path="/intro"><Protected><Intro /></Protected></Route>
         <Route path="/projects/:id"><Protected><ProjectDetail /></Protected></Route>
