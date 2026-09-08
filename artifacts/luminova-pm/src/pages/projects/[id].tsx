@@ -93,6 +93,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const [editingPanorama, setEditingPanorama] = React.useState<ProjectPanorama | null>(null)
   const [panoramaEditError, setPanoramaEditError] = React.useState("")
   const [collapsedPhotoCollections, setCollapsedPhotoCollections] = React.useState<Set<string>>(new Set())
+  const initializedPhotoFoldersForProject = React.useRef<string | null>(null)
   const [photoSearch, setPhotoSearch] = React.useState("")
   const [exteriorPhotoError, setExteriorPhotoError] = React.useState("")
   const [exteriorPhotoStatus, setExteriorPhotoStatus] = React.useState("")
@@ -125,6 +126,19 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
       : project.photos
     return buildPhotoFolderTree(photos)
   }, [project, photoSearch])
+  React.useEffect(() => {
+    if (!project || photoSearch || initializedPhotoFoldersForProject.current === projectId) return
+    const paths: string[] = []
+    const collectPaths = (folders: PhotoFolderNode[]) => {
+      for (const folder of folders) {
+        paths.push(folder.path)
+        collectPaths(folder.children)
+      }
+    }
+    collectPaths(photoFolderTree)
+    setCollapsedPhotoCollections(new Set(paths))
+    initializedPhotoFoldersForProject.current = projectId
+  }, [photoFolderTree, photoSearch, project, projectId])
   const invoiceFiles = project?.files.filter((file) => file.classification === "invoice") || []
   const quoteFiles = project?.files.filter((file) => file.classification === "quote") || []
 
