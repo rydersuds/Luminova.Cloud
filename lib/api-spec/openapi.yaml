@@ -897,7 +897,7 @@ components:
       type: object
       required: [total, revision, portions]
       properties:
-        total: { type: integer }
+        total: { type: number }
         revision: { type: string }
         portions:
           type: array
@@ -909,7 +909,7 @@ components:
       properties:
         code: { type: string }
         label: { type: string }
-        amount: { type: integer }
+        amount: { type: number }
     BudgetLineItem:
       type: object
       required: [id, code, description, budgeted, invoiced, variance]

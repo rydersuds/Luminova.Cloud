@@ -607,7 +607,13 @@ let vendorQuotes = [
   },
 ];
 
-type Project = (typeof projects)[number];
+type Project = (typeof projects)[number] & {
+  clientQuote?: {
+    total: number;
+    revision: string;
+    portions: Array<{ code: string; label: string; amount: number }>;
+  };
+};
 type Invoice = (typeof invoices)[number];
 type Trade = (typeof trades)[number];
 type VendorQuote = (typeof vendorQuotes)[number];
@@ -650,9 +656,9 @@ const allVendorQuotes = async () => [
 ];
 const findProject = async (projectId: string) => (await allProjects()).find((project) => project.id === projectId);
 
-const latestClientQuoteDetail = async (projectId: string) => {
+const latestClientQuoteDetail = async (project: Project) => {
   const latestQuote = (await allVendorQuotes())
-    .filter((quote) => quote.projectId === projectId && quote.direction === "luminova_to_client")
+    .filter((quote) => quote.projectId === project.id && quote.direction === "luminova_to_client")
     .sort((a, b) => {
       const issueDateDifference = b.issueDate.localeCompare(a.issueDate);
       if (issueDateDifference !== 0) return issueDateDifference;
@@ -660,7 +666,7 @@ const latestClientQuoteDetail = async (projectId: string) => {
     })[0];
 
   if (!latestQuote) {
-    return { total: 0, revision: "", portions: [] };
+    return project.clientQuote ?? { total: 0, revision: "", portions: [] };
   }
 
   return {
@@ -843,7 +849,7 @@ const detailsFor = async (project: Project, ownerId?: string) => {
         .where(eq(importedVendorsTable.importBatchId, importedProject.importBatchId)),
       db.select().from(projectDocumentsTable).where(eq(projectDocumentsTable.projectId, project.id)),
       panoramaStore.list(project.id),
-      latestClientQuoteDetail(project.id),
+      latestClientQuoteDetail(project),
     ]);
     const photos = documents
       .filter((document) => document.contentType.toLowerCase().startsWith("image/") && document.classification === "photo")
@@ -886,7 +892,7 @@ const detailsFor = async (project: Project, ownerId?: string) => {
     };
   }
 
-  const clientQuote = await latestClientQuoteDetail(project.id);
+  const clientQuote = await latestClientQuoteDetail(project);
   return {
     ...project,
     startDate: "",

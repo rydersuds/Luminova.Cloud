@@ -127,12 +127,12 @@ export const GetProjectResponse = zod.object({
 }).and(zod.object({
   "startDate": zod.string(),
   "clientQuote": zod.object({
-  "total": zod.number().int(),
+  "total": zod.number(),
   "revision": zod.string(),
   "portions": zod.array(zod.object({
   "code": zod.string(),
   "label": zod.string(),
-  "amount": zod.number().int()
+  "amount": zod.number()
 }))
 }),
   "lineItems": zod.array(zod.object({
