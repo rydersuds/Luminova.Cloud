@@ -36,6 +36,7 @@ function fakeClerk(
   let users = [...seed];
   let activeUserLookups = 0;
   let maxConcurrentUserLookups = 0;
+  let beforeUserLookup: ((id: string, user: User | undefined) => Promise<void>) | undefined;
   const invitations: Array<{ emailAddress: string; publicMetadata?: object }> = [];
   let invitationRecords: Array<{
     id: string;
@@ -62,6 +63,7 @@ function fakeClerk(
           }
           if (options.unavailableUserIds?.has(id)) throw { status: 503 };
           const user = users.find((candidate) => candidate.id === id);
+          await beforeUserLookup?.(id, user);
           if (!user) throw { status: 404 };
           return user;
         } finally {
@@ -125,6 +127,9 @@ function fakeClerk(
     getUsers: () => users,
     getInvitations: () => invitationRecords,
     getMaxConcurrentUserLookups: () => maxConcurrentUserLookups,
+    setBeforeUserLookup: (hook: typeof beforeUserLookup) => {
+      beforeUserLookup = hook;
+    },
   };
 }
 
@@ -478,6 +483,83 @@ test("deletes a confirmed target and revokes all of their client memberships", a
   assert.deepEqual(
     clerkErrorResponse({ status: 422, errors: [{ code: "form_identifier_exists", longMessage: "Email already exists." }] }, "failed"),
     { status: 409, error: "Email already exists." },
+  );
+});
+
+test("serializes client access grants with workspace-user deletion", async () => {
+  const fake = fakeClerk([
+    makeUser("admin", "Admin"),
+    makeUser("member", "Client"),
+    makeUser("other-client", "Client"),
+  ]);
+  let lockCalls = 0;
+  let secondLockCall!: () => void;
+  const deletionQueued = new Promise<void>((resolve) => {
+    secondLockCall = resolve;
+  });
+  let releaseMemberLookup!: () => void;
+  const memberLookupReleased = new Promise<void>((resolve) => {
+    releaseMemberLookup = resolve;
+  });
+  let startMemberLookup!: () => void;
+  const memberLookupStarted = new Promise<void>((resolve) => {
+    startMemberLookup = resolve;
+  });
+  let pausedMemberLookup = false;
+  fake.setBeforeUserLookup(async (id, user) => {
+    if (id === "member" && user && !pausedMemberLookup) {
+      pausedMemberLookup = true;
+      startMemberLookup();
+      await memberLookupReleased;
+    }
+  });
+  let tail = Promise.resolve();
+  const lock: NonNullable<Parameters<typeof createUsersRouter>[1]> = async (operation) => {
+    lockCalls += 1;
+    if (lockCalls === 2) secondLockCall();
+    const result = tail.then(operation, operation);
+    tail = result.then(() => undefined, () => undefined);
+    return result;
+  };
+  const base = await startApi("admin", fake.client, lock, "workspace-user-race");
+  const client = await createTestClient(base, "Workspace User Race Client");
+  assert.equal((await grantClientAccess(base, client.id, "other-client")).status, 201);
+  lockCalls = 0;
+
+  const grant = grantClientAccess(base, client.id, "member");
+  await memberLookupStarted;
+  const deletion = fetch(`${base}/users/member`, { method: "DELETE" });
+  await deletionQueued;
+  releaseMemberLookup();
+
+  const [grantResponse, deletionResponse] = await Promise.all([grant, deletion]);
+  assert.equal(grantResponse.status, 201);
+  assert.equal(deletionResponse.status, 204);
+  assert.deepEqual(fake.getUsers().map((user) => user.id), ["admin", "other-client"]);
+  assert.deepEqual(
+    await db.select({
+      userId: clientMembersTable.userId,
+      addedBy: clientMembersTable.addedBy,
+    }).from(clientMembersTable).where(eq(clientMembersTable.clientId, client.id)),
+    [{ userId: "other-client", addedBy: "admin" }],
+  );
+});
+
+test("returns a clear failure when a deleted workspace user is granted access", async () => {
+  const fake = fakeClerk([
+    makeUser("admin", "Admin"),
+    makeUser("member", "Client"),
+  ]);
+  const base = await startApi("admin", fake.client, undefined, "workspace-user-gone");
+  const client = await createTestClient(base, "Workspace User Gone Client");
+
+  assert.equal((await fetch(`${base}/users/member`, { method: "DELETE" })).status, 204);
+  const response = await grantClientAccess(base, client.id, "member");
+  assert.equal(response.status, 404);
+  assert.deepEqual(await response.json(), { error: "Workspace user not found" });
+  assert.deepEqual(
+    await db.select().from(clientMembersTable).where(eq(clientMembersTable.clientId, client.id)),
+    [],
   );
 });
 

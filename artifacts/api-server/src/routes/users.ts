@@ -376,17 +376,21 @@ router.post("/clients/:clientId/members", async (req: AuthenticatedRequest, res)
     return;
   }
   try {
-    const user = await client.users.getUser(body.data.userId);
-    if (workspaceRole(user) !== "Client") {
+    const grant = await withAdminLock(async () => {
+      const user = await client.users.getUser(body.data.userId);
+      if (workspaceRole(user) !== "Client") return false;
+      await db.insert(clientMembersTable).values({
+        id: randomUUID(),
+        clientId: params.data.clientId,
+        userId: body.data.userId,
+        addedBy: req.userId!,
+      });
+      return true;
+    });
+    if (!grant) {
       res.status(403).json({ error: "Only workspace users with the Client role can receive client access" });
       return;
     }
-    await db.insert(clientMembersTable).values({
-      id: randomUUID(),
-      clientId: params.data.clientId,
-      userId: body.data.userId,
-      addedBy: req.userId!,
-    });
     const updated = await serializeClients(client, scope, params.data.clientId);
     res.status(201).json(updated[0]);
   } catch (error) {
