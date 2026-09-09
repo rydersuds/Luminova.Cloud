@@ -170,6 +170,43 @@ function jsonHeaders(actor: string) {
   };
 }
 
+async function createHistoryWithReview(base: string, fixture: Fixture) {
+  const historyResponse = await fetch(base + `/trades/${fixture.vendorId}/job-history`, {
+    method: "POST",
+    headers: jsonHeaders("admin"),
+    body: JSON.stringify({
+      projectId: fixture.completedProjectId,
+      date: "2026-08-20",
+      amount: 24500,
+      source: "Completion certificate",
+    }),
+  });
+  assert.equal(historyResponse.status, 201);
+  const history = await historyResponse.json() as { id: string };
+
+  const reviewResponse = await fetch(base + `/trades/${fixture.vendorId}/reviews`, {
+    method: "POST",
+    headers: jsonHeaders("pm"),
+    body: JSON.stringify({
+      projectId: fixture.completedProjectId,
+      date: "2026-08-25",
+      rating: 5,
+      comment: "Reliable closeout and clean workmanship.",
+      source: "Project closeout review",
+    }),
+  });
+  assert.equal(reviewResponse.status, 201);
+  const review = await reviewResponse.json() as { id: string };
+
+  const [savedHistory] = await db.select().from(vendorJobHistoryTable)
+    .where(eq(vendorJobHistoryTable.id, history.id));
+  const [savedReview] = await db.select().from(vendorReviewTable)
+    .where(eq(vendorReviewTable.id, review.id));
+  assert.ok(savedHistory);
+  assert.ok(savedReview);
+  return { history: savedHistory, review: savedReview };
+}
+
 test("history mutations require administrators and remain durable across list/detail reads", async (t) => {
   const fixture = await createFixture();
   t.after(() => removeFixture(fixture));
@@ -290,6 +327,58 @@ test("history mutations require administrators and remain durable across list/de
   const deletedDetail = await detailAfterDelete.json() as { completedJobs: number; jobHistory: unknown[] };
   assert.equal(deletedDetail.completedJobs, 0);
   assert.deepEqual(deletedDetail.jobHistory, []);
+});
+
+test("history deletion is rejected when a review depends on it and preserves both records", async (t) => {
+  const fixture = await createFixture();
+  t.after(() => removeFixture(fixture));
+  const base = await startApi(t);
+  const { history: savedHistory, review: savedReview } = await createHistoryWithReview(base, fixture);
+
+  const response = await fetch(base + `/trades/${fixture.vendorId}/job-history/${savedHistory.id}`, {
+    method: "DELETE",
+    headers: { "x-test-user": "admin" },
+  });
+  assert.equal(response.status, 409);
+  assert.deepEqual(await response.json(), {
+    error: "Remove linked reviews before removing this job history",
+  });
+
+  const [historyAfter] = await db.select().from(vendorJobHistoryTable)
+    .where(eq(vendorJobHistoryTable.id, savedHistory.id));
+  const [reviewAfter] = await db.select().from(vendorReviewTable)
+    .where(eq(vendorReviewTable.id, savedReview.id));
+  assert.deepEqual(historyAfter, savedHistory);
+  assert.deepEqual(reviewAfter, savedReview);
+});
+
+test("history project changes are rejected when a review depends on it and preserves both records", async (t) => {
+  const fixture = await createFixture();
+  t.after(() => removeFixture(fixture));
+  const base = await startApi(t);
+  const { history: savedHistory, review: savedReview } = await createHistoryWithReview(base, fixture);
+
+  const response = await fetch(base + `/trades/${fixture.vendorId}/job-history/${savedHistory.id}`, {
+    method: "PATCH",
+    headers: jsonHeaders("admin"),
+    body: JSON.stringify({
+      projectId: fixture.incompleteProjectId,
+      date: "2026-09-01",
+      amount: 27000,
+      source: "Revised completion certificate",
+    }),
+  });
+  assert.equal(response.status, 409);
+  assert.deepEqual(await response.json(), {
+    error: "This job history has linked reviews and cannot change projects",
+  });
+
+  const [historyAfter] = await db.select().from(vendorJobHistoryTable)
+    .where(eq(vendorJobHistoryTable.id, savedHistory.id));
+  const [reviewAfter] = await db.select().from(vendorReviewTable)
+    .where(eq(vendorReviewTable.id, savedReview.id));
+  assert.deepEqual(historyAfter, savedHistory);
+  assert.deepEqual(reviewAfter, savedReview);
 });
 
 test("reviews require reviewer roles and verified completed projects, then aggregate persisted records", async (t) => {
