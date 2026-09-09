@@ -371,6 +371,7 @@ export interface FinancialSummary {
      */
   upcomingClientPayments: number;
 }
+
 export type VendorQuoteStatus = typeof VendorQuoteStatus[keyof typeof VendorQuoteStatus];
 
 

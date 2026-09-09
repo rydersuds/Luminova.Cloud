@@ -697,7 +697,7 @@ const jobHistoryForTrade = async (trade: Trade, ownerId: string) => {
   ]);
   const projects = projectRows.map((row) => row.data as Project);
   const projectById = new Map(projects.map((project) => [project.id, project]));
-  return records.map((record) => ({
+  return records.filter((record) => projectById.has(record.projectId)).map((record) => ({
     id: record.id,
     vendorId: record.vendorId,
     projectId: record.projectId,
@@ -718,7 +718,7 @@ const reviewsForTrade = async (trade: Trade, ownerId: string) => {
   ]);
   const projects = projectRows.map((row) => row.data as Project);
   const projectById = new Map(projects.map((project) => [project.id, project]));
-  return records.map((record) => ({
+  return records.filter((record) => projectById.has(record.projectId)).map((record) => ({
     id: record.id,
     vendorId: record.vendorId,
     projectId: record.projectId,
@@ -819,12 +819,18 @@ const projectsForOwner = async (ownerId: string) =>
     .where(eq(importedProjectsTable.ownerId, ownerId)))
     .map((row) => row.data as Project);
 const tradesForOwner = async (ownerId: string) => {
-  const [tradeRows, { invoices: ownedInvoices }] = await Promise.all([
+  const [tradeRows, projectRows, { invoices: ownedInvoices }, historyRecords, reviewRecords] = await Promise.all([
     db.select({ data: importedVendorsTable.data })
       .from(importedVendorsTable)
       .where(eq(importedVendorsTable.ownerId, ownerId)),
+    db.select({ data: importedProjectsTable.data })
+      .from(importedProjectsTable)
+      .where(eq(importedProjectsTable.ownerId, ownerId)),
     financialRecordsForOwner(ownerId),
+    db.select().from(vendorJobHistoryTable),
+    db.select().from(vendorReviewTable),
   ]);
+  const ownedProjectIds = new Set(projectRows.map((row) => (row.data as Project).id));
   const completedProjectsByVendor = new Map<string, Set<string>>();
   for (const invoice of ownedInvoices) {
     if (invoice.direction !== "company_to_luminova" || !invoice.projectId) continue;
@@ -833,9 +839,30 @@ const tradesForOwner = async (ownerId: string) => {
     vendorProjects.add(invoice.projectId);
     completedProjectsByVendor.set(key, vendorProjects);
   }
+  for (const record of historyRecords) {
+    if (!ownedProjectIds.has(record.projectId)) continue;
+    const vendorProjects = completedProjectsByVendor.get(record.vendorId) ?? new Set<string>();
+    vendorProjects.add(record.projectId);
+    completedProjectsByVendor.set(record.vendorId, vendorProjects);
+  }
+  const reviewsByVendor = new Map<string, number[]>();
+  for (const record of reviewRecords) {
+    if (!ownedProjectIds.has(record.projectId)) continue;
+    const vendorReviews = reviewsByVendor.get(record.vendorId) ?? [];
+    vendorReviews.push(record.rating);
+    reviewsByVendor.set(record.vendorId, vendorReviews);
+  }
   return tradeRows.map((row) => row.data as Trade).map((trade) => ({
     ...trade,
-    completedJobs: completedProjectsByVendor.get(normalizePartyName(trade.companyName))?.size ?? 0,
+    completedJobs: (
+      completedProjectsByVendor.get(trade.id)
+      ?? completedProjectsByVendor.get(normalizePartyName(trade.companyName))
+    )?.size ?? 0,
+    reviewCount: reviewsByVendor.get(trade.id)?.length ?? 0,
+    rating: (() => {
+      const ratings = reviewsByVendor.get(trade.id) ?? [];
+      return ratings.length ? Math.round((ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length) * 10) / 10 : 0;
+    })(),
   }));
 };
 const findOwnedProject = async (projectId: string, ownerId: string) =>
@@ -2083,6 +2110,10 @@ router.get("/trades/:tradeId", async (req: AuthenticatedRequest, res) => {
     regions: [trade.region, "Calgary", "Canmore"],
     reviews,
     completedJobs: jobHistory.length,
+    reviewCount: reviews.length,
+    rating: reviews.length
+      ? Math.round((reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length) * 10) / 10
+      : 0,
     jobHistory,
     bids,
   }));
