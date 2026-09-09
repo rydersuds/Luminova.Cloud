@@ -637,8 +637,8 @@ export default function TradeDetail() {
             <DialogDescription>Add the contact, service area, credentials, and profile photo shown on this vendor page.</DialogDescription>
           </DialogHeader>
           <form onSubmit={(event) => void submitProfile(event)} className="space-y-5">
-            <div className="flex flex-col gap-4 rounded-lg border border-border p-4 sm:flex-row sm:items-center">
-              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted font-heading text-2xl font-bold text-muted-foreground">
+            <div className="flex flex-col gap-5 rounded-lg border border-border bg-muted/20 p-4 sm:flex-row sm:items-start">
+              <div className="flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted font-heading text-3xl font-bold text-muted-foreground">
                 {profilePhotoPreview
                   ? <img
                       src={profilePhotoPreview}
@@ -667,6 +667,31 @@ export default function TradeDetail() {
                 <Label htmlFor="vendor-profile-photo">Profile photo</Label>
                 <Input id="vendor-profile-photo" type="file" accept="image/jpeg,image/png,image/webp" onChange={chooseProfilePhoto} />
                 <p className="text-xs text-muted-foreground">JPEG, PNG, or WebP. Maximum 8 MB.</p>
+                {(profilePhotoPreview || (trade.profilePhotoUrl && !removeProfilePhoto)) && (
+                  <div className="space-y-3 pt-2">
+                    <div>
+                      <div className="mb-1 flex items-center justify-between gap-3">
+                        <Label htmlFor="vendor-photo-horizontal">Horizontal framing</Label>
+                        <span className="font-mono text-xs text-muted-foreground">{profileForm.profilePhotoPositionX}%</span>
+                      </div>
+                      <Input id="vendor-photo-horizontal" type="range" min="0" max="100" value={profileForm.profilePhotoPositionX} onChange={(event) => setProfileForm((current) => ({ ...current, profilePhotoPositionX: Number(event.target.value) }))} />
+                    </div>
+                    <div>
+                      <div className="mb-1 flex items-center justify-between gap-3">
+                        <Label htmlFor="vendor-photo-vertical">Vertical framing</Label>
+                        <span className="font-mono text-xs text-muted-foreground">{profileForm.profilePhotoPositionY}%</span>
+                      </div>
+                      <Input id="vendor-photo-vertical" type="range" min="0" max="100" value={profileForm.profilePhotoPositionY} onChange={(event) => setProfileForm((current) => ({ ...current, profilePhotoPositionY: Number(event.target.value) }))} />
+                    </div>
+                    <div>
+                      <div className="mb-1 flex items-center justify-between gap-3">
+                        <Label htmlFor="vendor-photo-zoom">Zoom</Label>
+                        <span className="font-mono text-xs text-muted-foreground">{profileForm.profilePhotoZoom.toFixed(2)}×</span>
+                      </div>
+                      <Input id="vendor-photo-zoom" type="range" min="1" max="2" step="0.05" value={profileForm.profilePhotoZoom} onChange={(event) => setProfileForm((current) => ({ ...current, profilePhotoZoom: Number(event.target.value) }))} />
+                    </div>
+                  </div>
+                )}
                 {trade.profilePhotoUrl && !removeProfilePhoto && !profilePhoto && (
                   <Button type="button" variant="ghost" size="sm" className="h-auto gap-2 px-0 text-destructive hover:text-destructive" onClick={() => setRemoveProfilePhoto(true)}>
                     <Trash2 className="h-4 w-4" />
@@ -675,22 +700,6 @@ export default function TradeDetail() {
                 )}
               </div>
             </div>
-            {(profilePhotoPreview || (trade.profilePhotoUrl && !removeProfilePhoto)) && (
-              <div className="space-y-4 rounded-lg border border-border p-4">
-                <div>
-                  <Label htmlFor="vendor-photo-horizontal">Horizontal framing</Label>
-                  <Input id="vendor-photo-horizontal" type="range" min="0" max="100" value={profileForm.profilePhotoPositionX} onChange={(event) => setProfileForm((current) => ({ ...current, profilePhotoPositionX: Number(event.target.value) }))} />
-                </div>
-                <div>
-                  <Label htmlFor="vendor-photo-vertical">Vertical framing</Label>
-                  <Input id="vendor-photo-vertical" type="range" min="0" max="100" value={profileForm.profilePhotoPositionY} onChange={(event) => setProfileForm((current) => ({ ...current, profilePhotoPositionY: Number(event.target.value) }))} />
-                </div>
-                <div>
-                  <Label htmlFor="vendor-photo-zoom">Zoom</Label>
-                  <Input id="vendor-photo-zoom" type="range" min="1" max="2" step="0.05" value={profileForm.profilePhotoZoom} onChange={(event) => setProfileForm((current) => ({ ...current, profilePhotoZoom: Number(event.target.value) }))} />
-                </div>
-              </div>
-            )}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="vendor-phone">Phone number</Label>
