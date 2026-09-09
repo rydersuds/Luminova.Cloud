@@ -5,7 +5,12 @@ import type { Server } from "node:http";
 import type { User } from "@clerk/backend";
 import { clientMembersTable, clientsTable, db } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
-import { clerkErrorResponse, createUsersRouter, revokeClientMemberships } from "./users";
+import {
+  CLIENT_MEMBER_PROFILE_LOOKUP_CONCURRENCY,
+  clerkErrorResponse,
+  createUsersRouter,
+  revokeClientMemberships,
+} from "./users";
 
 type Role = "Admin" | "Project Manager" | "Field Team" | "Client";
 
@@ -24,8 +29,13 @@ function makeUser(id: string, role: Role, email = `${id}@example.com`): User {
   } as unknown as User;
 }
 
-function fakeClerk(seed: User[]) {
+function fakeClerk(
+  seed: User[],
+  options: { getUserDelayMs?: number; unavailableUserIds?: Set<string> } = {},
+) {
   let users = [...seed];
+  let activeUserLookups = 0;
+  let maxConcurrentUserLookups = 0;
   const invitations: Array<{ emailAddress: string; publicMetadata?: object }> = [];
   let invitationRecords: Array<{
     id: string;
@@ -44,9 +54,19 @@ function fakeClerk(seed: User[]) {
   const client = {
     users: {
       getUser: async (id: string) => {
-        const user = users.find((candidate) => candidate.id === id);
-        if (!user) throw { status: 404 };
-        return user;
+        activeUserLookups += 1;
+        maxConcurrentUserLookups = Math.max(maxConcurrentUserLookups, activeUserLookups);
+        try {
+          if (options.getUserDelayMs) {
+            await new Promise((resolve) => setTimeout(resolve, options.getUserDelayMs));
+          }
+          if (options.unavailableUserIds?.has(id)) throw { status: 503 };
+          const user = users.find((candidate) => candidate.id === id);
+          if (!user) throw { status: 404 };
+          return user;
+        } finally {
+          activeUserLookups -= 1;
+        }
       },
       getUserList: async () => ({ data: users, totalCount: users.length }),
       updateUserMetadata: async (id: string, input: { publicMetadata?: Record<string, unknown> }) => {
@@ -99,7 +119,13 @@ function fakeClerk(seed: User[]) {
       },
     },
   };
-  return { client, invitations, getUsers: () => users, getInvitations: () => invitationRecords };
+  return {
+    client,
+    invitations,
+    getUsers: () => users,
+    getInvitations: () => invitationRecords,
+    getMaxConcurrentUserLookups: () => maxConcurrentUserLookups,
+  };
 }
 
 const servers: Server[] = [];
@@ -531,6 +557,39 @@ test("keeps assigned users beyond the first Clerk page and valid memberships vis
   assert.equal(clients[0].members[0].userId, beyondFirstPage.id);
   assert.equal(clients[0].members[0].name, beyondFirstPage.fullName);
   assert.equal(clients[0].members[0].email, beyondFirstPage.primaryEmailAddress?.emailAddress);
+});
+
+test("bounds large profile lookups without dropping valid client memberships", async () => {
+  const assignedUsers = Array.from({ length: CLIENT_MEMBER_PROFILE_LOOKUP_CONCURRENCY * 3 }, (_, index) =>
+    makeUser(`assigned-client-${index}`, "Client"),
+  );
+  const temporarilyUnavailableUserId = "temporarily-unavailable";
+  const fake = fakeClerk([makeUser("admin", "Admin"), ...assignedUsers], {
+    getUserDelayMs: 10,
+    unavailableUserIds: new Set([temporarilyUnavailableUserId]),
+  });
+  const base = await startApi("admin", fake.client, undefined, "workspace-bounded-lookups");
+  const client = await createTestClient(base, "Bounded Lookup Client");
+  await db.insert(clientMembersTable).values([
+    ...assignedUsers.map((user, index) => ({
+      id: `bounded-membership-${index}`,
+      clientId: client.id,
+      userId: user.id,
+      addedBy: "admin",
+    })),
+    {
+      id: "temporarily-unavailable-membership",
+      clientId: client.id,
+      userId: temporarilyUnavailableUserId,
+      addedBy: "admin",
+    },
+  ]);
+
+  const response = await fetch(`${base}/clients`);
+  assert.equal(response.status, 200);
+  const clients = await response.json() as Array<{ members: Array<{ userId: string }> }>;
+  assert.deepEqual(clients[0].members.map((member) => member.userId), assignedUsers.map((user) => user.id));
+  assert.equal(fake.getMaxConcurrentUserLookups(), CLIENT_MEMBER_PROFILE_LOOKUP_CONCURRENCY);
 });
 
 test("rejects granting client access to a non-Client workspace user", async () => {

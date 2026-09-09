@@ -30,6 +30,7 @@ import { WEIDNER_CLIENT_NAME } from "../lib/partyClassification";
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 export const ROLES = ["Admin", "Project Manager", "Field Team", "Client"] as const;
 
+export const CLIENT_MEMBER_PROFILE_LOOKUP_CONCURRENCY = 8;
 type AuthenticatedRequest = Request & { userId?: string };
 type ClerkError = {
   status?: number;
@@ -96,6 +97,33 @@ function workspaceId(req: AuthenticatedRequest) {
   return getAuth(req).orgId || "default";
 }
 
+async function resolveClientMemberUsers(client: ClerkClient, memberUserIds: string[]) {
+  const usersById = new Map<string, User>();
+  let nextUserIndex = 0;
+
+  async function resolveNextUser(): Promise<void> {
+    while (true) {
+      const userIndex = nextUserIndex++;
+      if (userIndex >= memberUserIds.length) return;
+
+      const userId = memberUserIds[userIndex];
+      try {
+        usersById.set(userId, await client.users.getUser(userId));
+      } catch {
+        // A deleted or temporarily unavailable Clerk profile should not hide
+        // other valid memberships from the client assignment response.
+      }
+    }
+  }
+
+  await Promise.all(
+    Array.from(
+      { length: Math.min(CLIENT_MEMBER_PROFILE_LOOKUP_CONCURRENCY, memberUserIds.length) },
+      () => resolveNextUser(),
+    ),
+  );
+  return usersById;
+}
 async function serializeClients(client: ClerkClient, scope: string, clientId?: string) {
   const records = await db
     .select()
@@ -111,18 +139,7 @@ async function serializeClients(client: ClerkClient, scope: string, clientId?: s
     .from(clientMembersTable)
     .where(inArray(clientMembersTable.clientId, records.map((record) => record.id)));
   const memberUserIds = [...new Set(memberships.map((membership) => membership.userId))];
-  const userResults = await Promise.allSettled(
-    memberUserIds.map(async (userId) => [userId, await client.users.getUser(userId)] as const),
-  );
-  const usersById = new Map<string, User>();
-  for (const result of userResults) {
-    if (result.status === "fulfilled") {
-      usersById.set(result.value[0], result.value[1]);
-      continue;
-    }
-    const error = result.reason as ClerkError;
-    if (error.status !== 404) throw result.reason;
-  }
+  const usersById = await resolveClientMemberUsers(client, memberUserIds);
 
   return records.map((record) => ({
     id: record.id,
