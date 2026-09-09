@@ -1,7 +1,7 @@
 const TEXT_EXTENSIONS = new Set(["csv", "txt", "md", "json", "rtf"])
 export const dismissedImportStoragePrefix = "luminova-folder-import-dismissed:"
 
-type DismissalStorage = Pick<Storage, "getItem" | "setItem">
+type DismissalStorage = Pick<Storage, "getItem" | "setItem" | "removeItem" | "length" | "key">
 
 export type FolderCandidate = {
   file: File
@@ -42,6 +42,25 @@ export const rememberDismissedImportError = (
     storage.setItem(dismissedImportStorageKey(importId), "true")
   } catch {
     // The provider still suppresses the current session when browser storage is unavailable.
+  }
+}
+
+export const cleanupDismissedImportErrors = (
+  recoverableImportId: string | null,
+  storage: DismissalStorage = window.localStorage,
+) => {
+  try {
+    const staleKeys: string[] = []
+    const recoverableKey = recoverableImportId ? dismissedImportStorageKey(recoverableImportId) : null
+    for (let index = 0; index < storage.length; index++) {
+      const key = storage.key(index)
+      if (key?.startsWith(dismissedImportStoragePrefix) && key !== recoverableKey) {
+        staleKeys.push(key)
+      }
+    }
+    staleKeys.forEach((key) => storage.removeItem(key))
+  } catch {
+    // A storage failure must not block import recovery or hide a server error.
   }
 }
 

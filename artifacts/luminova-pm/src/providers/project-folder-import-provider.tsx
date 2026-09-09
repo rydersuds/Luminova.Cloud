@@ -4,7 +4,7 @@ import { getGetDashboardSummaryQueryKey, getGetProjectsQueryKey } from "@workspa
 import { useAuth } from "@clerk/react"
 import { CheckCircle2, ChevronDown, ChevronUp, LoaderCircle, UploadCloud, XCircle } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
-import { boundedTextSnippet, collectFolderCandidates, rememberDismissedImportError, readBatchImportResponse, wasImportErrorDismissed, type FolderCandidate, type SkippedFolderFile } from "@/lib/project-folder-import"
+import { boundedTextSnippet, cleanupDismissedImportErrors, collectFolderCandidates, rememberDismissedImportError, readBatchImportResponse, wasImportErrorDismissed, type FolderCandidate, type SkippedFolderFile } from "@/lib/project-folder-import"
 
 export type FolderImportStatus = "idle" | "uploading" | "building" | "success" | "error"
 type FolderImportProgress = { uploaded: number; failed: number }
@@ -216,6 +216,7 @@ export function ProjectFolderImportProvider({
       setFolderStatus("success")
       setFolderError("")
       await clearImportFiles(session.importId, session.documents.map((item) => item.relativePath))
+      cleanupDismissedImportErrors(null)
       sessionRef.current = null
       activeImportRef.current = false
       toast({ title: "Project initialized", description: "The folder was uploaded and the project build completed." })
@@ -262,7 +263,13 @@ export function ProjectFolderImportProvider({
       try {
         const response = await authenticatedFetch("/api/project-import-sessions")
         const session = await readBatchImportResponse<ImportSession | null>(response, { operation: "Restoring the import session" })
-        if (!session || cancelled) return
+        if (cancelled) return
+        cleanupDismissedImportErrors(session?.status === "completed" ? null : session?.importId ?? null)
+        if (!session) return
+        if (session.status === "completed") {
+          await clearImportFiles(session.importId, session.documents.map((item) => item.relativePath))
+          return
+        }
         if (dismissedImportIdsRef.current.has(session.importId) || wasImportErrorDismissed(session.importId)) {
           if (sessionRef.current?.importId === session.importId) clearFolderImport()
           return

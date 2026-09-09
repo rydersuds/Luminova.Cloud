@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { formatDateOnly } from "./utils.ts"
-import { boundedTextSnippet, collectFolderCandidates, dismissedImportStorageKey, folderFileIssue, normalizeRelativePath, readBatchImportResponse, rememberDismissedImportError, wasImportErrorDismissed } from "./project-folder-import.ts"
+import { boundedTextSnippet, cleanupDismissedImportErrors, collectFolderCandidates, dismissedImportStorageKey, folderFileIssue, normalizeRelativePath, readBatchImportResponse, rememberDismissedImportError, wasImportErrorDismissed } from "./project-folder-import.ts"
 import { LEGAL_CONSENT_LABEL, PRIVACY_PATH, TERMS_PATH, canSubmitSignIn } from "./legal-consent.ts"
 
 test("sign-in eligibility requires affirmative legal consent", () => {
@@ -137,6 +137,9 @@ test("dismissed folder import errors stay hidden for the same import after refre
   const storage = {
     getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => { values.set(key, value) },
+    removeItem: (key: string) => { values.delete(key) },
+    get length() { return values.size },
+    key: (index: number) => [...values.keys()][index] ?? null,
   }
 
   rememberDismissedImportError("import-failed", storage)
@@ -144,4 +147,46 @@ test("dismissed folder import errors stay hidden for the same import after refre
   assert.equal(wasImportErrorDismissed("import-failed", storage), true)
   assert.equal(values.get(dismissedImportStorageKey("import-failed")), "true")
   assert.equal(wasImportErrorDismissed("import-new", storage), false)
+})
+
+test("dismissed import cleanup preserves the recoverable session and removes older markers", () => {
+  const values = new Map<string, string>([
+    [dismissedImportStorageKey("import-old"), "true"],
+    [dismissedImportStorageKey("import-active"), "true"],
+    ["luminova-user-preference", "dark"],
+  ])
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => { values.set(key, value) },
+    removeItem: (key: string) => { values.delete(key) },
+    get length() { return values.size },
+    key: (index: number) => [...values.keys()][index] ?? null,
+  }
+
+  cleanupDismissedImportErrors("import-active", storage)
+
+  assert.equal(values.has(dismissedImportStorageKey("import-old")), false)
+  assert.equal(values.get(dismissedImportStorageKey("import-active")), "true")
+  assert.equal(values.get("luminova-user-preference"), "dark")
+})
+
+test("dismissed import cleanup removes all markers once no session can recover", () => {
+  const values = new Map<string, string>([
+    [dismissedImportStorageKey("import-completed"), "true"],
+    [dismissedImportStorageKey("import-expired"), "true"],
+    ["luminova-user-preference", "dark"],
+  ])
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => { values.set(key, value) },
+    removeItem: (key: string) => { values.delete(key) },
+    get length() { return values.size },
+    key: (index: number) => [...values.keys()][index] ?? null,
+  }
+
+  cleanupDismissedImportErrors(null, storage)
+
+  assert.equal(values.has(dismissedImportStorageKey("import-completed")), false)
+  assert.equal(values.has(dismissedImportStorageKey("import-expired")), false)
+  assert.equal(values.get("luminova-user-preference"), "dark")
 })
