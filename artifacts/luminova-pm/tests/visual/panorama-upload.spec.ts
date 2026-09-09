@@ -46,6 +46,9 @@ async function openGallery(page: Page) {
 
 test.beforeEach(async ({ page }) => {
   let current = structuredClone(project);
+  await page.addInitScript(() => {
+    window.localStorage.setItem('luminova-cookie-consent-v1', 'accepted');
+  });
   await page.route('**/api/storage/uploads/request-url', route => route.fulfill({
     json: {
       uploadURL: 'http://localhost:4173/__panorama-upload',

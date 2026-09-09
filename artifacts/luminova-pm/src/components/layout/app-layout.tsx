@@ -341,7 +341,10 @@ export function AppLayoutView({
   }, [location, sidebarCollapsed, sidebarOpen])
 
   return (
-    <div data-testid="app-layout" className="min-h-[100dvh] flex flex-col md:flex-row bg-background bg-tech-grid text-foreground selection:bg-primary selection:text-primary-foreground">
+    <div data-testid="app-layout" className="relative isolate min-h-[100dvh] flex flex-col md:flex-row overflow-x-clip bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
+      <div data-testid="app-background" aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-tech-grid">
+        <div className="absolute inset-0 bg-gradient-to-br from-background/20 via-transparent to-background/80" />
+      </div>
       <div className="md:hidden flex items-center justify-between p-4 glass-panel-dark text-sidebar-foreground z-30 relative border-b border-sidebar-border shadow-md">
         <div className="flex items-center">
           <img src="/luminova-logo.png" alt="Luminova Construction" className="h-10 w-36 object-contain object-left drop-shadow-md" />
@@ -559,8 +562,7 @@ export function AppLayoutView({
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col min-w-0 relative md:overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-background/20 via-transparent to-background/80 z-0" />
+      <main className="relative z-10 flex-1 flex flex-col min-w-0 md:overflow-hidden">
         <div className="relative z-10 flex-1 flex flex-col min-h-0 md:h-full md:overflow-hidden">
           {children}
         </div>

@@ -231,6 +231,20 @@ function App() {
     );
   }
 
+  if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/users')) {
+    return (
+      <WouterRouter base={basePath}>
+        <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl}>
+          <QueryClientProvider client={queryClient}>
+            <TooltipProvider>
+              <Suspense fallback={<PageFallback />}><Users /></Suspense>
+            </TooltipProvider>
+          </QueryClientProvider>
+        </ClerkProvider>
+      </WouterRouter>
+    );
+  }
+
   if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/sidebar')) {
     return <SidebarVisualHarness />;
   }
