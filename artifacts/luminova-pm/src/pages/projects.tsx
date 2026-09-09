@@ -40,7 +40,7 @@ export default function Projects() {
 
   return (
     <AppLayout>
-      <div className="min-h-0 flex-1 overflow-auto bg-transparent">
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto bg-transparent">
         <div className="mx-auto max-w-[1600px] space-y-7 p-4 sm:p-6 md:p-8">
           <header className="flex flex-col gap-5 border-b border-border/60 pb-7 lg:flex-row lg:items-end lg:justify-between">
             <div>

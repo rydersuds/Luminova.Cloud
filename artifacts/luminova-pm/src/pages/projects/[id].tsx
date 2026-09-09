@@ -488,7 +488,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
 
   return (
     <AppLayout>
-      <div className="flex-1 overflow-auto bg-background flex flex-col">
+      <div className="flex-1 overflow-x-hidden overflow-y-auto bg-background flex flex-col">
         {/* Project Header (Dark Chrome) */}
         <div className="bg-sidebar text-sidebar-foreground shrink-0 border-b border-sidebar-border">
           <div className="max-w-[1400px] mx-auto p-6 md:p-8 space-y-6">

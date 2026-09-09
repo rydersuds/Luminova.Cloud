@@ -190,7 +190,7 @@ export default function Users() {
 
   return (
     <AppLayout>
-      <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-6 md:p-8">
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 md:p-8">
         <div className="mx-auto max-w-6xl space-y-7">
           <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>

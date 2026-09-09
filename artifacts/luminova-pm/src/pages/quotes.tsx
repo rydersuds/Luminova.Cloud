@@ -82,7 +82,7 @@ export default function Quotes() {
 
   return (
     <AppLayout>
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         <div className="mx-auto max-w-[1500px] space-y-6 p-4 sm:p-6 md:p-8">
           <header className="flex flex-col gap-5 border-b border-border/60 pb-7 lg:flex-row lg:items-end lg:justify-between">
             <div>

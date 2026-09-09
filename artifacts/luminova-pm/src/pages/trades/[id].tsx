@@ -370,7 +370,7 @@ export default function TradeDetail() {
 
   return (
     <AppLayout>
-      <div className="flex-1 overflow-auto bg-background flex flex-col">
+      <div className="flex-1 overflow-x-hidden overflow-y-auto bg-background flex flex-col">
         <div className="border-b border-border bg-card">
           <div className="max-w-5xl mx-auto p-6 md:p-8">
             <button 

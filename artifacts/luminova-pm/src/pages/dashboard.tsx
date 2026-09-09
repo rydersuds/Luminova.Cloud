@@ -212,7 +212,7 @@ export default function Dashboard() {
 
   return (
     <AppLayout>
-      <div className="min-h-0 flex-1 md:overflow-auto bg-transparent pb-12">
+      <div className="min-h-0 flex-1 overflow-x-hidden md:overflow-y-auto bg-transparent pb-12">
         <div className="p-4 sm:p-6 md:p-8 max-w-[1600px] mx-auto space-y-8">
           
           {/* Header */}
@@ -402,7 +402,7 @@ export default function Dashboard() {
                                   </Button>
                                 </div>
                               </div>
-                              <div className="surface-3d bg-black/20 max-h-[230px] overflow-auto p-3 font-mono text-xs">
+                              <div className="surface-3d bg-black/20 max-h-[230px] overflow-x-hidden overflow-y-auto p-3 font-mono text-xs">
                                 {folderFiles.slice(0, 100).map(({ relativePath, file }) => <div key={relativePath} className="flex justify-between gap-4 border-b border-border/20 py-2"><span className="truncate">{relativePath}</span><span className="shrink-0 text-muted-foreground">{(file.size / 1024 / 1024).toFixed(1)} MB</span></div>)}
                                 {folderFiles.length > 100 && <p className="pt-3 text-muted-foreground">Showing the first 100 files.</p>}
                                 {!!skippedFolderFiles.length && <div className="mt-3 border-t border-destructive/30 pt-2 text-destructive">{skippedFolderFiles.slice(0, 20).map((item, index) => <p key={`${item.name}-${index}`}>{item.name}: {item.reason}</p>)}{skippedFolderFiles.length > 20 && <p>Plus {skippedFolderFiles.length - 20} more skipped files.</p>}</div>}
@@ -439,7 +439,7 @@ export default function Dashboard() {
                               </div>
 
                               <div className="surface-3d bg-black/20 overflow-hidden">
-                                <div className="max-h-[300px] overflow-auto">
+                                <div className="max-h-[300px] overflow-x-hidden overflow-y-auto">
                                   <table className="w-full text-sm text-left">
                                     <thead className="text-[10px] font-mono uppercase text-muted-foreground bg-black/50 sticky top-0 z-10 shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
                                       <tr>

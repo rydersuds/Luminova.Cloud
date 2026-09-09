@@ -63,7 +63,7 @@ export default function Invoices() {
 
   return (
     <AppLayout>
-      <div className="flex-1 overflow-auto bg-background p-6 md:p-8">
+      <div className="flex-1 overflow-x-hidden overflow-y-auto bg-background p-6 md:p-8">
         <div className="max-w-6xl mx-auto space-y-8">
           
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
