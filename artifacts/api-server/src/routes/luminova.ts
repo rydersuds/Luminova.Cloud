@@ -65,7 +65,11 @@ import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import { ObjectStorageService } from "../lib/objectStorage";
-import { enrichFinancialDocumentSnippets } from "../lib/financialDocumentExtraction";
+import {
+  enrichFinancialDocumentSnippets,
+  extractInternalBudgetFromDocuments,
+  type InternalBudgetLineItem,
+} from "../lib/financialDocumentExtraction";
 
 type AuthenticatedRequest = Request & { userId?: string };
 const router: IRouter = Router();
@@ -636,6 +640,8 @@ type Project = (typeof projects)[number] & {
     revision: string;
     portions: Array<{ code: string; label: string; amount: number }>;
   };
+  budgetLineItems?: InternalBudgetLineItem[];
+  internalBudgetSource?: string;
 };
 type Invoice = (typeof invoices)[number] & {
   direction?: "luminova_to_client" | "company_to_luminova";
@@ -900,7 +906,7 @@ const detailsFor = async (project: Project, ownerId?: string) => {
       ...project,
       startDate: "",
       clientQuote,
-      lineItems: [],
+      lineItems: project.budgetLineItems ?? [],
       invoices: projectInvoices,
       trades: vendorRows.map((row) => row.data as Trade),
       photos,
@@ -926,7 +932,7 @@ const detailsFor = async (project: Project, ownerId?: string) => {
     ...project,
     startDate: "",
     clientQuote,
-    lineItems: [],
+    lineItems: project.budgetLineItems ?? [],
     invoices: (await allInvoices()).filter((invoice) => invoice.projectId === project.id),
     trades: [],
     photos: [],
@@ -1152,8 +1158,12 @@ const createProjectImportHandler = async (req: Request, res: Response): Promise<
 
   let analysis: ImportAnalysis;
   let analyzedDocuments = parsed.data.documents;
+  let internalBudget: Awaited<ReturnType<typeof extractInternalBudgetFromDocuments>> = null;
   try {
-    analyzedDocuments = await enrichFinancialDocumentSnippets(parsed.data.documents, req.log);
+    [analyzedDocuments, internalBudget] = await Promise.all([
+      enrichFinancialDocumentSnippets(parsed.data.documents, req.log),
+      extractInternalBudgetFromDocuments(parsed.data.documents, req.log),
+    ]);
     analysis = await analyzeProjectImport(analyzedDocuments);
     analysis = {
       ...analysis,
@@ -1176,10 +1186,14 @@ const createProjectImportHandler = async (req: Request, res: Response): Promise<
     pmName: analysis.project.pmName,
     clientName: analysis.project.clientName,
     targetDate: analysis.project.targetDate && isValidCalendarDate(analysis.project.targetDate) ? analysis.project.targetDate : "",
-    budgeted: Math.round((analysis.project.budgetDollars ?? 0) * 100) / 100,
+    budgeted: internalBudget?.total ?? Math.round((analysis.project.budgetDollars ?? 0) * 100) / 100,
     invoiced: 0,
     exteriorImage: "",
     description: analysis.project.description,
+    ...(internalBudget ? {
+      budgetLineItems: internalBudget.lineItems,
+      internalBudgetSource: internalBudget.sourceRelativePath,
+    } : {}),
   };
   const vendorByName = new Map((await allTrades()).map((trade) => [trade.companyName.toLowerCase(), trade]));
   const importedVendors: Trade[] = [];
@@ -1233,6 +1247,16 @@ const createProjectImportHandler = async (req: Request, res: Response): Promise<
       lineItem: extracted.lineItem, overage,
     });
     if (extracted.direction === "luminova_to_client") project.invoiced += amount;
+    if (extracted.direction === "company_to_luminova" && project.budgetLineItems) {
+      project.budgetLineItems.push({
+        id: `internal-actual-${invoicesCreated}`,
+        code: `ACT-${String(invoicesCreated + 1).padStart(2, "0")}`,
+        description: `Unallocated actual cost — ${extracted.lineItem}`,
+        budgeted: 0,
+        invoiced: amount,
+        variance: -amount,
+      });
+    }
     invoicesCreated++;
   }
 

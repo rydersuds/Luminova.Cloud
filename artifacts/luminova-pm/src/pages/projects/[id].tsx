@@ -420,7 +420,8 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
     )
   }
 
-  const budgetVariance = project.budgeted - project.invoiced
+  const actualCost = project.lineItems.reduce((sum, item) => sum + item.invoiced, 0)
+  const budgetVariance = project.budgeted - actualCost
   const varianceIsPositive = budgetVariance >= 0
   const clientQuoteRemaining = project.clientQuote.total - project.invoiced
   const clientQuoteInvoicedPercent = project.clientQuote.total > 0
@@ -588,15 +589,15 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-sidebar-border rounded-lg overflow-hidden border border-sidebar-border">
               <div className="bg-sidebar p-4 space-y-1">
-                <p className="text-sm text-sidebar-foreground/60">Budgeted</p>
+                <p className="text-sm text-sidebar-foreground/60">Internal Budget</p>
                 <p className="text-xl font-bold tabular-nums">{formatCurrency(project.budgeted)}</p>
               </div>
               <div className="bg-sidebar p-4 space-y-1">
-                <p className="text-sm text-sidebar-foreground/60">Invoiced</p>
-                <p className="text-xl font-bold tabular-nums">{formatCurrency(project.invoiced)}</p>
+                <p className="text-sm text-sidebar-foreground/60">Actual / Committed</p>
+                <p className="text-xl font-bold tabular-nums">{formatCurrency(actualCost)}</p>
               </div>
               <div className="bg-sidebar p-4 space-y-1">
-                <p className="text-sm text-sidebar-foreground/60">Variance</p>
+                <p className="text-sm text-sidebar-foreground/60">Budget Remaining</p>
                 <p className={cn("text-xl font-bold tabular-nums", varianceIsPositive ? "text-success" : "text-destructive")}>
                   {varianceIsPositive ? "+" : ""}{formatCurrency(budgetVariance)}
                 </p>
@@ -1046,7 +1047,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
                     <CardTitle>Budget vs Actual</CardTitle>
-                    <CardDescription>Line item breakdown</CardDescription>
+                    <CardDescription>Internal cost budget with verified actual or committed costs; client billings are excluded.</CardDescription>
                   </div>
                   <Button>Add Line Item</Button>
                 </CardHeader>
@@ -1057,7 +1058,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                         <TableHead className="w-[100px]">Code</TableHead>
                         <TableHead>Description</TableHead>
                         <TableHead className="text-right">Budgeted</TableHead>
-                        <TableHead className="text-right">Invoiced</TableHead>
+                        <TableHead className="text-right">Actual / Committed</TableHead>
                         <TableHead className="text-right">Variance</TableHead>
                       </TableRow>
                     </TableHeader>
