@@ -26,11 +26,21 @@ type FolderImportContextValue = {
   collectFolderFiles: (files: File[]) => void
   startFolderImport: () => Promise<void>
   clearFolderImport: () => void
+  dismissFolderError: () => void
   isActive: boolean
 }
 
 const ProjectFolderImportContext = React.createContext<FolderImportContextValue | null>(null)
 const importFileDatabase = "luminova-folder-imports"
+const dismissedImportStoragePrefix = "luminova-folder-import-dismissed:"
+
+const wasImportErrorDismissed = (importId: string) => {
+  try {
+    return window.localStorage.getItem(`${dismissedImportStoragePrefix}${importId}`) === "true"
+  } catch {
+    return false
+  }
+}
 
 async function withImportFiles<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest<T> | void): Promise<T | undefined> {
   const database = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -90,12 +100,25 @@ export function ProjectFolderImportProvider({
   const clearFolderImport = React.useCallback(() => {
     if (activeImportRef.current) return
     folderFilesRef.current = []
+    sessionRef.current = null
     setFolderFiles([])
     setSkippedFolderFiles([])
     setFolderProgress({ uploaded: 0, failed: 0 })
     setFolderError("")
     setFolderStatus("idle")
   }, [isActive])
+
+  const dismissFolderError = React.useCallback(() => {
+    const importId = sessionRef.current?.importId
+    if (importId) {
+      try {
+        window.localStorage.setItem(`${dismissedImportStoragePrefix}${importId}`, "true")
+      } catch {
+        // Dismissal still applies for the current session if storage is unavailable.
+      }
+    }
+    clearFolderImport()
+  }, [clearFolderImport])
 
   const collectFolderFiles = React.useCallback((files: File[]) => {
     if (activeImportRef.current) return
@@ -250,7 +273,7 @@ export function ProjectFolderImportProvider({
       try {
         const response = await authenticatedFetch("/api/project-import-sessions")
         const session = await readBatchImportResponse<ImportSession | null>(response, { operation: "Restoring the import session" })
-        if (!session || cancelled) return
+        if (!session || cancelled || wasImportErrorDismissed(session.importId)) return
         sessionRef.current = session
         const restored = (await Promise.all(session.documents.map(async (document) => {
           const file = await loadImportFile(session.importId, document.relativePath)
@@ -315,7 +338,7 @@ export function ProjectFolderImportProvider({
     }
   }, [authenticatedFetch, isLoaded, isSignedIn, queryClient, startFolderImport])
 
-  return <ProjectFolderImportContext.Provider value={{ folderFiles, skippedFolderFiles, folderStatus, folderProgress, folderError, collectFolderFiles, startFolderImport, clearFolderImport, isActive }}>
+  return <ProjectFolderImportContext.Provider value={{ folderFiles, skippedFolderFiles, folderStatus, folderProgress, folderError, collectFolderFiles, startFolderImport, clearFolderImport, dismissFolderError, isActive }}>
     {children}
     <FolderImportActivity />
   </ProjectFolderImportContext.Provider>
@@ -329,7 +352,7 @@ export function useProjectFolderImport() {
 
 function FolderImportActivity() {
   const { isSignedIn } = useAuth()
-  const { folderFiles, skippedFolderFiles, folderStatus, folderProgress, folderError, clearFolderImport } = useProjectFolderImport()
+  const { folderFiles, skippedFolderFiles, folderStatus, folderProgress, folderError, dismissFolderError } = useProjectFolderImport()
   const [expanded, setExpanded] = React.useState(true)
   if (!isSignedIn || folderStatus === "idle") return null
   const active = folderStatus === "uploading" || folderStatus === "building"
@@ -370,7 +393,7 @@ function FolderImportActivity() {
         {folderStatus === "building" ? "Uploads complete. Reading documents and creating the project." : `${folderFiles.length} supported files · ${skippedFolderFiles.length} skipped`}
       </p>
       {folderError && <p role="alert" className="mt-2 text-xs text-destructive">{folderError}</p>}
-      {!active && <button type="button" onClick={clearFolderImport} className="mt-3 w-full rounded-lg border border-primary/25 px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-primary transition-colors hover:bg-primary/10">Dismiss status</button>}
+      {!active && <button type="button" onClick={dismissFolderError} className="mt-3 w-full rounded-lg border border-primary/25 px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-primary transition-colors hover:bg-primary/10">{isError ? "Dismiss error" : "Dismiss status"}</button>}
     </div>}
   </aside>
 }
