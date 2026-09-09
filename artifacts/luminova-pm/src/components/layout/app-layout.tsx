@@ -215,33 +215,43 @@ export function AppLayoutView({
       const indicatorElement = indicatorRef.current
       const direction = target.top > startTop ? 1 : -1
       const distance = Math.abs(target.top - startTop)
-      const stretch = Math.min(1.28, 1.08 + distance / 900)
+      const stretch = Math.min(1.62, 1.22 + distance / 520)
       const travelAnimation = indicatorElement.animate(
         [
           {
             transform: `translateY(${startTop}px) scale(1.025, 1)`,
             borderRadius: "12px",
+            filter: "brightness(1) saturate(1)",
             offset: 0,
           },
           {
-            transform: `translateY(${startTop + (target.top - startTop) * 0.28}px) scale(0.94, ${stretch})`,
-            borderRadius: direction > 0 ? "18px 18px 34px 34px" : "34px 34px 18px 18px",
-            offset: 0.34,
+            transform: `translate(7px, ${startTop + (target.top - startTop) * 0.18}px) scale(0.86, ${stretch})`,
+            borderRadius: direction > 0 ? "28px 16px 46px 34px" : "46px 34px 28px 16px",
+            filter: "brightness(1.2) saturate(1.25)",
+            offset: 0.28,
           },
           {
-            transform: `translateY(${target.top - direction * 11}px) scale(1.08, 0.92)`,
-            borderRadius: direction > 0 ? "28px 28px 15px 15px" : "15px 15px 28px 28px",
-            offset: 0.82,
+            transform: `translate(-5px, ${startTop + (target.top - startTop) * 0.62}px) scale(0.93, 1.24)`,
+            borderRadius: direction > 0 ? "18px 36px 42px 20px" : "42px 20px 18px 36px",
+            filter: "brightness(1.3) saturate(1.35)",
+            offset: 0.62,
           },
           {
-            transform: `translateY(${target.top - direction * 5}px) scale(1.035, 0.98)`,
-            borderRadius: "16px",
+            transform: `translate(3px, ${target.top - direction * 16}px) scale(1.16, 0.78)`,
+            borderRadius: direction > 0 ? "38px 30px 14px 18px" : "14px 18px 38px 30px",
+            filter: "brightness(1.22) saturate(1.2)",
+            offset: 0.86,
+          },
+          {
+            transform: `translateY(${target.top - direction * 7}px) scale(1.08, 0.92)`,
+            borderRadius: "20px",
+            filter: "brightness(1.1) saturate(1.1)",
             offset: 1,
           },
         ],
         {
-          duration: Math.min(520, 350 + distance * 0.32),
-          easing: "cubic-bezier(0.2, 0.72, 0.18, 1)",
+          duration: Math.min(720, 500 + distance * 0.55),
+          easing: "cubic-bezier(0.18, 0.72, 0.16, 1)",
           fill: "both",
         },
       )
@@ -252,23 +262,23 @@ export function AppLayoutView({
           [
             { opacity: 0, transform: "translate(0, 0) scale(0.35)" },
             {
-              opacity: 0.85,
-              transform: `translate(${side * (6 + index * 3)}px, ${direction * (10 + index * 8)}px) scale(${0.75 + index * 0.12})`,
-              offset: 0.38,
+              opacity: 1,
+              transform: `translate(${side * (13 + index * 5)}px, ${direction * (12 + index * 10)}px) scale(${0.95 + index * 0.16})`,
+              offset: 0.3,
             },
             {
-              opacity: 0.55,
-              transform: `translate(${side * (3 + index * 2)}px, ${direction * Math.max(18, distance * 0.5)}px) scale(${0.55 + index * 0.1})`,
-              offset: 0.76,
+              opacity: 0.8,
+              transform: `translate(${side * (7 + index * 3)}px, ${direction * Math.max(24, distance * 0.58)}px) scale(${0.7 + index * 0.12})`,
+              offset: 0.7,
             },
             {
               opacity: 0,
-              transform: `translate(0, ${direction * Math.max(24, distance * 0.72)}px) scale(0.18)`,
+              transform: `translate(0, ${direction * Math.max(34, distance * 0.86)}px) scale(0.12)`,
             },
           ],
           {
-            duration: Math.min(480, 320 + distance * 0.28),
-            delay: index * 28,
+            duration: Math.min(680, 450 + distance * 0.48),
+            delay: index * 45,
             easing: "cubic-bezier(0.2, 0.65, 0.25, 1)",
             fill: "both",
           },
@@ -284,13 +294,18 @@ export function AppLayoutView({
         const settleAnimation = indicatorElement.animate(
           [
             {
-              transform: `translateY(${target.top - direction * 5}px) scale(1.035, 0.98)`,
-              borderRadius: "16px",
+              transform: `translateY(${target.top - direction * 7}px) scale(1.08, 0.92)`,
+              borderRadius: "20px",
             },
             {
-              transform: `translateY(${target.top + direction * 3}px) scale(0.99, 1.045)`,
-              borderRadius: "13px",
-              offset: 0.58,
+              transform: `translateY(${target.top + direction * 7}px) scale(0.9, 1.15)`,
+              borderRadius: "24px 16px 22px 18px",
+              offset: 0.42,
+            },
+            {
+              transform: `translateY(${target.top - direction * 2}px) scale(1.09, 0.94)`,
+              borderRadius: "16px 22px 15px 20px",
+              offset: 0.72,
             },
             {
               transform: `translateY(${target.top}px) scale(1.025, 1)`,
@@ -298,8 +313,8 @@ export function AppLayoutView({
             },
           ],
           {
-            duration: 210,
-            easing: "cubic-bezier(0.22, 0.9, 0.28, 1)",
+            duration: 320,
+            easing: "cubic-bezier(0.2, 0.86, 0.24, 1)",
             fill: "both",
           },
         )
@@ -431,7 +446,7 @@ export function AppLayoutView({
             data-last-motion={indicator.lastMotion}
             aria-hidden="true"
             className={cn(
-              "pointer-events-none absolute z-0 overflow-visible rounded-xl bg-primary shadow-[inset_0_1px_2px_rgba(255,255,255,0.38),0_5px_18px_-3px_hsl(var(--primary)/0.72)] will-change-transform",
+              "pointer-events-none absolute z-0 overflow-visible rounded-xl bg-primary shadow-[inset_0_2px_3px_rgba(255,255,255,0.52),0_0_18px_hsl(var(--primary)/0.55),0_8px_28px_-4px_hsl(var(--primary)/0.9)] will-change-transform",
               sidebarCollapsed ? "left-2 right-2" : "left-4 right-4",
               !indicator.ready && "opacity-0",
             )}
@@ -440,12 +455,12 @@ export function AppLayoutView({
             <span
               ref={(element) => { indicatorBubbleRefs.current[0] = element }}
               aria-hidden="true"
-              className="absolute left-[18%] top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-primary shadow-[0_2px_8px_hsl(var(--primary)/0.55)] opacity-0"
+              className="absolute left-[14%] top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-primary shadow-[inset_0_1px_2px_rgba(255,255,255,0.5),0_0_14px_hsl(var(--primary)/0.8)] opacity-0"
             />
             <span
               ref={(element) => { indicatorBubbleRefs.current[1] = element }}
               aria-hidden="true"
-              className="absolute right-[16%] top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-primary shadow-[0_2px_8px_hsl(var(--primary)/0.55)] opacity-0"
+              className="absolute right-[12%] top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-primary shadow-[inset_0_1px_2px_rgba(255,255,255,0.5),0_0_12px_hsl(var(--primary)/0.8)] opacity-0"
             />
           </div>
           <div
