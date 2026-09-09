@@ -184,6 +184,8 @@ async function makeImportCleanupStorageUnavailable(page: Page) {
     };
   });
 }
+
+test('reload resumes an interrupted import by uploading only missing files', async ({ page }) => {
   const api = await installImportApi(page);
   api.blockAdditionalAttaches(true);
 
@@ -211,6 +213,20 @@ async function makeImportCleanupStorageUnavailable(page: Page) {
 
 test('reload while building polls until the existing build resolves', async ({ page }) => {
   const api = await installImportApi(page);
+  api.holdBuild();
+  await selectAndStart(page);
+  await expect(page.getByLabel('Import status')).toHaveText('building');
+  expect(api.buildRequests).toBe(1);
+
+  await page.reload();
+  await expect(page.getByLabel('Import status')).toHaveText('building');
+  api.setStatus('completed');
+  await expect(page.getByLabel('Import status')).toHaveText('success', { timeout: 5_000 });
+  expect(api.buildRequests).toBe(1);
+});
+
+test('completed import stays successful when browser cleanup fails', async ({ page }) => {
+  const api = await installImportApi(page);
   await makeImportCleanupStorageUnavailable(page);
 
   await selectAndStart(page);
@@ -224,52 +240,64 @@ test('reload while building polls until the existing build resolves', async ({ p
 
 test('dismissed import errors stay hidden for the session when dismissal storage is unavailable', async ({ page }) => {
   const api = await installImportApi(page);
-    api.setImportId(`import-storage-${failure}`);
-    api.seedDocuments();
-    api.setStatus('failed', 'The previous build was interrupted. Retry to continue.');
-    await makeImportFileStorageUnavailable(page, failure);
+  api.setImportId('import-storage-unavailable');
+  api.failUploads(true);
+  await makeDismissalStorageUnavailable(page);
 
-    await page.goto('/__visual/folder-import');
-    const activity = page.getByRole('complementary', { name: 'Project folder import activity' });
-    const dashboardAlert = page.getByTestId('dashboard-import-alert');
-    await expect(activity.getByRole('alert')).toContainText('Browser file storage is unavailable');
-    await expect(activity.getByRole('alert')).toContainText('Select the project folder again to retry');
-    await expect(dashboardAlert).toContainText('Browser file storage is unavailable');
-    await expect(dashboardAlert).toContainText('Select the project folder again to retry');
+  await selectAndStart(page);
+  const activity = page.getByRole('complementary', { name: 'Project folder import activity' });
+  const dashboardAlert = page.getByTestId('dashboard-import-alert');
+  await expect(activity.getByRole('alert')).toContainText('2 files still need to be uploaded');
+  await expect(dashboardAlert).toContainText('2 files still need to be uploaded');
 
-    await page.getByLabel('Project folder files').setInputFiles(files);
-    await page.getByRole('button', { name: 'Start import' }).click();
-    await expect(page.getByLabel('Import status')).toHaveText('success', { timeout: 10_000 });
-    expect(api.projectsCreated).toBe(1);
-    expect(api.uploadedPaths.size).toBe(2);
-  });
-}
+  await activity.getByRole('button', { name: 'Dismiss error' }).click();
+  await expect(activity).not.toBeVisible();
+  await expect(dashboardAlert).not.toBeVisible();
+  await expect(page.evaluate(() => {
+    try {
+      localStorage.getItem('luminova-folder-import-dismissed:import-storage-unavailable');
+      return false;
+    } catch {
+      return true;
+    }
+  })).resolves.toBe(true);
 
-test('a stale build becomes retryable without duplicating attached documents', async ({ page }) => {
+  await page.reload();
+  await expect(activity.getByRole('alert')).toContainText('2 files still need to be uploaded', { timeout: 10_000 });
+  await expect(dashboardAlert).toContainText('2 files still need to be uploaded');
+});
+
+test('dismissed import errors stay hidden after refresh without suppressing a new import', async ({ page }) => {
   const api = await installImportApi(page);
-    api.setImportId(`import-storage-${failure}`);
-    api.seedDocuments();
-    api.setStatus('failed', 'The previous build was interrupted. Retry to continue.');
-    await makeImportFileStorageUnavailable(page, failure);
+  api.setImportId('import-dismissed');
+  api.failUploads(true);
 
-    await page.goto('/__visual/folder-import');
-    const activity = page.getByRole('complementary', { name: 'Project folder import activity' });
-    const dashboardAlert = page.getByTestId('dashboard-import-alert');
-    await expect(activity.getByRole('alert')).toContainText('Browser file storage is unavailable');
-    await expect(activity.getByRole('alert')).toContainText('Select the project folder again to retry');
-    await expect(dashboardAlert).toContainText('Browser file storage is unavailable');
-    await expect(dashboardAlert).toContainText('Select the project folder again to retry');
+  await selectAndStart(page);
+  const activity = page.getByRole('complementary', { name: 'Project folder import activity' });
+  const dashboardAlert = page.getByTestId('dashboard-import-alert');
+  await expect(activity.getByRole('alert')).toContainText('2 files still need to be uploaded');
+  await expect(dashboardAlert).toContainText('2 files still need to be uploaded');
 
-    await page.getByLabel('Project folder files').setInputFiles(files);
-    await page.getByRole('button', { name: 'Start import' }).click();
-    await expect(page.getByLabel('Import status')).toHaveText('success', { timeout: 10_000 });
-    expect(api.projectsCreated).toBe(1);
-    expect(api.uploadedPaths.size).toBe(2);
-  });
-}
+  await activity.getByRole('button', { name: 'Dismiss error' }).click();
+  await expect(activity).not.toBeVisible();
+  await expect(dashboardAlert).not.toBeVisible();
+  await expect(page.evaluate(() => localStorage.getItem('luminova-folder-import-dismissed:import-dismissed'))).resolves.toBe('true');
 
-test('a stale build becomes retryable without duplicating attached documents', async ({ page }) => {
-  const api = await installImportApi(page);
+  await page.reload();
+  await expect(activity).not.toBeVisible();
+  await expect(dashboardAlert).not.toBeVisible();
+
+  api.setImportId('import-new');
+  await page.getByLabel('Project folder files').setInputFiles(files);
+  await page.getByRole('button', { name: 'Start import' }).click();
+  await expect(activity.getByRole('alert')).toContainText('2 files still need to be uploaded');
+  await expect(dashboardAlert).toContainText('2 files still need to be uploaded');
+  await expect(page.evaluate(() => localStorage.getItem('luminova-folder-import-dismissed:import-new'))).resolves.toBeNull();
+});
+
+for (const failure of ['open', 'transaction'] as const) {
+  test(`a ${failure} failure during recovery explains the retry and accepts a new folder`, async ({ page }) => {
+    const api = await installImportApi(page);
     api.setImportId(`import-storage-${failure}`);
     api.seedDocuments();
     api.setStatus('failed', 'The previous build was interrupted. Retry to continue.');
