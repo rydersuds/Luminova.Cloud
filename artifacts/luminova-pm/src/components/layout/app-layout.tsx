@@ -246,6 +246,7 @@ export function AppLayoutView({
             transform: `translateY(${target.top - direction * 7}px) scale(1.08, 0.92)`,
             borderRadius: "20px",
             filter: "brightness(1.1) saturate(1.1)",
+            opacity: 0.88,
             offset: 1,
           },
         ],
@@ -267,25 +268,33 @@ export function AppLayoutView({
             {
               transform: `translateY(${target.top - direction * 7}px) scale(1.08, 0.92)`,
               borderRadius: "20px",
+              filter: "brightness(1.16) saturate(1.14)",
+              opacity: 0.88,
             },
             {
               transform: `translateY(${target.top + direction * 7}px) scale(0.9, 1.15)`,
               borderRadius: "24px 16px 22px 18px",
+              filter: "brightness(1.1) saturate(1.08)",
+              opacity: 0.93,
               offset: 0.42,
             },
             {
               transform: `translateY(${target.top - direction * 2}px) scale(1.09, 0.94)`,
               borderRadius: "16px 22px 15px 20px",
+              filter: "brightness(1.04) saturate(1.03)",
+              opacity: 0.975,
               offset: 0.72,
             },
             {
               transform: `translateY(${target.top}px) scale(1.025, 1)`,
               borderRadius: "12px",
+              filter: "brightness(1) saturate(1)",
+              opacity: 1,
             },
           ],
           {
-            duration: 320,
-            easing: "cubic-bezier(0.2, 0.86, 0.24, 1)",
+            duration: 390,
+            easing: "cubic-bezier(0.16, 0.82, 0.22, 1)",
             fill: "both",
           },
         )
