@@ -60,6 +60,26 @@ test("portfolio financial summary only includes the authenticated owner's record
       },
     },
     {
+      id: `trade-luminova-${suffix}`,
+      importBatchId: batchIds[0],
+      ownerId,
+      data: {
+        id: `trade-luminova-${suffix}`, companyName: "Luminova Construction", contactName: "Owner",
+        tradeType: "Construction owner", region: "Calgary", rating: 0, reviewCount: 0,
+        completedJobs: 0, initials: "LC", accent: "#000000",
+      },
+    },
+    {
+      id: `trade-weidner-${suffix}`,
+      importBatchId: batchIds[0],
+      ownerId,
+      data: {
+        id: `trade-weidner-${suffix}`, companyName: "Weidner Apartment Homes", contactName: "Client",
+        tradeType: "Client", region: "Calgary", rating: 0, reviewCount: 0,
+        completedJobs: 0, initials: "WA", accent: "#000000",
+      },
+    },
+    {
       id: `trade-b-${suffix}`,
       importBatchId: batchIds[1],
       ownerId: otherOwnerId,
@@ -239,8 +259,9 @@ test("portfolio financial summary only includes the authenticated owner's record
   const tradeListResponse = await fetch(`http://127.0.0.1:${port}/trades`, {
     headers: { "x-test-user": ownerId },
   });
-  const tradeList = await tradeListResponse.json() as Array<{ id: string }>;
+  const tradeList = await tradeListResponse.json() as Array<{ id: string; companyName: string }>;
   assert.deepEqual(tradeList.map((item) => item.id), [`trade-a-${suffix}`]);
+  assert.equal(tradeList.some((item) => /luminova|weidner/i.test(item.companyName)), false);
   assert.equal((await fetch(`http://127.0.0.1:${port}/trades/trade-b-${suffix}`, {
     headers: { "x-test-user": ownerId },
   })).status, 404);

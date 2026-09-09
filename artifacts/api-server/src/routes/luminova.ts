@@ -696,6 +696,10 @@ const durableData = async <T>(table: typeof importedProjectsTable | typeof impor
   (await db.select({ data: table.data }).from(table)).map((row) => row.data as T);
 
 const normalizePartyName = (value: string) => value.replace(/[^a-z0-9]/gi, "").toLowerCase();
+const isDirectoryTrade = (trade: Pick<Trade, "companyName">) => {
+  const normalizedName = normalizePartyName(trade.companyName);
+  return !normalizedName.startsWith("luminova") && !normalizedName.startsWith("weidner");
+};
 
 const jobHistoryForTrade = async (trade: Trade, ownerId: string) => {
   const [projectRows, records] = await Promise.all([
@@ -901,18 +905,21 @@ const tradesForOwner = async (ownerId: string) => {
     vendorReviews.push(record.rating);
     reviewsByVendor.set(record.vendorId, vendorReviews);
   }
-  return tradeRows.map((row) => row.data as Trade).map((trade) => ({
-    ...trade,
-    completedJobs: (
-      completedProjectsByVendor.get(trade.id)
-      ?? completedProjectsByVendor.get(normalizePartyName(trade.companyName))
-    )?.size ?? 0,
-    reviewCount: reviewsByVendor.get(trade.id)?.length ?? 0,
-    rating: (() => {
-      const ratings = reviewsByVendor.get(trade.id) ?? [];
-      return ratings.length ? Math.round((ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length) * 10) / 10 : 0;
-    })(),
-  }));
+  return tradeRows
+    .map((row) => row.data as Trade)
+    .filter(isDirectoryTrade)
+    .map((trade) => ({
+      ...trade,
+      completedJobs: (
+        completedProjectsByVendor.get(trade.id)
+        ?? completedProjectsByVendor.get(normalizePartyName(trade.companyName))
+      )?.size ?? 0,
+      reviewCount: reviewsByVendor.get(trade.id)?.length ?? 0,
+      rating: (() => {
+        const ratings = reviewsByVendor.get(trade.id) ?? [];
+        return ratings.length ? Math.round((ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length) * 10) / 10 : 0;
+      })(),
+    }));
 };
 const findOwnedProject = async (projectId: string, ownerId: string) =>
   (await projectsForOwner(ownerId)).find((project) => project.id === projectId);

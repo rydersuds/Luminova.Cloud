@@ -31,29 +31,34 @@ export default function TradesDirectory() {
   return (
     <AppLayout>
       <div className="flex-1 overflow-auto bg-background">
-        <div className="bg-sidebar border-b border-sidebar-border text-sidebar-foreground py-12 px-6 md:px-8">
+        <div className="border-b border-border bg-background text-foreground dark:border-sidebar-border dark:bg-sidebar dark:text-sidebar-foreground">
           <div className="max-w-5xl mx-auto space-y-6">
-            <h1 className="text-3xl md:text-4xl font-heading font-bold">Trades & Vendors Directory</h1>
-            <p className="text-sidebar-foreground/70 max-w-2xl text-lg">
+            <div className="px-6 py-10 md:px-8 md:py-12">
+            <div className="mb-2 flex items-center gap-2">
+              <span className="h-px w-6 bg-primary" />
+              <span className="font-mono text-xs uppercase tracking-[0.22em] text-primary">Vendor network</span>
+            </div>
+            <h1 className="text-3xl font-heading font-bold md:text-4xl">Trades & Vendors Directory</h1>
+            <p className="mt-2 max-w-2xl text-base text-muted-foreground dark:text-sidebar-foreground/70 md:text-lg">
               Find, evaluate, and manage subcontractors across all regions. Review past performance before requesting bids.
             </p>
             
-            <div className="flex flex-col sm:flex-row gap-4 max-w-3xl mt-8">
+            <div className="mt-8 flex max-w-3xl flex-col gap-4 sm:flex-row">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-sidebar-foreground/50" />
+                <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground dark:text-sidebar-foreground/50" />
                 <Input 
                   placeholder="Search by company or contact name..." 
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="pl-10 h-12 bg-sidebar-accent border-sidebar-border text-sidebar-foreground placeholder:text-sidebar-foreground/50"
+                  className="h-12 border-input bg-card pl-10 text-foreground placeholder:text-muted-foreground dark:border-sidebar-border dark:bg-sidebar-accent dark:text-sidebar-foreground dark:placeholder:text-sidebar-foreground/50"
                 />
               </div>
               <div className="relative w-full sm:w-64">
-                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-sidebar-foreground/50" />
+                <Filter className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground dark:text-sidebar-foreground/50" />
                 <select
                   value={tradeType}
                   onChange={(e) => setTradeType(e.target.value)}
-                  className="w-full h-12 pl-10 pr-4 rounded-md bg-sidebar-accent border border-sidebar-border text-sidebar-foreground appearance-none focus:outline-none focus:ring-1 focus:ring-sidebar-primary"
+                  className="h-12 w-full appearance-none rounded-md border border-input bg-card pl-10 pr-4 text-foreground focus:outline-none focus:ring-1 focus:ring-ring dark:border-sidebar-border dark:bg-sidebar-accent dark:text-sidebar-foreground dark:focus:ring-sidebar-primary"
                 >
                   <option value="">All Trades</option>
                   <option value="Electrical">Electrical</option>
@@ -63,6 +68,7 @@ export default function TradesDirectory() {
                   <option value="Concrete">Concrete</option>
                 </select>
               </div>
+            </div>
             </div>
           </div>
         </div>
