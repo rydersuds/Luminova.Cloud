@@ -103,7 +103,7 @@ export default function Quotes() {
           </section>
 
           <section className="glass-panel tech-border space-y-4 p-4 sm:p-5">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_repeat(4,170px)_auto]">
+            <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(220px,1fr)_repeat(4,170px)_auto]">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Quote, project, vendor, notes" className="bg-background/70 pl-9" />

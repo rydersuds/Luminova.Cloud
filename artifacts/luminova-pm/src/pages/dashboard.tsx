@@ -212,11 +212,12 @@ export default function Dashboard() {
 
   return (
     <AppLayout>
-      <div className="min-h-0 flex-1 overflow-x-hidden md:overflow-y-auto bg-transparent pb-12">
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto bg-transparent pb-12">
         <div className="p-4 sm:p-6 md:p-8 max-w-[1600px] mx-auto space-y-8">
           
           {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-border/50">
+          <div className="flex flex-col gap-6 pb-6 border-b border-border/50">
+            <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="h-px w-6 bg-primary"></span>
@@ -228,10 +229,7 @@ export default function Dashboard() {
               </p>
             </div>
             
-            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:gap-4">
-              <GlobalSearch />
-
-              <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                 <DialogTrigger asChild>
                   <Button className="w-full sm:w-auto gap-2 btn-3d font-bold tracking-wide shadow-xl bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-5 sm:px-6">
                     <Plus className="h-4 w-4 drop-shadow-sm" />
@@ -482,6 +480,9 @@ export default function Dashboard() {
                   </div>
                 </DialogContent>
               </Dialog>
+            </div>
+            <div className="w-full max-w-3xl">
+              <GlobalSearch />
             </div>
           </div>
 

@@ -401,8 +401,8 @@ export default function TradeDetail() {
               </div>
 
               <div className="flex-1 space-y-2">
-                <div className="flex items-center gap-3">
-                  <h1 className="text-3xl font-heading font-bold">{trade.companyName}</h1>
+                <div className="flex min-w-0 flex-wrap items-center gap-3">
+                  <h1 className="break-words text-3xl font-heading font-bold">{trade.companyName}</h1>
                   <Badge variant="outline" className="border-primary text-primary">{trade.tradeType}</Badge>
                 </div>
                 <p className="text-lg text-muted-foreground">Contact: {trade.contactName}</p>

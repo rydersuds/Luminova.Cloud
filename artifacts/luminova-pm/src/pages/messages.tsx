@@ -72,9 +72,9 @@ export default function Messages() {
           <div className="absolute -left-[10%] -top-[20%] h-[60%] w-[60%] animate-pulse rounded-full bg-primary/10 blur-[140px] motion-reduce:animate-none" />
           <div className="absolute -bottom-[20%] -right-[10%] h-[60%] w-[60%] animate-pulse rounded-full bg-primary/5 blur-[140px] motion-reduce:animate-none" />
         </div>
-        <div className="relative z-10 mx-auto flex w-full max-w-[1600px] flex-1 gap-6 p-0 md:p-6">
+        <div className="relative z-10 mx-auto flex min-w-0 w-full max-w-[1600px] flex-1 gap-6 p-0 md:p-6">
           <div className={cn(
-            "absolute inset-0 z-20 flex w-full shrink-0 flex-col bg-background md:static md:flex md:w-80 md:translate-x-0 md:bg-transparent lg:w-96",
+            "absolute inset-0 z-20 flex w-full max-w-full shrink-0 flex-col bg-background md:static md:flex md:w-72 md:translate-x-0 md:bg-transparent lg:w-96",
             isMobileListOpen ? "translate-x-0" : "hidden md:flex",
           )}>
             <div className="flex flex-1 flex-col overflow-hidden md:rounded-3xl md:border md:border-sidebar-border md:bg-sidebar/40 md:shadow-2xl">
@@ -140,7 +140,7 @@ export default function Messages() {
               "absolute inset-0 z-30 flex min-w-0 flex-1 flex-col bg-background md:static md:flex md:bg-transparent",
               isMobileListOpen ? "hidden md:flex" : "flex",
             )}>
-              <div className="flex flex-1 flex-col overflow-hidden md:rounded-3xl md:border md:border-sidebar-border md:bg-sidebar/30 md:shadow-2xl">
+              <div className="flex min-w-0 flex-1 flex-col overflow-hidden md:rounded-3xl md:border md:border-sidebar-border md:bg-sidebar/30 md:shadow-2xl">
                 <header className="flex h-[76px] shrink-0 items-center gap-3 border-b border-sidebar-border/50 bg-sidebar/80 px-4 backdrop-blur-xl md:px-6">
                   <button type="button" onClick={() => setIsMobileListOpen(true)} className="rounded-full p-2 md:hidden" aria-label="Back to conversations">
                     <ChevronLeft className="h-6 w-6" />
@@ -163,7 +163,7 @@ export default function Messages() {
                     <div key={item.id} className="group ml-auto flex max-w-[85%] justify-end md:max-w-[70%]">
                       <div className="flex flex-col items-end">
                         <div className="rounded-2xl rounded-tr-sm border border-primary/20 bg-primary px-5 py-3.5 text-sm leading-relaxed text-primary-foreground shadow-lg">
-                          <p>{item.text}</p>
+                           <p className="break-words">{item.text}</p>
                         </div>
                         <div className="mt-1.5 flex items-center gap-1.5 px-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                           <span>{formatTime(item.createdAt)}</span>

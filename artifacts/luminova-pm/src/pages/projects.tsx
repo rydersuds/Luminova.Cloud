@@ -80,7 +80,7 @@ export default function Projects() {
               <SlidersHorizontal className="h-4 w-4 text-primary" />
               Filter projects
             </div>
-            <div className="grid gap-3 md:grid-cols-[minmax(220px,1fr)_220px_220px_auto]">
+            <div className="grid gap-3 xl:grid-cols-[minmax(220px,1fr)_220px_220px_auto]">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input

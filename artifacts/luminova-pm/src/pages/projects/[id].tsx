@@ -502,7 +502,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
             
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
               <div className="space-y-3">
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <Badge variant={getStatusColor(project.status) as any} className="capitalize">
                     {project.status}
                   </Badge>
@@ -510,9 +510,9 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                 </div>
                 <h1 className="text-3xl md:text-4xl font-heading font-bold">{project.name}</h1>
                 <div className="flex flex-wrap items-center gap-4 md:gap-6 text-sm text-sidebar-foreground/80">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex min-w-0 items-start gap-1.5">
                     <MapPin className="h-4 w-4 text-sidebar-primary" />
-                    {project.address}
+                    <span className="break-words">{project.address}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Calendar className="h-4 w-4 text-sidebar-primary" />
@@ -525,13 +525,13 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                 </div>
               </div>
               
-              <div className="flex items-center gap-3">
-                <Button variant="outline" className="bg-transparent border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground" onClick={() => setLocation(`/quotes?projectId=${project.id}`)}>
+              <div className="flex max-w-full flex-wrap items-center gap-3">
+                <Button variant="outline" className="max-w-full whitespace-normal bg-transparent border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground" onClick={() => setLocation(`/quotes?projectId=${project.id}`)}>
                   Vendor Quotes
                 </Button>
                 <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
                   <DialogTrigger asChild>
-                    <Button variant="outline" className="bg-transparent border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground">
+                    <Button variant="outline" className="max-w-full whitespace-normal bg-transparent border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground">
                       Edit Project
                     </Button>
                   </DialogTrigger>
