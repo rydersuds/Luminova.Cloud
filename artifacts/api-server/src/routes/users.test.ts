@@ -686,10 +686,57 @@ test("bounds large profile lookups without dropping valid client memberships", a
   ]);
 
   const response = await fetch(`${base}/clients`);
-  assert.equal(response.status, 200);
-  const clients = await response.json() as Array<{ members: Array<{ userId: string }> }>;
-  assert.deepEqual(clients[0].members.map((member) => member.userId), assignedUsers.map((user) => user.id));
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), { error: "Unable to load client member profiles" });
   assert.equal(fake.getMaxConcurrentUserLookups(), CLIENT_MEMBER_PROFILE_LOOKUP_CONCURRENCY);
+});
+
+test("returns a clear error instead of dropping valid memberships during a profile lookup failure", async () => {
+  const available = makeUser("available-client", "Client");
+  const temporarilyUnavailable = makeUser("temporarily-unavailable-client", "Client");
+  const fake = fakeClerk([makeUser("admin", "Admin"), available, temporarilyUnavailable]);
+  const getUser = fake.client.users.getUser;
+  let profileAvailable = false;
+  fake.client.users.getUser = async (id: string) => {
+    if (id === temporarilyUnavailable.id && !profileAvailable) {
+      throw {
+        status: 503,
+        errors: [{ longMessage: "Clerk profile service is temporarily unavailable." }],
+      };
+    }
+    return getUser(id);
+  };
+  const base = await startApi("admin", fake.client, undefined, "workspace-profile-failure");
+  const client = await createTestClient(base, "Profile Failure Client");
+
+  assert.equal((await grantClientAccess(base, client.id, available.id)).status, 201);
+  await db.insert(clientMembersTable).values({
+    id: "temporarily-unavailable-membership",
+    clientId: client.id,
+    userId: temporarilyUnavailable.id,
+    addedBy: "admin",
+  });
+
+  const failure = await fetch(`${base}/clients`);
+  assert.equal(failure.status, 502);
+  assert.deepEqual(await failure.json(), {
+    error: "Clerk profile service is temporarily unavailable.",
+  });
+
+  profileAvailable = true;
+  const recovered = await fetch(`${base}/clients`);
+  assert.equal(recovered.status, 200);
+  const clients = await recovered.json() as Array<{
+    id: string;
+    members: Array<{ userId: string; name: string; email: string; role: string; addedAt: number }>;
+  }>;
+  const recoveredClient = clients.find((candidate) => candidate.id === client.id);
+  assert(recoveredClient);
+  assert.deepEqual(recoveredClient.members.map((member) => member.userId).sort(), [
+    available.id,
+    temporarilyUnavailable.id,
+  ].sort());
+  assert.equal(recoveredClient.members.find((member) => member.userId === available.id)?.role, "Client");
 });
 
 test("rejects granting client access to a non-Client workspace user", async () => {

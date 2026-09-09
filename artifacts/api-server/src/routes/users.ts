@@ -37,6 +37,12 @@ type ClerkError = {
   errors?: Array<{ code?: string; message?: string; longMessage?: string }>;
 };
 
+class ClientMemberProfileLookupError extends Error {
+  constructor(public readonly clerkError: ClerkError) {
+    super("Unable to load client member profiles");
+    this.name = "ClientMemberProfileLookupError";
+  }
+}
 function postgresErrorCode(error: unknown): string | undefined {
   const candidate = error as { code?: unknown; cause?: { code?: unknown } };
   if (typeof candidate.code === "string") return candidate.code;
@@ -99,6 +105,7 @@ function workspaceId(req: AuthenticatedRequest) {
 
 async function resolveClientMemberUsers(client: ClerkClient, memberUserIds: string[]) {
   const usersById = new Map<string, User>();
+  let profileLookupError: ClerkError | undefined;
   let nextUserIndex = 0;
 
   async function resolveNextUser(): Promise<void> {
@@ -109,9 +116,11 @@ async function resolveClientMemberUsers(client: ClerkClient, memberUserIds: stri
       const userId = memberUserIds[userIndex];
       try {
         usersById.set(userId, await client.users.getUser(userId));
-      } catch {
-        // A deleted or temporarily unavailable Clerk profile should not hide
-        // other valid memberships from the client assignment response.
+      } catch (error) {
+        const clerkError = error as ClerkError;
+        if (clerkError.status !== 404 && !profileLookupError) {
+          profileLookupError = clerkError;
+        }
       }
     }
   }
@@ -122,8 +131,12 @@ async function resolveClientMemberUsers(client: ClerkClient, memberUserIds: stri
       () => resolveNextUser(),
     ),
   );
+  if (profileLookupError) {
+    throw new ClientMemberProfileLookupError(profileLookupError);
+  }
   return usersById;
 }
+
 async function serializeClients(client: ClerkClient, scope: string, clientId?: string) {
   const records = await db
     .select()
@@ -342,6 +355,12 @@ router.get("/clients", async (req: AuthenticatedRequest, res): Promise<void> => 
     await ensureKnownClients(scope, req.userId!);
     res.json(GetClientsResponse.parse(await serializeClients(client, scope)));
   } catch (error) {
+    if (error instanceof ClientMemberProfileLookupError) {
+      const normalized = clerkErrorResponse(error.clerkError, error.message);
+      req.log.warn({ status: normalized.status }, "Client member profile lookup failed");
+      res.status(normalized.status).json({ error: normalized.error });
+      return;
+    }
     req.log.error({ error }, "Client organization listing failed");
     res.status(500).json({ error: "Unable to load client organizations" });
   }
