@@ -54,6 +54,7 @@ import type {
   VendorQuoteInput,
   VendorQuoteUpdate,
   VendorReviewInput,
+  VendorReviewUpdateInput,
   WorkspaceInvitation,
   WorkspaceInvitationInput,
   WorkspaceUser,
@@ -1788,6 +1789,153 @@ export const useCreateTradeReview = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getCreateTradeReviewMutationOptions(options));
+    }
+
+export const getUpdateTradeReviewUrl = (tradeId: string,
+    reviewId: string,) => {
+
+
+
+
+  return `/api/trades/${tradeId}/reviews/${reviewId}`
+}
+
+/**
+ * @summary Correct a submitted vendor review
+ */
+export const updateTradeReview = async (tradeId: string,
+    reviewId: string,
+    vendorReviewUpdateInput: VendorReviewUpdateInput, options?: Parameters<typeof customFetch>[1]): Promise<Review> => {
+
+  return customFetch<Review>(getUpdateTradeReviewUrl(tradeId,reviewId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(vendorReviewUpdateInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateTradeReviewMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTradeReview>>, TError,{tradeId: string;reviewId: string;data: BodyType<VendorReviewUpdateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateTradeReview>>, TError,{tradeId: string;reviewId: string;data: BodyType<VendorReviewUpdateInput>}, TContext> => {
+
+const mutationKey = ['updateTradeReview'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTradeReview>>, {tradeId: string;reviewId: string;data: BodyType<VendorReviewUpdateInput>}> = (props) => {
+          const {tradeId,reviewId,data} = props ?? {};
+
+          return  updateTradeReview(tradeId,reviewId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateTradeReviewMutationResult = NonNullable<Awaited<ReturnType<typeof updateTradeReview>>>
+    export type UpdateTradeReviewMutationBody = BodyType<VendorReviewUpdateInput>
+    export type UpdateTradeReviewMutationError = ErrorType<void>
+
+    /**
+ * @summary Correct a submitted vendor review
+ */
+export const useUpdateTradeReview = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTradeReview>>, TError,{tradeId: string;reviewId: string;data: BodyType<VendorReviewUpdateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateTradeReview>>,
+        TError,
+        {tradeId: string;reviewId: string;data: BodyType<VendorReviewUpdateInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateTradeReviewMutationOptions(options));
+    }
+
+export const getDeleteTradeReviewUrl = (tradeId: string,
+    reviewId: string,) => {
+
+
+
+
+  return `/api/trades/${tradeId}/reviews/${reviewId}`
+}
+
+/**
+ * @summary Remove a submitted vendor review
+ */
+export const deleteTradeReview = async (tradeId: string,
+    reviewId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteTradeReviewUrl(tradeId,reviewId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteTradeReviewMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTradeReview>>, TError,{tradeId: string;reviewId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteTradeReview>>, TError,{tradeId: string;reviewId: string}, TContext> => {
+
+const mutationKey = ['deleteTradeReview'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTradeReview>>, {tradeId: string;reviewId: string}> = (props) => {
+          const {tradeId,reviewId} = props ?? {};
+
+          return  deleteTradeReview(tradeId,reviewId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteTradeReviewMutationResult = NonNullable<Awaited<ReturnType<typeof deleteTradeReview>>>
+
+    export type DeleteTradeReviewMutationError = ErrorType<void>
+
+    /**
+ * @summary Remove a submitted vendor review
+ */
+export const useDeleteTradeReview = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTradeReview>>, TError,{tradeId: string;reviewId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteTradeReview>>,
+        TError,
+        {tradeId: string;reviewId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteTradeReviewMutationOptions(options));
     }
 
 export const getGetInvoicesUrl = (params?: GetInvoicesParams,) => {

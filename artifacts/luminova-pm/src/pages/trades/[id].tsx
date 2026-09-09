@@ -5,12 +5,15 @@ import { AppLayout } from "@/components/layout/app-layout"
 import { 
   useGetTrade, 
   getGetTradeQueryKey,
+  getGetTradesQueryKey,
   useGetProjects,
   useGetCurrentWorkspaceUser,
   useCreateTradeJobHistory,
   useUpdateTradeJobHistory,
   useDeleteTradeJobHistory,
   useCreateTradeReview,
+  useUpdateTradeReview,
+  useDeleteTradeReview,
 } from "@workspace/api-client-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -57,9 +60,13 @@ export default function TradeDetail() {
   const updateJobHistory = useUpdateTradeJobHistory()
   const deleteJobHistory = useDeleteTradeJobHistory()
   const createReview = useCreateTradeReview()
+  const updateReview = useUpdateTradeReview()
+  const deleteReview = useDeleteTradeReview()
   const [historyDialog, setHistoryDialog] = React.useState<"create" | "edit" | null>(null)
   const [editingHistoryId, setEditingHistoryId] = React.useState<string | null>(null)
   const [reviewDialog, setReviewDialog] = React.useState(false)
+  const [editReviewDialog, setEditReviewDialog] = React.useState(false)
+  const [editingReviewId, setEditingReviewId] = React.useState<string | null>(null)
   const [feedback, setFeedback] = React.useState<Feedback>(null)
   const [historyForm, setHistoryForm] = React.useState({ projectId: "", date: today(), amount: "", source: "" })
   const [reviewForm, setReviewForm] = React.useState({ projectId: "", date: today(), rating: "5", comment: "", source: "" })
@@ -69,7 +76,10 @@ export default function TradeDetail() {
   const availableProjects = projects ?? []
   const completedProjectIds = new Set(trade?.jobHistory.map((job) => job.projectId) ?? [])
   const reviewProjects = availableProjects.filter((project) => completedProjectIds.has(project.id))
-  const refreshTrade = () => queryClient.invalidateQueries({ queryKey: getGetTradeQueryKey(tradeId) })
+  const refreshTrade = () => Promise.all([
+    queryClient.invalidateQueries({ queryKey: getGetTradeQueryKey(tradeId) }),
+    queryClient.invalidateQueries({ queryKey: getGetTradesQueryKey() }),
+  ])
 
   const openNewHistory = () => {
     setFeedback(null)
@@ -159,6 +169,56 @@ export default function TradeDetail() {
       setFeedback({ kind: "success", message: "Verified review submitted." })
     } catch (error) {
       setFeedback({ kind: "error", message: errorMessage(error, "Unable to submit the review.") })
+    }
+  }
+
+  const openEditReview = (review: NonNullable<typeof trade>["reviews"][number]) => {
+    setFeedback(null)
+    setEditingReviewId(review.id)
+    setReviewForm({
+      projectId: review.projectId,
+      date: review.date,
+      rating: String(review.rating),
+      comment: review.comment,
+      source: review.source,
+    })
+    setEditReviewDialog(true)
+  }
+
+  const submitEditReview = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setFeedback(null)
+    if (!editingReviewId || !reviewForm.comment.trim()) {
+      setFeedback({ kind: "error", message: "Enter a review before saving." })
+      return
+    }
+    try {
+      await updateReview.mutateAsync({
+        tradeId,
+        reviewId: editingReviewId,
+        data: {
+          date: reviewForm.date,
+          rating: Number(reviewForm.rating),
+          comment: reviewForm.comment.trim(),
+        },
+      })
+      setEditReviewDialog(false)
+      await refreshTrade()
+      setFeedback({ kind: "success", message: "Verified review updated." })
+    } catch (error) {
+      setFeedback({ kind: "error", message: errorMessage(error, "Unable to update the review.") })
+    }
+  }
+
+  const removeReview = async (reviewId: string) => {
+    if (!window.confirm("Remove this submitted review? This cannot be undone.")) return
+    setFeedback(null)
+    try {
+      await deleteReview.mutateAsync({ tradeId, reviewId })
+      await refreshTrade()
+      setFeedback({ kind: "success", message: "Verified review removed." })
+    } catch (error) {
+      setFeedback({ kind: "error", message: errorMessage(error, "Unable to remove the review.") })
     }
   }
 
@@ -387,18 +447,27 @@ export default function TradeDetail() {
                   {canReview && reviewProjects.length === 0 && (
                     <p className="text-sm text-muted-foreground">A verified completed project is required before submitting a review.</p>
                   )}
-                  {trade.reviews.length > 0 ? trade.reviews.map((review, i) => (
-                    <Card key={i}>
+                  {trade.reviews.length > 0 ? trade.reviews.map((review) => (
+                    <Card key={review.id}>
                       <CardContent className="p-5 space-y-3">
                         <div className="flex justify-between items-start">
                           <div>
                             <p className="font-medium text-foreground">{review.projectName}</p>
                             <p className="text-xs text-muted-foreground">Reviewed by {review.reviewer} • {formatDate(review.date)}</p>
+                            <p className="text-xs text-muted-foreground mt-1">Verified via {review.source}</p>
                           </div>
-                          <div className="flex gap-1">
-                            {Array.from({ length: 5 }).map((_, j) => (
-                              <Star key={j} className={cn("h-4 w-4", j < review.rating ? "fill-primary text-primary" : "fill-muted text-muted")} />
-                            ))}
+                          <div className="flex items-start gap-3">
+                            <div className="flex gap-1">
+                              {Array.from({ length: 5 }).map((_, j) => (
+                                <Star key={j} className={cn("h-4 w-4", j < review.rating ? "fill-primary text-primary" : "fill-muted text-muted")} />
+                              ))}
+                            </div>
+                            {isAdmin && (
+                              <div className="flex gap-2">
+                                <Button type="button" variant="ghost" size="sm" onClick={() => openEditReview(review)}>Edit</Button>
+                                <Button type="button" variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => void removeReview(review.id)} disabled={deleteReview.isPending}>Remove</Button>
+                              </div>
+                            )}
                           </div>
                         </div>
                         <p className="text-sm text-foreground/80 italic">"{review.comment}"</p>
@@ -492,6 +561,39 @@ export default function TradeDetail() {
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setReviewDialog(false)}>Cancel</Button>
               <Button type="submit" disabled={createReview.isPending}>Submit review</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={editReviewDialog} onOpenChange={setEditReviewDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Correct verified review</DialogTitle>
+            <DialogDescription>
+              The reviewer, completed project, and verification source stay attached to this record.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(event) => void submitEditReview(event)} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-review-date">Review date</Label>
+                <Input id="edit-review-date" type="date" value={reviewForm.date} onChange={(event) => setReviewForm((current) => ({ ...current, date: event.target.value }))} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-review-rating">Rating</Label>
+                <select id="edit-review-rating" value={reviewForm.rating} onChange={(event) => setReviewForm((current) => ({ ...current, rating: event.target.value }))} className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm">
+                  {[5, 4, 3, 2, 1].map((rating) => <option key={rating} value={rating}>{rating} / 5</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-review-comment">Review</Label>
+              <Textarea id="edit-review-comment" value={reviewForm.comment} onChange={(event) => setReviewForm((current) => ({ ...current, comment: event.target.value }))} maxLength={2000} required />
+            </div>
+            {feedback?.kind === "error" && <p role="alert" className="text-sm text-destructive">{feedback.message}</p>}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditReviewDialog(false)}>Cancel</Button>
+              <Button type="submit" disabled={updateReview.isPending}>Save changes</Button>
             </DialogFooter>
           </form>
         </DialogContent>

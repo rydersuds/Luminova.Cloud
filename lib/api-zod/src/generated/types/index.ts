@@ -53,6 +53,7 @@ export * from './vendorQuoteLineItemInput';
 export * from './vendorQuoteStatus';
 export * from './vendorQuoteUpdate';
 export * from './vendorReviewInput';
+export * from './vendorReviewUpdateInput';
 export * from './workspaceInvitation';
 export * from './workspaceInvitationInput';
 export * from './workspaceRole';

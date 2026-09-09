@@ -822,6 +822,58 @@ export const CreateTradeReviewResponse = zod.object({
 
 
 /**
+ * @summary Correct a submitted vendor review
+ */
+
+
+
+export const UpdateTradeReviewParams = zod.object({
+  "tradeId": zod.coerce.string(),
+  "reviewId": zod.coerce.string().min(1)
+})
+
+export const updateTradeReviewBodyDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateTradeReviewBodyRatingMax = 5;
+
+export const updateTradeReviewBodyCommentMax = 2000;
+
+
+
+export const UpdateTradeReviewBody = zod.object({
+  "date": zod.string().regex(updateTradeReviewBodyDateRegExp),
+  "rating": zod.number().int().min(1).max(updateTradeReviewBodyRatingMax),
+  "comment": zod.string().min(1).max(updateTradeReviewBodyCommentMax)
+})
+
+export const UpdateTradeReviewResponse = zod.object({
+  "id": zod.string(),
+  "vendorId": zod.string(),
+  "projectId": zod.string(),
+  "projectName": zod.string(),
+  "reviewerId": zod.string(),
+  "reviewer": zod.string(),
+  "date": zod.string(),
+  "rating": zod.number().int(),
+  "comment": zod.string(),
+  "source": zod.string()
+})
+
+
+/**
+ * @summary Remove a submitted vendor review
+ */
+
+
+
+export const DeleteTradeReviewParams = zod.object({
+  "tradeId": zod.coerce.string(),
+  "reviewId": zod.coerce.string().min(1)
+})
+
+export const DeleteTradeReviewResponse = zod.void()
+
+
+/**
  * @summary List invoices
  */
 export const GetInvoicesQueryParams = zod.object({

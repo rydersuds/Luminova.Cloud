@@ -56,6 +56,10 @@ import {
   CreateTradeReviewBody,
   CreateTradeReviewParams,
   CreateTradeReviewResponse,
+  UpdateTradeReviewBody,
+  UpdateTradeReviewParams,
+  UpdateTradeReviewResponse,
+  DeleteTradeReviewParams,
 } from "@workspace/api-zod";
 import { DatabasePanoramaStore } from "../lib/panoramaStore";
 import {
@@ -1889,6 +1893,78 @@ router.post("/trades/:tradeId/reviews", async (req: AuthenticatedRequest, res): 
     date: record.reviewedDate,
     reviewer: record.reviewerName,
   }));
+});
+
+router.patch("/trades/:tradeId/reviews/:reviewId", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!await requireWorkspaceRole(req, res, ["Admin"], "Administrator access required")) return;
+  const params = UpdateTradeReviewParams.safeParse(req.params);
+  const body = UpdateTradeReviewBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: "Invalid review update" });
+    return;
+  }
+  const trade = (await allTrades()).find((item) => item.id === params.data.tradeId);
+  if (!trade) {
+    res.status(404).json({ error: "Trade not found" });
+    return;
+  }
+  const [existing] = await db.select().from(vendorReviewTable)
+    .where(and(
+      eq(vendorReviewTable.id, params.data.reviewId),
+      eq(vendorReviewTable.vendorId, trade.id),
+    ))
+    .limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Review not found" });
+    return;
+  }
+  const updated = {
+    ...existing,
+    reviewedDate: body.data.date,
+    rating: body.data.rating,
+    comment: body.data.comment.trim(),
+    updatedAt: new Date(),
+  };
+  await db.update(vendorReviewTable).set({
+    reviewedDate: updated.reviewedDate,
+    rating: updated.rating,
+    comment: updated.comment,
+    updatedAt: updated.updatedAt,
+  }).where(eq(vendorReviewTable.id, existing.id));
+  const project = await findProject(existing.projectId);
+  res.json(UpdateTradeReviewResponse.parse({
+    ...updated,
+    projectName: project?.name || existing.projectId,
+    date: updated.reviewedDate,
+    reviewer: existing.reviewerName,
+  }));
+});
+
+router.delete("/trades/:tradeId/reviews/:reviewId", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!await requireWorkspaceRole(req, res, ["Admin"], "Administrator access required")) return;
+  const params = DeleteTradeReviewParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const trade = (await allTrades()).find((item) => item.id === params.data.tradeId);
+  if (!trade) {
+    res.status(404).json({ error: "Trade not found" });
+    return;
+  }
+  const [existing] = await db.select({ id: vendorReviewTable.id })
+    .from(vendorReviewTable)
+    .where(and(
+      eq(vendorReviewTable.id, params.data.reviewId),
+      eq(vendorReviewTable.vendorId, trade.id),
+    ))
+    .limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Review not found" });
+    return;
+  }
+  await db.delete(vendorReviewTable).where(eq(vendorReviewTable.id, existing.id));
+  res.sendStatus(204);
 });
 
 router.get("/trades/:tradeId", async (req, res) => {

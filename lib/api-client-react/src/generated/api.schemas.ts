@@ -334,6 +334,21 @@ export interface VendorReviewInput {
   source: string;
 }
 
+export interface VendorReviewUpdateInput {
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  date: string;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  rating: number;
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  comment: string;
+}
+
 export interface InvoiceInput {
   invoiceNumber: string;
   projectId: string;
