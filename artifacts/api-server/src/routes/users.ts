@@ -160,7 +160,7 @@ async function ensureKnownClients(scope: string, createdBy: string) {
   });
 }
 
-async function revokeClientMemberships(userId: string, scope: string) {
+export async function revokeClientMemberships(userId: string, scope: string) {
   const clients = await db
     .select({ id: clientsTable.id })
     .from(clientsTable)
@@ -179,6 +179,7 @@ async function deleteClientMemberships(userId: string) {
 type ClerkClient = typeof clerk;
 type AdminLock = <T>(operation: () => Promise<T>) => Promise<T>;
 
+type RevokeClientMemberships = (userId: string, scope: string) => Promise<void>;
 async function withWorkspaceAdminLock<T>(operation: () => Promise<T>): Promise<T> {
   const connection = await pool.connect();
   try {
@@ -257,7 +258,11 @@ export function clerkErrorResponse(error: unknown, fallback: string) {
   return { status: 502, error: detail?.longMessage || detail?.message || fallback };
 }
 
-export function createUsersRouter(client: ClerkClient = clerk, withAdminLock: AdminLock = withWorkspaceAdminLock) {
+export function createUsersRouter(
+  client: ClerkClient = clerk,
+  withAdminLock: AdminLock = withWorkspaceAdminLock,
+  revokeMemberships: RevokeClientMemberships = revokeClientMemberships,
+) {
 const router = Router();
 
 router.get("/users/me", async (req: AuthenticatedRequest, res): Promise<void> => {
@@ -551,12 +556,17 @@ router.patch("/users/:userId", async (req: AuthenticatedRequest, res): Promise<v
         updatedTarget = await client.users.getUser(updatedTarget.id);
       }
       if (body.data.role) {
-        const wasClient = workspaceRole(updatedTarget) === "Client";
-        updatedTarget = await client.users.updateUserMetadata(updatedTarget.id, {
-          publicMetadata: { ...updatedTarget.publicMetadata, role: body.data.role },
-        });
-        if (wasClient && body.data.role !== "Client") {
-          await revokeClientMemberships(updatedTarget.id, workspaceId(req));
+        if (workspaceRole(updatedTarget) !== body.data.role) {
+          updatedTarget = await client.users.updateUserMetadata(updatedTarget.id, {
+            publicMetadata: { ...updatedTarget.publicMetadata, role: body.data.role },
+          });
+        }
+        if (body.data.role !== "Client") {
+          try {
+            await revokeMemberships(updatedTarget.id, workspaceId(req));
+          } catch (error) {
+            throw new ClientAccessCleanupError(error);
+          }
         }
       }
       return updatedTarget;
@@ -578,6 +588,11 @@ router.patch("/users/:userId", async (req: AuthenticatedRequest, res): Promise<v
     }
     res.json(UpdateWorkspaceUserResponse.parse(serializeUser(target)));
   } catch (error) {
+    if (error instanceof ClientAccessCleanupError) {
+      req.log.error({ error: error.cause }, "Client access cleanup failed after role update");
+      res.status(503).json({ error: error.message });
+      return;
+    }
     const normalized = clerkErrorResponse(error, "Clerk could not update this user");
     req.log.warn({ status: normalized.status }, "Clerk user update failed");
     res.status(normalized.status).json({ error: normalized.error });
@@ -619,3 +634,13 @@ return router;
 }
 
 export default createUsersRouter();
+
+class ClientAccessCleanupError extends Error {
+  readonly cause: unknown;
+
+  constructor(cause: unknown) {
+    super("The role was updated, but client access cleanup failed. Retry this role change to finish removing access.");
+    this.name = "ClientAccessCleanupError";
+    this.cause = cause;
+  }
+}

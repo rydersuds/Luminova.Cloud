@@ -5,7 +5,7 @@ import type { Server } from "node:http";
 import type { User } from "@clerk/backend";
 import { clientMembersTable, clientsTable, db } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
-import { clerkErrorResponse, createUsersRouter } from "./users";
+import { clerkErrorResponse, createUsersRouter, revokeClientMemberships } from "./users";
 
 type Role = "Admin" | "Project Manager" | "Field Team" | "Client";
 
@@ -120,6 +120,7 @@ async function startApi(
   client: ReturnType<typeof fakeClerk>["client"],
   lock: Parameters<typeof createUsersRouter>[1] = async (operation) => operation(),
   organizationId = "default",
+  revokeMemberships: Parameters<typeof createUsersRouter>[2] = revokeClientMemberships,
 ) {
   const app = express();
   app.use(express.json());
@@ -138,6 +139,7 @@ async function startApi(
   app.use(createUsersRouter(
     client as unknown as Parameters<typeof createUsersRouter>[0],
     lock,
+    revokeMemberships,
   ));
   const server = app.listen(0);
   servers.push(server);
@@ -327,6 +329,61 @@ test("revokes all client memberships when a Client user is demoted", async () =>
   assert.equal(reassigned.status, 200);
   assert.equal((await reassigned.json() as { role: string }).role, "Client");
   assert.equal((await grantClientAccess(base, firstClient.id, "member")).status, 201);
+});
+
+test("reports failed client cleanup and retries the same demotion safely", async () => {
+  const fake = fakeClerk([
+    makeUser("admin", "Admin"),
+    makeUser("member", "Client"),
+  ]);
+  let failCleanup = true;
+  const base = await startApi(
+    "admin",
+    fake.client,
+    undefined,
+    "workspace-role-retry",
+    async (userId, scope) => {
+      if (failCleanup) {
+        failCleanup = false;
+        throw new Error("database unavailable");
+      }
+      await revokeClientMemberships(userId, scope);
+    },
+  );
+  const client = await createTestClient(base, "Retry Client");
+  await grantClientAccess(base, client.id, "member");
+
+  const demotion = () => fetch(`${base}/users/member`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ role: "Field Team" }),
+  });
+
+  const failed = await demotion();
+  assert.equal(failed.status, 503);
+  assert.deepEqual(await failed.json(), {
+    error: "The role was updated, but client access cleanup failed. Retry this role change to finish removing access.",
+  });
+  assert.equal(fake.getUsers().find((user) => user.id === "member")?.publicMetadata.role, "Field Team");
+  assert.equal(
+    (await db.select().from(clientMembersTable).where(eq(clientMembersTable.clientId, client.id))).length,
+    1,
+  );
+
+  const retried = await demotion();
+  assert.equal(retried.status, 200);
+  assert.equal((await retried.json() as { role: string }).role, "Field Team");
+  assert.deepEqual(
+    await db.select().from(clientMembersTable).where(eq(clientMembersTable.clientId, client.id)),
+    [],
+  );
+
+  const repeated = await demotion();
+  assert.equal(repeated.status, 200);
+  assert.deepEqual(
+    await db.select().from(clientMembersTable).where(eq(clientMembersTable.clientId, client.id)),
+    [],
+  );
 });
 
 test("rejects empty and unknown-only profile updates", async () => {
