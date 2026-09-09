@@ -49,6 +49,8 @@ type AppLayoutViewProps = {
 }
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "luminova-sidebar-collapsed"
+let previousMountedIndicatorLocation: string | null = null
+let previousMountedIndicatorTop = 0
 
 function readSidebarCollapsedPreference() {
   if (typeof window === "undefined") return false
@@ -90,9 +92,9 @@ export function AppLayoutView({
   const indicatorBubbleAnimationsRef = useRef<Animation[]>([])
   const indicatorPhaseRef = useRef<IndicatorPhase>("idle")
   const finishTimerRef = useRef<number | null>(null)
-  const hasPositionedIndicator = useRef(false)
-  const previousIndicatorLocation = useRef(location)
-  const indicatorTopRef = useRef(0)
+  const hasPositionedIndicator = useRef(previousMountedIndicatorLocation !== null)
+  const previousIndicatorLocation = useRef(previousMountedIndicatorLocation ?? location)
+  const indicatorTopRef = useRef(previousMountedIndicatorTop)
   const [indicator, setIndicator] = useState({
     top: 0,
     height: 0,
@@ -203,6 +205,8 @@ export function AppLayoutView({
     if (shouldAnimate && !prefersReducedMotion && indicatorRef.current) {
       const startTop = indicatorTopRef.current
       indicatorTopRef.current = target.top
+      previousMountedIndicatorTop = target.top
+      previousMountedIndicatorLocation = location
       indicatorPhaseRef.current = "travel"
       setIndicator({
         ...target,
@@ -331,6 +335,8 @@ export function AppLayoutView({
       }).catch(() => undefined)
     } else {
       indicatorTopRef.current = target.top
+      previousMountedIndicatorTop = target.top
+      previousMountedIndicatorLocation = location
       indicatorPhaseRef.current = "idle"
       setIndicator({ ...target, ready: true, phase: "idle", lastMotion: "none", direction: "none" })
       setVisuallyActiveLocation(location)

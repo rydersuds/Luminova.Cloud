@@ -7,3 +7,4 @@
 - [Workspace-scoped package installs](workspace-scoped-package-installs.md) — when package tooling cannot target a pnpm child package, edit its manifest and install from the workspace root.
 - [Internal budget semantics](internal-budget-semantics.md) — compare internal costs and commitments to internal budgets; never treat client billings as project costs.
 - [Visual auth harnesses](visual-auth-harnesses.md) — provider-owned UI should use injected auth state in isolated visual mounts instead of relying on Clerk session hydration.
+- [Route animation remounts](route-animation-remounts.md) — navigation motion must survive page-local shell remounts, and tests must recreate that lifecycle.

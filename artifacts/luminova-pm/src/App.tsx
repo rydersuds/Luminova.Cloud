@@ -301,6 +301,7 @@ function SidebarVisualHarness() {
   return (
     <WouterRouter base={basePath}>
       <AppLayoutView
+        key={activeLocation}
         location={activeLocation}
         displayName="Morgan Reyes"
         email="morgan@luminova.test"
