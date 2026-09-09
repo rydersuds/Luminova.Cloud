@@ -85,7 +85,9 @@ export function AppLayoutView({
   const navRef = useRef<HTMLElement>(null)
   const activeLinkRef = useRef<HTMLAnchorElement>(null)
   const indicatorRef = useRef<HTMLDivElement>(null)
+  const indicatorBubbleRefs = useRef<Array<HTMLSpanElement | null>>([])
   const indicatorAnimationRef = useRef<Animation | null>(null)
+  const indicatorBubbleAnimationsRef = useRef<Animation[]>([])
   const indicatorPhaseRef = useRef<IndicatorPhase>("idle")
   const finishTimerRef = useRef<number | null>(null)
   const hasPositionedIndicator = useRef(false)
@@ -186,6 +188,8 @@ export function AppLayoutView({
     const clearMotion = () => {
       indicatorAnimationRef.current?.cancel()
       indicatorAnimationRef.current = null
+      indicatorBubbleAnimationsRef.current.forEach((animation) => animation.cancel())
+      indicatorBubbleAnimationsRef.current = []
       if (finishTimerRef.current !== null) {
         window.clearTimeout(finishTimerRef.current)
         finishTimerRef.current = null
@@ -209,17 +213,67 @@ export function AppLayoutView({
       })
 
       const indicatorElement = indicatorRef.current
+      const direction = target.top > startTop ? 1 : -1
+      const distance = Math.abs(target.top - startTop)
+      const stretch = Math.min(1.28, 1.08 + distance / 900)
       const travelAnimation = indicatorElement.animate(
         [
-          { transform: `translateY(${startTop}px) scale(1.025)` },
-          { transform: `translateY(${target.top - 7}px) scale(1.025)` },
+          {
+            transform: `translateY(${startTop}px) scale(1.025, 1)`,
+            borderRadius: "12px",
+            offset: 0,
+          },
+          {
+            transform: `translateY(${startTop + (target.top - startTop) * 0.28}px) scale(0.94, ${stretch})`,
+            borderRadius: direction > 0 ? "18px 18px 34px 34px" : "34px 34px 18px 18px",
+            offset: 0.34,
+          },
+          {
+            transform: `translateY(${target.top - direction * 11}px) scale(1.08, 0.92)`,
+            borderRadius: direction > 0 ? "28px 28px 15px 15px" : "15px 15px 28px 28px",
+            offset: 0.82,
+          },
+          {
+            transform: `translateY(${target.top - direction * 5}px) scale(1.035, 0.98)`,
+            borderRadius: "16px",
+            offset: 1,
+          },
         ],
         {
-          duration: 345,
-          easing: "cubic-bezier(0.22, 0.8, 0.24, 1)",
+          duration: Math.min(520, 350 + distance * 0.32),
+          easing: "cubic-bezier(0.2, 0.72, 0.18, 1)",
           fill: "both",
         },
       )
+      indicatorBubbleAnimationsRef.current = indicatorBubbleRefs.current.flatMap((bubble, index) => {
+        if (!bubble) return []
+        const side = index === 0 ? -1 : 1
+        return [bubble.animate(
+          [
+            { opacity: 0, transform: "translate(0, 0) scale(0.35)" },
+            {
+              opacity: 0.85,
+              transform: `translate(${side * (6 + index * 3)}px, ${direction * (10 + index * 8)}px) scale(${0.75 + index * 0.12})`,
+              offset: 0.38,
+            },
+            {
+              opacity: 0.55,
+              transform: `translate(${side * (3 + index * 2)}px, ${direction * Math.max(18, distance * 0.5)}px) scale(${0.55 + index * 0.1})`,
+              offset: 0.76,
+            },
+            {
+              opacity: 0,
+              transform: `translate(0, ${direction * Math.max(24, distance * 0.72)}px) scale(0.18)`,
+            },
+          ],
+          {
+            duration: Math.min(480, 320 + distance * 0.28),
+            delay: index * 28,
+            easing: "cubic-bezier(0.2, 0.65, 0.25, 1)",
+            fill: "both",
+          },
+        )]
+      })
       indicatorAnimationRef.current = travelAnimation
       travelAnimation.finished.then(() => {
         if (indicatorAnimationRef.current !== travelAnimation) return
@@ -229,12 +283,23 @@ export function AppLayoutView({
 
         const settleAnimation = indicatorElement.animate(
           [
-            { transform: `translateY(${target.top - 7}px) scale(1.025)` },
-            { transform: `translateY(${target.top}px) scale(1.025)` },
+            {
+              transform: `translateY(${target.top - direction * 5}px) scale(1.035, 0.98)`,
+              borderRadius: "16px",
+            },
+            {
+              transform: `translateY(${target.top + direction * 3}px) scale(0.99, 1.045)`,
+              borderRadius: "13px",
+              offset: 0.58,
+            },
+            {
+              transform: `translateY(${target.top}px) scale(1.025, 1)`,
+              borderRadius: "12px",
+            },
           ],
           {
-            duration: 135,
-            easing: "cubic-bezier(0.2, 0.9, 0.3, 1)",
+            duration: 210,
+            easing: "cubic-bezier(0.22, 0.9, 0.28, 1)",
             fill: "both",
           },
         )
@@ -366,12 +431,23 @@ export function AppLayoutView({
             data-last-motion={indicator.lastMotion}
             aria-hidden="true"
             className={cn(
-              "pointer-events-none absolute z-0 rounded-xl bg-primary shadow-[inset_0_1px_2px_rgba(255,255,255,0.38),0_5px_18px_-3px_hsl(var(--primary)/0.72)] will-change-transform",
+              "pointer-events-none absolute z-0 overflow-visible rounded-xl bg-primary shadow-[inset_0_1px_2px_rgba(255,255,255,0.38),0_5px_18px_-3px_hsl(var(--primary)/0.72)] will-change-transform",
               sidebarCollapsed ? "left-2 right-2" : "left-4 right-4",
               !indicator.ready && "opacity-0",
             )}
             style={{ height: indicator.height, transform: `translateY(${indicator.top}px) scale(1.025)` }}
-          />
+          >
+            <span
+              ref={(element) => { indicatorBubbleRefs.current[0] = element }}
+              aria-hidden="true"
+              className="absolute left-[18%] top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-primary shadow-[0_2px_8px_hsl(var(--primary)/0.55)] opacity-0"
+            />
+            <span
+              ref={(element) => { indicatorBubbleRefs.current[1] = element }}
+              aria-hidden="true"
+              className="absolute right-[16%] top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-primary shadow-[0_2px_8px_hsl(var(--primary)/0.55)] opacity-0"
+            />
+          </div>
           <div
             data-contrast-label="navigation section label"
             className={cn(
