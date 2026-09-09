@@ -28,10 +28,10 @@ export const pendingDismissedImportStorageKey = dismissedImportStorageKey("__pen
 
 export const wasImportErrorDismissed = (
   importId: string,
-  storage: DismissalStorage = window.localStorage,
+  storage?: DismissalStorage,
 ) => {
   try {
-    return storage.getItem(dismissedImportStorageKey(importId)) === "true"
+    return (storage ?? window.localStorage).getItem(dismissedImportStorageKey(importId)) === "true"
   } catch {
     return false
   }
@@ -39,10 +39,11 @@ export const wasImportErrorDismissed = (
 
 export const rememberDismissedImportError = (
   importId: string,
-  storage: DismissalStorage = window.localStorage,
+  storage?: DismissalStorage,
 ) => {
   try {
-    storage.setItem(dismissedImportStorageKey(importId), "true")
+    const availableStorage = storage ?? window.localStorage
+    availableStorage.setItem(dismissedImportStorageKey(importId), "true")
   } catch {
     // The provider still suppresses the current session when browser storage is unavailable.
   }
@@ -50,10 +51,11 @@ export const rememberDismissedImportError = (
 
 export const forgetDismissedImportError = (
   importId: string,
-  storage: DismissalStorage = window.localStorage,
+  storage?: DismissalStorage,
 ) => {
   try {
-    storage.removeItem(dismissedImportStorageKey(importId))
+    const availableStorage = storage ?? window.localStorage
+    availableStorage.removeItem(dismissedImportStorageKey(importId))
   } catch {
     // A storage failure must not block the import flow.
   }
@@ -61,18 +63,19 @@ export const forgetDismissedImportError = (
 
 export const cleanupDismissedImportErrors = (
   recoverableImportId: string | null,
-  storage: DismissalStorage = window.localStorage,
+  storage?: DismissalStorage,
 ) => {
   try {
+    const availableStorage = storage ?? window.localStorage
     const staleKeys: string[] = []
     const recoverableKey = recoverableImportId ? dismissedImportStorageKey(recoverableImportId) : null
-    for (let index = 0; index < storage.length; index++) {
-      const key = storage.key(index)
+    for (let index = 0; index < availableStorage.length; index++) {
+      const key = availableStorage.key(index)
       if (key?.startsWith(dismissedImportStoragePrefix) && key !== recoverableKey && key !== pendingDismissedImportStorageKey) {
         staleKeys.push(key)
       }
     }
-    staleKeys.forEach((key) => storage.removeItem(key))
+    staleKeys.forEach((key) => availableStorage.removeItem(key))
   } catch {
     // A storage failure must not block import recovery or hide a server error.
   }
