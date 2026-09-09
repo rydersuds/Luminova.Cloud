@@ -66,6 +66,7 @@ paths:
           in: query
           schema:
             type: string
+            maxLength: 100
         - name: region
           in: query
           schema:
@@ -590,6 +591,11 @@ paths:
           in: query
           schema:
             type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+            maxLength: 100
       responses:
         "200":
           description: Invoice list
@@ -636,6 +642,39 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/FinancialSummary"
+  /search:
+    get:
+      operationId: searchWorkspace
+      tags: [search]
+      summary: Search persisted workspace records
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 100
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 30
+            default: 12
+      responses:
+        "200":
+          description: Matching workspace records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkspaceSearchResult"
+        "400":
+          description: Invalid search query
+        "401":
+          description: Authentication required
   /vendor-quotes:
     get:
       operationId: getVendorQuotes
@@ -1010,6 +1049,17 @@ components:
           type: string
       required:
         - status
+    WorkspaceSearchResult:
+      type: object
+      required: [id, kind, title, subtitle, href]
+      properties:
+        id: { type: string }
+        kind:
+          type: string
+          enum: [project, vendor, quote, invoice]
+        title: { type: string }
+        subtitle: { type: string }
+        href: { type: string }
     DashboardSummary:
       type: object
       required: [activeProjects, awaitingApproval, unreadMessages, new360Photos, budgeted, invoiced, recentActivity]

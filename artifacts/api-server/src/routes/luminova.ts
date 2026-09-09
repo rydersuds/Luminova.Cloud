@@ -17,6 +17,8 @@ import {
   CreateProjectPanoramaParams,
   CreateProjectPanoramaResponse,
   GetDashboardSummaryResponse,
+  SearchWorkspaceQueryParams,
+  SearchWorkspaceResponse,
   GetInvoicesQueryParams,
   GetInvoicesResponse,
   GetFinancialSummaryResponse,
@@ -1221,6 +1223,92 @@ router.get("/dashboard/summary", async (req, res) => {
   }
 });
 
+router.get("/search", async (req: AuthenticatedRequest, res) => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  const parsed = SearchWorkspaceQueryParams.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const query = parsed.data.query.trim().toLowerCase();
+  const limit = parsed.data.limit ?? 12;
+  const matches = (value: string) => value.toLowerCase().includes(query);
+  const rank = (title: string, searchable: string) => {
+    const normalizedTitle = title.toLowerCase();
+    if (normalizedTitle === query) return 0;
+    if (normalizedTitle.startsWith(query)) return 1;
+    if (normalizedTitle.includes(query)) return 2;
+    return searchable.toLowerCase().indexOf(query) >= 0 ? 3 : 4;
+  };
+
+  try {
+    const [projectRecords, tradeRecords, financialRecords] = await Promise.all([
+      projectsForOwner(req.userId),
+      tradesForOwner(req.userId),
+      financialRecordsForOwner(req.userId),
+    ]);
+    const results = [
+      ...projectRecords.flatMap((project) => {
+        const searchable = `${project.name} ${project.address} ${project.region} ${project.clientName} ${project.pmName} ${project.description}`;
+        return matches(searchable) ? [{
+          id: project.id,
+          kind: "project" as const,
+          title: project.name,
+          subtitle: `${project.address} · ${project.status}`,
+          href: `/projects/${project.id}`,
+          rank: rank(project.name, searchable),
+        }] : [];
+      }),
+      ...tradeRecords.flatMap((trade) => {
+        const searchable = `${trade.companyName} ${trade.contactName} ${trade.tradeType} ${trade.region} ${trade.email ?? ""} ${trade.phone ?? ""}`;
+        return matches(searchable) ? [{
+          id: trade.id,
+          kind: "vendor" as const,
+          title: trade.companyName,
+          subtitle: `${trade.tradeType} · ${trade.contactName}`,
+          href: `/trades/${trade.id}`,
+          rank: rank(trade.companyName, searchable),
+        }] : [];
+      }),
+      ...financialRecords.quotes.flatMap((quote) => {
+        if (quote.direction !== "company_to_luminova") return [];
+        const searchable = `${quote.quoteNumber} ${quote.projectName} ${quote.vendorName} ${quote.trade} ${quote.notes}`;
+        return matches(searchable) ? [{
+          id: quote.id,
+          kind: "quote" as const,
+          title: quote.quoteNumber,
+          subtitle: `${quote.vendorName} · ${quote.projectName}`,
+          href: `/quotes?search=${encodeURIComponent(quote.quoteNumber)}`,
+          rank: rank(quote.quoteNumber, searchable),
+        }] : [];
+      }),
+      ...financialRecords.invoices.flatMap((invoice) => {
+        const searchable = `${invoice.invoiceNumber} ${invoice.projectName} ${invoice.vendor} ${invoice.lineItem} ${invoice.status}`;
+        return matches(searchable) ? [{
+          id: invoice.id,
+          kind: "invoice" as const,
+          title: invoice.invoiceNumber,
+          subtitle: `${invoice.vendor} · ${invoice.projectName}`,
+          href: `/invoices?search=${encodeURIComponent(invoice.invoiceNumber)}`,
+          rank: rank(invoice.invoiceNumber, searchable),
+        }] : [];
+      }),
+    ]
+      .sort((a, b) => a.rank - b.rank || a.title.localeCompare(b.title))
+      .slice(0, limit)
+      .map(({ rank: _rank, ...result }) => result);
+
+    res.json(SearchWorkspaceResponse.parse(results));
+  } catch (error) {
+    req.log.error({ err: error }, "Workspace search failed");
+    res.status(500).json({ error: "Workspace search could not be completed." });
+  }
+});
+
 router.get("/projects", async (req, res) => {
   const parsed = GetProjectsQueryParams.safeParse(req.query);
   if (!parsed.success) {
@@ -2367,7 +2455,11 @@ router.get("/invoices", async (req: AuthenticatedRequest, res) => {
     return;
   }
   const { invoices: records } = await financialRecordsForOwner(req.userId);
-  const result = parsed.data.status ? records.filter((invoice) => invoice.status === parsed.data.status) : records;
+  const normalizedSearch = parsed.data.search?.trim().toLowerCase();
+  const result = records.filter((invoice) =>
+    (!parsed.data.status || invoice.status === parsed.data.status) &&
+    (!normalizedSearch || `${invoice.invoiceNumber} ${invoice.projectName} ${invoice.vendor} ${invoice.lineItem} ${invoice.status}`.toLowerCase().includes(normalizedSearch)),
+  );
   res.json(GetInvoicesResponse.parse(result));
 });
 

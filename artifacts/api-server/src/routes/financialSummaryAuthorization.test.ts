@@ -245,6 +245,18 @@ test("portfolio financial summary only includes the authenticated owner's record
   });
   assert.equal(outboundQuoteListResponse.status, 200);
   assert.deepEqual(await outboundQuoteListResponse.json(), []);
+  assert.equal((await fetch(`http://127.0.0.1:${port}/search?query=Q-IN`)).status, 401);
+  const searchResponse = await fetch(`http://127.0.0.1:${port}/search?query=Q-IN`, {
+    headers: { "x-test-user": ownerId },
+  });
+  assert.equal(searchResponse.status, 200);
+  assert.deepEqual(await searchResponse.json(), [{
+    id: `quote-incoming-${suffix}`,
+    kind: "quote",
+    title: "Q-IN",
+    subtitle: "Owned Trade · Owned project",
+    href: "/quotes?search=Q-IN",
+  }]);
   assert.equal((await fetch(`http://127.0.0.1:${port}/vendor-quotes/quote-b-${suffix}`, {
     headers: { "x-test-user": ownerId },
   })).status, 404);

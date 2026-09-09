@@ -8,6 +8,9 @@
 
 export type GetProjectsParams = {
 status?: string;
+/**
+ * @maxLength 100
+ */
 search?: string;
 region?: string;
 };

@@ -41,9 +41,13 @@ export const GetDashboardSummaryResponse = zod.object({
 /**
  * @summary List accessible projects
  */
+export const getProjectsQuerySearchMax = 100;
+
+
+
 export const GetProjectsQueryParams = zod.object({
   "status": zod.coerce.string().optional(),
-  "search": zod.coerce.string().optional(),
+  "search": zod.coerce.string().max(getProjectsQuerySearchMax).optional(),
   "region": zod.coerce.string().optional()
 })
 
@@ -1071,8 +1075,13 @@ export const DeleteTradeReviewResponse = zod.void()
 /**
  * @summary List invoices
  */
+export const getInvoicesQuerySearchMax = 100;
+
+
+
 export const GetInvoicesQueryParams = zod.object({
-  "status": zod.coerce.string().optional()
+  "status": zod.coerce.string().optional(),
+  "search": zod.coerce.string().max(getInvoicesQuerySearchMax).optional()
 })
 
 export const GetInvoicesResponseItem = zod.object({
@@ -1132,6 +1141,32 @@ export const GetFinancialSummaryResponse = zod.object({
   "acceptedClientQuoteValue": zod.number().describe('Deduplicated accepted Luminova-to-client quote value across projects.'),
   "upcomingClientPayments": zod.number().min(getFinancialSummaryResponseUpcomingClientPaymentsMin).describe('Accepted client quote value remaining after outgoing invoices, floored per project at zero.')
 })
+
+
+/**
+ * @summary Search persisted workspace records
+ */
+export const searchWorkspaceQueryQueryMin = 2;
+export const searchWorkspaceQueryQueryMax = 100;
+
+export const searchWorkspaceQueryLimitDefault = 12;
+export const searchWorkspaceQueryLimitMax = 30;
+
+
+
+export const SearchWorkspaceQueryParams = zod.object({
+  "query": zod.coerce.string().min(searchWorkspaceQueryQueryMin).max(searchWorkspaceQueryQueryMax),
+  "limit": zod.coerce.number().int().min(1).max(searchWorkspaceQueryLimitMax).default(searchWorkspaceQueryLimitDefault)
+})
+
+export const SearchWorkspaceResponseItem = zod.object({
+  "id": zod.string(),
+  "kind": zod.enum(['project', 'vendor', 'quote', 'invoice']),
+  "title": zod.string(),
+  "subtitle": zod.string(),
+  "href": zod.string()
+})
+export const SearchWorkspaceResponse = zod.array(SearchWorkspaceResponseItem)
 
 
 /**

@@ -35,7 +35,7 @@ export default function Quotes() {
   const queryClient = useQueryClient()
   const initialProject = React.useMemo(() => new URLSearchParams(window.location.search).get("projectId") ?? "", [])
   const initialVendor = React.useMemo(() => new URLSearchParams(window.location.search).get("vendorId") ?? "", [])
-  const [search, setSearch] = React.useState("")
+  const [search, setSearch] = React.useState(() => new URLSearchParams(window.location.search).get("search") ?? "")
   const [projectId, setProjectId] = React.useState(initialProject)
   const [vendorId, setVendorId] = React.useState(initialVendor)
   const [trade, setTrade] = React.useState("")

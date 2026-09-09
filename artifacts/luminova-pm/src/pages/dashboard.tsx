@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
-import { Plus, Search, MapPin, Building, Activity, Camera, DollarSign, Clock, UploadCloud, FileJson, FileSpreadsheet, X, CheckCircle2, AlertTriangle, ShieldAlert, FolderUp, FileText } from "lucide-react"
+import { Plus, MapPin, Building, Activity, Camera, DollarSign, Clock, UploadCloud, FileJson, FileSpreadsheet, X, CheckCircle2, AlertTriangle, ShieldAlert, FolderUp, FileText } from "lucide-react"
 import { Link, useLocation } from "wouter"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
@@ -23,6 +23,7 @@ import { z } from "zod"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useProjectFolderImport } from "@/providers/project-folder-import-provider"
+import { GlobalSearch } from "@/components/global-search"
 
 // Strict validation schema, zero defaults
 const projectSchema = z.object({
@@ -57,7 +58,6 @@ const parseCSV = (text: string) => {
 
 export default function Dashboard() {
   const [, setLocation] = useLocation()
-  const [search, setSearch] = React.useState("")
   const [isCreateOpen, setIsCreateOpen] = React.useState(false)
   const queryClient = useQueryClient()
   
@@ -66,8 +66,8 @@ export default function Dashboard() {
   })
   
   const { data: projects, isLoading: loadingProjects } = useGetProjects(
-    { search: search || undefined },
-    { query: { queryKey: getGetProjectsQueryKey({ search: search || undefined }) } }
+    {},
+    { query: { queryKey: getGetProjectsQueryKey({}) } }
   )
 
   const createProject = useCreateProject()
@@ -229,15 +229,7 @@ export default function Dashboard() {
             </div>
             
             <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:gap-4">
-              <div className="relative group w-full sm:w-auto">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                <Input 
-                  placeholder="Query projects..." 
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9 w-full sm:w-[280px] bg-background/50 border-border/50 focus-visible:ring-primary/50 backdrop-blur-sm font-mono text-sm"
-                />
-              </div>
+              <GlobalSearch />
 
               <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                 <DialogTrigger asChild>

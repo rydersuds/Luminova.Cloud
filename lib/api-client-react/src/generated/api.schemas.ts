@@ -73,6 +73,24 @@ export interface HealthStatus {
   status: string;
 }
 
+export type WorkspaceSearchResultKind = typeof WorkspaceSearchResultKind[keyof typeof WorkspaceSearchResultKind];
+
+
+export const WorkspaceSearchResultKind = {
+  project: 'project',
+  vendor: 'vendor',
+  quote: 'quote',
+  invoice: 'invoice',
+} as const;
+
+export interface WorkspaceSearchResult {
+  id: string;
+  kind: WorkspaceSearchResultKind;
+  title: string;
+  subtitle: string;
+  href: string;
+}
+
 export interface Activity {
   id: string;
   type: string;
@@ -710,6 +728,9 @@ export interface ProjectImport {
 
 export type GetProjectsParams = {
 status?: string;
+/**
+ * @maxLength 100
+ */
 search?: string;
 region?: string;
 };
@@ -722,6 +743,23 @@ region?: string;
 
 export type GetInvoicesParams = {
 status?: string;
+/**
+ * @maxLength 100
+ */
+search?: string;
+};
+
+export type SearchWorkspaceParams = {
+/**
+ * @minLength 2
+ * @maxLength 100
+ */
+query: string;
+/**
+ * @minimum 1
+ * @maximum 30
+ */
+limit?: number;
 };
 
 export type GetVendorQuotesParams = {

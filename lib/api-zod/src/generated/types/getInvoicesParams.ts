@@ -8,4 +8,8 @@
 
 export type GetInvoicesParams = {
 status?: string;
+/**
+ * @maxLength 100
+ */
+search?: string;
 };

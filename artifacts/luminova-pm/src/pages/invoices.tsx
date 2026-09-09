@@ -20,14 +20,16 @@ import { useQueryClient } from "@tanstack/react-query"
 
 export default function Invoices() {
   const [statusFilter, setStatusFilter] = React.useState("")
+  const [search, setSearch] = React.useState(() => new URLSearchParams(window.location.search).get("search") ?? "")
   const [isSubmitOpen, setIsSubmitOpen] = React.useState(false)
   const queryClient = useQueryClient()
 
   const { data: invoices, isLoading } = useGetInvoices({ 
-    status: statusFilter || undefined
+    status: statusFilter || undefined,
+    search: search || undefined,
   }, {
     query: {
-      queryKey: getGetInvoicesQueryKey({ status: statusFilter || undefined })
+      queryKey: getGetInvoicesQueryKey({ status: statusFilter || undefined, search: search || undefined })
     }
   })
   const financialSummary = useGetFinancialSummary({
@@ -140,7 +142,7 @@ export default function Invoices() {
             <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
               <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Search invoice or vendor..." className="pl-9 bg-background" />
+                <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search invoice or vendor..." className="pl-9 bg-background" />
               </div>
               <div className="relative w-full sm:w-auto">
                 <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
