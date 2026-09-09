@@ -583,7 +583,6 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                     </form>
                   </DialogContent>
                 </Dialog>
-                <Button>Update Progress</Button>
               </div>
             </div>
             
