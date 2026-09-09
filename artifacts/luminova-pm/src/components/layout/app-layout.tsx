@@ -496,7 +496,7 @@ export function AppLayoutView({
         </nav>
 
         <div className={cn("mt-auto", sidebarCollapsed ? "p-2" : "p-4")}>
-          <div className={cn("relative rounded-2xl bg-black p-2", sidebarCollapsed && "md:rounded-xl")}>
+          <div className="relative">
             <button
               type="button"
               data-contrast-label="profile control"
@@ -505,7 +505,7 @@ export function AppLayoutView({
               title={sidebarCollapsed ? `Account menu for ${displayName}` : undefined}
               aria-expanded={profileOpen}
               className={cn(
-                "flex w-full items-center rounded-xl bg-[#202020] py-3 text-left text-sm text-sidebar-foreground transition-colors hover:bg-[#292929] hover:text-white cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-black motion-reduce:transition-none",
+                "flex w-full cursor-pointer items-center rounded-xl py-3 text-left text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar motion-reduce:transition-none",
                 sidebarCollapsed ? "justify-center px-2" : "gap-3 px-3",
               )}
             >
@@ -546,7 +546,7 @@ export function AppLayoutView({
               title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
               onClick={toggleTheme}
               className={cn(
-                "mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-sidebar-border bg-sidebar-accent px-3 py-3 text-xs font-bold uppercase tracking-wider text-sidebar-foreground transition-colors hover:bg-sidebar-accent/80 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-black motion-reduce:transition-none",
+                "mt-2 flex w-full items-center justify-center gap-2 rounded-xl px-3 py-3 text-xs font-bold uppercase tracking-wider text-sidebar-foreground transition-colors hover:bg-sidebar-accent/80 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar motion-reduce:transition-none",
                 sidebarCollapsed && "md:px-2",
               )}
             >

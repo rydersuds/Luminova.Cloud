@@ -14,6 +14,21 @@ const stabilize = async (page: import('@playwright/test').Page) => {
   await expect(page.getByTestId('app-layout')).toBeVisible();
 };
 
+const assertBackgroundlessSidebarControls = async (page: import('@playwright/test').Page) => {
+  const controls = [
+    page.locator('[data-contrast-label="profile control"]'),
+    page.getByTestId('theme-toggle'),
+  ];
+
+  for (const control of controls) {
+    await expect(control).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(control).toHaveCSS('border-top-width', '0px');
+    await expect(control).toHaveCSS('border-right-width', '0px');
+    await expect(control).toHaveCSS('border-bottom-width', '0px');
+    await expect(control).toHaveCSS('border-left-width', '0px');
+  }
+};
+
 const assertNavigationContrast = async (
   page: import('@playwright/test').Page,
   state: string,
@@ -147,6 +162,7 @@ test.describe('navigation contrast', () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/__visual/sidebar?profile=open');
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+    await assertBackgroundlessSidebarControls(page);
     await assertNavigationContrast(page, 'desktop profile expanded');
     await expect(page).toHaveScreenshot('desktop-profile-sign-out.png', { animations: 'disabled' });
 
@@ -178,6 +194,7 @@ test.describe('navigation contrast', () => {
     await expect(page.getByRole('link', { name: 'Communications' })).toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeInViewport();
+    await assertBackgroundlessSidebarControls(page);
     await expect(page).toHaveScreenshot('desktop-compact.png', { animations: 'disabled' });
 
     await toggle.focus();
@@ -235,6 +252,7 @@ test.describe('navigation contrast', () => {
 
     await page.goto('/__visual/sidebar?drawer=open&profile=open');
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+    await assertBackgroundlessSidebarControls(page);
     await assertNavigationContrast(page, 'mobile drawer profile expanded');
     await expect(page).toHaveScreenshot('mobile-drawer-overlay.png', { animations: 'disabled' });
 
