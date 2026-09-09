@@ -169,6 +169,19 @@ test("portfolio financial summary only includes the authenticated owner's record
         total: 20000, createdAt: "2026-08-01T00:00:00.000Z", updatedAt: "2026-08-01T00:00:00.000Z",
       },
     },
+    {
+      id: `quote-incoming-${suffix}`,
+      importBatchId: batchIds[0],
+      ownerId,
+      data: {
+        id: `quote-incoming-${suffix}`, quoteNumber: "Q-IN", projectId: `project-a-${suffix}`,
+        projectName: "Owned project", vendorId: `trade-a-${suffix}`, vendorName: "Owned Trade",
+        direction: "company_to_luminova", isProjectTotal: false, trade: "Electrical", status: "Received",
+        revision: 1, issueDate: "2026-08-02", dueDate: "2026-08-16", notes: "",
+        lineItems: [{ id: "line-in", description: "Electrical", quantity: 1, unitPrice: 500, amount: 500 }],
+        total: 500, createdAt: "2026-08-02T00:00:00.000Z", updatedAt: "2026-08-02T00:00:00.000Z",
+      },
+    },
   ]);
 
   const app = express();
@@ -226,7 +239,12 @@ test("portfolio financial summary only includes the authenticated owner's record
   });
   const quoteList = await quoteListResponse.json() as Array<{ id: string }>;
   assert.equal(quoteListResponse.status, 200);
-  assert.deepEqual(quoteList.map((quote) => quote.id), [`quote-a-${suffix}`]);
+  assert.deepEqual(quoteList.map((quote) => quote.id), [`quote-incoming-${suffix}`]);
+  const outboundQuoteListResponse = await fetch(`http://127.0.0.1:${port}/vendor-quotes?direction=luminova_to_client`, {
+    headers: { "x-test-user": ownerId },
+  });
+  assert.equal(outboundQuoteListResponse.status, 200);
+  assert.deepEqual(await outboundQuoteListResponse.json(), []);
   assert.equal((await fetch(`http://127.0.0.1:${port}/vendor-quotes/quote-b-${suffix}`, {
     headers: { "x-test-user": ownerId },
   })).status, 404);

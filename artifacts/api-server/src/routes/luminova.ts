@@ -2425,6 +2425,7 @@ router.get("/vendor-quotes", async (req: AuthenticatedRequest, res) => {
   const normalizedSearch = search?.trim().toLowerCase();
   const { quotes: ownedQuotes } = await financialRecordsForOwner(req.userId);
   const result = ownedQuotes.filter((quote) =>
+    quote.direction === "company_to_luminova" &&
     (!projectId || quote.projectId === projectId) &&
     (!vendorId || quote.vendorId === vendorId) &&
     (!trade || quote.trade === trade) &&
