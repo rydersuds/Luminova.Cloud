@@ -31,7 +31,7 @@ export default function TradesDirectory() {
   return (
     <AppLayout>
       <div className="flex-1 overflow-auto bg-transparent">
-        <div className="border-b border-border bg-background/90 bg-tech-grid text-foreground backdrop-blur-[2px] dark:border-sidebar-border dark:bg-sidebar/90 dark:text-sidebar-foreground">
+        <div className="border-b border-border bg-transparent text-foreground dark:text-sidebar-foreground">
           <div className="max-w-5xl mx-auto space-y-6">
             <div className="px-6 py-10 md:px-8 md:py-12">
             <div className="mb-2 flex items-center gap-2">
