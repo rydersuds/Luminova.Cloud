@@ -1161,12 +1161,122 @@ export const SearchWorkspaceQueryParams = zod.object({
 
 export const SearchWorkspaceResponseItem = zod.object({
   "id": zod.string(),
-  "kind": zod.enum(['project', 'vendor', 'quote', 'invoice']),
+  "kind": zod.enum(['project', 'vendor', 'quote', 'invoice', 'message']),
   "title": zod.string(),
   "subtitle": zod.string(),
   "href": zod.string()
 })
 export const SearchWorkspaceResponse = zod.array(SearchWorkspaceResponseItem)
+
+
+/**
+ * @summary List the authenticated workspace's project conversations
+ */
+export const GetProjectConversationsResponseItem = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "projectName": zod.string(),
+  "title": zod.string(),
+  "context": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "messages": zod.array(zod.object({
+  "id": zod.string(),
+  "conversationId": zod.string(),
+  "projectId": zod.string(),
+  "senderId": zod.string(),
+  "text": zod.string(),
+  "createdAt": zod.coerce.date()
+}))
+})
+export const GetProjectConversationsResponse = zod.array(GetProjectConversationsResponseItem)
+
+
+/**
+ * @summary Create a conversation for an owned project
+ */
+
+export const createProjectConversationBodyTitleMax = 160;
+
+export const createProjectConversationBodyContextDefault = `Project channel`;
+export const createProjectConversationBodyContextMax = 200;
+
+
+
+export const CreateProjectConversationBody = zod.object({
+  "projectId": zod.string().min(1),
+  "title": zod.string().min(1).max(createProjectConversationBodyTitleMax),
+  "context": zod.string().max(createProjectConversationBodyContextMax).default(createProjectConversationBodyContextDefault)
+})
+
+export const CreateProjectConversationResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "projectName": zod.string(),
+  "title": zod.string(),
+  "context": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "messages": zod.array(zod.object({
+  "id": zod.string(),
+  "conversationId": zod.string(),
+  "projectId": zod.string(),
+  "senderId": zod.string(),
+  "text": zod.string(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Get an owned project conversation
+ */
+export const GetProjectConversationParams = zod.object({
+  "conversationId": zod.coerce.string()
+})
+
+export const GetProjectConversationResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "projectName": zod.string(),
+  "title": zod.string(),
+  "context": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "messages": zod.array(zod.object({
+  "id": zod.string(),
+  "conversationId": zod.string(),
+  "projectId": zod.string(),
+  "senderId": zod.string(),
+  "text": zod.string(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Add a message to an owned project conversation
+ */
+export const CreateProjectMessageParams = zod.object({
+  "conversationId": zod.coerce.string()
+})
+
+export const createProjectMessageBodyTextMax = 5000;
+
+
+
+export const CreateProjectMessageBody = zod.object({
+  "text": zod.string().min(1).max(createProjectMessageBodyTextMax)
+})
+
+export const CreateProjectMessageResponse = zod.object({
+  "id": zod.string(),
+  "conversationId": zod.string(),
+  "projectId": zod.string(),
+  "senderId": zod.string(),
+  "text": zod.string(),
+  "createdAt": zod.coerce.date()
+})
 
 
 /**

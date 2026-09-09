@@ -27,6 +27,7 @@ const resultIcons = {
   vendor: Users,
   quote: FileText,
   invoice: FileText,
+  message: MessageSquare,
 } satisfies Record<WorkspaceSearchResult["kind"], React.ElementType>
 
 export function GlobalSearch() {
@@ -77,7 +78,7 @@ export function GlobalSearch() {
         aria-label="Search the workspace"
         aria-expanded={showPanel}
         aria-controls="global-search-results"
-        placeholder="Search projects, vendors, quotes, invoices…"
+        placeholder="Search projects, vendors, messages…"
         value={value}
         onChange={(event) => {
           setValue(event.target.value)

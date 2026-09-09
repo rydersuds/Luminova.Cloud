@@ -36,6 +36,8 @@ import type {
   PanoramaInput,
   PanoramaUpdate,
   Project,
+  ProjectConversation,
+  ProjectConversationInput,
   ProjectDetail,
   ProjectImport,
   ProjectImportDocument,
@@ -43,6 +45,8 @@ import type {
   ProjectImportSession,
   ProjectImportSessionInput,
   ProjectInput,
+  ProjectMessage,
+  ProjectMessageInput,
   ProjectUpdate,
   Review,
   SearchWorkspaceParams,
@@ -2402,6 +2406,303 @@ export function useSearchWorkspace<TData = Awaited<ReturnType<typeof searchWorks
 
 
 
+
+export const getGetProjectConversationsUrl = () => {
+
+
+
+
+  return `/api/conversations`
+}
+
+/**
+ * @summary List the authenticated workspace's project conversations
+ */
+export const getProjectConversations = async ( options?: Parameters<typeof customFetch>[1]): Promise<ProjectConversation[]> => {
+
+  return customFetch<ProjectConversation[]>(getGetProjectConversationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProjectConversationsQueryKey = () => {
+    return [
+    `/api/conversations`
+    ] as const;
+    }
+
+
+export const getGetProjectConversationsQueryOptions = <TData = Awaited<ReturnType<typeof getProjectConversations>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectConversations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProjectConversationsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProjectConversations>>> = ({ signal }) => getProjectConversations({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProjectConversations>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProjectConversationsQueryResult = NonNullable<Awaited<ReturnType<typeof getProjectConversations>>>
+export type GetProjectConversationsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List the authenticated workspace's project conversations
+ */
+
+export function useGetProjectConversations<TData = Awaited<ReturnType<typeof getProjectConversations>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectConversations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProjectConversationsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateProjectConversationUrl = () => {
+
+
+
+
+  return `/api/conversations`
+}
+
+/**
+ * @summary Create a conversation for an owned project
+ */
+export const createProjectConversation = async (projectConversationInput: ProjectConversationInput, options?: Parameters<typeof customFetch>[1]): Promise<ProjectConversation> => {
+
+  return customFetch<ProjectConversation>(getCreateProjectConversationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(projectConversationInput)
+  }
+);}
+
+
+
+
+
+export const getCreateProjectConversationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProjectConversation>>, TError,{data: BodyType<ProjectConversationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createProjectConversation>>, TError,{data: BodyType<ProjectConversationInput>}, TContext> => {
+
+const mutationKey = ['createProjectConversation'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createProjectConversation>>, {data: BodyType<ProjectConversationInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createProjectConversation(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateProjectConversationMutationResult = NonNullable<Awaited<ReturnType<typeof createProjectConversation>>>
+    export type CreateProjectConversationMutationBody = BodyType<ProjectConversationInput>
+    export type CreateProjectConversationMutationError = ErrorType<void>
+
+    /**
+ * @summary Create a conversation for an owned project
+ */
+export const useCreateProjectConversation = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProjectConversation>>, TError,{data: BodyType<ProjectConversationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createProjectConversation>>,
+        TError,
+        {data: BodyType<ProjectConversationInput>},
+        TContext
+      > => {
+      return useMutation(getCreateProjectConversationMutationOptions(options));
+    }
+
+export const getGetProjectConversationUrl = (conversationId: string,) => {
+
+
+
+
+  return `/api/conversations/${conversationId}`
+}
+
+/**
+ * @summary Get an owned project conversation
+ */
+export const getProjectConversation = async (conversationId: string, options?: Parameters<typeof customFetch>[1]): Promise<ProjectConversation> => {
+
+  return customFetch<ProjectConversation>(getGetProjectConversationUrl(conversationId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProjectConversationQueryKey = (conversationId: string,) => {
+    return [
+    `/api/conversations/${conversationId}`
+    ] as const;
+    }
+
+
+export const getGetProjectConversationQueryOptions = <TData = Awaited<ReturnType<typeof getProjectConversation>>, TError = ErrorType<void>>(conversationId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectConversation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProjectConversationQueryKey(conversationId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProjectConversation>>> = ({ signal }) => getProjectConversation(conversationId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: conversationId !== null && conversationId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProjectConversation>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProjectConversationQueryResult = NonNullable<Awaited<ReturnType<typeof getProjectConversation>>>
+export type GetProjectConversationQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get an owned project conversation
+ */
+
+export function useGetProjectConversation<TData = Awaited<ReturnType<typeof getProjectConversation>>, TError = ErrorType<void>>(
+ conversationId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectConversation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProjectConversationQueryOptions(conversationId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateProjectMessageUrl = (conversationId: string,) => {
+
+
+
+
+  return `/api/conversations/${conversationId}/messages`
+}
+
+/**
+ * @summary Add a message to an owned project conversation
+ */
+export const createProjectMessage = async (conversationId: string,
+    projectMessageInput: ProjectMessageInput, options?: Parameters<typeof customFetch>[1]): Promise<ProjectMessage> => {
+
+  return customFetch<ProjectMessage>(getCreateProjectMessageUrl(conversationId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(projectMessageInput)
+  }
+);}
+
+
+
+
+
+export const getCreateProjectMessageMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProjectMessage>>, TError,{conversationId: string;data: BodyType<ProjectMessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createProjectMessage>>, TError,{conversationId: string;data: BodyType<ProjectMessageInput>}, TContext> => {
+
+const mutationKey = ['createProjectMessage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createProjectMessage>>, {conversationId: string;data: BodyType<ProjectMessageInput>}> = (props) => {
+          const {conversationId,data} = props ?? {};
+
+          return  createProjectMessage(conversationId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateProjectMessageMutationResult = NonNullable<Awaited<ReturnType<typeof createProjectMessage>>>
+    export type CreateProjectMessageMutationBody = BodyType<ProjectMessageInput>
+    export type CreateProjectMessageMutationError = ErrorType<void>
+
+    /**
+ * @summary Add a message to an owned project conversation
+ */
+export const useCreateProjectMessage = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProjectMessage>>, TError,{conversationId: string;data: BodyType<ProjectMessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createProjectMessage>>,
+        TError,
+        {conversationId: string;data: BodyType<ProjectMessageInput>},
+        TContext
+      > => {
+      return useMutation(getCreateProjectMessageMutationOptions(options));
+    }
 
 export const getGetVendorQuotesUrl = (params?: GetVendorQuotesParams,) => {
   const normalizedParams = new URLSearchParams();

@@ -675,6 +675,95 @@ paths:
           description: Invalid search query
         "401":
           description: Authentication required
+  /conversations:
+    get:
+      operationId: getProjectConversations
+      tags: [communications]
+      summary: List the authenticated workspace's project conversations
+      responses:
+        "200":
+          description: Project conversations with persisted messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProjectConversation"
+        "401":
+          description: Authentication required
+    post:
+      operationId: createProjectConversation
+      tags: [communications]
+      summary: Create a conversation for an owned project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectConversationInput"
+      responses:
+        "201":
+          description: Created conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectConversation"
+        "400":
+          description: Invalid conversation
+        "401":
+          description: Authentication required
+        "404":
+          description: Project not found
+  /conversations/{conversationId}:
+    get:
+      operationId: getProjectConversation
+      tags: [communications]
+      summary: Get an owned project conversation
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Project conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectConversation"
+        "401":
+          description: Authentication required
+        "404":
+          description: Conversation not found
+  /conversations/{conversationId}/messages:
+    post:
+      operationId: createProjectMessage
+      tags: [communications]
+      summary: Add a message to an owned project conversation
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectMessageInput"
+      responses:
+        "201":
+          description: Created message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectMessage"
+        "400":
+          description: Invalid message
+        "401":
+          description: Authentication required
+        "404":
+          description: Conversation not found
   /vendor-quotes:
     get:
       operationId: getVendorQuotes
@@ -1056,10 +1145,52 @@ components:
         id: { type: string }
         kind:
           type: string
-          enum: [project, vendor, quote, invoice]
+          enum: [project, vendor, quote, invoice, message]
         title: { type: string }
         subtitle: { type: string }
         href: { type: string }
+    ProjectMessage:
+      type: object
+      required: [id, conversationId, projectId, senderId, text, createdAt]
+      properties:
+        id: { type: string }
+        conversationId: { type: string }
+        projectId: { type: string }
+        senderId: { type: string }
+        text: { type: string }
+        createdAt: { type: string, format: date-time }
+    ProjectMessageInput:
+      type: object
+      additionalProperties: false
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 5000
+    ProjectConversation:
+      type: object
+      required: [id, projectId, projectName, title, context, createdAt, updatedAt, messages]
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        projectName: { type: string }
+        title: { type: string }
+        context: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectMessage"
+    ProjectConversationInput:
+      type: object
+      additionalProperties: false
+      required: [projectId, title]
+      properties:
+        projectId: { type: string, minLength: 1 }
+        title: { type: string, minLength: 1, maxLength: 160 }
+        context: { type: string, maxLength: 200, default: Project channel }
     DashboardSummary:
       type: object
       required: [activeProjects, awaitingApproval, unreadMessages, new360Photos, budgeted, invoiced, recentActivity]

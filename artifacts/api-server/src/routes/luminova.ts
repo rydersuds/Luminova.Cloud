@@ -2,6 +2,11 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import {
   CreateInvoiceBody,
   CreateInvoiceResponse,
+  CreateProjectConversationBody,
+  CreateProjectConversationResponse,
+  CreateProjectMessageBody,
+  CreateProjectMessageParams,
+  CreateProjectMessageResponse,
   CreateProjectImportBody,
   CreateProjectImportResponse,
   CreateProjectImportSessionBody,
@@ -24,6 +29,9 @@ import {
   GetFinancialSummaryResponse,
   GetProjectActivityParams,
   GetProjectActivityResponse,
+  GetProjectConversationParams,
+  GetProjectConversationResponse,
+  GetProjectConversationsResponse,
   GetProjectParams,
   GetProjectResponse,
   OrganizeProjectFilesParams,
@@ -81,6 +89,8 @@ import {
   projectDocumentsTable,
   projectExteriorPhotosTable,
   projectImportBatchesTable,
+  projectConversationsTable,
+  projectMessagesTable,
   vendorJobHistoryTable,
   vendorReviewTable,
 } from "@workspace/db";
@@ -952,6 +962,55 @@ const findOwnedProject = async (projectId: string, ownerId: string) =>
   (await projectsForOwner(ownerId)).find((project) => project.id === projectId);
 const findProject = async (projectId: string) => (await allProjects()).find((project) => project.id === projectId);
 
+const conversationsForOwner = async (ownerId: string) => {
+  const [conversationRows, projectRows] = await Promise.all([
+    db.select().from(projectConversationsTable)
+      .where(and(
+        eq(projectConversationsTable.ownerId, ownerId),
+        eq(projectConversationsTable.workspaceId, ownerId),
+      ))
+      .orderBy(desc(projectConversationsTable.updatedAt)),
+    db.select({ data: importedProjectsTable.data }).from(importedProjectsTable)
+      .where(eq(importedProjectsTable.ownerId, ownerId)),
+  ]);
+  if (!conversationRows.length) return [];
+  const conversationIds = conversationRows.map((conversation) => conversation.id);
+  const messageRows = await db.select().from(projectMessagesTable)
+    .where(and(
+      eq(projectMessagesTable.ownerId, ownerId),
+      eq(projectMessagesTable.workspaceId, ownerId),
+      inArray(projectMessagesTable.conversationId, conversationIds),
+    ))
+    .orderBy(projectMessagesTable.createdAt);
+  const projectNames = new Map(projectRows.map((row) => {
+    const project = row.data as Project;
+    return [project.id, project.name] as const;
+  }));
+  return conversationRows.flatMap((conversation) => {
+    const projectName = projectNames.get(conversation.projectId);
+    if (!projectName) return [];
+    return [{
+      id: conversation.id,
+      projectId: conversation.projectId,
+      projectName,
+      title: conversation.title,
+      context: conversation.context,
+      createdAt: conversation.createdAt,
+      updatedAt: conversation.updatedAt,
+      messages: messageRows
+        .filter((message) => message.conversationId === conversation.id && message.projectId === conversation.projectId)
+        .map((message) => ({
+          id: message.id,
+          conversationId: message.conversationId,
+          projectId: message.projectId,
+          senderId: message.senderId,
+          text: message.text,
+          createdAt: message.createdAt,
+        })),
+    }];
+  });
+};
+
 const latestClientQuoteDetail = async (project: Project) => {
   const latestQuote = (await allVendorQuotes())
     .filter((quote) => quote.projectId === project.id && quote.direction === "luminova_to_client")
@@ -1233,7 +1292,6 @@ router.get("/search", async (req: AuthenticatedRequest, res) => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-
   const query = parsed.data.query.trim().toLowerCase();
   const limit = parsed.data.limit ?? 12;
   const matches = (value: string) => value.toLowerCase().includes(query);
@@ -1246,10 +1304,11 @@ router.get("/search", async (req: AuthenticatedRequest, res) => {
   };
 
   try {
-    const [projectRecords, tradeRecords, financialRecords] = await Promise.all([
+    const [projectRecords, tradeRecords, financialRecords, conversationRecords] = await Promise.all([
       projectsForOwner(req.userId),
       tradesForOwner(req.userId),
       financialRecordsForOwner(req.userId),
+      conversationsForOwner(req.userId),
     ]);
     const results = [
       ...projectRecords.flatMap((project) => {
@@ -1297,6 +1356,19 @@ router.get("/search", async (req: AuthenticatedRequest, res) => {
           rank: rank(invoice.invoiceNumber, searchable),
         }] : [];
       }),
+      ...conversationRecords.flatMap((conversation) =>
+        conversation.messages.flatMap((message) => {
+          const searchable = `${conversation.title} ${conversation.projectName} ${conversation.context} ${message.text}`;
+          return matches(searchable) ? [{
+            id: message.id,
+            kind: "message" as const,
+            title: conversation.title,
+            subtitle: `${message.text} · ${conversation.projectName}`,
+            href: `/messages?conversation=${encodeURIComponent(conversation.id)}`,
+            rank: rank(conversation.title, searchable),
+          }] : [];
+        }),
+      ),
     ]
       .sort((a, b) => a.rank - b.rank || a.title.localeCompare(b.title))
       .slice(0, limit)
@@ -1307,6 +1379,136 @@ router.get("/search", async (req: AuthenticatedRequest, res) => {
     req.log.error({ err: error }, "Workspace search failed");
     res.status(500).json({ error: "Workspace search could not be completed." });
   }
+});
+
+router.get("/conversations", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  const conversations = await conversationsForOwner(req.userId);
+  res.json(GetProjectConversationsResponse.parse(conversations));
+});
+
+router.post("/conversations", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  const parsed = CreateProjectConversationBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  if (!parsed.data.title.trim()) {
+    res.status(400).json({ error: "Conversation title is required" });
+    return;
+  }
+  const project = await findOwnedProject(parsed.data.projectId, req.userId);
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+  const now = new Date();
+  const [created] = await db.insert(projectConversationsTable).values({
+    id: `conversation-${randomUUID()}`,
+    workspaceId: req.userId,
+    ownerId: req.userId,
+    projectId: project.id,
+    title: parsed.data.title.trim(),
+    context: parsed.data.context?.trim() || "Project channel",
+    createdAt: now,
+    updatedAt: now,
+  }).returning();
+  res.status(201).json(CreateProjectConversationResponse.parse({
+    id: created.id,
+    projectId: created.projectId,
+    projectName: project.name,
+    title: created.title,
+    context: created.context,
+    createdAt: created.createdAt,
+    updatedAt: created.updatedAt,
+    messages: [],
+  }));
+});
+
+router.get("/conversations/:conversationId", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  const params = GetProjectConversationParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const conversation = (await conversationsForOwner(req.userId))
+    .find((item) => item.id === params.data.conversationId);
+  if (!conversation) {
+    res.status(404).json({ error: "Conversation not found" });
+    return;
+  }
+  res.json(GetProjectConversationResponse.parse(conversation));
+});
+
+router.post("/conversations/:conversationId/messages", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  const [params, body] = [
+    CreateProjectMessageParams.safeParse(req.params),
+    CreateProjectMessageBody.safeParse(req.body),
+  ];
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  if (!body.data.text.trim()) {
+    res.status(400).json({ error: "Message text is required" });
+    return;
+  }
+  const [conversation] = await db.select().from(projectConversationsTable).where(and(
+    eq(projectConversationsTable.id, params.data.conversationId),
+    eq(projectConversationsTable.ownerId, req.userId),
+    eq(projectConversationsTable.workspaceId, req.userId),
+  )).limit(1);
+  if (!conversation || !(await findOwnedProject(conversation.projectId, req.userId))) {
+    res.status(404).json({ error: "Conversation not found" });
+    return;
+  }
+  const now = new Date();
+  const [created] = await db.transaction(async (tx) => {
+    const messages = await tx.insert(projectMessagesTable).values({
+      id: `message-${randomUUID()}`,
+      conversationId: conversation.id,
+      workspaceId: req.userId!,
+      ownerId: req.userId!,
+      projectId: conversation.projectId,
+      senderId: req.userId!,
+      text: body.data.text.trim(),
+      createdAt: now,
+    }).returning();
+    await tx.update(projectConversationsTable)
+      .set({ updatedAt: now })
+      .where(and(
+        eq(projectConversationsTable.id, conversation.id),
+        eq(projectConversationsTable.ownerId, req.userId!),
+      ));
+    return messages;
+  });
+  res.status(201).json(CreateProjectMessageResponse.parse({
+    id: created.id,
+    conversationId: created.conversationId,
+    projectId: created.projectId,
+    senderId: created.senderId,
+    text: created.text,
+    createdAt: created.createdAt,
+  }));
 });
 
 router.get("/projects", async (req, res) => {

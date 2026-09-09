@@ -81,6 +81,7 @@ export const WorkspaceSearchResultKind = {
   vendor: 'vendor',
   quote: 'quote',
   invoice: 'invoice',
+  message: 'message',
 } as const;
 
 export interface WorkspaceSearchResult {
@@ -89,6 +90,46 @@ export interface WorkspaceSearchResult {
   title: string;
   subtitle: string;
   href: string;
+}
+
+export interface ProjectMessage {
+  id: string;
+  conversationId: string;
+  projectId: string;
+  senderId: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface ProjectMessageInput {
+  /**
+     * @minLength 1
+     * @maxLength 5000
+     */
+  text: string;
+}
+
+export interface ProjectConversation {
+  id: string;
+  projectId: string;
+  projectName: string;
+  title: string;
+  context: string;
+  createdAt: string;
+  updatedAt: string;
+  messages: ProjectMessage[];
+}
+
+export interface ProjectConversationInput {
+  /** @minLength 1 */
+  projectId: string;
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  title: string;
+  /** @maxLength 200 */
+  context?: string;
 }
 
 export interface Activity {
