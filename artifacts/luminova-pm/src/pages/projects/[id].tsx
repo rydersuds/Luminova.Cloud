@@ -593,7 +593,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                 <p className="text-xl font-bold tabular-nums">{formatCurrency(project.budgeted)}</p>
               </div>
               <div className="bg-sidebar p-4 space-y-1">
-                <p className="text-sm text-sidebar-foreground/60">Actual / Committed</p>
+                <p className="text-sm text-sidebar-foreground/60">Invoiced expenses</p>
                 <p className="text-xl font-bold tabular-nums">{formatCurrency(actualCost)}</p>
               </div>
               <div className="bg-sidebar p-4 space-y-1">
@@ -1046,8 +1046,8 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
-                    <CardTitle>Budget vs Actual</CardTitle>
-                    <CardDescription>Internal cost budget with verified actual or committed costs; client billings are excluded.</CardDescription>
+                    <CardTitle>Budget vs Invoiced Expenses</CardTitle>
+                    <CardDescription>Internal cost budget with verified expenses invoiced to Luminova; client billings are excluded.</CardDescription>
                   </div>
                   <Button>Add Line Item</Button>
                 </CardHeader>
@@ -1058,7 +1058,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                         <TableHead className="w-[100px]">Code</TableHead>
                         <TableHead>Description</TableHead>
                         <TableHead className="text-right">Budgeted</TableHead>
-                        <TableHead className="text-right">Actual / Committed</TableHead>
+                        <TableHead className="text-right">Invoiced expenses</TableHead>
                         <TableHead className="text-right">Variance</TableHead>
                       </TableRow>
                     </TableHeader>
