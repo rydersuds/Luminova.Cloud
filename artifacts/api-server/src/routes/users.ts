@@ -173,6 +173,9 @@ async function revokeClientMemberships(userId: string, scope: string) {
   ));
 }
 
+async function deleteClientMemberships(userId: string) {
+  await db.delete(clientMembersTable).where(eq(clientMembersTable.userId, userId));
+}
 type ClerkClient = typeof clerk;
 type AdminLock = <T>(operation: () => Promise<T>) => Promise<T>;
 
@@ -597,6 +600,7 @@ router.delete("/users/:userId", async (req: AuthenticatedRequest, res): Promise<
       const target = await client.users.getUser(params.data.userId);
       if (await isFinalAdmin(client, target)) return false;
       await client.users.deleteUser(target.id);
+      await deleteClientMemberships(target.id);
       return true;
     });
     if (!deleted) {

@@ -363,11 +363,35 @@ test("protects self-deletion and the final administrator role", async () => {
   assert.equal(fake.getUsers()[0].primaryEmailAddress?.emailAddress, "admin@example.com");
 });
 
-test("deletes a confirmed target and normalizes Clerk conflicts", async () => {
-  const fake = fakeClerk([makeUser("admin", "Admin"), makeUser("member", "Client")]);
-  const base = await startApi("admin", fake.client);
+test("deletes a confirmed target and revokes all of their client memberships", async () => {
+  const fake = fakeClerk([
+    makeUser("admin", "Admin"),
+    makeUser("member", "Client"),
+    makeUser("other-client", "Client"),
+  ]);
+  const base = await startApi("admin", fake.client, undefined, "workspace-delete-user-check");
+  const firstClient = await createTestClient(base, "First Delete User Client");
+  const secondClient = await createTestClient(base, "Second Delete User Client");
+  const otherWorkspace = await startApi("admin", fake.client, undefined, "workspace-delete-user-other");
+  const thirdClient = await createTestClient(otherWorkspace, "Third Delete User Client");
+  await grantClientAccess(base, firstClient.id, "member");
+  await grantClientAccess(base, secondClient.id, "member");
+  await grantClientAccess(base, firstClient.id, "other-client");
+  await grantClientAccess(otherWorkspace, thirdClient.id, "member");
+
   assert.equal((await fetch(`${base}/users/member`, { method: "DELETE" })).status, 204);
-  assert.deepEqual(fake.getUsers().map((user) => user.id), ["admin"]);
+  assert.deepEqual(fake.getUsers().map((user) => user.id), ["admin", "other-client"]);
+  assert.deepEqual(
+    await db.select({
+      clientId: clientMembersTable.clientId,
+      userId: clientMembersTable.userId,
+      addedBy: clientMembersTable.addedBy,
+    }).from(clientMembersTable).where(inArray(
+      clientMembersTable.clientId,
+      [firstClient.id, secondClient.id, thirdClient.id],
+    )),
+    [{ clientId: firstClient.id, userId: "other-client", addedBy: "admin" }],
+  );
   assert.deepEqual(
     clerkErrorResponse({ status: 422, errors: [{ code: "form_identifier_exists", longMessage: "Email already exists." }] }, "failed"),
     { status: 409, error: "Email already exists." },
