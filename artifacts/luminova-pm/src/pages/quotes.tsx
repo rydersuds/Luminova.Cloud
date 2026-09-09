@@ -180,19 +180,19 @@ function QuoteCard({ quote, onEdit, onProject, onVendor }: { quote: VendorQuote;
   return (
     <Card className="overflow-hidden border-border/60 bg-card/80 transition-colors hover:border-primary/35">
       <CardContent className="p-0">
-        <div className="flex items-start justify-between gap-4 border-b border-border/50 p-5">
-          <div><p className="font-mono text-xs text-primary">{quote.quoteNumber} · REV {quote.revision}</p><h3 className="mt-1 text-lg font-bold">{quote.trade}</h3></div>
-          <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border/50 p-5">
+          <div className="min-w-0 flex-1"><p className="break-words font-mono text-xs text-primary">{quote.quoteNumber} · REV {quote.revision}</p><h3 className="mt-1 break-words text-lg font-bold">{quote.trade}</h3></div>
+          <div className="flex max-w-full flex-wrap items-end justify-end gap-2">
             <Badge variant={getStatusColor(quote.status) as any}>{quote.status}</Badge>
             <Badge variant="outline">{directionLabel(quote.direction)}</Badge>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-x-5 gap-y-4 p-5 text-sm">
-          <button onClick={onProject} className="text-left hover:text-primary"><span className="mb-1 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground"><FolderKanban className="h-3.5 w-3.5" />Project</span><strong>{quote.projectName}</strong></button>
+        <div className="grid grid-cols-1 gap-x-5 gap-y-4 p-5 text-sm min-[420px]:grid-cols-2">
+          <button onClick={onProject} className="min-w-0 break-words text-left hover:text-primary"><span className="mb-1 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground"><FolderKanban className="h-3.5 w-3.5 shrink-0" />Project</span><strong className="break-words">{quote.projectName}</strong></button>
           {quote.direction === "company_to_luminova" ? (
-            <button onClick={onVendor} className="text-left hover:text-primary"><span className="mb-1 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground"><Users className="h-3.5 w-3.5" />From company</span><strong>{quote.vendorName}</strong></button>
+            <button onClick={onVendor} className="min-w-0 break-words text-left hover:text-primary"><span className="mb-1 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground"><Users className="h-3.5 w-3.5 shrink-0" />From company</span><strong className="break-words">{quote.vendorName}</strong></button>
           ) : (
-            <div><span className="mb-1 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground"><Users className="h-3.5 w-3.5" />From</span><strong>Luminova Construction</strong></div>
+            <div className="min-w-0 break-words"><span className="mb-1 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground"><Users className="h-3.5 w-3.5 shrink-0" />From</span><strong className="break-words">Luminova Construction</strong></div>
           )}
           <div><span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Due date</span><p className="mt-1 font-medium">{formatDateOnly(quote.dueDate)}</p></div>
           <div><span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Quote total</span><p className="mt-1 text-lg font-bold tabular-nums">{formatCurrency(quote.total)}</p></div>

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { GetFinancialSummaryResponse } from "@workspace/api-zod";
-import { calculatePortfolioFinancialSummary, type FinancialInvoice, type FinancialQuote } from "./financialSummary";
+import { calculatePortfolioFinancialSummary, type FinancialInvoice, type FinancialQuote, type FinancialProject } from "./financialSummary";
 
 const quote = (overrides: Partial<FinancialQuote> = {}): FinancialQuote => ({
   id: "quote-1",
@@ -21,6 +21,11 @@ const invoice = (overrides: Partial<FinancialInvoice> = {}): FinancialInvoice =>
   projectId: "project-1",
   amount: 100,
   direction: "luminova_to_client",
+  ...overrides,
+});
+
+const project = (overrides: Partial<FinancialProject> = {}): FinancialProject => ({
+  projectId: "project-1",
   ...overrides,
 });
 
@@ -79,4 +84,22 @@ test("floors each over-invoiced project's remainder before portfolio aggregation
   );
 
   assert.equal(summary.upcomingClientPayments, 400);
+});
+
+test("uses persisted project financial evidence for legacy imported records", () => {
+  const summary = calculatePortfolioFinancialSummary(
+    [{ projectId: "project-1", amount: 446070.71, direction: "luminova_to_client" }],
+    [],
+    [project({
+      clientQuoteTotal: 942715.84,
+      internalExpenseTotal: 196801.5,
+    })],
+  );
+
+  assert.deepEqual(summary, {
+    invoicedRevenue: 446070.71,
+    invoicedExpenses: 196801.5,
+    acceptedClientQuoteValue: 942715.84,
+    upcomingClientPayments: 496645.13,
+  });
 });

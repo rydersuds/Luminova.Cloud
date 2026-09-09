@@ -136,18 +136,18 @@ export default function Invoices() {
             <p className="mt-1 text-sm text-muted-foreground">Review, approve, and track incoming and client invoices.</p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-card p-4 rounded-lg border border-border">
-            <div className="flex items-center gap-4 w-full sm:w-auto">
-              <div className="relative flex-1 sm:w-64">
+          <div className="flex flex-col gap-4 bg-card p-4 rounded-lg border border-border sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input placeholder="Search invoice or vendor..." className="pl-9 bg-background" />
               </div>
-              <div className="relative">
+              <div className="relative w-full sm:w-auto">
                 <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="h-9 pl-9 pr-8 rounded-md bg-background border border-input text-sm focus:outline-none focus:ring-1 focus:ring-ring appearance-none"
+                  className="h-9 w-full appearance-none rounded-md border border-input bg-background pl-9 pr-8 text-sm focus:outline-none focus:ring-1 focus:ring-ring sm:w-auto"
                 >
                   <option value="">All Statuses</option>
                   <option value="Pending">Pending Approval</option>
@@ -158,7 +158,7 @@ export default function Invoices() {
             </div>
             
             {pendingCount > 0 && (
-              <div className="flex items-center gap-2 text-warning text-sm font-medium bg-warning/10 px-3 py-1.5 rounded-full">
+              <div className="flex max-w-full items-center gap-2 self-start rounded-full bg-warning/10 px-3 py-1.5 text-sm font-medium text-warning sm:self-auto">
                 <AlertTriangle className="h-4 w-4" />
                 {pendingCount} action{pendingCount !== 1 ? 's' : ''} required
               </div>
@@ -189,10 +189,10 @@ export default function Invoices() {
                     </TableRow>
                   ) : invoices?.map((invoice) => (
                     <TableRow key={invoice.id}>
-                      <TableCell className="font-mono text-sm font-medium">{invoice.invoiceNumber}</TableCell>
-                      <TableCell>
-                        <p className="font-medium text-foreground">{invoice.projectName}</p>
-                        <p className="text-xs text-muted-foreground">{invoice.vendor} • Line: {invoice.lineItem}</p>
+                      <TableCell className="max-w-[12rem] break-words font-mono text-sm font-medium">{invoice.invoiceNumber}</TableCell>
+                      <TableCell className="min-w-[12rem]">
+                        <p className="break-words font-medium text-foreground">{invoice.projectName}</p>
+                        <p className="break-words text-xs text-muted-foreground">{invoice.vendor} • Line: {invoice.lineItem}</p>
                       </TableCell>
                       <TableCell className="text-sm">{formatDate(invoice.date)}</TableCell>
                       <TableCell className="text-right">
@@ -206,7 +206,8 @@ export default function Invoices() {
                       <TableCell>
                         <Badge variant={getStatusColor(invoice.status) as any}>{invoice.status}</Badge>
                       </TableCell>
-                      <TableCell className="text-right space-x-2">
+                      <TableCell className="min-w-[8rem] text-right">
+                        <div className="flex flex-wrap justify-end gap-1">
                         <Button variant="ghost" size="icon" title="View PDF">
                           <FileText className="h-4 w-4" />
                         </Button>
@@ -220,6 +221,7 @@ export default function Invoices() {
                             </Button>
                           </>
                         )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

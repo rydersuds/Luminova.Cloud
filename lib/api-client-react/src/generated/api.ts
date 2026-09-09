@@ -2103,7 +2103,7 @@ export const getGetFinancialSummaryUrl = () => {
 }
 
 /**
- * Aggregates all project invoices and accepted Luminova-to-client quotes. Invoices without a direction are treated as legacy company-to-Luminova expenses. Accepted quote revisions and overlapping project-total quotes are counted once, and each project's remaining client value is floored at zero.
+ * Aggregates all project invoices and accepted Luminova-to-client quotes. A directionless legacy invoice is treated as client revenue only when the persisted project's invoiced total accounts for that legacy amount; otherwise it remains a company-to-Luminova expense. Persisted internal budget actuals are used when available. Accepted quote revisions and overlapping project-total quotes are counted once, and each project's remaining client value is floored at zero.
  * @summary Get portfolio financial summary
  */
 export const getFinancialSummary = async ( options?: Parameters<typeof customFetch>[1]): Promise<FinancialSummary> => {

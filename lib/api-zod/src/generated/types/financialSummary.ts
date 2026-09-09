@@ -9,7 +9,7 @@
 export interface FinancialSummary {
   /** Total Luminova-to-client invoice value. */
   invoicedRevenue: number;
-  /** Total company-to-Luminova invoice value, including legacy invoices with no direction. */
+  /** Total internal expense value from company-to-Luminova invoices or persisted internal budget actuals. */
   invoicedExpenses: number;
   /** Deduplicated accepted Luminova-to-client quote value across projects. */
   acceptedClientQuoteValue: number;

@@ -8,3 +8,9 @@ Budget vs Actual must compare the internal cost budget against verified costs or
 **Why:** Mixing client billings with internal costs produces a plausible-looking but financially invalid variance and margin.
 
 **How to apply:** Use incoming vendor invoices as actual costs and identify signed subcontract values as commitments. Keep their source and status visible, and leave unsupported actual values empty rather than inferring them.
+
+Legacy imports may omit invoice direction. Reclassify those rows as client revenue only when the persisted project invoiced total exactly reconciles the unknown rows after explicit client invoices; otherwise keep them as expenses. Use persisted project client-quote and internal budget actual fields as fallback evidence when normalized quote or invoice rows are absent.
+
+**Why:** Older imported Madison Park records stored the correct financial totals on the project but omitted direction and standalone quote rows; treating every unknown row as an expense or ignoring project-level evidence produced invalid portfolio totals.
+
+**How to apply:** Resolve legacy direction in the owner-scoped financial aggregation, and prefer project-level budget actuals over duplicate expense rows when both represent the same persisted cost.

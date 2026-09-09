@@ -29,13 +29,23 @@ test("portfolio financial summary only includes the authenticated owner's record
       id: `project-a-${suffix}`,
       importBatchId: batchIds[0],
       ownerId,
-      data: { id: `project-a-${suffix}`, name: "Owned project" },
+      data: {
+        id: `project-a-${suffix}`, name: "Owned project", address: "1 Test Street", region: "Calgary",
+        status: "Planning", progress: 0, pmName: "Test PM", clientName: "Test Client",
+        targetDate: "2026-12-31", budgeted: 1200, invoiced: 375, exteriorImage: "", description: "Test project",
+        clientQuote: { total: 1000, revision: "Q-A", portions: [] },
+        budgetLineItems: [{ id: "actual-a", code: "ACT-01", description: "Verified internal cost", budgeted: 50, invoiced: 50, variance: -50 }],
+      },
     },
     {
       id: `project-b-${suffix}`,
       importBatchId: batchIds[1],
       ownerId: otherOwnerId,
-      data: { id: `project-b-${suffix}`, name: "Other project" },
+      data: {
+        id: `project-b-${suffix}`, name: "Other project", address: "2 Test Street", region: "Edmonton",
+        status: "Planning", progress: 0, pmName: "Other PM", clientName: "Other Client",
+        targetDate: "2027-01-31", budgeted: 20000, invoiced: 9000, exteriorImage: "", description: "Other project",
+      },
     },
   ]);
   await db.insert(importedVendorsTable).values([
@@ -170,11 +180,18 @@ test("portfolio financial summary only includes the authenticated owner's record
   });
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {
-    invoicedRevenue: 300,
-    invoicedExpenses: 100,
+    invoicedRevenue: 375,
+    invoicedExpenses: 50,
     acceptedClientQuoteValue: 1000,
-    upcomingClientPayments: 700,
+    upcomingClientPayments: 625,
   });
+
+  const projectsResponse = await fetch(`http://127.0.0.1:${port}/projects`, {
+    headers: { "x-test-user": ownerId },
+  });
+  assert.equal(projectsResponse.status, 200);
+  const projects = await projectsResponse.json() as Array<{ id: string; progress: number }>;
+  assert.equal(projects.find((project) => project.id === `project-a-${suffix}`)?.progress, 37.5);
 
   const invoiceListResponse = await fetch(`http://127.0.0.1:${port}/invoices`, {
     headers: { "x-test-user": ownerId },

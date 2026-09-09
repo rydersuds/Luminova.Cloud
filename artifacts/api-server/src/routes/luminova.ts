@@ -62,7 +62,7 @@ import {
   UpdateTradeReviewResponse,
   DeleteTradeReviewParams,
 } from "@workspace/api-zod";
-import { calculatePortfolioFinancialSummary } from "../lib/financialSummary";
+import { calculatePortfolioFinancialSummary, type FinancialProject } from "../lib/financialSummary";
 import { DatabasePanoramaStore } from "../lib/panoramaStore";
 import {
   db,
@@ -676,6 +676,15 @@ type VendorQuote = (typeof vendorQuotes)[number] & {
   ownerId?: string;
 };
 
+const withCalculatedProjectProgress = (project: Project): Project => {
+  const quoteTotal = project.clientQuote?.total ?? 0;
+  if (quoteTotal <= 0) return project;
+  return {
+    ...project,
+    progress: Math.round(Math.min(Math.max(project.invoiced, 0) / quoteTotal, 1) * 1000) / 10,
+  };
+};
+
 // Demo fixtures define the local record shapes above, but must never enter the live product.
 activities.length = 0;
 trades.length = 0;
@@ -739,7 +748,7 @@ const allProjects = async () => {
   ]);
   const exteriorPhotoByProject = new Map(exteriorPhotos.map((item) => [item.projectId, item]));
   const importedProjects = importedProjectRows.map((row) => {
-    const project = row.data as Project;
+    const project = withCalculatedProjectProgress(row.data as Project);
     const exteriorPhoto = exteriorPhotoByProject.get(project.id);
     return exteriorPhoto?.ownerId === row.ownerId ? { ...project, exteriorImage: exteriorPhoto.exteriorImage } : project;
   });
@@ -789,19 +798,58 @@ const allVendorQuotes = async (): Promise<VendorQuote[]> => [
   ...vendorQuotes,
 ];
 const financialRecordsForOwner = async (ownerId: string) => {
-  const [invoiceRows, quoteRows] = await Promise.all([
+  const [invoiceRows, quoteRows, projectRows] = await Promise.all([
     db.select({ data: importedInvoicesTable.data })
       .from(importedInvoicesTable)
       .where(eq(importedInvoicesTable.ownerId, ownerId)),
     db.select({ data: importedVendorQuotesTable.data })
       .from(importedVendorQuotesTable)
       .where(eq(importedVendorQuotesTable.ownerId, ownerId)),
+    db.select({ data: importedProjectsTable.data })
+      .from(importedProjectsTable)
+      .where(eq(importedProjectsTable.ownerId, ownerId)),
   ]);
+  const ownedProjects = projectRows.map((row) => row.data as Project);
+  const projectById = new Map(ownedProjects.map((project) => [project.id, project]));
+  const ownedInvoices = [
+    ...invoiceRows.map((row) => row.data as Invoice),
+    ...(invoices as Invoice[]).filter((invoice) => invoice.ownerId === ownerId),
+  ];
+  const legacyInvoicesByProject = new Map<string, Invoice[]>();
+  for (const invoice of ownedInvoices) {
+    if (invoice.direction) continue;
+    const projectInvoices = legacyInvoicesByProject.get(invoice.projectId) ?? [];
+    projectInvoices.push(invoice);
+    legacyInvoicesByProject.set(invoice.projectId, projectInvoices);
+  }
+  const legacyClientInvoiceIds = new Set<string>();
+  for (const [projectId, projectInvoices] of legacyInvoicesByProject) {
+    const project = projectById.get(projectId);
+    if (!project || typeof project.invoiced !== "number") continue;
+    const explicitRevenue = ownedInvoices
+      .filter((invoice) => invoice.projectId === projectId && invoice.direction === "luminova_to_client")
+      .reduce((total, invoice) => total + invoice.amount, 0);
+    const legacyTotal = projectInvoices.reduce((total, invoice) => total + invoice.amount, 0);
+    const expectedLegacyRevenue = Math.max(project.invoiced - explicitRevenue, 0);
+    if (Math.abs(legacyTotal - expectedLegacyRevenue) <= 0.01) {
+      for (const invoice of projectInvoices) legacyClientInvoiceIds.add(invoice.id);
+    }
+  }
+  const normalizedInvoices = ownedInvoices.map((invoice) =>
+    invoice.direction || !legacyClientInvoiceIds.has(invoice.id)
+      ? invoice
+      : { ...invoice, direction: "luminova_to_client" as const },
+  );
+  const financialProjects: FinancialProject[] = ownedProjects.map((project) => ({
+    projectId: project.id,
+    clientQuoteTotal: project.clientQuote?.total,
+    internalExpenseTotal: project.budgetLineItems?.reduce(
+      (total, lineItem) => total + Math.max(lineItem.invoiced, 0),
+      0,
+    ),
+  }));
   return {
-    invoices: [
-      ...invoiceRows.map((row) => row.data as Invoice),
-      ...(invoices as Invoice[]).filter((invoice) => invoice.ownerId === ownerId),
-    ],
+    invoices: normalizedInvoices,
     quotes: [
       ...quoteRows.map((row) => row.data as VendorQuote).map((quote) => ({
         ...quote,
@@ -811,13 +859,14 @@ const financialRecordsForOwner = async (ownerId: string) => {
       })),
       ...(vendorQuotes as VendorQuote[]).filter((quote) => quote.ownerId === ownerId),
     ],
+    projects: financialProjects,
   };
 };
 const projectsForOwner = async (ownerId: string) =>
   (await db.select({ data: importedProjectsTable.data })
     .from(importedProjectsTable)
     .where(eq(importedProjectsTable.ownerId, ownerId)))
-    .map((row) => row.data as Project);
+    .map((row) => withCalculatedProjectProgress(row.data as Project));
 const tradesForOwner = async (ownerId: string) => {
   const [tradeRows, projectRows, { invoices: ownedInvoices }, historyRecords, reviewRecords] = await Promise.all([
     db.select({ data: importedVendorsTable.data })
@@ -2139,9 +2188,9 @@ router.get("/invoices/summary", async (req: AuthenticatedRequest, res) => {
     res.status(401).json({ error: "Authentication required" });
     return;
   }
-  const { invoices: invoiceRecords, quotes: quoteRecords } = await financialRecordsForOwner(req.userId);
+  const { invoices: invoiceRecords, quotes: quoteRecords, projects: projectRecords } = await financialRecordsForOwner(req.userId);
   res.json(GetFinancialSummaryResponse.parse(
-    calculatePortfolioFinancialSummary(invoiceRecords, quoteRecords),
+    calculatePortfolioFinancialSummary(invoiceRecords, quoteRecords, projectRecords),
   ));
 });
 

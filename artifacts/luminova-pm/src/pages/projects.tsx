@@ -162,30 +162,30 @@ export default function Projects() {
                       {project.status}
                     </Badge>
                   </div>
-                  <CardContent className="flex flex-col gap-5 p-5">
-                    <div>
-                      <h2 className="text-xl font-bold">{project.name}</h2>
-                      <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                    <CardContent className="flex min-w-0 flex-col gap-5 p-5">
+                      <div className="min-w-0">
+                        <h2 className="break-words text-xl font-bold">{project.name}</h2>
+                        <div className="mt-2 flex min-w-0 items-start gap-2 text-sm text-muted-foreground">
                         <MapPin className="h-4 w-4 shrink-0 text-primary" />
-                        <span className="truncate">{project.address}</span>
+                          <span className="min-w-0 break-words">{project.address}</span>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4 border-y border-border/50 py-4 text-sm">
-                      <div>
+                      <div className="grid grid-cols-1 gap-4 border-y border-border/50 py-4 text-sm min-[420px]:grid-cols-2">
+                        <div className="min-w-0">
                         <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Project manager</p>
-                        <p className="mt-1 font-medium">{project.pmName}</p>
+                          <p className="mt-1 break-words font-medium">{project.pmName}</p>
                       </div>
-                      <div>
+                        <div className="min-w-0">
                         <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Target</p>
-                        <p className="mt-1 font-medium">{formatDate(project.targetDate)}</p>
+                          <p className="mt-1 break-words font-medium">{formatDate(project.targetDate)}</p>
                       </div>
-                      <div>
+                        <div className="min-w-0">
                         <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Budget</p>
-                        <p className="mt-1 font-semibold tabular-nums">{formatCurrency(project.budgeted)}</p>
+                          <p className="mt-1 break-words font-semibold tabular-nums">{formatCurrency(project.budgeted)}</p>
                       </div>
-                      <div>
+                        <div className="min-w-0">
                         <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Region</p>
-                        <p className="mt-1 font-medium">{project.region}</p>
+                          <p className="mt-1 break-words font-medium">{project.region}</p>
                       </div>
                     </div>
                     <div>

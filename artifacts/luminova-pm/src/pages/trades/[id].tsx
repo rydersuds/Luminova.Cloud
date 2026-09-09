@@ -361,14 +361,14 @@ export default function TradeDetail() {
 
             <div className="md:col-span-2 space-y-6">
               <Tabs defaultValue="history">
-                <div className="flex flex-col sm:flex-row sm:items-end gap-3 mb-6">
-                <TabsList className="flex-1 w-full justify-start border-b border-border rounded-none bg-transparent p-0 mb-0">
+                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                <TabsList className="flex h-auto min-w-0 flex-1 flex-wrap justify-start border-b border-border rounded-none bg-transparent p-0 mb-0">
                   <TabsTrigger value="history" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 pb-2">Job History</TabsTrigger>
                   <TabsTrigger value="bids" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 pb-2">Recent Bids</TabsTrigger>
                   <TabsTrigger value="reviews" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 pb-2">Reviews</TabsTrigger>
                 </TabsList>
-                {isAdmin && <Button size="sm" onClick={openNewHistory}>Record verified work</Button>}
-                {canReview && <Button size="sm" variant="outline" onClick={openReview} disabled={reviewProjects.length === 0}>Submit review</Button>}
+                {isAdmin && <Button size="sm" className="max-w-full whitespace-normal" onClick={openNewHistory}>Record verified work</Button>}
+                {canReview && <Button size="sm" variant="outline" className="max-w-full whitespace-normal" onClick={openReview} disabled={reviewProjects.length === 0}>Submit review</Button>}
                 </div>
 
                 <TabsContent value="history" className="mt-0">
@@ -392,9 +392,11 @@ export default function TradeDetail() {
                               <TableCell className="text-right tabular-nums">{formatCurrency(job.amount)}</TableCell>
                               <TableCell className="text-muted-foreground text-sm">{job.source}</TableCell>
                               {isAdmin && (
-                                <TableCell className="text-right whitespace-nowrap">
-                                  <Button variant="ghost" size="sm" onClick={() => openEditHistory(job)}>Edit</Button>
-                                  <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => void removeHistory(job.id)}>Remove</Button>
+                                <TableCell className="min-w-[8rem] text-right">
+                                  <div className="flex flex-wrap justify-end gap-1">
+                                    <Button variant="ghost" size="sm" onClick={() => openEditHistory(job)}>Edit</Button>
+                                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => void removeHistory(job.id)}>Remove</Button>
+                                  </div>
                                 </TableCell>
                               )}
                             </TableRow>

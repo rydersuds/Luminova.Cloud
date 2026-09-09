@@ -53,7 +53,7 @@ export const GetProjectsResponseItem = zod.object({
   "address": zod.string(),
   "region": zod.string(),
   "status": zod.string(),
-  "progress": zod.number().int(),
+  "progress": zod.number(),
   "pmName": zod.string(),
   "clientName": zod.string(),
   "targetDate": zod.string(),
@@ -87,7 +87,7 @@ export const CreateProjectResponse = zod.object({
   "address": zod.string(),
   "region": zod.string(),
   "status": zod.string(),
-  "progress": zod.number().int(),
+  "progress": zod.number(),
   "pmName": zod.string(),
   "clientName": zod.string(),
   "targetDate": zod.string(),
@@ -116,7 +116,7 @@ export const GetProjectResponse = zod.object({
   "address": zod.string(),
   "region": zod.string(),
   "status": zod.string(),
-  "progress": zod.number().int(),
+  "progress": zod.number(),
   "pmName": zod.string(),
   "clientName": zod.string(),
   "targetDate": zod.string(),
@@ -229,7 +229,7 @@ export const UpdateProjectResponse = zod.object({
   "address": zod.string(),
   "region": zod.string(),
   "status": zod.string(),
-  "progress": zod.number().int(),
+  "progress": zod.number(),
   "pmName": zod.string(),
   "clientName": zod.string(),
   "targetDate": zod.string(),
@@ -395,7 +395,7 @@ export const CreateProjectImportResponse = zod.object({
   "address": zod.string(),
   "region": zod.string(),
   "status": zod.string(),
-  "progress": zod.number().int(),
+  "progress": zod.number(),
   "pmName": zod.string(),
   "clientName": zod.string(),
   "targetDate": zod.string(),
@@ -565,7 +565,7 @@ export const BuildProjectImportSessionResponse = zod.object({
   "address": zod.string(),
   "region": zod.string(),
   "status": zod.string(),
-  "progress": zod.number().int(),
+  "progress": zod.number(),
   "pmName": zod.string(),
   "clientName": zod.string(),
   "targetDate": zod.string(),
@@ -924,7 +924,7 @@ export const CreateInvoiceResponse = zod.object({
 
 
 /**
- * Aggregates all project invoices and accepted Luminova-to-client quotes. Invoices without a direction are treated as legacy company-to-Luminova expenses. Accepted quote revisions and overlapping project-total quotes are counted once, and each project's remaining client value is floored at zero.
+ * Aggregates all project invoices and accepted Luminova-to-client quotes. A directionless legacy invoice is treated as client revenue only when the persisted project's invoiced total accounts for that legacy amount; otherwise it remains a company-to-Luminova expense. Persisted internal budget actuals are used when available. Accepted quote revisions and overlapping project-total quotes are counted once, and each project's remaining client value is floored at zero.
  * @summary Get portfolio financial summary
  */
 export const getFinancialSummaryResponseUpcomingClientPaymentsMin = 0;
@@ -933,7 +933,7 @@ export const getFinancialSummaryResponseUpcomingClientPaymentsMin = 0;
 
 export const GetFinancialSummaryResponse = zod.object({
   "invoicedRevenue": zod.number().describe('Total Luminova-to-client invoice value.'),
-  "invoicedExpenses": zod.number().describe('Total company-to-Luminova invoice value, including legacy invoices with no direction.'),
+  "invoicedExpenses": zod.number().describe('Total internal expense value from company-to-Luminova invoices or persisted internal budget actuals.'),
   "acceptedClientQuoteValue": zod.number().describe('Deduplicated accepted Luminova-to-client quote value across projects.'),
   "upcomingClientPayments": zod.number().min(getFinancialSummaryResponseUpcomingClientPaymentsMin).describe('Accepted client quote value remaining after outgoing invoices, floored per project at zero.')
 })
