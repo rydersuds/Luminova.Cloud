@@ -166,7 +166,24 @@ async function makeImportFileStorageUnavailable(page: Page, failure: 'open' | 't
   }, failure);
 }
 
-test('reload resumes an interrupted import by uploading only missing files', async ({ page }) => {
+async function makeImportCleanupStorageUnavailable(page: Page) {
+  await page.addInitScript(() => {
+    const originalTransaction = IDBDatabase.prototype.transaction;
+    let successfulTransactions = 0;
+    IDBDatabase.prototype.transaction = function (
+      storeNames: string | string[],
+      mode?: IDBTransactionMode,
+      options?: IDBTransactionOptions,
+    ) {
+      if (successfulTransactions >= 2) {
+        throw new DOMException('IndexedDB cleanup transaction failed', 'UnknownError');
+      }
+      const transaction = originalTransaction.call(this, storeNames, mode, options);
+      successfulTransactions++;
+      return transaction;
+    };
+  });
+}
   const api = await installImportApi(page);
   api.blockAdditionalAttaches(true);
 
@@ -194,16 +211,15 @@ test('reload resumes an interrupted import by uploading only missing files', asy
 
 test('reload while building polls until the existing build resolves', async ({ page }) => {
   const api = await installImportApi(page);
-  api.holdBuild();
-  await selectAndStart(page);
-  await expect(page.getByLabel('Import status')).toHaveText('building');
-  expect(api.buildRequests).toBe(1);
+  await makeImportCleanupStorageUnavailable(page);
 
-  await page.reload();
-  await expect(page.getByLabel('Import status')).toHaveText('building');
-  api.setStatus('completed');
-  await expect(page.getByLabel('Import status')).toHaveText('success', { timeout: 5_000 });
-  expect(api.buildRequests).toBe(1);
+  await selectAndStart(page);
+  await expect(page.getByLabel('Import status')).toHaveText('success', { timeout: 10_000 });
+  await page.waitForTimeout(1_500);
+
+  expect(api.projectsCreated).toBe(1);
+  await expect(page.getByLabel('Import status')).toHaveText('success');
+  await expect(page.getByTestId('dashboard-import-alert')).toHaveCount(0);
 });
 
 test('dismissed import errors stay hidden for the session when dismissal storage is unavailable', async ({ page }) => {

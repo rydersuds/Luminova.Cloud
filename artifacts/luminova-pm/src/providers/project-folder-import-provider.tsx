@@ -70,6 +70,20 @@ const loadImportFile = (importId: string, relativePath: string) =>
 const clearImportFiles = (importId: string, paths: string[]) =>
   Promise.all(paths.map((path) => withImportFiles("readwrite", (store) => store.delete(`${importId}:${path}`))))
 
+const scheduleImportFileCleanup = (importId: string, paths: string[]) => {
+  void (async () => {
+    for (const delay of [0, 250, 1000]) {
+      if (delay) await new Promise((resolve) => window.setTimeout(resolve, delay))
+      try {
+        await clearImportFiles(importId, paths)
+        return
+      } catch {
+        // Cleanup is best-effort after the server has completed the project build.
+      }
+    }
+  })()
+}
+
 export function ProjectFolderImportProvider({
   children,
   authState,
@@ -241,7 +255,7 @@ export function ProjectFolderImportProvider({
       ])
       setFolderStatus("success")
       setFolderError("")
-      await clearImportFiles(session.importId, session.documents.map((item) => item.relativePath))
+      scheduleImportFileCleanup(session.importId, session.documents.map((item) => item.relativePath))
       cleanupDismissedImportErrors(null)
       forgetDismissedImportError("__pending__")
       sessionRef.current = null
@@ -298,7 +312,7 @@ export function ProjectFolderImportProvider({
           return
         }
         if (session.status === "completed") {
-          await clearImportFiles(session.importId, session.documents.map((item) => item.relativePath))
+          scheduleImportFileCleanup(session.importId, session.documents.map((item) => item.relativePath))
           return
         }
         if (pendingDismissed) {
@@ -349,7 +363,7 @@ export function ProjectFolderImportProvider({
               queryClient.invalidateQueries({ queryKey: getGetProjectsQueryKey() }),
               queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() }),
             ])
-            await clearImportFiles(session.importId, session.documents.map((item) => item.relativePath))
+            scheduleImportFileCleanup(session.importId, session.documents.map((item) => item.relativePath))
             sessionRef.current = null
             setFolderStatus("success")
           }, 2000)
