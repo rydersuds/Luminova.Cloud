@@ -421,6 +421,35 @@ test("isolates client organizations and memberships by workspace", async () => {
   assert.deepEqual(memberships, []);
 });
 
+test("keeps assigned users beyond the first Clerk page and valid memberships visible", async () => {
+  const beyondFirstPage = makeUser("client-beyond-first-page", "Client");
+  const fake = fakeClerk([
+    makeUser("admin", "Admin"),
+    ...Array.from({ length: 100 }, (_, index) => makeUser(`workspace-user-${index}`, "Field Team")),
+    beyondFirstPage,
+  ]);
+  const base = await startApi("admin", fake.client, undefined, "workspace-large-members");
+  const client = await createTestClient(base, "Large Workspace Client");
+
+  assert.equal((await grantClientAccess(base, client.id, beyondFirstPage.id)).status, 201);
+  await db.insert(clientMembersTable).values({
+    id: "stale-membership",
+    clientId: client.id,
+    userId: "deleted-clerk-user",
+    addedBy: "admin",
+  });
+
+  const response = await fetch(`${base}/clients`);
+  assert.equal(response.status, 200);
+  const clients = await response.json() as Array<{
+    members: Array<{ userId: string; name: string; email: string }>;
+  }>;
+  assert.equal(clients[0].members.length, 1);
+  assert.equal(clients[0].members[0].userId, beyondFirstPage.id);
+  assert.equal(clients[0].members[0].name, beyondFirstPage.fullName);
+  assert.equal(clients[0].members[0].email, beyondFirstPage.primaryEmailAddress?.emailAddress);
+});
+
 test("rejects granting client access to a non-Client workspace user", async () => {
   const fake = fakeClerk([
     makeUser("admin", "Admin"),

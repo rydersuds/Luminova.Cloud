@@ -110,8 +110,19 @@ async function serializeClients(client: ClerkClient, scope: string, clientId?: s
     .select()
     .from(clientMembersTable)
     .where(inArray(clientMembersTable.clientId, records.map((record) => record.id)));
-  const users = await client.users.getUserList({ limit: 100 });
-  const usersById = new Map(users.data.map((user) => [user.id, user]));
+  const memberUserIds = [...new Set(memberships.map((membership) => membership.userId))];
+  const userResults = await Promise.allSettled(
+    memberUserIds.map(async (userId) => [userId, await client.users.getUser(userId)] as const),
+  );
+  const usersById = new Map<string, User>();
+  for (const result of userResults) {
+    if (result.status === "fulfilled") {
+      usersById.set(result.value[0], result.value[1]);
+      continue;
+    }
+    const error = result.reason as ClerkError;
+    if (error.status !== 404) throw result.reason;
+  }
 
   return records.map((record) => ({
     id: record.id,
@@ -121,6 +132,8 @@ async function serializeClients(client: ClerkClient, scope: string, clientId?: s
       .filter((membership) => membership.clientId === record.id)
       .map((membership) => {
         const user = usersById.get(membership.userId);
+        // A deleted or otherwise unresolvable Clerk user has no profile to serialize.
+        // Omit only that stale membership; other memberships remain visible.
         if (!user) return null;
         return {
           id: membership.id,
