@@ -490,11 +490,11 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
     <AppLayout>
       <div className="flex-1 overflow-x-hidden overflow-y-auto bg-transparent flex flex-col">
         {/* Project Header (Dark Chrome) */}
-        <div className="bg-sidebar/80 text-sidebar-foreground shrink-0 border-b border-sidebar-border backdrop-blur-xl">
+        <div className="bg-transparent text-foreground shrink-0 border-b border-border/60">
           <div className="max-w-[1400px] mx-auto p-6 md:p-8 space-y-6">
             <button 
               onClick={() => setLocation("/")}
-              className="flex items-center gap-2 text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors text-sm font-medium w-fit"
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-sm font-medium w-fit"
             >
               <ArrowLeft className="h-4 w-4" />
               Back to Projects
@@ -506,32 +506,32 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                   <Badge variant={getStatusColor(project.status) as any} className="capitalize">
                     {project.status}
                   </Badge>
-                  <span className="text-sidebar-foreground/60 text-sm font-medium">ID: {project.id}</span>
+                  <span className="text-muted-foreground text-sm font-medium">ID: {project.id}</span>
                 </div>
                 <h1 className="text-3xl md:text-4xl font-heading font-bold">{project.name}</h1>
-                <div className="flex flex-wrap items-center gap-4 md:gap-6 text-sm text-sidebar-foreground/80">
+                <div className="flex flex-wrap items-center gap-4 md:gap-6 text-sm text-muted-foreground">
                   <div className="flex min-w-0 items-start gap-1.5">
-                    <MapPin className="h-4 w-4 text-sidebar-primary" />
+                    <MapPin className="h-4 w-4 text-primary" />
                     <span className="break-words">{project.address}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <Calendar className="h-4 w-4 text-sidebar-primary" />
+                    <Calendar className="h-4 w-4 text-primary" />
                     Target: {formatDate(project.targetDate)}
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <Briefcase className="h-4 w-4 text-sidebar-primary" />
+                    <Briefcase className="h-4 w-4 text-primary" />
                     Client: {project.clientName}
                   </div>
                 </div>
               </div>
               
               <div className="flex max-w-full flex-wrap items-center gap-3">
-                <Button variant="outline" className="max-w-full whitespace-normal bg-transparent border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground" onClick={() => setLocation(`/quotes?projectId=${project.id}`)}>
+                <Button variant="outline" className="max-w-full whitespace-normal bg-transparent border-border text-foreground hover:bg-card/60 hover:text-foreground" onClick={() => setLocation(`/quotes?projectId=${project.id}`)}>
                   Vendor Quotes
                 </Button>
                 <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
                   <DialogTrigger asChild>
-                    <Button variant="outline" className="max-w-full whitespace-normal bg-transparent border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground">
+                    <Button variant="outline" className="max-w-full whitespace-normal bg-transparent border-border text-foreground hover:bg-card/60 hover:text-foreground">
                       Edit Project
                     </Button>
                   </DialogTrigger>
@@ -587,27 +587,27 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
               </div>
             </div>
             
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-sidebar-border/60 rounded-lg overflow-hidden border border-sidebar-border/70">
-              <div className="bg-sidebar/55 p-4 space-y-1 backdrop-blur-sm">
-                <p className="text-sm text-sidebar-foreground/60">Internal Budget</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border/50 rounded-lg overflow-hidden border border-border/70">
+              <div className="bg-card/35 p-4 space-y-1 backdrop-blur-sm">
+                <p className="text-sm text-muted-foreground">Internal Budget</p>
                 <p className="text-xl font-bold tabular-nums">{formatCurrency(project.budgeted)}</p>
               </div>
-              <div className="bg-sidebar/55 p-4 space-y-1 backdrop-blur-sm">
-                <p className="text-sm text-sidebar-foreground/60">Invoiced expenses</p>
+              <div className="bg-card/35 p-4 space-y-1 backdrop-blur-sm">
+                <p className="text-sm text-muted-foreground">Invoiced expenses</p>
                 <p className="text-xl font-bold tabular-nums">{formatCurrency(actualCost)}</p>
               </div>
-              <div className="bg-sidebar/55 p-4 space-y-1 backdrop-blur-sm">
-                <p className="text-sm text-sidebar-foreground/60">Budget Remaining</p>
+              <div className="bg-card/35 p-4 space-y-1 backdrop-blur-sm">
+                <p className="text-sm text-muted-foreground">Budget Remaining</p>
                 <p className={cn("text-xl font-bold tabular-nums", varianceIsPositive ? "text-success" : "text-destructive")}>
                   {varianceIsPositive ? "+" : ""}{formatCurrency(budgetVariance)}
                 </p>
               </div>
-              <div className="bg-sidebar/55 p-4 space-y-1 backdrop-blur-sm">
-                <p className="text-sm text-sidebar-foreground/60">Total Progress</p>
+              <div className="bg-card/35 p-4 space-y-1 backdrop-blur-sm">
+                <p className="text-sm text-muted-foreground">Total Progress</p>
                 <div className="flex items-center gap-2">
                   <p className="text-xl font-bold tabular-nums">{clientQuoteInvoicedPercent.toFixed(1)}%</p>
-                  <div className="flex-1 h-1.5 bg-sidebar-accent/70 rounded-full overflow-hidden">
-                    <div className="h-full bg-sidebar-primary rounded-full" style={{ width: `${clientQuoteInvoicedPercent}%` }} />
+                  <div className="flex-1 h-1.5 bg-muted/70 rounded-full overflow-hidden">
+                    <div className="h-full bg-primary rounded-full" style={{ width: `${clientQuoteInvoicedPercent}%` }} />
                   </div>
                 </div>
               </div>
