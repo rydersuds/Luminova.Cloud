@@ -6,3 +6,4 @@
 - [Photo analysis isolation](photo-analysis-isolation.md) — keep private visual analysis bounded and per-photo so one AI or decoder failure never rolls back a valid import.
 - [Workspace-scoped package installs](workspace-scoped-package-installs.md) — when package tooling cannot target a pnpm child package, edit its manifest and install from the workspace root.
 - [Internal budget semantics](internal-budget-semantics.md) — compare internal costs and commitments to internal budgets; never treat client billings as project costs.
+- [Visual auth harnesses](visual-auth-harnesses.md) — provider-owned UI should use injected auth state in isolated visual mounts instead of relying on Clerk session hydration.

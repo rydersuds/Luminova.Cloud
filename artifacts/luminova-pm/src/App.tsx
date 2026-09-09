@@ -289,7 +289,7 @@ function FolderImportVisualHarness() {
       <button type="button" onClick={() => void folderImport.startFolderImport()}>Start import</button>
       <output aria-label="Import status">{folderImport.folderStatus}</output>
       <output aria-label="Uploaded files">{folderImport.folderProgress.uploaded}</output>
-      {folderImport.folderError && <p role="alert">{folderImport.folderError}</p>}
+      {folderImport.folderError && <p data-testid="dashboard-import-alert" role="alert">{folderImport.folderError}</p>}
     </main>
   );
 }

@@ -8,9 +8,9 @@ const files = [
   { name: 'budget.txt', mimeType: 'text/plain', buffer: Buffer.from('Budget: $1000') },
 ];
 
-function session(status: SessionStatus, documents: Document[], uploadedPaths: string[], error: string | null = null) {
+function session(status: SessionStatus, documents: Document[], uploadedPaths: string[], error: string | null = null, importId = 'import-recovery-test') {
   return {
-    importId: 'import-recovery-test',
+    importId,
     status,
     documents,
     uploadedPaths,
@@ -31,18 +31,24 @@ async function installImportApi(page: Page) {
   const uploadRequests: string[] = [];
   let holdBuild = false;
   let blockAdditionalAttaches = false;
+  let failUploads = false;
+  let importId = 'import-recovery-test';
 
   await page.route('**/api/project-import-sessions', async (route) => {
     if (route.request().method() === 'POST') {
       documents = route.request().postDataJSON().documents;
-      await route.fulfill({ status: 201, json: session(status, documents, [...uploadedPaths]) });
+      await route.fulfill({ status: 201, json: session(status, documents, [...uploadedPaths], null, importId) });
       return;
     }
-    await route.fulfill({ json: documents.length ? session(status, documents, [...uploadedPaths], error) : null });
+    await route.fulfill({ json: documents.length ? session(status, documents, [...uploadedPaths], error, importId) : null });
   });
   await page.route('**/api/storage/uploads/request-url', async (route) => {
     const body = route.request().postDataJSON();
     uploadRequests.push(body.relativePath);
+    if (failUploads) {
+      await route.fulfill({ status: 500, json: { error: 'The upload could not be completed.' } });
+      return;
+    }
     await route.fulfill({ json: { uploadURL: `http://127.0.0.1:4173/__folder-upload/${body.relativePath}`, objectPath: `/objects/${body.relativePath}` } });
   });
   await page.route('**/__folder-upload/**', route => route.fulfill({ status: 200 }));
@@ -81,6 +87,8 @@ async function installImportApi(page: Page) {
     setStatus(next: SessionStatus, message: string | null = null) { status = next; error = message; },
     holdBuild() { holdBuild = true; },
     blockAdditionalAttaches(value: boolean) { blockAdditionalAttaches = value; },
+    failUploads(value: boolean) { failUploads = value; },
+    setImportId(next: string) { importId = next; },
     seedDocuments() {
       documents = files.map(file => ({
         relativePath: file.name,
@@ -138,6 +146,34 @@ test('reload while building polls until the existing build resolves', async ({ p
   expect(api.buildRequests).toBe(1);
 });
 
+test('dismissed import errors stay hidden after refresh without suppressing a new import', async ({ page }) => {
+  const api = await installImportApi(page);
+  api.setImportId('import-dismissed');
+  api.failUploads(true);
+
+  await selectAndStart(page);
+  const activity = page.getByRole('complementary', { name: 'Project folder import activity' });
+  const dashboardAlert = page.getByTestId('dashboard-import-alert');
+  await expect(activity.getByRole('alert')).toContainText('2 files still need to be uploaded');
+  await expect(dashboardAlert).toContainText('2 files still need to be uploaded');
+
+  await activity.getByRole('button', { name: 'Dismiss error' }).click();
+  await expect(activity).not.toBeVisible();
+  await expect(dashboardAlert).not.toBeVisible();
+  await expect(page.evaluate(() => localStorage.getItem('luminova-folder-import-dismissed:import-dismissed'))).resolves.toBe('true');
+
+  await page.reload();
+  await expect(activity).not.toBeVisible();
+  await expect(dashboardAlert).not.toBeVisible();
+
+  api.setImportId('import-new');
+  await page.getByLabel('Project folder files').setInputFiles(files);
+  await page.getByRole('button', { name: 'Start import' }).click();
+  await expect(activity.getByRole('alert')).toContainText('2 files still need to be uploaded');
+  await expect(dashboardAlert).toContainText('2 files still need to be uploaded');
+  await expect(page.evaluate(() => localStorage.getItem('luminova-folder-import-dismissed:import-new'))).resolves.toBeNull();
+});
+
 test('a stale build becomes retryable without duplicating attached documents', async ({ page }) => {
   const api = await installImportApi(page);
   api.seedDocuments();
@@ -146,7 +182,7 @@ test('a stale build becomes retryable without duplicating attached documents', a
   api.setStatus('failed', 'The previous build was interrupted. Retry to continue.');
 
   await page.goto('/__visual/folder-import');
-  await expect(page.getByRole('alert')).toContainText('previous build was interrupted');
+  await expect(page.getByRole('complementary', { name: 'Project folder import activity' }).getByRole('alert')).toContainText('previous build was interrupted');
   await page.getByLabel('Project folder files').setInputFiles(files);
   await page.getByRole('button', { name: 'Start import' }).click();
   await expect(page.getByLabel('Import status')).toHaveText('success');

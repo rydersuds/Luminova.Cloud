@@ -333,7 +333,7 @@ export function ProjectFolderImportProvider({
 
   return <ProjectFolderImportContext.Provider value={{ folderFiles, skippedFolderFiles, folderStatus, folderProgress, folderError, collectFolderFiles, startFolderImport, clearFolderImport, dismissFolderError, isActive }}>
     {children}
-    <FolderImportActivity />
+    <FolderImportActivity isSignedIn={Boolean(isSignedIn)} />
   </ProjectFolderImportContext.Provider>
 }
 
@@ -343,8 +343,7 @@ export function useProjectFolderImport() {
   return context
 }
 
-function FolderImportActivity() {
-  const { isSignedIn } = useAuth()
+function FolderImportActivity({ isSignedIn }: { isSignedIn: boolean }) {
   const { folderFiles, skippedFolderFiles, folderStatus, folderProgress, folderError, dismissFolderError } = useProjectFolderImport()
   const [expanded, setExpanded] = React.useState(true)
   if (!isSignedIn || folderStatus === "idle") return null
