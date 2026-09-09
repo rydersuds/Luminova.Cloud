@@ -36,6 +36,11 @@ type ClerkError = {
   errors?: Array<{ code?: string; message?: string; longMessage?: string }>;
 };
 
+function postgresErrorCode(error: unknown): string | undefined {
+  const candidate = error as { code?: unknown; cause?: { code?: unknown } };
+  if (typeof candidate.code === "string") return candidate.code;
+  return typeof candidate.cause?.code === "string" ? candidate.cause.code : undefined;
+}
 export function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
   const auth = getAuth(req);
   const userId = auth?.userId;
@@ -270,7 +275,7 @@ router.post("/clients", async (req: AuthenticatedRequest, res): Promise<void> =>
     const created = await serializeClients(client, workspaceId(req), record[0].id);
     res.status(201).json(CreateClientResponse.parse(created[0]));
   } catch (error) {
-    if ((error as { code?: string }).code === "23505") {
+    if (postgresErrorCode(error) === "23505") {
       res.status(409).json({ error: "A client with that name already exists" });
       return;
     }
@@ -334,7 +339,7 @@ router.post("/clients/:clientId/members", async (req: AuthenticatedRequest, res)
     const updated = await serializeClients(client, scope, params.data.clientId);
     res.status(201).json(updated[0]);
   } catch (error) {
-    if ((error as { code?: string }).code === "23505") {
+    if (postgresErrorCode(error) === "23505") {
       res.status(409).json({ error: "This user already has access to the client" });
       return;
     }
@@ -352,6 +357,16 @@ router.delete("/clients/:clientId/members/:userId", async (req: AuthenticatedReq
   const params = RevokeClientAccessParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: "Invalid client membership" });
+    return;
+  }
+  const ownedClient = await db.select({ id: clientsTable.id }).from(clientsTable).where(
+    and(
+      eq(clientsTable.id, params.data.clientId),
+      eq(clientsTable.workspaceId, workspaceId(req)),
+    ),
+  );
+  if (!ownedClient.length) {
+    res.status(404).json({ error: "Client not found" });
     return;
   }
   const removed = await db.delete(clientMembersTable).where(

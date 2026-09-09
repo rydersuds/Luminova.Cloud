@@ -3,6 +3,8 @@ import { afterEach, test } from "node:test";
 import express from "express";
 import type { Server } from "node:http";
 import type { User } from "@clerk/backend";
+import { clientMembersTable, clientsTable, db } from "@workspace/db";
+import { eq, inArray } from "drizzle-orm";
 import { clerkErrorResponse, createUsersRouter } from "./users";
 
 type Role = "Admin" | "Project Manager" | "Field Team" | "Client";
@@ -101,19 +103,36 @@ function fakeClerk(seed: User[]) {
 }
 
 const servers: Server[] = [];
-afterEach(() => {
+const testClientIds = new Set<string>();
+
+afterEach(async () => {
   for (const server of servers.splice(0)) server.close();
+  const clientIds = [...testClientIds];
+  testClientIds.clear();
+  if (clientIds.length) {
+    await db.delete(clientMembersTable).where(inArray(clientMembersTable.clientId, clientIds));
+    await db.delete(clientsTable).where(inArray(clientsTable.id, clientIds));
+  }
 });
 
 async function startApi(
   actorId: string,
   client: ReturnType<typeof fakeClerk>["client"],
   lock: Parameters<typeof createUsersRouter>[1] = async (operation) => operation(),
+  organizationId = "default",
 ) {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
-    Object.assign(req, { userId: actorId, log: { warn: () => undefined } });
+    const auth = Object.assign(
+      () => ({ userId: actorId, orgId: organizationId, tokenType: "session_token" }),
+      { [Symbol.for("@clerk/express.auth")]: true },
+    );
+    Object.assign(req, {
+      userId: actorId,
+      auth,
+      log: { warn: () => undefined, error: () => undefined },
+    });
     next();
   });
   app.use(createUsersRouter(
@@ -126,6 +145,27 @@ async function startApi(
   const address = server.address();
   assert(address && typeof address !== "string");
   return `http://127.0.0.1:${address.port}`;
+}
+
+async function createTestClient(base: string, name: string) {
+  const response = await fetch(`${base}/clients`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  const payload = await response.text();
+  assert.equal(response.status, 201, payload);
+  const client = JSON.parse(payload) as { id: string; name: string; members: unknown[] };
+  testClientIds.add(client.id);
+  return client;
+}
+
+async function grantClientAccess(base: string, clientId: string, userId: string) {
+  return fetch(`${base}/clients/${clientId}/members`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ userId }),
+  });
 }
 
 test("blocks non-administrators from listing and mutating users", async () => {
@@ -315,4 +355,88 @@ test("serializes concurrent admin removal so one administrator remains", async (
   ]);
   assert.equal([demotion.status, deletion.status].filter((status) => status < 300).length, 1);
   assert.equal(fake.getUsers().filter((user) => user.publicMetadata.role === "Admin").length, 1);
+});
+
+test("isolates client organizations and memberships by workspace", async () => {
+  const fake = fakeClerk([
+    makeUser("admin", "Admin"),
+    makeUser("client-a", "Client"),
+    makeUser("client-b", "Client"),
+  ]);
+  const workspaceA = await startApi("admin", fake.client, undefined, "workspace-a");
+  const workspaceB = await startApi("admin", fake.client, undefined, "workspace-b");
+  const clientA = await createTestClient(workspaceA, "Workspace A Client");
+  const clientB = await createTestClient(workspaceB, "Workspace B Client");
+
+  const listedA = await fetch(`${workspaceA}/clients`);
+  const listedB = await fetch(`${workspaceB}/clients`);
+  const clientsA = await listedA.json() as Array<{ id: string }>;
+  const clientsB = await listedB.json() as Array<{ id: string }>;
+  assert.deepEqual(clientsA.map((client) => client.id), [clientA.id]);
+  assert.deepEqual(clientsB.map((client) => client.id), [clientB.id]);
+
+  assert.equal((await grantClientAccess(workspaceA, clientB.id, "client-a")).status, 404);
+  assert.equal((await fetch(`${workspaceA}/clients/${clientB.id}/members/client-b`, {
+    method: "DELETE",
+  })).status, 404);
+  const memberships = await db.select().from(clientMembersTable).where(eq(clientMembersTable.clientId, clientB.id));
+  assert.deepEqual(memberships, []);
+});
+
+test("rejects granting client access to a non-Client workspace user", async () => {
+  const fake = fakeClerk([
+    makeUser("admin", "Admin"),
+    makeUser("project-manager", "Project Manager"),
+  ]);
+  const base = await startApi("admin", fake.client, undefined, "workspace-role-check");
+  const client = await createTestClient(base, "Role Check Client");
+
+  const response = await grantClientAccess(base, client.id, "project-manager");
+  assert.equal(response.status, 403);
+  const clients = await (await fetch(`${base}/clients`)).json() as Array<{ members: unknown[] }>;
+  assert.deepEqual(clients[0].members, []);
+});
+
+test("rejects duplicate grants and revokes only the targeted membership", async () => {
+  const fake = fakeClerk([
+    makeUser("admin", "Admin"),
+    makeUser("client-one", "Client"),
+    makeUser("client-two", "Client"),
+  ]);
+  const base = await startApi("admin", fake.client, undefined, "workspace-membership-check");
+  const client = await createTestClient(base, "Membership Check Client");
+
+  assert.equal((await grantClientAccess(base, client.id, "client-one")).status, 201);
+  assert.equal((await grantClientAccess(base, client.id, "client-two")).status, 201);
+  const duplicate = await grantClientAccess(base, client.id, "client-one");
+  assert.equal(duplicate.status, 409);
+
+  const revoke = await fetch(`${base}/clients/${client.id}/members/client-one`, { method: "DELETE" });
+  assert.equal(revoke.status, 204);
+  const remaining = await (await fetch(`${base}/clients`)).json() as Array<{ members: Array<{ userId: string }> }>;
+  assert.deepEqual(remaining[0].members.map((member: { userId: string }) => member.userId), ["client-two"]);
+  assert.equal((await fetch(`${base}/clients/${client.id}/members/client-one`, {
+    method: "DELETE",
+  })).status, 404);
+});
+
+test("deleting a client revokes memberships without deleting workspace users", async () => {
+  const fake = fakeClerk([
+    makeUser("admin", "Admin"),
+    makeUser("client-one", "Client"),
+    makeUser("client-two", "Client"),
+  ]);
+  const base = await startApi("admin", fake.client, undefined, "workspace-delete-check");
+  const client = await createTestClient(base, "Delete Check Client");
+  await grantClientAccess(base, client.id, "client-one");
+  await grantClientAccess(base, client.id, "client-two");
+
+  const deleted = await fetch(`${base}/clients/${client.id}`, { method: "DELETE" });
+  assert.equal(deleted.status, 204);
+  assert.deepEqual((await (await fetch(`${base}/clients`)).json()), []);
+  assert.deepEqual(
+    await db.select().from(clientMembersTable).where(eq(clientMembersTable.clientId, client.id)),
+    [],
+  );
+  assert.deepEqual(fake.getUsers().map((user) => user.id), ["admin", "client-one", "client-two"]);
 });
