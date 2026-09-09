@@ -4,7 +4,7 @@ import { getGetDashboardSummaryQueryKey, getGetProjectsQueryKey } from "@workspa
 import { useAuth } from "@clerk/react"
 import { CheckCircle2, ChevronDown, ChevronUp, LoaderCircle, UploadCloud, XCircle } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
-import { boundedTextSnippet, cleanupDismissedImportErrors, collectFolderCandidates, rememberDismissedImportError, readBatchImportResponse, wasImportErrorDismissed, type FolderCandidate, type SkippedFolderFile } from "@/lib/project-folder-import"
+import { boundedTextSnippet, cleanupDismissedImportErrors, collectFolderCandidates, forgetDismissedImportError, pendingDismissedImportStorageKey, rememberDismissedImportError, readBatchImportResponse, wasImportErrorDismissed, type FolderCandidate, type SkippedFolderFile } from "@/lib/project-folder-import"
 
 export type FolderImportStatus = "idle" | "uploading" | "building" | "success" | "error"
 type FolderImportProgress = { uploaded: number; failed: number }
@@ -77,6 +77,7 @@ export function ProjectFolderImportProvider({
   const folderFilesRef = React.useRef<FolderCandidate[]>([])
   const sessionRef = React.useRef<ImportSession | null>(null)
   const dismissedImportIdsRef = React.useRef(new Set<string>())
+  const dismissedPendingErrorRef = React.useRef(false)
   const authenticatedFetch = React.useCallback(async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const send = async (token: string | null) => {
       const headers = new Headers(init.headers)
@@ -105,6 +106,11 @@ export function ProjectFolderImportProvider({
     if (importId) {
       dismissedImportIdsRef.current.add(importId)
       rememberDismissedImportError(importId)
+      dismissedPendingErrorRef.current = false
+      forgetDismissedImportError("__pending__")
+    } else {
+      dismissedPendingErrorRef.current = true
+      rememberDismissedImportError("__pending__")
     }
     clearFolderImport()
   }, [clearFolderImport])
@@ -118,11 +124,15 @@ export function ProjectFolderImportProvider({
     setFolderProgress({ uploaded: 0, failed: 0 })
     setFolderError("")
     setFolderStatus("idle")
+    dismissedPendingErrorRef.current = false
+    forgetDismissedImportError("__pending__")
   }, [isActive])
 
   const startFolderImport = React.useCallback(async () => {
     const candidates = [...folderFilesRef.current]
     if (activeImportRef.current || !candidates.length) return
+    dismissedPendingErrorRef.current = false
+    forgetDismissedImportError("__pending__")
     activeImportRef.current = true
     setFolderStatus("uploading")
     setFolderError("")
@@ -217,6 +227,7 @@ export function ProjectFolderImportProvider({
       setFolderError("")
       await clearImportFiles(session.importId, session.documents.map((item) => item.relativePath))
       cleanupDismissedImportErrors(null)
+      forgetDismissedImportError("__pending__")
       sessionRef.current = null
       activeImportRef.current = false
       toast({ title: "Project initialized", description: "The folder was uploaded and the project build completed." })
@@ -265,9 +276,20 @@ export function ProjectFolderImportProvider({
         const session = await readBatchImportResponse<ImportSession | null>(response, { operation: "Restoring the import session" })
         if (cancelled) return
         cleanupDismissedImportErrors(session?.status === "completed" ? null : session?.importId ?? null)
-        if (!session) return
+        const pendingDismissed = dismissedPendingErrorRef.current || wasImportErrorDismissed("__pending__")
+        if (!session) {
+          if (pendingDismissed) return
+          return
+        }
         if (session.status === "completed") {
           await clearImportFiles(session.importId, session.documents.map((item) => item.relativePath))
+          return
+        }
+        if (pendingDismissed) {
+          dismissedImportIdsRef.current.add(session.importId)
+          rememberDismissedImportError(session.importId)
+          dismissedPendingErrorRef.current = false
+          forgetDismissedImportError("__pending__")
           return
         }
         if (dismissedImportIdsRef.current.has(session.importId) || wasImportErrorDismissed(session.importId)) {
@@ -326,6 +348,7 @@ export function ProjectFolderImportProvider({
         }
       } catch (error) {
         if (!cancelled) {
+          if (dismissedPendingErrorRef.current || wasImportErrorDismissed("__pending__")) return
           setFolderStatus("error")
           setFolderError(error instanceof Error ? error.message : "Restoring the import session failed. Start a new import or retry.")
         }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { formatDateOnly } from "./utils.ts"
-import { boundedTextSnippet, cleanupDismissedImportErrors, collectFolderCandidates, dismissedImportStorageKey, folderFileIssue, normalizeRelativePath, readBatchImportResponse, rememberDismissedImportError, wasImportErrorDismissed } from "./project-folder-import.ts"
+import { boundedTextSnippet, cleanupDismissedImportErrors, collectFolderCandidates, dismissedImportStorageKey, forgetDismissedImportError, folderFileIssue, normalizeRelativePath, pendingDismissedImportStorageKey, readBatchImportResponse, rememberDismissedImportError, wasImportErrorDismissed } from "./project-folder-import.ts"
 import { LEGAL_CONSENT_LABEL, PRIVACY_PATH, TERMS_PATH, canSubmitSignIn } from "./legal-consent.ts"
 
 test("sign-in eligibility requires affirmative legal consent", () => {
@@ -168,6 +168,24 @@ test("dismissed import cleanup preserves the recoverable session and removes old
   assert.equal(values.has(dismissedImportStorageKey("import-old")), false)
   assert.equal(values.get(dismissedImportStorageKey("import-active")), "true")
   assert.equal(values.get("luminova-user-preference"), "dark")
+})
+
+test("pending dismissal survives until recovery identifies the import", () => {
+  const values = new Map<string, string>()
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => { values.set(key, value) },
+    removeItem: (key: string) => { values.delete(key) },
+  }
+
+  rememberDismissedImportError("__pending__", storage)
+  assert.equal(values.get(pendingDismissedImportStorageKey), "true")
+  assert.equal(wasImportErrorDismissed("__pending__", storage), true)
+
+  rememberDismissedImportError("import-recovered", storage)
+  forgetDismissedImportError("__pending__", storage)
+  assert.equal(wasImportErrorDismissed("import-recovered", storage), true)
+  assert.equal(wasImportErrorDismissed("__pending__", storage), false)
 })
 
 test("dismissed import cleanup removes all markers once no session can recover", () => {

@@ -22,6 +22,7 @@ type BatchImportResponseContext = {
 
 export const dismissedImportStorageKey = (importId: string) =>
   `${dismissedImportStoragePrefix}${importId}`
+export const pendingDismissedImportStorageKey = dismissedImportStorageKey("__pending__")
 
 export const wasImportErrorDismissed = (
   importId: string,
@@ -45,6 +46,17 @@ export const rememberDismissedImportError = (
   }
 }
 
+export const forgetDismissedImportError = (
+  importId: string,
+  storage: DismissalStorage = window.localStorage,
+) => {
+  try {
+    storage.removeItem(dismissedImportStorageKey(importId))
+  } catch {
+    // A storage failure must not block the import flow.
+  }
+}
+
 export const cleanupDismissedImportErrors = (
   recoverableImportId: string | null,
   storage: DismissalStorage = window.localStorage,
@@ -54,7 +66,7 @@ export const cleanupDismissedImportErrors = (
     const recoverableKey = recoverableImportId ? dismissedImportStorageKey(recoverableImportId) : null
     for (let index = 0; index < storage.length; index++) {
       const key = storage.key(index)
-      if (key?.startsWith(dismissedImportStoragePrefix) && key !== recoverableKey) {
+      if (key?.startsWith(dismissedImportStoragePrefix) && key !== recoverableKey && key !== pendingDismissedImportStorageKey) {
         staleKeys.push(key)
       }
     }
