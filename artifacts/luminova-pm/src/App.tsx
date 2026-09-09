@@ -1,19 +1,8 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, type ReactNode, useEffect, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import NotFound from '@/pages/not-found';
-import Dashboard from '@/pages/dashboard';
-import ProjectDetail from '@/pages/projects/[id]';
-import Projects from '@/pages/projects';
-import TradesDirectory from '@/pages/trades';
-import TradeDetail from '@/pages/trades/[id]';
-import Invoices from '@/pages/invoices';
-import Messages from '@/pages/messages';
-import Login from '@/pages/login';
-import { SignUpPage } from '@/pages/login';
-import Users from '@/pages/users';
 import { AppLayoutView } from '@/components/layout/app-layout';
 import { ClerkProvider, Show, useAuth, useClerk } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
@@ -28,13 +17,41 @@ import {
   useLocation,
   Router as WouterRouter,
 } from 'wouter';
-import Quotes from '@/pages/quotes';
-import { PrivacyPage, TermsPage } from '@/pages/legal';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 const clerkPubKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+
+const NotFound = lazy(() => import('@/pages/not-found'));
+const Login = lazy(() => import('@/pages/login'));
+const Dashboard = lazy(() => import('@/pages/dashboard'));
+const ProjectDetail = lazy(() => import('@/pages/projects/[id]'));
+const Projects = lazy(() => import('@/pages/projects'));
+const TradesDirectory = lazy(() => import('@/pages/trades'));
+const TradeDetail = lazy(() => import('@/pages/trades/[id]'));
+const Invoices = lazy(() => import('@/pages/invoices'));
+const Messages = lazy(() => import('@/pages/messages'));
+const Users = lazy(() => import('@/pages/users'));
+const Quotes = lazy(() => import('@/pages/quotes'));
+const SignUpPage = lazy(() => import('@/pages/login').then(({ SignUpPage }) => ({ default: SignUpPage })));
+const PrivacyPage = lazy(() => import('@/pages/legal').then(({ PrivacyPage }) => ({ default: PrivacyPage })));
+const TermsPage = lazy(() => import('@/pages/legal').then(({ TermsPage }) => ({ default: TermsPage })));
+
+function PageFallback() {
+  return (
+    <main className="flex min-h-[100dvh] items-center justify-center bg-background text-muted-foreground">
+      <p className="font-mono text-xs uppercase tracking-[0.2em]">Loading workspace…</p>
+    </main>
+  );
+}
 
 function Protected({ children }: { children: ReactNode }) {
   return <>
@@ -147,7 +164,7 @@ function App() {
         <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl}>
           <QueryClientProvider client={queryClient}>
             <TooltipProvider>
-              <Messages />
+              <Suspense fallback={<PageFallback />}><Messages /></Suspense>
             </TooltipProvider>
           </QueryClientProvider>
         </ClerkProvider>
@@ -161,7 +178,7 @@ function App() {
         <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl}>
           <QueryClientProvider client={queryClient}>
             <TooltipProvider>
-              <ProjectDetail projectIdOverride="riverstone" />
+              <Suspense fallback={<PageFallback />}><ProjectDetail projectIdOverride="riverstone" /></Suspense>
               <Toaster />
             </TooltipProvider>
           </QueryClientProvider>
@@ -176,7 +193,7 @@ function App() {
         <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl}>
           <QueryClientProvider client={queryClient}>
             <TooltipProvider>
-              <Projects />
+              <Suspense fallback={<PageFallback />}><Projects /></Suspense>
             </TooltipProvider>
           </QueryClientProvider>
         </ClerkProvider>
@@ -191,7 +208,7 @@ function App() {
           <QueryClientProvider client={queryClient}>
             <ProjectFolderImportProvider authState={{ isLoaded: true, isSignedIn: true }}>
               <TooltipProvider>
-                <Dashboard />
+                <Suspense fallback={<PageFallback />}><Dashboard /></Suspense>
               </TooltipProvider>
             </ProjectFolderImportProvider>
           </QueryClientProvider>
@@ -235,7 +252,7 @@ function App() {
             <ProjectFolderImportProvider>
               <TooltipProvider>
                 <SessionPolicy />
-                <Router />
+                <Suspense fallback={<PageFallback />}><Router /></Suspense>
                 <Toaster />
               </TooltipProvider>
             </ProjectFolderImportProvider>
