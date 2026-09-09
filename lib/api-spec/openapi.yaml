@@ -567,6 +567,23 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Invoice"
+  /invoices/summary:
+    get:
+      operationId: getFinancialSummary
+      tags: [invoices]
+      summary: Get portfolio financial summary
+      description: >-
+        Aggregates all project invoices and accepted Luminova-to-client quotes.
+        Invoices without a direction are treated as legacy company-to-Luminova expenses.
+        Accepted quote revisions and overlapping project-total quotes are counted once,
+        and each project's remaining client value is floored at zero.
+      responses:
+        "200":
+          description: Portfolio financial summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinancialSummary"
   /vendor-quotes:
     get:
       operationId: getVendorQuotes
@@ -1203,6 +1220,23 @@ components:
         amount: { type: number }
         date: { type: string }
         lineItem: { type: string }
+    FinancialSummary:
+      type: object
+      required: [invoicedRevenue, invoicedExpenses, acceptedClientQuoteValue, upcomingClientPayments]
+      properties:
+        invoicedRevenue:
+          type: number
+          description: Total Luminova-to-client invoice value.
+        invoicedExpenses:
+          type: number
+          description: Total company-to-Luminova invoice value, including legacy invoices with no direction.
+        acceptedClientQuoteValue:
+          type: number
+          description: Deduplicated accepted Luminova-to-client quote value across projects.
+        upcomingClientPayments:
+          type: number
+          minimum: 0
+          description: Accepted client quote value remaining after outgoing invoices, floored per project at zero.
     VendorQuoteStatus:
       type: string
       enum: [Draft, Requested, Received, Under review, Accepted, Declined, Expired]

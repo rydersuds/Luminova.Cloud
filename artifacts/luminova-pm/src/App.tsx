@@ -217,6 +217,20 @@ function App() {
     );
   }
 
+  if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/financials')) {
+    return (
+      <WouterRouter base={basePath}>
+        <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl}>
+          <QueryClientProvider client={queryClient}>
+            <TooltipProvider>
+              <Invoices />
+            </TooltipProvider>
+          </QueryClientProvider>
+        </ClerkProvider>
+      </WouterRouter>
+    );
+  }
+
   if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/sidebar')) {
     return <SidebarVisualHarness />;
   }

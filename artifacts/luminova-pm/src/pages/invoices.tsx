@@ -3,16 +3,18 @@ import { AppLayout } from "@/components/layout/app-layout"
 import { 
   useGetInvoices,
   useCreateInvoice,
-  getGetInvoicesQueryKey 
+  getGetInvoicesQueryKey,
+  useGetFinancialSummary,
+  getGetFinancialSummaryQueryKey,
 } from "@workspace/api-client-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { Filter, FileText, Check, X, AlertTriangle, Search, Plus } from "lucide-react"
+import { Filter, FileText, Check, X, AlertTriangle, Search, Plus, ArrowUpRight, ArrowDownRight, Clock3, RefreshCw } from "lucide-react"
 import { formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
 
@@ -27,6 +29,9 @@ export default function Invoices() {
     query: {
       queryKey: getGetInvoicesQueryKey({ status: statusFilter || undefined })
     }
+  })
+  const financialSummary = useGetFinancialSummary({
+    query: { queryKey: getGetFinancialSummaryQueryKey(), retry: false },
   })
 
   const createInvoice = useCreateInvoice()
@@ -46,6 +51,7 @@ export default function Invoices() {
     }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetInvoicesQueryKey() })
+        queryClient.invalidateQueries({ queryKey: getGetFinancialSummaryQueryKey() })
         setIsSubmitOpen(false)
       }
     })
@@ -60,8 +66,12 @@ export default function Invoices() {
           
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <h1 className="text-3xl font-heading font-bold text-foreground">Invoice Intake queue</h1>
-              <p className="text-muted-foreground mt-1 text-sm">Review, approve, and track project payables.</p>
+              <div className="mb-2 flex items-center gap-2">
+                <span className="h-px w-6 bg-primary" />
+                <span className="font-mono text-xs uppercase tracking-[0.22em] text-primary">Portfolio financials</span>
+              </div>
+              <h1 className="text-3xl font-heading font-bold text-foreground">Financial Overview</h1>
+              <p className="text-muted-foreground mt-1 text-sm">Track client revenue, project expenses, and accepted work still available to invoice.</p>
             </div>
             
             <Dialog open={isSubmitOpen} onOpenChange={setIsSubmitOpen}>
@@ -112,6 +122,18 @@ export default function Invoices() {
                 </form>
               </DialogContent>
             </Dialog>
+          </div>
+
+          <FinancialSummary
+            data={financialSummary.data}
+            isLoading={financialSummary.isLoading}
+            isError={financialSummary.isError}
+            onRetry={() => financialSummary.refetch()}
+          />
+
+          <div className="border-t border-border/60 pt-2">
+            <h2 className="text-xl font-heading font-bold">Invoice intake queue</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Review, approve, and track incoming and client invoices.</p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-card p-4 rounded-lg border border-border">
@@ -209,5 +231,92 @@ export default function Invoices() {
         </div>
       </div>
     </AppLayout>
+  )
+}
+
+function FinancialSummary({
+  data,
+  isLoading,
+  isError,
+  onRetry,
+}: {
+  data?: {
+    invoicedRevenue: number
+    invoicedExpenses: number
+    acceptedClientQuoteValue: number
+    upcomingClientPayments: number
+  }
+  isLoading: boolean
+  isError: boolean
+  onRetry: () => unknown
+}) {
+  if (isLoading) {
+    return (
+      <section aria-label="Portfolio financial summary" aria-busy="true" className="grid gap-4 md:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <Card key={index} className="h-36 animate-pulse border-border/60 bg-muted/30" />
+        ))}
+        <p className="sr-only">Loading portfolio financial totals</p>
+      </section>
+    )
+  }
+
+  if (isError || !data) {
+    return (
+      <section aria-label="Portfolio financial summary" className="flex flex-col gap-4 border border-destructive/30 bg-destructive/5 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="font-bold">Financial totals are unavailable</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Invoice intake is still available. Retry to load the portfolio overview.</p>
+        </div>
+        <Button variant="outline" onClick={onRetry} className="gap-2 self-start">
+          <RefreshCw className="h-4 w-4" /> Retry totals
+        </Button>
+      </section>
+    )
+  }
+
+  const cards = [
+    {
+      label: "Invoiced revenue",
+      value: data.invoicedRevenue,
+      detail: "Luminova invoices sent to clients",
+      icon: ArrowUpRight,
+      accent: "text-success bg-success/10",
+    },
+    {
+      label: "Invoiced expenses",
+      value: data.invoicedExpenses,
+      detail: "Company invoices received by Luminova",
+      icon: ArrowDownRight,
+      accent: "text-warning bg-warning/10",
+    },
+    {
+      label: "Upcoming client payments",
+      value: data.upcomingClientPayments,
+      detail: `${formatCurrency(data.acceptedClientQuoteValue)} accepted client work`,
+      icon: Clock3,
+      accent: "text-primary bg-primary/10",
+    },
+  ]
+
+  return (
+    <section aria-label="Portfolio financial summary" className="grid gap-4 md:grid-cols-3">
+      {cards.map(({ label, value, detail, icon: Icon, accent }) => (
+        <Card key={label} className="border-border/60 bg-card/80">
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+                <p className="mt-3 text-2xl font-extrabold tabular-nums sm:text-3xl">{formatCurrency(value)}</p>
+              </div>
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center ${accent}`}>
+                <Icon className="h-5 w-5" />
+              </div>
+            </div>
+            <p className="mt-4 border-t border-border/50 pt-3 text-xs text-muted-foreground">{detail}</p>
+          </CardContent>
+        </Card>
+      ))}
+    </section>
   )
 }

@@ -19,6 +19,7 @@ import {
   GetDashboardSummaryResponse,
   GetInvoicesQueryParams,
   GetInvoicesResponse,
+  GetFinancialSummaryResponse,
   GetProjectActivityParams,
   GetProjectActivityResponse,
   GetProjectParams,
@@ -61,6 +62,7 @@ import {
   UpdateTradeReviewResponse,
   DeleteTradeReviewParams,
 } from "@workspace/api-zod";
+import { calculatePortfolioFinancialSummary } from "../lib/financialSummary";
 import { DatabasePanoramaStore } from "../lib/panoramaStore";
 import {
   db,
@@ -666,10 +668,12 @@ type Project = (typeof projects)[number] & {
 };
 type Invoice = (typeof invoices)[number] & {
   direction?: "luminova_to_client" | "company_to_luminova";
+  ownerId?: string;
 };
 type Trade = (typeof trades)[number];
 type VendorQuote = (typeof vendorQuotes)[number] & {
   isProjectTotal?: boolean;
+  ownerId?: string;
 };
 
 // Demo fixtures define the local record shapes above, but must never enter the live product.
@@ -682,11 +686,16 @@ vendorQuotes.length = 0;
 const durableData = async <T>(table: typeof importedProjectsTable | typeof importedVendorsTable | typeof importedVendorQuotesTable | typeof importedInvoicesTable) =>
   (await db.select({ data: table.data }).from(table)).map((row) => row.data as T);
 
-const jobHistoryForTrade = async (trade: Trade) => {
-  const [projects, records] = await Promise.all([
-    allProjects(),
+const normalizePartyName = (value: string) => value.replace(/[^a-z0-9]/gi, "").toLowerCase();
+
+const jobHistoryForTrade = async (trade: Trade, ownerId: string) => {
+  const [projectRows, records] = await Promise.all([
+    db.select({ data: importedProjectsTable.data })
+      .from(importedProjectsTable)
+      .where(eq(importedProjectsTable.ownerId, ownerId)),
     db.select().from(vendorJobHistoryTable).where(eq(vendorJobHistoryTable.vendorId, trade.id)),
   ]);
+  const projects = projectRows.map((row) => row.data as Project);
   const projectById = new Map(projects.map((project) => [project.id, project]));
   return records.map((record) => ({
     id: record.id,
@@ -700,11 +709,14 @@ const jobHistoryForTrade = async (trade: Trade) => {
   }));
 };
 
-const reviewsForTrade = async (trade: Trade) => {
-  const [projects, records] = await Promise.all([
-    allProjects(),
+const reviewsForTrade = async (trade: Trade, ownerId: string) => {
+  const [projectRows, records] = await Promise.all([
+    db.select({ data: importedProjectsTable.data })
+      .from(importedProjectsTable)
+      .where(eq(importedProjectsTable.ownerId, ownerId)),
     db.select().from(vendorReviewTable).where(eq(vendorReviewTable.vendorId, trade.id)),
   ]);
+  const projects = projectRows.map((row) => row.data as Project);
   const projectById = new Map(projects.map((project) => [project.id, project]));
   return records.map((record) => ({
     id: record.id,
@@ -776,6 +788,58 @@ const allVendorQuotes = async (): Promise<VendorQuote[]> => [
   })),
   ...vendorQuotes,
 ];
+const financialRecordsForOwner = async (ownerId: string) => {
+  const [invoiceRows, quoteRows] = await Promise.all([
+    db.select({ data: importedInvoicesTable.data })
+      .from(importedInvoicesTable)
+      .where(eq(importedInvoicesTable.ownerId, ownerId)),
+    db.select({ data: importedVendorQuotesTable.data })
+      .from(importedVendorQuotesTable)
+      .where(eq(importedVendorQuotesTable.ownerId, ownerId)),
+  ]);
+  return {
+    invoices: [
+      ...invoiceRows.map((row) => row.data as Invoice),
+      ...(invoices as Invoice[]).filter((invoice) => invoice.ownerId === ownerId),
+    ],
+    quotes: [
+      ...quoteRows.map((row) => row.data as VendorQuote).map((quote) => ({
+        ...quote,
+        direction: quote.direction === "luminova_to_client"
+          ? "luminova_to_client" as const
+          : "company_to_luminova" as const,
+      })),
+      ...(vendorQuotes as VendorQuote[]).filter((quote) => quote.ownerId === ownerId),
+    ],
+  };
+};
+const projectsForOwner = async (ownerId: string) =>
+  (await db.select({ data: importedProjectsTable.data })
+    .from(importedProjectsTable)
+    .where(eq(importedProjectsTable.ownerId, ownerId)))
+    .map((row) => row.data as Project);
+const tradesForOwner = async (ownerId: string) => {
+  const [tradeRows, { invoices: ownedInvoices }] = await Promise.all([
+    db.select({ data: importedVendorsTable.data })
+      .from(importedVendorsTable)
+      .where(eq(importedVendorsTable.ownerId, ownerId)),
+    financialRecordsForOwner(ownerId),
+  ]);
+  const completedProjectsByVendor = new Map<string, Set<string>>();
+  for (const invoice of ownedInvoices) {
+    if (invoice.direction !== "company_to_luminova" || !invoice.projectId) continue;
+    const key = normalizePartyName(invoice.vendor);
+    const vendorProjects = completedProjectsByVendor.get(key) ?? new Set<string>();
+    vendorProjects.add(invoice.projectId);
+    completedProjectsByVendor.set(key, vendorProjects);
+  }
+  return tradeRows.map((row) => row.data as Trade).map((trade) => ({
+    ...trade,
+    completedJobs: completedProjectsByVendor.get(normalizePartyName(trade.companyName))?.size ?? 0,
+  }));
+};
+const findOwnedProject = async (projectId: string, ownerId: string) =>
+  (await projectsForOwner(ownerId)).find((project) => project.id === projectId);
 const findProject = async (projectId: string) => (await allProjects()).find((project) => project.id === projectId);
 
 const latestClientQuoteDetail = async (project: Project) => {
@@ -1672,14 +1736,18 @@ router.post("/projects/:projectId/organize-files", async (req: AuthenticatedRequ
   }
 });
 
-router.get("/trades", async (req, res) => {
+router.get("/trades", async (req: AuthenticatedRequest, res) => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
   const parsed = GetTradesQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
   const { search, tradeType, region } = parsed.data;
-  const result = (await allTrades()).filter((trade) =>
+  const result = (await tradesForOwner(req.userId)).filter((trade) =>
     (!tradeType || trade.tradeType === tradeType) &&
     (!region || trade.region === region) &&
     (!search || `${trade.companyName} ${trade.contactName} ${trade.tradeType}`.toLowerCase().includes(search.toLowerCase())),
@@ -1967,18 +2035,30 @@ router.delete("/trades/:tradeId/reviews/:reviewId", async (req: AuthenticatedReq
   res.sendStatus(204);
 });
 
-router.get("/trades/:tradeId", async (req, res) => {
+router.get("/trades/:tradeId", async (req: AuthenticatedRequest, res) => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
   const parsed = GetTradeParams.safeParse(req.params);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const trade = (await allTrades()).find((item) => item.id === parsed.data.tradeId);
+  const [tradeRow] = await db.select({ data: importedVendorsTable.data })
+    .from(importedVendorsTable)
+    .where(and(
+      eq(importedVendorsTable.id, parsed.data.tradeId),
+      eq(importedVendorsTable.ownerId, req.userId),
+    ))
+    .limit(1);
+  const trade = tradeRow?.data as Trade | undefined;
   if (!trade) {
     res.status(404).json({ error: "Trade not found" });
     return;
   }
-  const bids = (await allVendorQuotes())
+  const { quotes: ownedQuotes } = await financialRecordsForOwner(req.userId);
+  const bids = ownedQuotes
     .filter((quote) => quote.vendorId === trade.id)
     .map((quote) => ({
       projectName: quote.projectName,
@@ -1991,8 +2071,8 @@ router.get("/trades/:tradeId", async (req, res) => {
           ? "Lost"
           : "Pending",
     }));
-  const jobHistory = await jobHistoryForTrade(trade);
-  const reviews = await reviewsForTrade(trade);
+  const jobHistory = await jobHistoryForTrade(trade, req.userId);
+  const reviews = await reviewsForTrade(trade, req.userId);
   res.json(GetTradeResponse.parse({
     ...trade,
     phone: "403-555-0188",
@@ -2008,24 +2088,43 @@ router.get("/trades/:tradeId", async (req, res) => {
   }));
 });
 
-router.get("/invoices", async (req, res) => {
+router.get("/invoices", async (req: AuthenticatedRequest, res) => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
   const parsed = GetInvoicesQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const records = await allInvoices();
+  const { invoices: records } = await financialRecordsForOwner(req.userId);
   const result = parsed.data.status ? records.filter((invoice) => invoice.status === parsed.data.status) : records;
   res.json(GetInvoicesResponse.parse(result));
 });
 
-router.post("/invoices", async (req, res) => {
+router.get("/invoices/summary", async (req: AuthenticatedRequest, res) => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  const { invoices: invoiceRecords, quotes: quoteRecords } = await financialRecordsForOwner(req.userId);
+  res.json(GetFinancialSummaryResponse.parse(
+    calculatePortfolioFinancialSummary(invoiceRecords, quoteRecords),
+  ));
+});
+
+router.post("/invoices", async (req: AuthenticatedRequest, res) => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
   const parsed = CreateInvoiceBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const project = await findProject(parsed.data.projectId);
+  const project = await findOwnedProject(parsed.data.projectId, req.userId);
   if (!project) {
     res.status(404).json({ error: "Project not found" });
     return;
@@ -2034,6 +2133,7 @@ router.post("/invoices", async (req, res) => {
   const overage = Math.max(parsed.data.amount - remaining, 0);
   const invoice = {
     ...parsed.data,
+    ownerId: req.userId,
     id: `inv-${Date.now()}`,
     projectName: project.name,
     status: overage > 0 ? "Pending approval" : "Auto-approved",
@@ -2043,7 +2143,11 @@ router.post("/invoices", async (req, res) => {
   res.status(201).json(CreateInvoiceResponse.parse(invoice));
 });
 
-router.get("/vendor-quotes", async (req, res) => {
+router.get("/vendor-quotes", async (req: AuthenticatedRequest, res) => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
   const parsed = GetVendorQuotesQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -2051,7 +2155,8 @@ router.get("/vendor-quotes", async (req, res) => {
   }
   const { search, projectId, vendorId, trade, status, direction } = parsed.data;
   const normalizedSearch = search?.trim().toLowerCase();
-  const result = (await allVendorQuotes()).filter((quote) =>
+  const { quotes: ownedQuotes } = await financialRecordsForOwner(req.userId);
+  const result = ownedQuotes.filter((quote) =>
     (!projectId || quote.projectId === projectId) &&
     (!vendorId || quote.vendorId === vendorId) &&
     (!trade || quote.trade === trade) &&
@@ -2062,7 +2167,11 @@ router.get("/vendor-quotes", async (req, res) => {
   res.json(GetVendorQuotesResponse.parse(result));
 });
 
-router.post("/vendor-quotes", async (req, res) => {
+router.post("/vendor-quotes", async (req: AuthenticatedRequest, res) => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
   const parsed = CreateVendorQuoteBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -2070,10 +2179,10 @@ router.post("/vendor-quotes", async (req, res) => {
   }
   const isClientQuote = parsed.data.direction === "luminova_to_client";
   const [project, vendor] = await Promise.all([
-    findProject(parsed.data.projectId),
+    findOwnedProject(parsed.data.projectId, req.userId),
     isClientQuote
       ? Promise.resolve(null)
-      : allTrades().then((records) => records.find((item) => item.id === parsed.data.vendorId)),
+      : tradesForOwner(req.userId).then((records) => records.find((item) => item.id === parsed.data.vendorId)),
   ]);
   if (!project || (!isClientQuote && !vendor)) {
     res.status(404).json({ error: !project ? "Project not found" : "Vendor not found" });
@@ -2089,6 +2198,7 @@ router.post("/vendor-quotes", async (req, res) => {
   const now = new Date().toISOString();
   const quote = {
     ...parsed.data,
+    ownerId: req.userId,
     id: `vq-${Date.now()}`,
     projectName: project.name,
     vendorId: isClientQuote ? "luminova-construction" : vendor!.id,
@@ -2105,13 +2215,18 @@ router.post("/vendor-quotes", async (req, res) => {
   res.status(201).json(CreateVendorQuoteResponse.parse(quote));
 });
 
-router.get("/vendor-quotes/:quoteId", async (req, res) => {
+router.get("/vendor-quotes/:quoteId", async (req: AuthenticatedRequest, res) => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
   const parsed = GetVendorQuoteParams.safeParse(req.params);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const quote = (await allVendorQuotes()).find((item) => item.id === parsed.data.quoteId);
+  const { quotes: ownedQuotes } = await financialRecordsForOwner(req.userId);
+  const quote = ownedQuotes.find((item) => item.id === parsed.data.quoteId);
   if (!quote) {
     res.status(404).json({ error: "Vendor quote not found" });
     return;
@@ -2119,16 +2234,27 @@ router.get("/vendor-quotes/:quoteId", async (req, res) => {
   res.json(GetVendorQuoteResponse.parse(quote));
 });
 
-router.patch("/vendor-quotes/:quoteId", async (req, res) => {
+router.patch("/vendor-quotes/:quoteId", async (req: AuthenticatedRequest, res) => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
   const params = UpdateVendorQuoteParams.safeParse(req.params);
   const body = UpdateVendorQuoteBody.safeParse(req.body);
   if (!params.success || !body.success) {
     res.status(400).json({ error: "Invalid vendor quote update" });
     return;
   }
-  const index = vendorQuotes.findIndex((item) => item.id === params.data.quoteId);
+  const index = (vendorQuotes as VendorQuote[]).findIndex((item) =>
+    item.id === params.data.quoteId && item.ownerId === req.userId);
   if (index === -1) {
-    const imported = await db.select({ data: importedVendorQuotesTable.data }).from(importedVendorQuotesTable).where(eq(importedVendorQuotesTable.id, params.data.quoteId)).limit(1);
+    const imported = await db.select({ data: importedVendorQuotesTable.data })
+      .from(importedVendorQuotesTable)
+      .where(and(
+        eq(importedVendorQuotesTable.id, params.data.quoteId),
+        eq(importedVendorQuotesTable.ownerId, req.userId),
+      ))
+      .limit(1);
     if (!imported[0]) {
       res.status(404).json({ error: "Vendor quote not found" });
       return;
@@ -2139,8 +2265,8 @@ router.patch("/vendor-quotes/:quoteId", async (req, res) => {
     const isClientQuote = direction === "luminova_to_client";
     const vendorId = isClientQuote ? "luminova-construction" : body.data.vendorId ?? current.vendorId;
     const [project, vendor] = await Promise.all([
-      findProject(projectId),
-      isClientQuote ? Promise.resolve(null) : allTrades().then((records) => records.find((item) => item.id === vendorId)),
+      findOwnedProject(projectId, req.userId),
+      isClientQuote ? Promise.resolve(null) : tradesForOwner(req.userId).then((records) => records.find((item) => item.id === vendorId)),
     ]);
     if (!project || (!isClientQuote && !vendor)) {
       res.status(404).json({ error: !project ? "Project not found" : "Vendor not found" });
@@ -2168,7 +2294,10 @@ router.patch("/vendor-quotes/:quoteId", async (req, res) => {
       total: lineItems.reduce((sum, item) => sum + item.amount, 0),
       updatedAt: new Date().toISOString(),
     };
-    await db.update(importedVendorQuotesTable).set({ data: updated }).where(eq(importedVendorQuotesTable.id, params.data.quoteId));
+    await db.update(importedVendorQuotesTable).set({ data: updated }).where(and(
+      eq(importedVendorQuotesTable.id, params.data.quoteId),
+      eq(importedVendorQuotesTable.ownerId, req.userId),
+    ));
     res.json(UpdateVendorQuoteResponse.parse(updated));
     return;
   }
@@ -2178,8 +2307,8 @@ router.patch("/vendor-quotes/:quoteId", async (req, res) => {
   const isClientQuote = direction === "luminova_to_client";
   const vendorId = isClientQuote ? "luminova-construction" : body.data.vendorId ?? current.vendorId;
   const [project, vendor] = await Promise.all([
-    findProject(projectId),
-    isClientQuote ? Promise.resolve(null) : allTrades().then((records) => records.find((item) => item.id === vendorId)),
+    findOwnedProject(projectId, req.userId),
+    isClientQuote ? Promise.resolve(null) : tradesForOwner(req.userId).then((records) => records.find((item) => item.id === vendorId)),
   ]);
   if (!project || (!isClientQuote && !vendor)) {
     res.status(404).json({ error: !project ? "Project not found" : "Vendor not found" });

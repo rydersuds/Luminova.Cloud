@@ -358,6 +358,19 @@ export interface InvoiceInput {
   lineItem: string;
 }
 
+export interface FinancialSummary {
+  /** Total Luminova-to-client invoice value. */
+  invoicedRevenue: number;
+  /** Total company-to-Luminova invoice value, including legacy invoices with no direction. */
+  invoicedExpenses: number;
+  /** Deduplicated accepted Luminova-to-client quote value across projects. */
+  acceptedClientQuoteValue: number;
+  /**
+     * Accepted client quote value remaining after outgoing invoices, floored per project at zero.
+     * @minimum 0
+     */
+  upcomingClientPayments: number;
+}
 export type VendorQuoteStatus = typeof VendorQuoteStatus[keyof typeof VendorQuoteStatus];
 
 
@@ -653,4 +666,3 @@ trade?: string;
 status?: VendorQuoteStatus;
 direction?: QuoteDirection;
 };
-

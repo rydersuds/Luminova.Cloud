@@ -11,6 +11,7 @@ export * from './budgetLineItem';
 export * from './clientQuote';
 export * from './currentWorkspaceUser';
 export * from './dashboardSummary';
+export * from './financialSummary';
 export * from './getInvoicesParams';
 export * from './getProjectsParams';
 export * from './getTradesParams';
