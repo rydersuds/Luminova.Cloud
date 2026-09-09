@@ -207,6 +207,26 @@ test.describe('navigation contrast', () => {
     await expect(page.getByRole('link', { name: 'All Projects' })).toBeVisible();
   });
 
+  test('theme toggle applies and persists the dark mode preference', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/__visual/sidebar');
+
+    const toggle = page.getByTestId('theme-toggle');
+    await expect(toggle).toHaveAccessibleName('Switch to dark mode');
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
+
+    await toggle.click();
+    await expect(toggle).toHaveAccessibleName('Switch to light mode');
+    await expect(page.locator('html')).toHaveClass(/dark/);
+
+    await page.reload();
+    await expect(page.getByTestId('theme-toggle')).toHaveAccessibleName('Switch to light mode');
+    await expect(page.locator('html')).toHaveClass(/dark/);
+
+    await page.getByTestId('theme-toggle').click();
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
+  });
+
   test('mobile header, drawer, and overlay', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await stabilize(page);

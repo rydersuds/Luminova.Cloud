@@ -13,10 +13,13 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   LogOut,
+  Moon,
+  Sun,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useClerk, useUser } from "@clerk/react"
+import { useTheme } from "@/hooks/use-theme"
 
 type IndicatorPhase = "idle" | "travel" | "settle"
 
@@ -67,6 +70,7 @@ export function AppLayoutView({
   hoveredHref,
   onNavigate,
 }: AppLayoutViewProps) {
+  const { theme, toggleTheme } = useTheme()
   const [sidebarOpen, setSidebarOpen] = useState(initialSidebarOpen)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => initialSidebarCollapsed ?? readSidebarCollapsedPreference(),
@@ -469,6 +473,23 @@ export function AppLayoutView({
                 Sign out
               </button>
             )}
+            <button
+              type="button"
+              data-testid="theme-toggle"
+              aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              aria-pressed={theme === "dark"}
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              onClick={toggleTheme}
+              className={cn(
+                "mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-sidebar-border bg-sidebar-accent px-3 py-3 text-xs font-bold uppercase tracking-wider text-sidebar-foreground transition-colors hover:bg-sidebar-accent/80 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-black motion-reduce:transition-none",
+                sidebarCollapsed && "md:px-2",
+              )}
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4 shrink-0" /> : <Moon className="h-4 w-4 shrink-0" />}
+              <span className={cn(sidebarCollapsed && "sr-only")}>
+                {theme === "dark" ? "Light mode" : "Dark mode"}
+              </span>
+            </button>
           </div>
         </div>
       </aside>
