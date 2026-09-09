@@ -26,6 +26,16 @@ export const clientMembersTable = pgTable("client_members", {
   index("client_members_user_idx").on(table.userId),
 ]);
 
+export const clientAccessCleanupTable = pgTable("client_access_cleanup", {
+  workspaceId: text("workspace_id").notNull(),
+  userId: text("user_id").notNull(),
+  failedAt: timestamp("failed_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+}, (table) => [
+  uniqueIndex("client_access_cleanup_workspace_user_unique").on(table.workspaceId, table.userId),
+  index("client_access_cleanup_workspace_idx").on(table.workspaceId),
+]);
+
 export const insertClientSchema = createInsertSchema(clientsTable).omit({
   createdAt: true,
   updatedAt: true,
@@ -38,3 +48,4 @@ export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clientsTable.$inferSelect;
 export type InsertClientMember = z.infer<typeof insertClientMemberSchema>;
 export type ClientMember = typeof clientMembersTable.$inferSelect;
+export type ClientAccessCleanup = typeof clientAccessCleanupTable.$inferSelect;

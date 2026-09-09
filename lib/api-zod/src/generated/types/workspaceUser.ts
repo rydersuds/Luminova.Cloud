@@ -18,4 +18,5 @@ export interface WorkspaceUser {
   /** @nullable */
   lastSignInAt?: number | null;
   imageUrl: string;
+  clientAccessCleanupPending: boolean;
 }

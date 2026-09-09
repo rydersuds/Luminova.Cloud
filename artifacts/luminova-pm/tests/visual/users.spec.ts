@@ -11,6 +11,7 @@ const workspaceUsers = [
     email: 'morgan@luminova.test',
     imageUrl: avatarUrl,
     role: 'Admin',
+    clientAccessCleanupPending: false,
   },
   {
     id: 'user-sam',
@@ -20,6 +21,7 @@ const workspaceUsers = [
     email: 'sam.carter@luminova.test',
     imageUrl: avatarUrl,
     role: 'Project Manager',
+    clientAccessCleanupPending: false,
   },
   {
     id: 'user-jordan',
@@ -29,6 +31,7 @@ const workspaceUsers = [
     email: 'jordan.lee@luminova.test',
     imageUrl: avatarUrl,
     role: 'Field Team',
+    clientAccessCleanupPending: false,
   },
   {
     id: 'user-taylor',
@@ -38,6 +41,7 @@ const workspaceUsers = [
     email: 'taylor.nguyen@luminova.test',
     imageUrl: avatarUrl,
     role: 'Client',
+    clientAccessCleanupPending: false,
   },
 ];
 

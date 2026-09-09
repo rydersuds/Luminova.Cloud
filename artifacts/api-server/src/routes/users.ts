@@ -1,6 +1,6 @@
 import { createClerkClient, type Invitation, type User } from "@clerk/backend";
 import { getAuth } from "@clerk/express";
-import { clientMembersTable, clientsTable, db, pool } from "@workspace/db";
+import { clientAccessCleanupTable, clientMembersTable, clientsTable, db, pool } from "@workspace/db";
 import {
   CreateClientBody,
   CreateClientResponse,
@@ -190,6 +190,15 @@ export async function revokeClientMemberships(userId: string, scope: string) {
   ));
 }
 
+async function markClientAccessCleanup(userId: string, scope: string) {
+  await db.insert(clientAccessCleanupTable).values({
+    workspaceId: scope,
+    userId,
+  }).onConflictDoUpdate({
+    target: [clientAccessCleanupTable.workspaceId, clientAccessCleanupTable.userId],
+    set: { updatedAt: new Date() },
+  });
+}
 async function deleteClientMemberships(userId: string) {
   await db.delete(clientMembersTable).where(eq(clientMembersTable.userId, userId));
 }
@@ -290,7 +299,40 @@ router.get("/users/me", async (req: AuthenticatedRequest, res): Promise<void> =>
 router.get("/users", async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!await requireAdmin(client, req, res)) return;
   const result = await client.users.getUserList({ limit: 100, orderBy: "-created_at" });
-  res.json(GetWorkspaceUsersResponse.parse(result.data.map(serializeUser)));
+  const pendingCleanup = await db
+    .select({ userId: clientAccessCleanupTable.userId })
+    .from(clientAccessCleanupTable)
+    .where(eq(clientAccessCleanupTable.workspaceId, workspaceId(req)));
+  const pendingUserIds = new Set(pendingCleanup.map(({ userId }) => userId));
+  res.json(GetWorkspaceUsersResponse.parse(result.data.map((user) => ({
+    ...serializeUser(user),
+    clientAccessCleanupPending: pendingUserIds.has(user.id),
+  }))));
+});
+
+router.post("/users/:userId/client-access-reconciliation", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!await requireAdmin(client, req, res)) return;
+  const params = UpdateWorkspaceUserParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Invalid user" });
+    return;
+  }
+
+  try {
+    await withWorkspaceAdminLock(async () => {
+      await client.users.getUser(params.data.userId);
+      await revokeClientMemberships(params.data.userId, workspaceId(req));
+      await clearClientAccessCleanup(params.data.userId, workspaceId(req));
+    });
+    res.status(204).send();
+  } catch (error) {
+    if ((error as ClerkError).status === 404) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    req.log.error({ error }, "Client access reconciliation failed");
+    res.status(503).json({ error: "Client access cleanup failed again. Try reconciling this user again." });
+  }
 });
 
 router.get("/clients", async (req: AuthenticatedRequest, res): Promise<void> => {
@@ -585,9 +627,12 @@ router.patch("/users/:userId", async (req: AuthenticatedRequest, res): Promise<v
         if (body.data.role !== "Client") {
           try {
             await revokeMemberships(updatedTarget.id, workspaceId(req));
+            await clearClientAccessCleanup(updatedTarget.id, workspaceId(req));
           } catch (error) {
-            throw new ClientAccessCleanupError(error);
+            throw new ClientAccessCleanupError(error, updatedTarget.id, workspaceId(req));
           }
+        } else {
+          await clearClientAccessCleanup(updatedTarget.id, workspaceId(req));
         }
       }
       return updatedTarget;
@@ -607,9 +652,24 @@ router.patch("/users/:userId", async (req: AuthenticatedRequest, res): Promise<v
     } else {
       target = await applyUpdate(await client.users.getUser(params.data.userId));
     }
-    res.json(UpdateWorkspaceUserResponse.parse(serializeUser(target)));
+    const pendingCleanup = await db
+      .select({ userId: clientAccessCleanupTable.userId })
+      .from(clientAccessCleanupTable)
+      .where(and(
+        eq(clientAccessCleanupTable.workspaceId, workspaceId(req)),
+        eq(clientAccessCleanupTable.userId, target.id),
+      ));
+    res.json(UpdateWorkspaceUserResponse.parse({
+      ...serializeUser(target),
+      clientAccessCleanupPending: pendingCleanup.length > 0,
+    }));
   } catch (error) {
     if (error instanceof ClientAccessCleanupError) {
+      try {
+        await markClientAccessCleanup(error.userId, error.workspaceId);
+      } catch (recordError) {
+        req.log.error({ error: recordError, userId: error.userId }, "Could not persist client access cleanup state");
+      }
       req.log.error({ error: error.cause }, "Client access cleanup failed after role update");
       res.status(503).json({ error: error.message });
       return;
@@ -637,6 +697,7 @@ router.delete("/users/:userId", async (req: AuthenticatedRequest, res): Promise<
       if (await isFinalAdmin(client, target)) return false;
       await client.users.deleteUser(target.id);
       await deleteClientMemberships(target.id);
+      await clearClientAccessCleanup(target.id, workspaceId(req));
       return true;
     });
     if (!deleted) {
@@ -658,10 +719,21 @@ export default createUsersRouter();
 
 class ClientAccessCleanupError extends Error {
   readonly cause: unknown;
+  readonly userId: string;
+  readonly workspaceId: string;
 
-  constructor(cause: unknown) {
+  constructor(cause: unknown, userId: string, workspaceId: string) {
     super("The role was updated, but client access cleanup failed. Retry this role change to finish removing access.");
     this.name = "ClientAccessCleanupError";
     this.cause = cause;
+    this.userId = userId;
+    this.workspaceId = workspaceId;
   }
+}
+
+async function clearClientAccessCleanup(userId: string, scope: string) {
+  await db.delete(clientAccessCleanupTable).where(and(
+    eq(clientAccessCleanupTable.userId, userId),
+    eq(clientAccessCleanupTable.workspaceId, scope),
+  ));
 }

@@ -891,6 +891,24 @@ paths:
           description: Authentication required
         "403":
           description: Administrator access required
+  /users/{userId}/client-access-reconciliation:
+    post:
+      operationId: reconcileClientAccess
+      tags: [users]
+      summary: Reconcile a user's client access after a failed cleanup
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "204":
+          description: Client access reconciled
+        "401":
+          description: Authentication required
+        "403":
+          description: Administrator access required
+        "404":
+          description: User not found
+        "503":
+          description: Client access cleanup failed again
   /clients:
     get:
       operationId: getClients
@@ -1190,7 +1208,7 @@ components:
           $ref: "#/components/schemas/WorkspaceRole"
     WorkspaceUser:
       type: object
-      required: [id, firstName, lastName, name, email, role, createdAt, imageUrl]
+      required: [id, firstName, lastName, name, email, role, createdAt, imageUrl, clientAccessCleanupPending]
       properties:
         id: { type: string }
         firstName: { type: string }
@@ -1202,6 +1220,7 @@ components:
         createdAt: { type: integer }
         lastSignInAt: { type: [integer, "null"] }
         imageUrl: { type: string }
+        clientAccessCleanupPending: { type: boolean }
     ClientMember:
       type: object
       required: [id, userId, name, email, imageUrl, role, addedAt]

@@ -3,7 +3,7 @@ import { afterEach, test } from "node:test";
 import express from "express";
 import type { Server } from "node:http";
 import type { User } from "@clerk/backend";
-import { clientMembersTable, clientsTable, db } from "@workspace/db";
+import { clientAccessCleanupTable, clientMembersTable, clientsTable, db } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import {
   CLIENT_MEMBER_PROFILE_LOOKUP_CONCURRENCY,
@@ -321,6 +321,7 @@ test("updates Clerk profile, email, and role together", async () => {
     createdAt: 1,
     lastSignInAt: null,
     imageUrl: "https://example.com/avatar.png",
+    clientAccessCleanupPending: false,
   });
 });
 
@@ -400,6 +401,23 @@ test("reports failed client cleanup and retries the same demotion safely", async
     (await db.select().from(clientMembersTable).where(eq(clientMembersTable.clientId, client.id))).length,
     1,
   );
+  const listedAfterFailure = await (await fetch(`${base}/users`)).json() as Array<{
+    id: string;
+    clientAccessCleanupPending: boolean;
+  }>;
+  assert.equal(listedAfterFailure.find((user) => user.id === "member")?.clientAccessCleanupPending, true);
+
+  const reconciled = await fetch(`${base}/users/member/client-access-reconciliation`, { method: "POST" });
+  assert.equal(reconciled.status, 204);
+  assert.deepEqual(
+    await db.select().from(clientMembersTable).where(eq(clientMembersTable.clientId, client.id)),
+    [],
+  );
+  const listedAfterReconciliation = await (await fetch(`${base}/users`)).json() as Array<{
+    id: string;
+    clientAccessCleanupPending: boolean;
+  }>;
+  assert.equal(listedAfterReconciliation.find((user) => user.id === "member")?.clientAccessCleanupPending, false);
 
   const retried = await demotion();
   assert.equal(retried.status, 200);
