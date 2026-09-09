@@ -159,6 +159,54 @@ test.describe('navigation contrast', () => {
     await expect(page).toHaveScreenshot('desktop-sign-out-hover.png', { animations: 'disabled' });
   });
 
+  test('desktop compact rail keeps destinations and profile actions usable', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/__visual/sidebar?sidebar=compact&active=messages&profile=open');
+    await expect(page.getByTestId('app-layout')).toBeVisible();
+
+    const sidebar = page.locator('aside');
+    const main = page.locator('main');
+    const compactSidebarBox = await sidebar.boundingBox();
+    const compactMainBox = await main.boundingBox();
+    expect(compactSidebarBox?.width).toBeLessThan(100);
+    expect(compactMainBox?.x).toBeGreaterThan((compactSidebarBox?.x ?? 0) + (compactSidebarBox?.width ?? 0));
+
+    const toggle = page.getByTestId('desktop-sidebar-toggle');
+    await expect(toggle).toHaveAccessibleName('Expand sidebar');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByRole('link', { name: 'Communications' })).toHaveAttribute('title', 'Communications');
+    await expect(page.getByRole('link', { name: 'Communications' })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign out' })).toBeInViewport();
+    await expect(page).toHaveScreenshot('desktop-compact.png', { animations: 'disabled' });
+
+    await toggle.focus();
+    await page.keyboard.press('Enter');
+    await expect(toggle).toHaveAccessibleName('Collapse sidebar');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByRole('link', { name: 'Communications' })).not.toHaveAttribute('title', 'Communications');
+  });
+
+  test('desktop collapse preference survives reload and does not change mobile drawer behavior', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/__visual/sidebar?sidebar=expanded');
+    const toggle = page.getByTestId('desktop-sidebar-toggle');
+    await toggle.click();
+    await expect(toggle).toHaveAccessibleName('Expand sidebar');
+
+    await page.goto('/__visual/sidebar');
+    await expect(page.getByTestId('desktop-sidebar-toggle')).toHaveAccessibleName('Expand sidebar');
+    await expect(page.getByRole('link', { name: 'All Projects' })).toHaveAttribute('title', 'All Projects');
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Open navigation' })).toBeVisible();
+    await expect(page.getByTestId('desktop-sidebar-toggle')).toBeHidden();
+    await page.getByRole('button', { name: 'Open navigation' }).click();
+    await expect(page.getByRole('dialog', { name: 'Main navigation' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'All Projects' })).toBeVisible();
+  });
+
   test('mobile header, drawer, and overlay', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await stabilize(page);
@@ -277,5 +325,22 @@ test.describe('navigation selection motion', () => {
     await expect(indicator).toHaveAttribute('data-animate', 'false');
     await expect(indicator).toHaveAttribute('data-motion-phase', 'idle');
     await expectIndicatorAligned(indicator, financials);
+  });
+
+  test('keeps compact desktop selection aligned through route changes', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/__visual/sidebar?sidebar=compact');
+    await expect(page.getByTestId('desktop-sidebar-toggle')).toHaveAccessibleName('Expand sidebar');
+
+    const indicator = page.getByTestId('sidebar-selection-indicator');
+    const messages = page.getByRole('link', { name: 'Communications' });
+    await messages.click();
+    await expect(messages).toHaveAttribute('aria-current', 'page');
+    await expectIndicatorAligned(indicator, messages);
+
+    await page.getByTestId('desktop-sidebar-toggle').click();
+    await expect(page.getByTestId('desktop-sidebar-toggle')).toHaveAccessibleName('Collapse sidebar');
+    await expectIndicatorAligned(indicator, messages);
   });
 });

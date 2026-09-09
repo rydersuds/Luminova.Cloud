@@ -307,6 +307,13 @@ function SidebarVisualHarness() {
         onSignOut={() => undefined}
         onNavigate={setActiveLocation}
         initialSidebarOpen={params.get('drawer') === 'open'}
+        initialSidebarCollapsed={
+          params.get('sidebar') === 'compact'
+            ? true
+            : params.get('sidebar') === 'expanded'
+              ? false
+              : undefined
+        }
         initialProfileOpen={params.get('profile') === 'open'}
         hoveredHref={params.get('hover') === 'trades' ? '/trades' : undefined}
       >

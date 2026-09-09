@@ -10,6 +10,8 @@ import {
   Menu,
   X,
   ChevronDown,
+  PanelLeftClose,
+  PanelLeftOpen,
   LogOut,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -35,9 +37,22 @@ type AppLayoutViewProps = {
   email: string
   onSignOut: () => void
   initialSidebarOpen?: boolean
+  initialSidebarCollapsed?: boolean
   initialProfileOpen?: boolean
   hoveredHref?: string
   onNavigate?: (href: string) => void
+}
+
+const SIDEBAR_COLLAPSED_STORAGE_KEY = "luminova-sidebar-collapsed"
+
+function readSidebarCollapsedPreference() {
+  if (typeof window === "undefined") return false
+
+  try {
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true"
+  } catch {
+    return false
+  }
 }
 
 export function AppLayoutView({
@@ -47,11 +62,15 @@ export function AppLayoutView({
   email,
   onSignOut,
   initialSidebarOpen = false,
+  initialSidebarCollapsed,
   initialProfileOpen = false,
   hoveredHref,
   onNavigate,
 }: AppLayoutViewProps) {
   const [sidebarOpen, setSidebarOpen] = useState(initialSidebarOpen)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => initialSidebarCollapsed ?? readSidebarCollapsedPreference(),
+  )
   const [profileOpen, setProfileOpen] = useState(initialProfileOpen)
   const [isMobile, setIsMobile] = useState(false)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
@@ -90,12 +109,24 @@ export function AppLayoutView({
   }, [])
 
   useEffect(() => {
+    try {
+      window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(sidebarCollapsed))
+    } catch {
+      // A blocked storage context should not make the navigation unusable.
+    }
+  }, [sidebarCollapsed])
+
+  useEffect(() => {
     if (!sidebarOpen || !isMobile) return
 
     const sidebar = sidebarRef.current
     const focusableSelector = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
     const focusableElements = () =>
       Array.from(sidebar?.querySelectorAll<HTMLElement>(focusableSelector) ?? [])
+        .filter((element) => {
+          const style = window.getComputedStyle(element)
+          return style.display !== "none" && style.visibility !== "hidden" && element.getClientRects().length > 0
+        })
 
     window.requestAnimationFrame(() => focusableElements()[0]?.focus())
 
@@ -238,7 +269,7 @@ export function AppLayoutView({
       observer.disconnect()
       window.removeEventListener("resize", positionAfterLayoutChange)
     }
-  }, [location, sidebarOpen])
+  }, [location, sidebarCollapsed, sidebarOpen])
 
   return (
     <div data-testid="app-layout" className="min-h-[100dvh] flex flex-col md:flex-row bg-background bg-tech-grid text-foreground selection:bg-primary selection:text-primary-foreground">
@@ -272,21 +303,53 @@ export function AppLayoutView({
       <aside
         ref={sidebarRef}
         id="mobile-navigation"
+        data-sidebar-collapsed={sidebarCollapsed}
         role={isMobile ? "dialog" : undefined}
         aria-modal={isMobile ? true : undefined}
         aria-label={isMobile ? "Main navigation" : undefined}
         aria-hidden={isMobile && !sidebarOpen ? true : undefined}
         tabIndex={isMobile ? -1 : undefined}
         className={cn(
-        "fixed md:sticky md:top-4 md:self-start inset-y-0 left-0 w-72 glass-panel-dark text-sidebar-foreground flex flex-col z-30 transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] md:m-4 md:rounded-2xl md:h-[calc(100dvh-2rem)]",
+        "sidebar-chrome fixed md:sticky md:top-4 md:self-start inset-y-0 left-0 w-72 glass-panel-dark text-sidebar-foreground flex flex-col z-30 shrink-0 transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] md:transition-[width,transform] md:m-4 md:rounded-2xl md:h-[calc(100dvh-2rem)] motion-reduce:transition-none",
+        sidebarCollapsed ? "md:w-[4.5rem]" : "md:w-72",
         sidebarOpen ? "translate-x-0 shadow-[0_0_50px_rgba(0,0,0,0.8)]" : "-translate-x-full md:translate-x-0",
       )}>
-        <div className="px-6 py-8 hidden md:flex flex-col relative items-center">
+        <div className={cn(
+          "hidden md:flex flex-col relative items-center",
+          sidebarCollapsed ? "px-2 pt-12 pb-2" : "px-6 py-8",
+        )}>
           <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-primary/10 to-transparent opacity-50" />
-          <img src="/luminova-logo.png" alt="Luminova Construction" className="h-16 w-auto object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)] z-10" />
+          {sidebarCollapsed ? (
+            <Building2
+              aria-label="Luminova Construction"
+              data-testid="compact-sidebar-logo"
+              className="relative z-10 h-9 w-9 text-primary drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]"
+            />
+          ) : (
+            <img src="/luminova-logo.png" alt="Luminova Construction" className="h-16 w-auto object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)] z-10" />
+          )}
+          <button
+            type="button"
+            data-testid="desktop-sidebar-toggle"
+            aria-controls="mobile-navigation"
+            aria-expanded={!sidebarCollapsed}
+            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+            className="absolute right-2 top-2 z-20 inline-flex h-8 w-8 items-center justify-center rounded-lg text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar motion-reduce:transition-none"
+          >
+            {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          </button>
         </div>
 
-        <nav ref={navRef} className="relative flex-1 px-4 py-6 md:py-2 space-y-3 overflow-y-auto">
+        <nav
+          ref={navRef}
+          aria-label="Main navigation"
+          className={cn(
+            "relative flex-1 py-6 md:py-2 space-y-3 overflow-y-auto",
+            sidebarCollapsed ? "px-2" : "px-4",
+          )}
+        >
           <div
             ref={indicatorRef}
             data-testid="sidebar-selection-indicator"
@@ -296,12 +359,21 @@ export function AppLayoutView({
             data-last-motion={indicator.lastMotion}
             aria-hidden="true"
             className={cn(
-              "pointer-events-none absolute left-4 right-4 z-0 rounded-xl bg-primary shadow-[inset_0_1px_2px_rgba(255,255,255,0.38),0_5px_18px_-3px_hsl(var(--primary)/0.72)] will-change-transform",
+              "pointer-events-none absolute z-0 rounded-xl bg-primary shadow-[inset_0_1px_2px_rgba(255,255,255,0.38),0_5px_18px_-3px_hsl(var(--primary)/0.72)] will-change-transform",
+              sidebarCollapsed ? "left-2 right-2" : "left-4 right-4",
               !indicator.ready && "opacity-0",
             )}
             style={{ height: indicator.height, transform: `translateY(${indicator.top}px) scale(1.025)` }}
           />
-          <div data-contrast-label="navigation section label" className="relative z-10 text-[10px] font-mono uppercase tracking-widest text-sidebar-foreground/60 mb-4 px-2">Operations Center</div>
+          <div
+            data-contrast-label="navigation section label"
+            className={cn(
+              "relative z-10 text-[10px] font-mono uppercase tracking-widest text-sidebar-foreground/60 mb-4 px-2",
+              sidebarCollapsed && "sr-only",
+            )}
+          >
+            Operations Center
+          </div>
           {NAV_ITEMS.map((item) => {
             const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href))
             const isVisuallyActive = visuallyActiveLocation === item.href || (item.href !== "/" && visuallyActiveLocation.startsWith(item.href))
@@ -312,9 +384,12 @@ export function AppLayoutView({
                 href={item.href}
                 ref={isActive ? activeLinkRef : undefined}
                 aria-current={isActive ? "page" : undefined}
+                aria-label={item.label}
+                title={sidebarCollapsed ? item.label : undefined}
                 data-contrast-label={`navigation link "${item.label}"`}
                 className={cn(
-                  "group relative z-10 flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-[color,background-color,box-shadow,transform] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden shadow-sm motion-reduce:transition-none",
+                  "group relative z-10 flex items-center py-3.5 rounded-xl text-sm font-bold transition-[color,background-color,box-shadow,transform] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden shadow-sm motion-reduce:transition-none",
+                  sidebarCollapsed ? "justify-center gap-0 px-2" : "gap-3 px-4",
                   isVisuallyActive
                     ? "text-primary-foreground transform scale-[1.025]"
                     : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_2px_10px_rgba(0,0,0,0.2)]",
@@ -340,6 +415,7 @@ export function AppLayoutView({
                 <span
                   className={cn(
                     "relative z-10 tracking-wide drop-shadow-sm transition-[transform,letter-spacing] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
+                    sidebarCollapsed && "sr-only",
                     isVisuallyActive && "translate-x-1 tracking-[0.035em]",
                   )}
                 >
@@ -350,19 +426,24 @@ export function AppLayoutView({
           })}
         </nav>
 
-        <div className="p-4 mt-auto">
-          <div className="rounded-2xl bg-black p-2">
+        <div className={cn("mt-auto", sidebarCollapsed ? "p-2" : "p-4")}>
+          <div className={cn("relative rounded-2xl bg-black p-2", sidebarCollapsed && "md:rounded-xl")}>
             <button
               type="button"
               data-contrast-label="profile control"
               onClick={() => setProfileOpen((open) => !open)}
+              aria-label={`Account menu for ${displayName}`}
+              title={sidebarCollapsed ? `Account menu for ${displayName}` : undefined}
               aria-expanded={profileOpen}
-              className="flex w-full items-center gap-3 rounded-xl bg-[#202020] px-3 py-3 text-left text-sm text-sidebar-foreground transition-colors hover:bg-[#292929] hover:text-white cursor-pointer"
+              className={cn(
+                "flex w-full items-center rounded-xl bg-[#202020] py-3 text-left text-sm text-sidebar-foreground transition-colors hover:bg-[#292929] hover:text-white cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-black motion-reduce:transition-none",
+                sidebarCollapsed ? "justify-center px-2" : "gap-3 px-3",
+              )}
             >
               <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center font-heading font-bold text-primary-foreground shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),0_4px_8px_rgba(0,0,0,0.5)]">
                 {initials || "PM"}
               </div>
-              <div className="min-w-0 flex-1">
+              <div className={cn("min-w-0 flex-1", sidebarCollapsed && "sr-only")}>
                 <p className="font-bold truncate tracking-wide drop-shadow-sm">{displayName}</p>
                 <p
                   data-contrast-label="profile email"
@@ -372,14 +453,17 @@ export function AppLayoutView({
                   {email}
                 </p>
               </div>
-              <ChevronDown className={cn("h-4 w-4 shrink-0 text-primary transition-transform drop-shadow-sm", profileOpen && "rotate-180")} />
+              <ChevronDown className={cn("h-4 w-4 shrink-0 text-primary transition-transform drop-shadow-sm", sidebarCollapsed && "hidden", profileOpen && "rotate-180")} />
             </button>
             {profileOpen && (
               <button
                 type="button"
                 data-contrast-label="sign-out control"
                 onClick={onSignOut}
-                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-destructive/10 border border-destructive/20 px-3 py-3 text-xs font-bold uppercase tracking-wider text-red-400 transition-all hover:bg-destructive hover:text-destructive-foreground hover:shadow-[0_4px_10px_rgba(255,0,0,0.3)]"
+                className={cn(
+                  "mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-destructive/10 border border-destructive/20 px-3 py-3 text-xs font-bold uppercase tracking-wider text-red-400 transition-all hover:bg-destructive hover:text-destructive-foreground hover:shadow-[0_4px_10px_rgba(255,0,0,0.3)] motion-reduce:transition-none",
+                  sidebarCollapsed && "md:absolute md:left-[calc(100%+0.5rem)] md:bottom-0 md:z-50 md:mt-0 md:w-44 md:bg-[#202020] md:p-3 md:shadow-xl",
+                )}
               >
                 <LogOut className="h-4 w-4" />
                 Sign out
