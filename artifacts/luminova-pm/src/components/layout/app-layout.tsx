@@ -87,9 +87,7 @@ export function AppLayoutView({
   const navRef = useRef<HTMLElement>(null)
   const activeLinkRef = useRef<HTMLAnchorElement>(null)
   const indicatorRef = useRef<HTMLDivElement>(null)
-  const indicatorBubbleRefs = useRef<Array<HTMLSpanElement | null>>([])
   const indicatorAnimationRef = useRef<Animation | null>(null)
-  const indicatorBubbleAnimationsRef = useRef<Animation[]>([])
   const indicatorPhaseRef = useRef<IndicatorPhase>("idle")
   const finishTimerRef = useRef<number | null>(null)
   const hasPositionedIndicator = useRef(previousMountedIndicatorLocation !== null)
@@ -190,8 +188,6 @@ export function AppLayoutView({
     const clearMotion = () => {
       indicatorAnimationRef.current?.cancel()
       indicatorAnimationRef.current = null
-      indicatorBubbleAnimationsRef.current.forEach((animation) => animation.cancel())
-      indicatorBubbleAnimationsRef.current = []
       if (finishTimerRef.current !== null) {
         window.clearTimeout(finishTimerRef.current)
         finishTimerRef.current = null
@@ -259,35 +255,6 @@ export function AppLayoutView({
           fill: "both",
         },
       )
-      indicatorBubbleAnimationsRef.current = indicatorBubbleRefs.current.flatMap((bubble, index) => {
-        if (!bubble) return []
-        const side = index === 0 ? -1 : 1
-        return [bubble.animate(
-          [
-            { opacity: 0, transform: "translate(0, 0) scale(0.35)" },
-            {
-              opacity: 1,
-              transform: `translate(${side * (13 + index * 5)}px, ${direction * (12 + index * 10)}px) scale(${0.95 + index * 0.16})`,
-              offset: 0.3,
-            },
-            {
-              opacity: 0.8,
-              transform: `translate(${side * (7 + index * 3)}px, ${direction * Math.max(24, distance * 0.58)}px) scale(${0.7 + index * 0.12})`,
-              offset: 0.7,
-            },
-            {
-              opacity: 0,
-              transform: `translate(0, ${direction * Math.max(34, distance * 0.86)}px) scale(0.12)`,
-            },
-          ],
-          {
-            duration: Math.min(680, 450 + distance * 0.48),
-            delay: index * 45,
-            easing: "cubic-bezier(0.2, 0.65, 0.25, 1)",
-            fill: "both",
-          },
-        )]
-      })
       indicatorAnimationRef.current = travelAnimation
       travelAnimation.finished.then(() => {
         if (indicatorAnimationRef.current !== travelAnimation) return
@@ -457,18 +424,7 @@ export function AppLayoutView({
               !indicator.ready && "opacity-0",
             )}
             style={{ height: indicator.height, transform: `translateY(${indicator.top}px) scale(1.025)` }}
-          >
-            <span
-              ref={(element) => { indicatorBubbleRefs.current[0] = element }}
-              aria-hidden="true"
-              className="absolute left-[14%] top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-primary shadow-[inset_0_1px_2px_rgba(255,255,255,0.5),0_0_14px_hsl(var(--primary)/0.8)] opacity-0"
-            />
-            <span
-              ref={(element) => { indicatorBubbleRefs.current[1] = element }}
-              aria-hidden="true"
-              className="absolute right-[12%] top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-primary shadow-[inset_0_1px_2px_rgba(255,255,255,0.5),0_0_12px_hsl(var(--primary)/0.8)] opacity-0"
-            />
-          </div>
+          />
           <div
             data-contrast-label="navigation section label"
             className={cn(
