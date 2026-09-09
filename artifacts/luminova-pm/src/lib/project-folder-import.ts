@@ -1,4 +1,7 @@
 const TEXT_EXTENSIONS = new Set(["csv", "txt", "md", "json", "rtf"])
+export const dismissedImportStoragePrefix = "luminova-folder-import-dismissed:"
+
+type DismissalStorage = Pick<Storage, "getItem" | "setItem">
 
 export type FolderCandidate = {
   file: File
@@ -15,6 +18,31 @@ type BatchImportResponseContext = {
   fileName?: string
   expectsJson?: boolean
   requestPath?: string
+}
+
+export const dismissedImportStorageKey = (importId: string) =>
+  `${dismissedImportStoragePrefix}${importId}`
+
+export const wasImportErrorDismissed = (
+  importId: string,
+  storage: DismissalStorage = window.localStorage,
+) => {
+  try {
+    return storage.getItem(dismissedImportStorageKey(importId)) === "true"
+  } catch {
+    return false
+  }
+}
+
+export const rememberDismissedImportError = (
+  importId: string,
+  storage: DismissalStorage = window.localStorage,
+) => {
+  try {
+    storage.setItem(dismissedImportStorageKey(importId), "true")
+  } catch {
+    // The provider still suppresses the current session when browser storage is unavailable.
+  }
 }
 
 const payloadLimitPattern = /\b(?:413|content too large|entity too large|payload too large|request too large|max(?:imum)? (?:request|body|payload|upload|file) size|size limit)\b/i

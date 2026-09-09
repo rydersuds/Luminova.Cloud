@@ -4,7 +4,7 @@ import { getGetDashboardSummaryQueryKey, getGetProjectsQueryKey } from "@workspa
 import { useAuth } from "@clerk/react"
 import { CheckCircle2, ChevronDown, ChevronUp, LoaderCircle, UploadCloud, XCircle } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
-import { boundedTextSnippet, collectFolderCandidates, readBatchImportResponse, type FolderCandidate, type SkippedFolderFile } from "@/lib/project-folder-import"
+import { boundedTextSnippet, collectFolderCandidates, dismissedImportStorageKey, rememberDismissedImportError, readBatchImportResponse, wasImportErrorDismissed, type FolderCandidate, type SkippedFolderFile } from "@/lib/project-folder-import"
 
 export type FolderImportStatus = "idle" | "uploading" | "building" | "success" | "error"
 type FolderImportProgress = { uploaded: number; failed: number }
@@ -32,15 +32,6 @@ type FolderImportContextValue = {
 
 const ProjectFolderImportContext = React.createContext<FolderImportContextValue | null>(null)
 const importFileDatabase = "luminova-folder-imports"
-const dismissedImportStoragePrefix = "luminova-folder-import-dismissed:"
-
-const wasImportErrorDismissed = (importId: string) => {
-  try {
-    return window.localStorage.getItem(`${dismissedImportStoragePrefix}${importId}`) === "true"
-  } catch {
-    return false
-  }
-}
 
 async function withImportFiles<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest<T> | void): Promise<T | undefined> {
   const database = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -85,6 +76,7 @@ export function ProjectFolderImportProvider({
   const activeImportRef = React.useRef(false)
   const folderFilesRef = React.useRef<FolderCandidate[]>([])
   const sessionRef = React.useRef<ImportSession | null>(null)
+  const dismissedImportIdsRef = React.useRef(new Set<string>())
   const authenticatedFetch = React.useCallback(async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const send = async (token: string | null) => {
       const headers = new Headers(init.headers)
@@ -111,11 +103,8 @@ export function ProjectFolderImportProvider({
   const dismissFolderError = React.useCallback(() => {
     const importId = sessionRef.current?.importId
     if (importId) {
-      try {
-        window.localStorage.setItem(`${dismissedImportStoragePrefix}${importId}`, "true")
-      } catch {
-        // Dismissal still applies for the current session if storage is unavailable.
-      }
+      dismissedImportIdsRef.current.add(importId)
+      rememberDismissedImportError(importId)
     }
     clearFolderImport()
   }, [clearFolderImport])
@@ -273,7 +262,11 @@ export function ProjectFolderImportProvider({
       try {
         const response = await authenticatedFetch("/api/project-import-sessions")
         const session = await readBatchImportResponse<ImportSession | null>(response, { operation: "Restoring the import session" })
-        if (!session || cancelled || wasImportErrorDismissed(session.importId)) return
+        if (!session || cancelled) return
+        if (dismissedImportIdsRef.current.has(session.importId) || wasImportErrorDismissed(session.importId)) {
+          if (sessionRef.current?.importId === session.importId) clearFolderImport()
+          return
+        }
         sessionRef.current = session
         const restored = (await Promise.all(session.documents.map(async (document) => {
           const file = await loadImportFile(session.importId, document.relativePath)

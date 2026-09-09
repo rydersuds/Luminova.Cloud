@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { formatDateOnly } from "./utils.ts"
-import { boundedTextSnippet, collectFolderCandidates, folderFileIssue, normalizeRelativePath, readBatchImportResponse } from "./project-folder-import.ts"
+import { boundedTextSnippet, collectFolderCandidates, dismissedImportStorageKey, folderFileIssue, normalizeRelativePath, readBatchImportResponse, rememberDismissedImportError, wasImportErrorDismissed } from "./project-folder-import.ts"
 import { LEGAL_CONSENT_LABEL, PRIVACY_PATH, TERMS_PATH, canSubmitSignIn } from "./legal-consent.ts"
 
 test("sign-in eligibility requires affirmative legal consent", () => {
@@ -130,4 +130,18 @@ test("batch import response reader handles empty and malformed JSON without pars
     ),
     (error: Error) => error.message.includes("unreadable response") && !error.message.includes("Unexpected"),
   )
+})
+
+test("dismissed folder import errors stay hidden for the same import after refresh", () => {
+  const values = new Map<string, string>()
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => { values.set(key, value) },
+  }
+
+  rememberDismissedImportError("import-failed", storage)
+
+  assert.equal(wasImportErrorDismissed("import-failed", storage), true)
+  assert.equal(values.get(dismissedImportStorageKey("import-failed")), "true")
+  assert.equal(wasImportErrorDismissed("import-new", storage), false)
 })
