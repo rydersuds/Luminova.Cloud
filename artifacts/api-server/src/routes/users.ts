@@ -147,6 +147,19 @@ async function ensureKnownClients(scope: string, createdBy: string) {
   });
 }
 
+async function revokeClientMemberships(userId: string, scope: string) {
+  const clients = await db
+    .select({ id: clientsTable.id })
+    .from(clientsTable)
+    .where(eq(clientsTable.workspaceId, scope));
+  if (!clients.length) return;
+
+  await db.delete(clientMembersTable).where(and(
+    eq(clientMembersTable.userId, userId),
+    inArray(clientMembersTable.clientId, clients.map((client) => client.id)),
+  ));
+}
+
 type ClerkClient = typeof clerk;
 type AdminLock = <T>(operation: () => Promise<T>) => Promise<T>;
 
@@ -522,9 +535,13 @@ router.patch("/users/:userId", async (req: AuthenticatedRequest, res): Promise<v
         updatedTarget = await client.users.getUser(updatedTarget.id);
       }
       if (body.data.role) {
+        const wasClient = workspaceRole(updatedTarget) === "Client";
         updatedTarget = await client.users.updateUserMetadata(updatedTarget.id, {
           publicMetadata: { ...updatedTarget.publicMetadata, role: body.data.role },
         });
+        if (wasClient && body.data.role !== "Client") {
+          await revokeClientMemberships(updatedTarget.id, workspaceId(req));
+        }
       }
       return updatedTarget;
     };

@@ -291,6 +291,44 @@ test("updates Clerk profile, email, and role together", async () => {
   });
 });
 
+test("revokes all client memberships when a Client user is demoted", async () => {
+  const fake = fakeClerk([
+    makeUser("admin", "Admin"),
+    makeUser("member", "Client"),
+  ]);
+  const base = await startApi("admin", fake.client, undefined, "workspace-role-revoke");
+  const firstClient = await createTestClient(base, "First Client");
+  const secondClient = await createTestClient(base, "Second Client");
+  await grantClientAccess(base, firstClient.id, "member");
+  await grantClientAccess(base, secondClient.id, "member");
+
+  const response = await fetch(`${base}/users/member`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ role: "Field Team" }),
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal((await response.json() as { role: string }).role, "Field Team");
+  assert.equal(fake.getUsers().find((user) => user.id === "member")?.publicMetadata.role, "Field Team");
+  assert.deepEqual(
+    await db.select().from(clientMembersTable).where(inArray(
+      clientMembersTable.clientId,
+      [firstClient.id, secondClient.id],
+    )),
+    [],
+  );
+
+  const reassigned = await fetch(`${base}/users/member`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ role: "Client" }),
+  });
+  assert.equal(reassigned.status, 200);
+  assert.equal((await reassigned.json() as { role: string }).role, "Client");
+  assert.equal((await grantClientAccess(base, firstClient.id, "member")).status, 201);
+});
+
 test("rejects empty and unknown-only profile updates", async () => {
   const fake = fakeClerk([makeUser("admin", "Admin"), makeUser("member", "Client")]);
   const base = await startApi("admin", fake.client);
