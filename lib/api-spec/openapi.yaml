@@ -917,9 +917,9 @@ components:
         id: { type: string }
         code: { type: string }
         description: { type: string }
-        budgeted: { type: integer }
-        invoiced: { type: integer }
-        variance: { type: integer }
+        budgeted: { type: number }
+        invoiced: { type: number }
+        variance: { type: number }
     Trade:
       type: object
       required: [id, companyName, contactName, tradeType, region, rating, reviewCount, completedJobs, initials, accent]

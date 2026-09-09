@@ -139,9 +139,9 @@ export const GetProjectResponse = zod.object({
   "id": zod.string(),
   "code": zod.string(),
   "description": zod.string(),
-  "budgeted": zod.number().int(),
-  "invoiced": zod.number().int(),
-  "variance": zod.number().int()
+  "budgeted": zod.number(),
+  "invoiced": zod.number(),
+  "variance": zod.number()
 })),
   "invoices": zod.array(zod.object({
   "id": zod.string(),
