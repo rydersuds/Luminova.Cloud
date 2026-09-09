@@ -46,6 +46,16 @@ import {
   UpdateVendorQuoteBody,
   UpdateVendorQuoteParams,
   UpdateVendorQuoteResponse,
+  CreateTradeJobHistoryBody,
+  CreateTradeJobHistoryParams,
+  CreateTradeJobHistoryResponse,
+  UpdateTradeJobHistoryBody,
+  UpdateTradeJobHistoryParams,
+  UpdateTradeJobHistoryResponse,
+  DeleteTradeJobHistoryParams,
+  CreateTradeReviewBody,
+  CreateTradeReviewParams,
+  CreateTradeReviewResponse,
 } from "@workspace/api-zod";
 import { DatabasePanoramaStore } from "../lib/panoramaStore";
 import {
@@ -57,6 +67,8 @@ import {
   projectDocumentsTable,
   projectExteriorPhotosTable,
   projectImportBatchesTable,
+  vendorJobHistoryTable,
+  vendorReviewTable,
 } from "@workspace/db";
 import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
@@ -70,6 +82,7 @@ import {
   extractInternalBudgetFromDocuments,
   type InternalBudgetLineItem,
 } from "../lib/financialDocumentExtraction";
+import { requireWorkspaceRole, workspaceUserDisplayName } from "./users";
 
 type AuthenticatedRequest = Request & { userId?: string };
 const router: IRouter = Router();
@@ -665,26 +678,42 @@ vendorQuotes.length = 0;
 const durableData = async <T>(table: typeof importedProjectsTable | typeof importedVendorsTable | typeof importedVendorQuotesTable | typeof importedInvoicesTable) =>
   (await db.select({ data: table.data }).from(table)).map((row) => row.data as T);
 
-const normalizePartyName = (value: string) => value.replace(/[^a-z0-9]/gi, "").toLowerCase();
-
 const jobHistoryForTrade = async (trade: Trade) => {
-  const [projects, invoices] = await Promise.all([allProjects(), allInvoices()]);
+  const [projects, records] = await Promise.all([
+    allProjects(),
+    db.select().from(vendorJobHistoryTable).where(eq(vendorJobHistoryTable.vendorId, trade.id)),
+  ]);
   const projectById = new Map(projects.map((project) => [project.id, project]));
-  const grouped = new Map<string, { projectName: string; date: string; amount: number }>();
-  for (const invoice of invoices) {
-    if (
-      invoice.direction !== "company_to_luminova" ||
-      normalizePartyName(invoice.vendor) !== normalizePartyName(trade.companyName) ||
-      !invoice.projectId
-    ) continue;
-    const current = grouped.get(invoice.projectId);
-    grouped.set(invoice.projectId, {
-      projectName: invoice.projectName || projectById.get(invoice.projectId)?.name || invoice.projectId,
-      date: invoice.date > (current?.date ?? "") ? invoice.date : (current?.date ?? invoice.date),
-      amount: Math.round(((current?.amount ?? 0) + invoice.amount) * 100) / 100,
-    });
-  }
-  return [...grouped.values()];
+  return records.map((record) => ({
+    id: record.id,
+    vendorId: record.vendorId,
+    projectId: record.projectId,
+    projectName: projectById.get(record.projectId)?.name || record.projectId,
+    date: record.completedDate,
+    amount: record.amount,
+    source: record.source,
+    recordedBy: record.recordedBy,
+  }));
+};
+
+const reviewsForTrade = async (trade: Trade) => {
+  const [projects, records] = await Promise.all([
+    allProjects(),
+    db.select().from(vendorReviewTable).where(eq(vendorReviewTable.vendorId, trade.id)),
+  ]);
+  const projectById = new Map(projects.map((project) => [project.id, project]));
+  return records.map((record) => ({
+    id: record.id,
+    vendorId: record.vendorId,
+    projectId: record.projectId,
+    projectName: projectById.get(record.projectId)?.name || record.projectId,
+    reviewerId: record.reviewerId,
+    reviewer: record.reviewerName,
+    date: record.reviewedDate,
+    rating: record.rating,
+    comment: record.comment,
+    source: record.source,
+  }));
 };
 
 const allProjects = async () => {
@@ -706,22 +735,32 @@ const allProjects = async () => {
 };
 const allInvoices = async (): Promise<Invoice[]> => [...await durableData<Invoice>(importedInvoicesTable), ...invoices];
 const allTrades = async () => {
-  const [importedTrades, invoices] = await Promise.all([
+  const [importedTrades, jobHistory, reviews] = await Promise.all([
     durableData<Trade>(importedVendorsTable),
-    allInvoices(),
+    db.select().from(vendorJobHistoryTable),
+    db.select().from(vendorReviewTable),
   ]);
-  const completedProjectsByVendor = new Map<string, Set<string>>();
-  for (const invoice of invoices) {
-    if (invoice.direction !== "company_to_luminova" || !invoice.projectId) continue;
-    const key = normalizePartyName(invoice.vendor);
-    const projectsForVendor = completedProjectsByVendor.get(key) ?? new Set<string>();
-    projectsForVendor.add(invoice.projectId);
-    completedProjectsByVendor.set(key, projectsForVendor);
+  const historyByVendor = new Map<string, Set<string>>();
+  for (const record of jobHistory) {
+    const projectsForVendor = historyByVendor.get(record.vendorId) ?? new Set<string>();
+    projectsForVendor.add(record.projectId);
+    historyByVendor.set(record.vendorId, projectsForVendor);
+  }
+  const reviewsByVendor = new Map<string, number[]>();
+  for (const record of reviews) {
+    const vendorReviews = reviewsByVendor.get(record.vendorId) ?? [];
+    vendorReviews.push(record.rating);
+    reviewsByVendor.set(record.vendorId, vendorReviews);
   }
   return [
     ...importedTrades.map((trade) => ({
       ...trade,
-      completedJobs: completedProjectsByVendor.get(normalizePartyName(trade.companyName))?.size ?? 0,
+      completedJobs: historyByVendor.get(trade.id)?.size ?? 0,
+      reviewCount: reviewsByVendor.get(trade.id)?.length ?? 0,
+      rating: (() => {
+        const ratings = reviewsByVendor.get(trade.id) ?? [];
+        return ratings.length ? Math.round((ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length) * 10) / 10 : 0;
+      })(),
     })),
     ...trades,
   ];
@@ -1644,6 +1683,214 @@ router.get("/trades", async (req, res) => {
   res.json(GetTradesResponse.parse(result));
 });
 
+router.post("/trades/:tradeId/job-history", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!await requireWorkspaceRole(req, res, ["Admin"], "Administrator access required")) return;
+  const params = CreateTradeJobHistoryParams.safeParse(req.params);
+  const body = CreateTradeJobHistoryBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: "Invalid job history" });
+    return;
+  }
+  const trade = (await allTrades()).find((item) => item.id === params.data.tradeId);
+  if (!trade) {
+    res.status(404).json({ error: "Trade not found" });
+    return;
+  }
+  const project = await findProject(body.data.projectId);
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+  const [existing] = await db.select({ id: vendorJobHistoryTable.id })
+    .from(vendorJobHistoryTable)
+    .where(and(eq(vendorJobHistoryTable.vendorId, trade.id), eq(vendorJobHistoryTable.projectId, project.id)))
+    .limit(1);
+  if (existing) {
+    res.status(409).json({ error: "Job history already exists for this project" });
+    return;
+  }
+  const record = {
+    id: randomUUID(),
+    vendorId: trade.id,
+    projectId: project.id,
+    completedDate: body.data.date,
+    amount: body.data.amount,
+    source: body.data.source.trim(),
+    recordedBy: req.userId!,
+  };
+  await db.insert(vendorJobHistoryTable).values(record);
+  res.status(201).json(CreateTradeJobHistoryResponse.parse({
+    ...record,
+    projectName: project.name,
+    date: record.completedDate,
+  }));
+});
+
+router.patch("/trades/:tradeId/job-history/:historyId", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!await requireWorkspaceRole(req, res, ["Admin"], "Administrator access required")) return;
+  const params = UpdateTradeJobHistoryParams.safeParse(req.params);
+  const body = UpdateTradeJobHistoryBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: "Invalid job history" });
+    return;
+  }
+  const trade = (await allTrades()).find((item) => item.id === params.data.tradeId);
+  if (!trade) {
+    res.status(404).json({ error: "Trade not found" });
+    return;
+  }
+  const project = await findProject(body.data.projectId);
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+  const [existing] = await db.select().from(vendorJobHistoryTable)
+    .where(and(eq(vendorJobHistoryTable.id, params.data.historyId), eq(vendorJobHistoryTable.vendorId, trade.id)))
+    .limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Job history not found" });
+    return;
+  }
+  const [duplicate] = await db.select({ id: vendorJobHistoryTable.id })
+    .from(vendorJobHistoryTable)
+    .where(and(
+      eq(vendorJobHistoryTable.vendorId, trade.id),
+      eq(vendorJobHistoryTable.projectId, project.id),
+    ))
+    .limit(1);
+  if (duplicate && duplicate.id !== existing.id) {
+    res.status(409).json({ error: "Job history already exists for this project" });
+    return;
+  }
+  if (existing.projectId !== project.id) {
+    const [linkedReview] = await db.select({ id: vendorReviewTable.id })
+      .from(vendorReviewTable)
+      .where(and(
+        eq(vendorReviewTable.vendorId, trade.id),
+        eq(vendorReviewTable.projectId, existing.projectId),
+      ))
+      .limit(1);
+    if (linkedReview) {
+      res.status(409).json({ error: "This job history has linked reviews and cannot change projects" });
+      return;
+    }
+  }
+  const updated = {
+    ...existing,
+    projectId: project.id,
+    completedDate: body.data.date,
+    amount: body.data.amount,
+    source: body.data.source.trim(),
+    updatedAt: new Date(),
+  };
+  await db.update(vendorJobHistoryTable).set({
+    projectId: updated.projectId,
+    completedDate: updated.completedDate,
+    amount: updated.amount,
+    source: updated.source,
+    updatedAt: updated.updatedAt,
+  }).where(eq(vendorJobHistoryTable.id, existing.id));
+  res.json(UpdateTradeJobHistoryResponse.parse({
+    ...updated,
+    date: updated.completedDate,
+    projectName: project.name,
+  }));
+});
+
+router.delete("/trades/:tradeId/job-history/:historyId", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!await requireWorkspaceRole(req, res, ["Admin"], "Administrator access required")) return;
+  const params = DeleteTradeJobHistoryParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const trade = (await allTrades()).find((item) => item.id === params.data.tradeId);
+  if (!trade) {
+    res.status(404).json({ error: "Trade not found" });
+    return;
+  }
+  const [existing] = await db.select({ id: vendorJobHistoryTable.id, projectId: vendorJobHistoryTable.projectId })
+    .from(vendorJobHistoryTable)
+    .where(and(eq(vendorJobHistoryTable.id, params.data.historyId), eq(vendorJobHistoryTable.vendorId, trade.id)))
+    .limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Job history not found" });
+    return;
+  }
+  const [linkedReview] = await db.select({ id: vendorReviewTable.id })
+    .from(vendorReviewTable)
+    .where(and(eq(vendorReviewTable.vendorId, trade.id), eq(vendorReviewTable.projectId, existing.projectId)))
+    .limit(1);
+  if (linkedReview) {
+    res.status(409).json({ error: "Remove linked reviews before removing this job history" });
+    return;
+  }
+  await db.delete(vendorJobHistoryTable).where(eq(vendorJobHistoryTable.id, existing.id));
+  res.sendStatus(204);
+});
+
+router.post("/trades/:tradeId/reviews", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!await requireWorkspaceRole(req, res, ["Admin", "Project Manager"], "Reviewer access required")) return;
+  const params = CreateTradeReviewParams.safeParse(req.params);
+  const body = CreateTradeReviewBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: "Invalid review" });
+    return;
+  }
+  const trade = (await allTrades()).find((item) => item.id === params.data.tradeId);
+  if (!trade) {
+    res.status(404).json({ error: "Trade not found" });
+    return;
+  }
+  const project = await findProject(body.data.projectId);
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+  const [completedProject] = await db.select({ id: vendorJobHistoryTable.id })
+    .from(vendorJobHistoryTable)
+    .where(and(
+      eq(vendorJobHistoryTable.vendorId, trade.id),
+      eq(vendorJobHistoryTable.projectId, project.id),
+    ))
+    .limit(1);
+  if (!completedProject) {
+    res.status(404).json({ error: "Review must be tied to a verified completed project" });
+    return;
+  }
+  const [existing] = await db.select({ id: vendorReviewTable.id })
+    .from(vendorReviewTable)
+    .where(and(
+      eq(vendorReviewTable.vendorId, trade.id),
+      eq(vendorReviewTable.projectId, project.id),
+      eq(vendorReviewTable.reviewerId, req.userId!),
+    ))
+    .limit(1);
+  if (existing) {
+    res.status(409).json({ error: "You have already reviewed this project for this vendor" });
+    return;
+  }
+  const reviewerName = await workspaceUserDisplayName(req.userId!);
+  const record = {
+    id: randomUUID(),
+    vendorId: trade.id,
+    projectId: project.id,
+    reviewerId: req.userId!,
+    reviewerName,
+    reviewedDate: body.data.date,
+    rating: body.data.rating,
+    comment: body.data.comment.trim(),
+    source: body.data.source.trim(),
+  };
+  await db.insert(vendorReviewTable).values(record);
+  res.status(201).json(CreateTradeReviewResponse.parse({
+    ...record,
+    projectName: project.name,
+    date: record.reviewedDate,
+    reviewer: record.reviewerName,
+  }));
+});
+
 router.get("/trades/:tradeId", async (req, res) => {
   const parsed = GetTradeParams.safeParse(req.params);
   if (!parsed.success) {
@@ -1669,6 +1916,7 @@ router.get("/trades/:tradeId", async (req, res) => {
           : "Pending",
     }));
   const jobHistory = await jobHistoryForTrade(trade);
+  const reviews = await reviewsForTrade(trade);
   res.json(GetTradeResponse.parse({
     ...trade,
     phone: "403-555-0188",
@@ -1677,7 +1925,7 @@ router.get("/trades/:tradeId", async (req, res) => {
     licence: "AB-WCB-449218",
     insuranceExpiry: "2027-04-30",
     regions: [trade.region, "Calgary", "Canmore"],
-    reviews: [],
+    reviews,
     completedJobs: jobHistory.length,
     jobHistory,
     bids,

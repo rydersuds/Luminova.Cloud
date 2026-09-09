@@ -7,9 +7,14 @@
  */
 
 export interface Review {
+  id: string;
+  vendorId: string;
+  projectId: string;
   projectName: string;
+  reviewerId: string;
   reviewer: string;
   date: string;
   rating: number;
   comment: string;
+  source: string;
 }

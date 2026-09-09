@@ -110,6 +110,29 @@ async function ensureRole(client: ClerkClient, userId: string) {
   return role;
 }
 
+export async function requireWorkspaceRole(
+  req: AuthenticatedRequest,
+  res: Response,
+  allowedRoles: readonly string[],
+  errorMessage: string,
+): Promise<boolean> {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return false;
+  }
+  const role = await ensureRole(clerk, req.userId);
+  if (allowedRoles.includes(role)) return true;
+  res.status(403).json({ error: errorMessage });
+  return false;
+}
+
+export async function workspaceUserDisplayName(userId: string): Promise<string> {
+  const user = await clerk.users.getUser(userId);
+  const firstName = user.firstName ?? "";
+  const lastName = user.lastName ?? "";
+  return user.fullName || user.username || [firstName, lastName].filter(Boolean).join(" ") || "Workspace user";
+}
+
 async function requireAdmin(client: ClerkClient, req: AuthenticatedRequest, res: Response): Promise<boolean> {
   const role = await ensureRole(client, req.userId!);
   if (role === "Admin") return true;

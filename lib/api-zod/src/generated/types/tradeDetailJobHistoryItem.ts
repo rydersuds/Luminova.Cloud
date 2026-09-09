@@ -7,7 +7,12 @@
  */
 
 export type TradeDetailJobHistoryItem = {
+  id: string;
+  vendorId: string;
+  projectId: string;
   projectName: string;
   date: string;
   amount: number;
+  source: string;
+  recordedBy: string;
 };

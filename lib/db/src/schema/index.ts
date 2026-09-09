@@ -20,3 +20,4 @@
 export * from "./projectPanoramas";
 export * from "./projectImports";
 export * from "./projectExteriorPhotos";
+export * from "./vendorRecords";

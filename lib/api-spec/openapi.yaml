@@ -385,6 +385,105 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TradeDetail"
+  /trades/{tradeId}/job-history:
+    post:
+      operationId: createTradeJobHistory
+      tags: [trades]
+      summary: Record verified vendor job history
+      parameters:
+        - $ref: "#/components/parameters/TradeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VendorJobHistoryInput"
+      responses:
+        "201":
+          description: Recorded job history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorJobHistory"
+        "400":
+          description: Invalid job history or project
+        "403":
+          description: Administrator access required
+        "404":
+          description: Trade or project not found
+  /trades/{tradeId}/job-history/{historyId}:
+    patch:
+      operationId: updateTradeJobHistory
+      tags: [trades]
+      summary: Update verified vendor job history
+      parameters:
+        - $ref: "#/components/parameters/TradeId"
+        - name: historyId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VendorJobHistoryInput"
+      responses:
+        "200":
+          description: Updated job history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorJobHistory"
+        "400":
+          description: Invalid job history or project
+        "403":
+          description: Administrator access required
+        "404":
+          description: Job history, trade, or project not found
+    delete:
+      operationId: deleteTradeJobHistory
+      tags: [trades]
+      summary: Remove verified vendor job history
+      parameters:
+        - $ref: "#/components/parameters/TradeId"
+        - name: historyId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+      responses:
+        "204":
+          description: Job history removed
+        "403":
+          description: Administrator access required
+        "404":
+          description: Job history or trade not found
+  /trades/{tradeId}/reviews:
+    post:
+      operationId: createTradeReview
+      tags: [trades]
+      summary: Submit a verified vendor review
+      parameters:
+        - $ref: "#/components/parameters/TradeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VendorReviewInput"
+      responses:
+        "201":
+          description: Submitted review
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+        "400":
+          description: Invalid review or project
+        "403":
+          description: Reviewer access required
+        "404":
+          description: Trade or completed project not found
   /invoices:
     get:
       operationId: getInvoices
@@ -956,24 +1055,65 @@ components:
               type: array
               items:
                 type: object
-                required: [projectName, date, amount]
+                required: [id, vendorId, projectId, projectName, date, amount, source, recordedBy]
                 properties:
+                  id: { type: string }
+                  vendorId: { type: string }
+                  projectId: { type: string }
                   projectName: { type: string }
                   date: { type: string }
                   amount: { type: number }
+                  source: { type: string }
+                  recordedBy: { type: string }
             bids:
               type: array
               items:
                 $ref: "#/components/schemas/TradeBid"
     Review:
       type: object
-      required: [projectName, reviewer, date, rating, comment]
+      required: [id, vendorId, projectId, projectName, reviewerId, reviewer, date, rating, comment, source]
       properties:
+        id: { type: string }
+        vendorId: { type: string }
+        projectId: { type: string }
         projectName: { type: string }
+        reviewerId: { type: string }
         reviewer: { type: string }
         date: { type: string }
         rating: { type: integer }
         comment: { type: string }
+        source: { type: string }
+    VendorJobHistoryInput:
+      type: object
+      additionalProperties: false
+      required: [projectId, date, amount, source]
+      properties:
+        projectId: { type: string, minLength: 1 }
+        date: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
+        amount: { type: integer, minimum: 0 }
+        source: { type: string, minLength: 1, maxLength: 300 }
+    VendorJobHistory:
+      type: object
+      required: [id, vendorId, projectId, projectName, date, amount, source, recordedBy]
+      properties:
+        id: { type: string }
+        vendorId: { type: string }
+        projectId: { type: string }
+        projectName: { type: string }
+        date: { type: string }
+        amount: { type: number }
+        source: { type: string }
+        recordedBy: { type: string }
+    VendorReviewInput:
+      type: object
+      additionalProperties: false
+      required: [projectId, date, rating, comment, source]
+      properties:
+        projectId: { type: string, minLength: 1 }
+        date: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        comment: { type: string, minLength: 1, maxLength: 2000 }
+        source: { type: string, minLength: 1, maxLength: 300 }
     TradeBid:
       type: object
       required: [projectName, scope, amount, date, outcome]

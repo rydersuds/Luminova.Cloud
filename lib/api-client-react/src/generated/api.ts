@@ -43,13 +43,17 @@ import type {
   ProjectImportSessionInput,
   ProjectInput,
   ProjectUpdate,
+  Review,
   Trade,
   TradeDetail,
   UploadUrlRequest,
   UploadUrlResponse,
+  VendorJobHistory,
+  VendorJobHistoryInput,
   VendorQuote,
   VendorQuoteInput,
   VendorQuoteUpdate,
+  VendorReviewInput,
   WorkspaceInvitation,
   WorkspaceInvitationInput,
   WorkspaceUser,
@@ -1494,6 +1498,297 @@ export function useGetTrade<TData = Awaited<ReturnType<typeof getTrade>>, TError
 
 
 
+
+export const getCreateTradeJobHistoryUrl = (tradeId: string,) => {
+
+
+
+
+  return `/api/trades/${tradeId}/job-history`
+}
+
+/**
+ * @summary Record verified vendor job history
+ */
+export const createTradeJobHistory = async (tradeId: string,
+    vendorJobHistoryInput: VendorJobHistoryInput, options?: Parameters<typeof customFetch>[1]): Promise<VendorJobHistory> => {
+
+  return customFetch<VendorJobHistory>(getCreateTradeJobHistoryUrl(tradeId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(vendorJobHistoryInput)
+  }
+);}
+
+
+
+
+
+export const getCreateTradeJobHistoryMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTradeJobHistory>>, TError,{tradeId: string;data: BodyType<VendorJobHistoryInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createTradeJobHistory>>, TError,{tradeId: string;data: BodyType<VendorJobHistoryInput>}, TContext> => {
+
+const mutationKey = ['createTradeJobHistory'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createTradeJobHistory>>, {tradeId: string;data: BodyType<VendorJobHistoryInput>}> = (props) => {
+          const {tradeId,data} = props ?? {};
+
+          return  createTradeJobHistory(tradeId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateTradeJobHistoryMutationResult = NonNullable<Awaited<ReturnType<typeof createTradeJobHistory>>>
+    export type CreateTradeJobHistoryMutationBody = BodyType<VendorJobHistoryInput>
+    export type CreateTradeJobHistoryMutationError = ErrorType<void>
+
+    /**
+ * @summary Record verified vendor job history
+ */
+export const useCreateTradeJobHistory = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTradeJobHistory>>, TError,{tradeId: string;data: BodyType<VendorJobHistoryInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createTradeJobHistory>>,
+        TError,
+        {tradeId: string;data: BodyType<VendorJobHistoryInput>},
+        TContext
+      > => {
+      return useMutation(getCreateTradeJobHistoryMutationOptions(options));
+    }
+
+export const getUpdateTradeJobHistoryUrl = (tradeId: string,
+    historyId: string,) => {
+
+
+
+
+  return `/api/trades/${tradeId}/job-history/${historyId}`
+}
+
+/**
+ * @summary Update verified vendor job history
+ */
+export const updateTradeJobHistory = async (tradeId: string,
+    historyId: string,
+    vendorJobHistoryInput: VendorJobHistoryInput, options?: Parameters<typeof customFetch>[1]): Promise<VendorJobHistory> => {
+
+  return customFetch<VendorJobHistory>(getUpdateTradeJobHistoryUrl(tradeId,historyId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(vendorJobHistoryInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateTradeJobHistoryMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTradeJobHistory>>, TError,{tradeId: string;historyId: string;data: BodyType<VendorJobHistoryInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateTradeJobHistory>>, TError,{tradeId: string;historyId: string;data: BodyType<VendorJobHistoryInput>}, TContext> => {
+
+const mutationKey = ['updateTradeJobHistory'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTradeJobHistory>>, {tradeId: string;historyId: string;data: BodyType<VendorJobHistoryInput>}> = (props) => {
+          const {tradeId,historyId,data} = props ?? {};
+
+          return  updateTradeJobHistory(tradeId,historyId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateTradeJobHistoryMutationResult = NonNullable<Awaited<ReturnType<typeof updateTradeJobHistory>>>
+    export type UpdateTradeJobHistoryMutationBody = BodyType<VendorJobHistoryInput>
+    export type UpdateTradeJobHistoryMutationError = ErrorType<void>
+
+    /**
+ * @summary Update verified vendor job history
+ */
+export const useUpdateTradeJobHistory = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTradeJobHistory>>, TError,{tradeId: string;historyId: string;data: BodyType<VendorJobHistoryInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateTradeJobHistory>>,
+        TError,
+        {tradeId: string;historyId: string;data: BodyType<VendorJobHistoryInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateTradeJobHistoryMutationOptions(options));
+    }
+
+export const getDeleteTradeJobHistoryUrl = (tradeId: string,
+    historyId: string,) => {
+
+
+
+
+  return `/api/trades/${tradeId}/job-history/${historyId}`
+}
+
+/**
+ * @summary Remove verified vendor job history
+ */
+export const deleteTradeJobHistory = async (tradeId: string,
+    historyId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteTradeJobHistoryUrl(tradeId,historyId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteTradeJobHistoryMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTradeJobHistory>>, TError,{tradeId: string;historyId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteTradeJobHistory>>, TError,{tradeId: string;historyId: string}, TContext> => {
+
+const mutationKey = ['deleteTradeJobHistory'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTradeJobHistory>>, {tradeId: string;historyId: string}> = (props) => {
+          const {tradeId,historyId} = props ?? {};
+
+          return  deleteTradeJobHistory(tradeId,historyId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteTradeJobHistoryMutationResult = NonNullable<Awaited<ReturnType<typeof deleteTradeJobHistory>>>
+
+    export type DeleteTradeJobHistoryMutationError = ErrorType<void>
+
+    /**
+ * @summary Remove verified vendor job history
+ */
+export const useDeleteTradeJobHistory = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTradeJobHistory>>, TError,{tradeId: string;historyId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteTradeJobHistory>>,
+        TError,
+        {tradeId: string;historyId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteTradeJobHistoryMutationOptions(options));
+    }
+
+export const getCreateTradeReviewUrl = (tradeId: string,) => {
+
+
+
+
+  return `/api/trades/${tradeId}/reviews`
+}
+
+/**
+ * @summary Submit a verified vendor review
+ */
+export const createTradeReview = async (tradeId: string,
+    vendorReviewInput: VendorReviewInput, options?: Parameters<typeof customFetch>[1]): Promise<Review> => {
+
+  return customFetch<Review>(getCreateTradeReviewUrl(tradeId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(vendorReviewInput)
+  }
+);}
+
+
+
+
+
+export const getCreateTradeReviewMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTradeReview>>, TError,{tradeId: string;data: BodyType<VendorReviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createTradeReview>>, TError,{tradeId: string;data: BodyType<VendorReviewInput>}, TContext> => {
+
+const mutationKey = ['createTradeReview'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createTradeReview>>, {tradeId: string;data: BodyType<VendorReviewInput>}> = (props) => {
+          const {tradeId,data} = props ?? {};
+
+          return  createTradeReview(tradeId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateTradeReviewMutationResult = NonNullable<Awaited<ReturnType<typeof createTradeReview>>>
+    export type CreateTradeReviewMutationBody = BodyType<VendorReviewInput>
+    export type CreateTradeReviewMutationError = ErrorType<void>
+
+    /**
+ * @summary Submit a verified vendor review
+ */
+export const useCreateTradeReview = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTradeReview>>, TError,{tradeId: string;data: BodyType<VendorReviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createTradeReview>>,
+        TError,
+        {tradeId: string;data: BodyType<VendorReviewInput>},
+        TContext
+      > => {
+      return useMutation(getCreateTradeReviewMutationOptions(options));
+    }
 
 export const getGetInvoicesUrl = (params?: GetInvoicesParams,) => {
   const normalizedParams = new URLSearchParams();

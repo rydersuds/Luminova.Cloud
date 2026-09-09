@@ -244,17 +244,27 @@ export type ProjectDetail = Project & {
 };
 
 export type TradeDetailJobHistoryItem = {
+  id: string;
+  vendorId: string;
+  projectId: string;
   projectName: string;
   date: string;
   amount: number;
+  source: string;
+  recordedBy: string;
 };
 
 export interface Review {
+  id: string;
+  vendorId: string;
+  projectId: string;
   projectName: string;
+  reviewerId: string;
   reviewer: string;
   date: string;
   rating: number;
   comment: string;
+  source: string;
 }
 
 export interface TradeBid {
@@ -276,6 +286,53 @@ export type TradeDetail = Trade & {
   jobHistory: TradeDetailJobHistoryItem[];
   bids: TradeBid[];
 };
+
+export interface VendorJobHistoryInput {
+  /** @minLength 1 */
+  projectId: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  date: string;
+  /** @minimum 0 */
+  amount: number;
+  /**
+     * @minLength 1
+     * @maxLength 300
+     */
+  source: string;
+}
+
+export interface VendorJobHistory {
+  id: string;
+  vendorId: string;
+  projectId: string;
+  projectName: string;
+  date: string;
+  amount: number;
+  source: string;
+  recordedBy: string;
+}
+
+export interface VendorReviewInput {
+  /** @minLength 1 */
+  projectId: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  date: string;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  rating: number;
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  comment: string;
+  /**
+     * @minLength 1
+     * @maxLength 300
+     */
+  source: string;
+}
 
 export interface InvoiceInput {
   invoiceNumber: string;

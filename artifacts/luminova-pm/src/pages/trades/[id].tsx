@@ -1,9 +1,16 @@
 import * as React from "react"
 import { useLocation, useParams } from "wouter"
+import { useQueryClient } from "@tanstack/react-query"
 import { AppLayout } from "@/components/layout/app-layout"
 import { 
   useGetTrade, 
-  getGetTradeQueryKey 
+  getGetTradeQueryKey,
+  useGetProjects,
+  useGetCurrentWorkspaceUser,
+  useCreateTradeJobHistory,
+  useUpdateTradeJobHistory,
+  useDeleteTradeJobHistory,
+  useCreateTradeReview,
 } from "@workspace/api-client-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -14,10 +21,28 @@ import {
   MapPin, Star, Phone, Mail, Globe, ShieldCheck, FileCheck, ArrowLeft, History, MessageSquare
 } from "lucide-react"
 import { cn, formatCurrency, formatDate } from "@/lib/utils"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+
+type Feedback = { kind: "success" | "error"; message: string } | null
+type ErrorWithData = { data?: { error?: string }; message?: string }
+
+const today = () => {
+  const date = new Date()
+  const pad = (value: number) => String(value).padStart(2, "0")
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+const errorMessage = (error: unknown, fallback: string) => {
+  const typed = error as ErrorWithData
+  return typed.data?.error || typed.message || fallback
+}
 
 export default function TradeDetail() {
   const params = useParams()
   const [, setLocation] = useLocation()
+  const queryClient = useQueryClient()
   const tradeId = params.id as string
 
   const { data: trade, isLoading } = useGetTrade(tradeId, {
@@ -26,6 +51,116 @@ export default function TradeDetail() {
       queryKey: getGetTradeQueryKey(tradeId)
     }
   })
+  const { data: projects } = useGetProjects()
+  const { data: currentUser } = useGetCurrentWorkspaceUser()
+  const createJobHistory = useCreateTradeJobHistory()
+  const updateJobHistory = useUpdateTradeJobHistory()
+  const deleteJobHistory = useDeleteTradeJobHistory()
+  const createReview = useCreateTradeReview()
+  const [historyDialog, setHistoryDialog] = React.useState<"create" | "edit" | null>(null)
+  const [editingHistoryId, setEditingHistoryId] = React.useState<string | null>(null)
+  const [reviewDialog, setReviewDialog] = React.useState(false)
+  const [feedback, setFeedback] = React.useState<Feedback>(null)
+  const [historyForm, setHistoryForm] = React.useState({ projectId: "", date: today(), amount: "", source: "" })
+  const [reviewForm, setReviewForm] = React.useState({ projectId: "", date: today(), rating: "5", comment: "", source: "" })
+
+  const isAdmin = currentUser?.role === "Admin"
+  const canReview = isAdmin || currentUser?.role === "Project Manager"
+  const availableProjects = projects ?? []
+  const completedProjectIds = new Set(trade?.jobHistory.map((job) => job.projectId) ?? [])
+  const reviewProjects = availableProjects.filter((project) => completedProjectIds.has(project.id))
+  const refreshTrade = () => queryClient.invalidateQueries({ queryKey: getGetTradeQueryKey(tradeId) })
+
+  const openNewHistory = () => {
+    setFeedback(null)
+    setEditingHistoryId(null)
+    setHistoryForm({ projectId: "", date: today(), amount: "", source: "" })
+    setHistoryDialog("create")
+  }
+
+  const openEditHistory = (history: NonNullable<typeof trade>["jobHistory"][number]) => {
+    setFeedback(null)
+    setEditingHistoryId(history.id)
+    setHistoryForm({
+      projectId: history.projectId,
+      date: history.date,
+      amount: (history.amount / 100).toFixed(2),
+      source: history.source,
+    })
+    setHistoryDialog("edit")
+  }
+
+  const submitHistory = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setFeedback(null)
+    const amount = Number(historyForm.amount)
+    if (!historyForm.projectId || !historyForm.source.trim() || !Number.isFinite(amount) || amount < 0) {
+      setFeedback({ kind: "error", message: "Choose a project and enter a valid amount and source." })
+      return
+    }
+    try {
+      const data = {
+        projectId: historyForm.projectId,
+        date: historyForm.date,
+        amount: Math.round(amount * 100),
+        source: historyForm.source.trim(),
+      }
+      if (historyDialog === "edit" && editingHistoryId) {
+        await updateJobHistory.mutateAsync({ tradeId, historyId: editingHistoryId, data })
+      } else {
+        await createJobHistory.mutateAsync({ tradeId, data })
+      }
+      setHistoryDialog(null)
+      await refreshTrade()
+      setFeedback({ kind: "success", message: historyDialog === "edit" ? "Verified work updated." : "Verified work recorded." })
+    } catch (error) {
+      setFeedback({ kind: "error", message: errorMessage(error, "Unable to save verified work.") })
+    }
+  }
+
+  const removeHistory = async (historyId: string) => {
+    if (!window.confirm("Remove this verified job-history record?")) return
+    setFeedback(null)
+    try {
+      await deleteJobHistory.mutateAsync({ tradeId, historyId })
+      await refreshTrade()
+      setFeedback({ kind: "success", message: "Verified work removed." })
+    } catch (error) {
+      setFeedback({ kind: "error", message: errorMessage(error, "Unable to remove verified work.") })
+    }
+  }
+
+  const openReview = () => {
+    setFeedback(null)
+    setReviewForm({ projectId: reviewProjects[0]?.id ?? "", date: today(), rating: "5", comment: "", source: "" })
+    setReviewDialog(true)
+  }
+
+  const submitReview = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setFeedback(null)
+    if (!reviewForm.projectId || !reviewForm.comment.trim() || !reviewForm.source.trim()) {
+      setFeedback({ kind: "error", message: "Choose a completed project and enter the review and source." })
+      return
+    }
+    try {
+      await createReview.mutateAsync({
+        tradeId,
+        data: {
+          projectId: reviewForm.projectId,
+          date: reviewForm.date,
+          rating: Number(reviewForm.rating),
+          comment: reviewForm.comment.trim(),
+          source: reviewForm.source.trim(),
+        },
+      })
+      setReviewDialog(false)
+      await refreshTrade()
+      setFeedback({ kind: "success", message: "Verified review submitted." })
+    } catch (error) {
+      setFeedback({ kind: "error", message: errorMessage(error, "Unable to submit the review.") })
+    }
+  }
 
   if (isLoading) {
     return (
@@ -105,6 +240,11 @@ export default function TradeDetail() {
         </div>
 
         <div className="flex-1 p-6 md:p-8 max-w-5xl mx-auto w-full">
+          {feedback && (
+            <div role={feedback.kind === "error" ? "alert" : "status"} className={cn("mb-6 rounded-md border p-3 text-sm", feedback.kind === "error" ? "border-destructive/40 bg-destructive/10 text-destructive" : "border-primary/40 bg-primary/10")}>
+              {feedback.message}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="space-y-6">
               <Card>
@@ -161,11 +301,15 @@ export default function TradeDetail() {
 
             <div className="md:col-span-2 space-y-6">
               <Tabs defaultValue="history">
-                <TabsList className="w-full justify-start border-b border-border rounded-none bg-transparent p-0 mb-6">
+                <div className="flex flex-col sm:flex-row sm:items-end gap-3 mb-6">
+                <TabsList className="flex-1 w-full justify-start border-b border-border rounded-none bg-transparent p-0 mb-0">
                   <TabsTrigger value="history" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 pb-2">Job History</TabsTrigger>
                   <TabsTrigger value="bids" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 pb-2">Recent Bids</TabsTrigger>
                   <TabsTrigger value="reviews" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 pb-2">Reviews</TabsTrigger>
                 </TabsList>
+                {isAdmin && <Button size="sm" onClick={openNewHistory}>Record verified work</Button>}
+                {canReview && <Button size="sm" variant="outline" onClick={openReview} disabled={reviewProjects.length === 0}>Submit review</Button>}
+                </div>
 
                 <TabsContent value="history" className="mt-0">
                   <Card>
@@ -176,20 +320,29 @@ export default function TradeDetail() {
                             <TableHead>Project</TableHead>
                             <TableHead>Date</TableHead>
                             <TableHead className="text-right">Contract Value</TableHead>
+                            <TableHead>Source</TableHead>
+                            {isAdmin && <TableHead className="text-right">Actions</TableHead>}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {trade.jobHistory.length > 0 ? trade.jobHistory.map((job, i) => (
-                            <TableRow key={i}>
+                          {trade.jobHistory.length > 0 ? trade.jobHistory.map((job) => (
+                            <TableRow key={job.id}>
                               <TableCell className="font-medium">{job.projectName}</TableCell>
                               <TableCell>{formatDate(job.date)}</TableCell>
                               <TableCell className="text-right tabular-nums">{formatCurrency(job.amount)}</TableCell>
+                              <TableCell className="text-muted-foreground text-sm">{job.source}</TableCell>
+                              {isAdmin && (
+                                <TableCell className="text-right whitespace-nowrap">
+                                  <Button variant="ghost" size="sm" onClick={() => openEditHistory(job)}>Edit</Button>
+                                  <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => void removeHistory(job.id)}>Remove</Button>
+                                </TableCell>
+                              )}
                             </TableRow>
                           )) : (
                             <TableRow>
-                              <TableCell colSpan={3} className="h-24 text-center">
+                              <TableCell colSpan={isAdmin ? 5 : 4} className="h-24 text-center">
                                 <p className="font-medium">No verified job history</p>
-                                <p className="mt-1 text-sm text-muted-foreground">Completed work will appear after a real vendor invoice is linked to a project.</p>
+                                <p className="mt-1 text-sm text-muted-foreground">Completed work will appear after an administrator records a verified project.</p>
                               </TableCell>
                             </TableRow>
                           )}
@@ -231,6 +384,9 @@ export default function TradeDetail() {
                 </TabsContent>
 
                 <TabsContent value="reviews" className="mt-0 space-y-4">
+                  {canReview && reviewProjects.length === 0 && (
+                    <p className="text-sm text-muted-foreground">A verified completed project is required before submitting a review.</p>
+                  )}
                   {trade.reviews.length > 0 ? trade.reviews.map((review, i) => (
                     <Card key={i}>
                       <CardContent className="p-5 space-y-3">
@@ -262,6 +418,84 @@ export default function TradeDetail() {
           </div>
         </div>
       </div>
+      <Dialog open={historyDialog !== null} onOpenChange={(open) => !open && setHistoryDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{historyDialog === "edit" ? "Edit verified work" : "Record verified work"}</DialogTitle>
+            <DialogDescription>Only persisted project records can be used for vendor history.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(event) => void submitHistory(event)} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="history-project">Completed project</Label>
+              <select id="history-project" value={historyForm.projectId} onChange={(event) => setHistoryForm((current) => ({ ...current, projectId: event.target.value }))} className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm">
+                <option value="">Choose a project</option>
+                {availableProjects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+              </select>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="history-date">Completion date</Label>
+                <Input id="history-date" type="date" value={historyForm.date} onChange={(event) => setHistoryForm((current) => ({ ...current, date: event.target.value }))} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="history-amount">Contract value ($)</Label>
+                <Input id="history-amount" type="number" min="0" step="0.01" value={historyForm.amount} onChange={(event) => setHistoryForm((current) => ({ ...current, amount: event.target.value }))} required />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="history-source">Verification source</Label>
+              <Input id="history-source" placeholder="e.g. signed completion certificate" value={historyForm.source} onChange={(event) => setHistoryForm((current) => ({ ...current, source: event.target.value }))} maxLength={300} required />
+            </div>
+            {feedback?.kind === "error" && <p role="alert" className="text-sm text-destructive">{feedback.message}</p>}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setHistoryDialog(null)}>Cancel</Button>
+              <Button type="submit" disabled={createJobHistory.isPending || updateJobHistory.isPending}>{historyDialog === "edit" ? "Save changes" : "Record work"}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={reviewDialog} onOpenChange={setReviewDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Submit verified review</DialogTitle>
+            <DialogDescription>Reviews must reference a verified completed project for this vendor.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(event) => void submitReview(event)} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="review-project">Completed project</Label>
+              <select id="review-project" value={reviewForm.projectId} onChange={(event) => setReviewForm((current) => ({ ...current, projectId: event.target.value }))} className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm" required>
+                <option value="">Choose a project</option>
+                {reviewProjects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+              </select>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="review-date">Review date</Label>
+                <Input id="review-date" type="date" value={reviewForm.date} onChange={(event) => setReviewForm((current) => ({ ...current, date: event.target.value }))} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="review-rating">Rating</Label>
+                <select id="review-rating" value={reviewForm.rating} onChange={(event) => setReviewForm((current) => ({ ...current, rating: event.target.value }))} className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm">
+                  {[5, 4, 3, 2, 1].map((rating) => <option key={rating} value={rating}>{rating} / 5</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="review-comment">Review</Label>
+              <Textarea id="review-comment" value={reviewForm.comment} onChange={(event) => setReviewForm((current) => ({ ...current, comment: event.target.value }))} maxLength={2000} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="review-source">Verification source</Label>
+              <Input id="review-source" placeholder="e.g. project closeout meeting" value={reviewForm.source} onChange={(event) => setReviewForm((current) => ({ ...current, source: event.target.value }))} maxLength={300} required />
+            </div>
+            {feedback?.kind === "error" && <p role="alert" className="text-sm text-destructive">{feedback.message}</p>}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setReviewDialog(false)}>Cancel</Button>
+              <Button type="submit" disabled={createReview.isPending}>Submit review</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   )
 }

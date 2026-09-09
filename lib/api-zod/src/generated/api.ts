@@ -665,16 +665,26 @@ export const GetTradeResponse = zod.object({
   "insuranceExpiry": zod.string(),
   "regions": zod.array(zod.string()),
   "reviews": zod.array(zod.object({
+  "id": zod.string(),
+  "vendorId": zod.string(),
+  "projectId": zod.string(),
   "projectName": zod.string(),
+  "reviewerId": zod.string(),
   "reviewer": zod.string(),
   "date": zod.string(),
   "rating": zod.number().int(),
-  "comment": zod.string()
+  "comment": zod.string(),
+  "source": zod.string()
 })),
   "jobHistory": zod.array(zod.object({
+  "id": zod.string(),
+  "vendorId": zod.string(),
+  "projectId": zod.string(),
   "projectName": zod.string(),
   "date": zod.string(),
-  "amount": zod.number()
+  "amount": zod.number(),
+  "source": zod.string(),
+  "recordedBy": zod.string()
 })),
   "bids": zod.array(zod.object({
   "projectName": zod.string(),
@@ -684,6 +694,131 @@ export const GetTradeResponse = zod.object({
   "outcome": zod.string()
 }))
 }))
+
+
+/**
+ * @summary Record verified vendor job history
+ */
+export const CreateTradeJobHistoryParams = zod.object({
+  "tradeId": zod.coerce.string()
+})
+
+
+export const createTradeJobHistoryBodyDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createTradeJobHistoryBodyAmountMin = 0;
+
+export const createTradeJobHistoryBodySourceMax = 300;
+
+
+
+export const CreateTradeJobHistoryBody = zod.object({
+  "projectId": zod.string().min(1),
+  "date": zod.string().regex(createTradeJobHistoryBodyDateRegExp),
+  "amount": zod.number().int().min(createTradeJobHistoryBodyAmountMin),
+  "source": zod.string().min(1).max(createTradeJobHistoryBodySourceMax)
+})
+
+export const CreateTradeJobHistoryResponse = zod.object({
+  "id": zod.string(),
+  "vendorId": zod.string(),
+  "projectId": zod.string(),
+  "projectName": zod.string(),
+  "date": zod.string(),
+  "amount": zod.number(),
+  "source": zod.string(),
+  "recordedBy": zod.string()
+})
+
+
+/**
+ * @summary Update verified vendor job history
+ */
+
+
+
+export const UpdateTradeJobHistoryParams = zod.object({
+  "tradeId": zod.coerce.string(),
+  "historyId": zod.coerce.string().min(1)
+})
+
+
+export const updateTradeJobHistoryBodyDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateTradeJobHistoryBodyAmountMin = 0;
+
+export const updateTradeJobHistoryBodySourceMax = 300;
+
+
+
+export const UpdateTradeJobHistoryBody = zod.object({
+  "projectId": zod.string().min(1),
+  "date": zod.string().regex(updateTradeJobHistoryBodyDateRegExp),
+  "amount": zod.number().int().min(updateTradeJobHistoryBodyAmountMin),
+  "source": zod.string().min(1).max(updateTradeJobHistoryBodySourceMax)
+})
+
+export const UpdateTradeJobHistoryResponse = zod.object({
+  "id": zod.string(),
+  "vendorId": zod.string(),
+  "projectId": zod.string(),
+  "projectName": zod.string(),
+  "date": zod.string(),
+  "amount": zod.number(),
+  "source": zod.string(),
+  "recordedBy": zod.string()
+})
+
+
+/**
+ * @summary Remove verified vendor job history
+ */
+
+
+
+export const DeleteTradeJobHistoryParams = zod.object({
+  "tradeId": zod.coerce.string(),
+  "historyId": zod.coerce.string().min(1)
+})
+
+export const DeleteTradeJobHistoryResponse = zod.void()
+
+
+/**
+ * @summary Submit a verified vendor review
+ */
+export const CreateTradeReviewParams = zod.object({
+  "tradeId": zod.coerce.string()
+})
+
+
+export const createTradeReviewBodyDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createTradeReviewBodyRatingMax = 5;
+
+export const createTradeReviewBodyCommentMax = 2000;
+
+export const createTradeReviewBodySourceMax = 300;
+
+
+
+export const CreateTradeReviewBody = zod.object({
+  "projectId": zod.string().min(1),
+  "date": zod.string().regex(createTradeReviewBodyDateRegExp),
+  "rating": zod.number().int().min(1).max(createTradeReviewBodyRatingMax),
+  "comment": zod.string().min(1).max(createTradeReviewBodyCommentMax),
+  "source": zod.string().min(1).max(createTradeReviewBodySourceMax)
+})
+
+export const CreateTradeReviewResponse = zod.object({
+  "id": zod.string(),
+  "vendorId": zod.string(),
+  "projectId": zod.string(),
+  "projectName": zod.string(),
+  "reviewerId": zod.string(),
+  "reviewer": zod.string(),
+  "date": zod.string(),
+  "rating": zod.number().int(),
+  "comment": zod.string(),
+  "source": zod.string()
+})
 
 
 /**
