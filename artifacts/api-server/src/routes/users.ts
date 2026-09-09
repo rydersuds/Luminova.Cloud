@@ -25,6 +25,7 @@ import {
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
+import { WEIDNER_CLIENT_NAME } from "../lib/partyClassification";
 
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 export const ROLES = ["Admin", "Project Manager", "Field Team", "Client"] as const;
@@ -130,6 +131,17 @@ async function serializeClients(client: ClerkClient, scope: string, clientId?: s
   }));
 }
 
+async function ensureKnownClients(scope: string, createdBy: string) {
+  await db.insert(clientsTable).values({
+    id: randomUUID(),
+    workspaceId: scope,
+    name: WEIDNER_CLIENT_NAME,
+    createdBy,
+  }).onConflictDoNothing({
+    target: [clientsTable.workspaceId, clientsTable.name],
+  });
+}
+
 type ClerkClient = typeof clerk;
 type AdminLock = <T>(operation: () => Promise<T>) => Promise<T>;
 
@@ -228,7 +240,9 @@ router.get("/users", async (req: AuthenticatedRequest, res): Promise<void> => {
 router.get("/clients", async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!await requireAdmin(client, req, res)) return;
   try {
-    res.json(GetClientsResponse.parse(await serializeClients(client, workspaceId(req))));
+    const scope = workspaceId(req);
+    await ensureKnownClients(scope, req.userId!);
+    res.json(GetClientsResponse.parse(await serializeClients(client, scope)));
   } catch (error) {
     req.log.error({ error }, "Client organization listing failed");
     res.status(500).json({ error: "Unable to load client organizations" });

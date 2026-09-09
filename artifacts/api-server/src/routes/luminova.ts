@@ -106,6 +106,14 @@ import {
   extractInternalBudgetFromDocuments,
   type InternalBudgetLineItem,
 } from "../lib/financialDocumentExtraction";
+import {
+  canonicalClientName,
+  isClientParty,
+  isDirectoryVendorName,
+  isLuminovaParty,
+  normalizeFinancialParty,
+  normalizePartyName,
+} from "../lib/partyClassification";
 import { requireWorkspaceRole, workspaceUserDisplayName } from "./users";
 
 type AuthenticatedRequest = Request & { userId?: string };
@@ -709,9 +717,10 @@ type VendorQuote = (typeof vendorQuotes)[number] & {
 
 const withCalculatedProjectProgress = (project: Project): Project => {
   const quoteTotal = project.clientQuote?.total ?? 0;
-  if (quoteTotal <= 0) return project;
+  if (quoteTotal <= 0) return { ...project, clientName: canonicalClientName(project.clientName) };
   return {
     ...project,
+    clientName: canonicalClientName(project.clientName),
     progress: Math.round(Math.min(Math.max(project.invoiced, 0) / quoteTotal, 1) * 1000) / 10,
   };
 };
@@ -726,12 +735,10 @@ vendorQuotes.length = 0;
 const durableData = async <T>(table: typeof importedProjectsTable | typeof importedVendorsTable | typeof importedVendorQuotesTable | typeof importedInvoicesTable) =>
   (await db.select({ data: table.data }).from(table)).map((row) => row.data as T);
 
-const normalizePartyName = (value: string) => value.replace(/[^a-z0-9]/gi, "").toLowerCase();
 const tradeProfilePhotoUrl = (trade: Trade) =>
   trade.profilePhotoObjectPath ? `/api/storage${trade.profilePhotoObjectPath}` : null;
 const isDirectoryTrade = (trade: Pick<Trade, "companyName">) => {
-  const normalizedName = normalizePartyName(trade.companyName);
-  return !normalizedName.startsWith("luminova") && !normalizedName.startsWith("weidner");
+  return isDirectoryVendorName(trade.companyName);
 };
 
 const jobHistoryForTrade = async (trade: Trade, ownerId: string) => {
@@ -790,8 +797,9 @@ const allProjects = async () => {
     return exteriorPhoto?.ownerId === row.ownerId ? { ...project, exteriorImage: exteriorPhoto.exteriorImage } : project;
   });
   const seededProjects = projects.map((project) => {
-    const exteriorPhoto = exteriorPhotoByProject.get(project.id);
-    return exteriorPhoto?.ownerId === "seeded-project" ? { ...project, exteriorImage: exteriorPhoto.exteriorImage } : project;
+    const normalizedProject = withCalculatedProjectProgress(project);
+    const exteriorPhoto = exteriorPhotoByProject.get(normalizedProject.id);
+    return exteriorPhoto?.ownerId === "seeded-project" ? { ...normalizedProject, exteriorImage: exteriorPhoto.exteriorImage } : normalizedProject;
   });
   return [...importedProjects, ...seededProjects];
 };
@@ -815,7 +823,7 @@ const allTrades = async () => {
     reviewsByVendor.set(record.vendorId, vendorReviews);
   }
   return [
-    ...importedTrades.map((trade) => ({
+    ...importedTrades.filter(isDirectoryTrade).map((trade) => ({
       ...trade,
       completedJobs: historyByVendor.get(trade.id)?.size ?? 0,
       reviewCount: reviewsByVendor.get(trade.id)?.length ?? 0,
@@ -827,13 +835,26 @@ const allTrades = async () => {
     ...trades,
   ];
 };
-const allVendorQuotes = async (): Promise<VendorQuote[]> => [
-  ...(await durableData<VendorQuote>(importedVendorQuotesTable)).map((quote) => ({
-    ...quote,
-    direction: quote.direction === "luminova_to_client" ? "luminova_to_client" as const : "company_to_luminova" as const,
-  })),
-  ...vendorQuotes,
-];
+const allVendorQuotes = async (): Promise<VendorQuote[]> => {
+  const [quoteRows, projectRows] = await Promise.all([
+    durableData<VendorQuote>(importedVendorQuotesTable),
+    durableData<Project>(importedProjectsTable),
+  ]);
+  const clientNameByProject = new Map(projectRows.map((project) => [project.id, project.clientName]));
+  return [
+    ...quoteRows.map((quote) => {
+      const normalized = {
+        ...quote,
+        direction: quote.direction === "luminova_to_client" ? "luminova_to_client" as const : "company_to_luminova" as const,
+      };
+      return normalizeFinancialParty(
+        normalized,
+        isLuminovaParty(normalized.vendorName) ? clientNameByProject.get(quote.projectId) : undefined,
+      );
+    }),
+    ...vendorQuotes,
+  ];
+};
 const financialRecordsForOwner = async (ownerId: string) => {
   const [invoiceRows, quoteRows, projectRows] = await Promise.all([
     db.select({ data: importedInvoicesTable.data })
@@ -872,11 +893,12 @@ const financialRecordsForOwner = async (ownerId: string) => {
       for (const invoice of projectInvoices) legacyClientInvoiceIds.add(invoice.id);
     }
   }
-  const normalizedInvoices = ownedInvoices.map((invoice) =>
-    invoice.direction || !legacyClientInvoiceIds.has(invoice.id)
-      ? invoice
-      : { ...invoice, direction: "luminova_to_client" as const },
-  );
+  const normalizedInvoices = ownedInvoices.map((invoice) => {
+    const normalized = normalizeFinancialParty(invoice);
+    return normalized.direction || !legacyClientInvoiceIds.has(invoice.id)
+      ? normalized
+      : { ...normalized, direction: "luminova_to_client" as const };
+  });
   const financialProjects: FinancialProject[] = ownedProjects.map((project) => ({
     projectId: project.id,
     clientQuoteTotal: project.clientQuote?.total,
@@ -888,12 +910,19 @@ const financialRecordsForOwner = async (ownerId: string) => {
   return {
     invoices: normalizedInvoices,
     quotes: [
-      ...quoteRows.map((row) => row.data as VendorQuote).map((quote) => ({
-        ...quote,
-        direction: quote.direction === "luminova_to_client"
-          ? "luminova_to_client" as const
-          : "company_to_luminova" as const,
-      })),
+      ...quoteRows.map((row) => {
+        const quote = row.data as VendorQuote;
+        const normalized = {
+          ...quote,
+          direction: quote.direction === "luminova_to_client"
+            ? "luminova_to_client" as const
+            : "company_to_luminova" as const,
+        };
+        return normalizeFinancialParty(
+          normalized,
+          isLuminovaParty(normalized.vendorName) ? projectById.get(quote.projectId)?.clientName : undefined,
+        );
+      }),
       ...(vendorQuotes as VendorQuote[]).filter((quote) => quote.ownerId === ownerId),
     ],
     projects: financialProjects,
@@ -1718,8 +1747,19 @@ const createProjectImportHandler = async (req: Request, res: Response): Promise<
     analysis = await analyzeProjectImport(analyzedDocuments);
     analysis = {
       ...analysis,
-      quotes: deduplicateFinancialRecords(analysis.quotes),
-      invoices: deduplicateFinancialRecords(analysis.invoices),
+      project: {
+        ...analysis.project,
+        clientName: canonicalClientName(analysis.project.clientName),
+      },
+      vendors: analysis.vendors.filter((vendor) => isDirectoryVendorName(vendor.companyName)),
+      quotes: deduplicateFinancialRecords(analysis.quotes.map((quote) => {
+        const normalized = normalizeFinancialParty(quote, isLuminovaParty(quote.vendorName) ? analysis.project.clientName : undefined);
+        return {
+          ...normalized,
+          vendorName: isClientParty(normalized.vendorName) ? canonicalClientName(normalized.vendorName) : normalized.vendorName,
+        };
+      })),
+      invoices: deduplicateFinancialRecords(analysis.invoices.map((invoice) => normalizeFinancialParty(invoice))),
     };
   } catch (error) {
     req.log.error({ err: error }, "Project import extraction failed");
@@ -1746,10 +1786,11 @@ const createProjectImportHandler = async (req: Request, res: Response): Promise<
       internalBudgetSource: internalBudget.sourceRelativePath,
     } : {}),
   };
-  const vendorByName = new Map((await allTrades()).map((trade) => [trade.companyName.toLowerCase(), trade]));
+  const vendorByName = new Map((await allTrades()).filter(isDirectoryTrade).map((trade) => [trade.companyName.toLowerCase(), trade]));
   const importedVendors: Trade[] = [];
   let vendorsCreated = 0;
   for (const vendor of analysis.vendors) {
+    if (!isDirectoryVendorName(vendor.companyName)) continue;
     const key = vendor.companyName.toLowerCase();
     if (vendorByName.has(key)) continue;
     const initials = vendor.companyName.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "VN";
@@ -2451,7 +2492,7 @@ router.get("/trades/:tradeId", async (req: AuthenticatedRequest, res) => {
     ))
     .limit(1);
   const trade = tradeRow?.data as Trade | undefined;
-  if (!trade) {
+  if (!trade || !isDirectoryTrade(trade)) {
     res.status(404).json({ error: "Trade not found" });
     return;
   }
@@ -2516,7 +2557,7 @@ router.post("/trades/:tradeId/profile-photo-upload", async (req: AuthenticatedRe
     ))
     .limit(1);
   const trade = tradeRow?.data as Trade | undefined;
-  if (!trade) {
+  if (!trade || !isDirectoryTrade(trade)) {
     res.status(404).json({ error: "Vendor not found" });
     return;
   }
@@ -2559,7 +2600,7 @@ router.patch("/trades/:tradeId", async (req: AuthenticatedRequest, res): Promise
     ))
     .limit(1);
   const trade = tradeRow?.data as Trade | undefined;
-  if (!trade) {
+  if (!trade || !isDirectoryTrade(trade)) {
     res.status(404).json({ error: "Vendor not found" });
     return;
   }
