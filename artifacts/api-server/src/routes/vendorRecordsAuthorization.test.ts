@@ -170,6 +170,95 @@ function jsonHeaders(actor: string) {
   };
 }
 
+test("vendor profiles persist editable contact and credential details for their owner", async (t) => {
+  const fixture = await createFixture();
+  t.after(() => removeFixture(fixture));
+  const base = await startApi(t);
+  const update = await fetch(base + `/trades/${fixture.vendorId}`, {
+    method: "PATCH",
+    headers: jsonHeaders(fixture.ownerId),
+    body: JSON.stringify({
+      phone: "403-555-0142",
+      email: "office@persistent-electric.ca",
+      website: "persistent-electric.ca",
+      regions: ["Calgary", "Airdrie"],
+      licence: "AB-EL-2048",
+      insurance: "Northstar Mutual · Policy NS-4481",
+      insuranceExpiry: "2027-11-30",
+      profilePhotoPositionX: 35,
+      profilePhotoPositionY: 65,
+      profilePhotoZoom: 1.25,
+    }),
+  });
+  assert.equal(update.status, 200);
+
+  const detailResponse = await fetch(base + `/trades/${fixture.vendorId}`, {
+    headers: { "x-test-user": fixture.ownerId },
+  });
+  assert.equal(detailResponse.status, 200);
+  const detail = await detailResponse.json() as {
+    phone: string;
+    email: string;
+    website: string;
+    regions: string[];
+    licence: string;
+    insurance: string;
+    insuranceExpiry: string;
+    profilePhotoUrl: string | null;
+    profilePhotoPositionX: number;
+    profilePhotoPositionY: number;
+    profilePhotoZoom: number;
+  };
+  assert.equal(detail.phone, "403-555-0142");
+  assert.equal(detail.email, "office@persistent-electric.ca");
+  assert.equal(detail.website, "https://persistent-electric.ca/");
+  assert.deepEqual(detail.regions, ["Calgary", "Airdrie"]);
+  assert.equal(detail.licence, "AB-EL-2048");
+  assert.equal(detail.insurance, "Northstar Mutual · Policy NS-4481");
+  assert.equal(detail.insuranceExpiry, "2027-11-30");
+  assert.equal(detail.profilePhotoUrl, null);
+  assert.equal(detail.profilePhotoPositionX, 35);
+  assert.equal(detail.profilePhotoPositionY, 65);
+  assert.equal(detail.profilePhotoZoom, 1.25);
+
+  const rejectedPhoto = await fetch(base + `/trades/${fixture.vendorId}`, {
+    method: "PATCH",
+    headers: jsonHeaders(fixture.ownerId),
+    body: JSON.stringify({
+      phone: detail.phone,
+      email: detail.email,
+      website: detail.website,
+      regions: detail.regions,
+      licence: detail.licence,
+      insurance: detail.insurance,
+      insuranceExpiry: detail.insuranceExpiry,
+      profilePhotoPositionX: detail.profilePhotoPositionX,
+      profilePhotoPositionY: detail.profilePhotoPositionY,
+      profilePhotoZoom: detail.profilePhotoZoom,
+      profilePhotoObjectPath: "/objects/uploads/not-issued-for-this-vendor",
+    }),
+  });
+  assert.equal(rejectedPhoto.status, 403);
+
+  const denied = await fetch(base + `/trades/${fixture.vendorId}`, {
+    method: "PATCH",
+    headers: jsonHeaders(`other-owner-${fixture.suffix}`),
+    body: JSON.stringify({
+      phone: "changed",
+      email: "",
+      website: "",
+      regions: [],
+      licence: "",
+      insurance: "",
+      insuranceExpiry: "",
+      profilePhotoPositionX: 50,
+      profilePhotoPositionY: 50,
+      profilePhotoZoom: 1,
+    }),
+  });
+  assert.equal(denied.status, 404);
+});
+
 async function createHistoryWithReview(base: string, fixture: Fixture) {
   const historyResponse = await fetch(base + `/trades/${fixture.vendorId}/job-history`, {
     method: "POST",

@@ -105,6 +105,14 @@ export const GetProjectParams = zod.object({
   "projectId": zod.coerce.string()
 })
 
+export const getProjectResponseTwoTradesItemProfilePhotoPositionXMin = 0;
+export const getProjectResponseTwoTradesItemProfilePhotoPositionXMax = 100;
+
+export const getProjectResponseTwoTradesItemProfilePhotoPositionYMin = 0;
+export const getProjectResponseTwoTradesItemProfilePhotoPositionYMax = 100;
+
+export const getProjectResponseTwoTradesItemProfilePhotoZoomMax = 2;
+
 export const getProjectResponseTwoFilesItemAiConfidenceMin = 0;
 export const getProjectResponseTwoFilesItemAiConfidenceMax = 100;
 
@@ -166,7 +174,18 @@ export const GetProjectResponse = zod.object({
   "reviewCount": zod.number().int(),
   "completedJobs": zod.number().int(),
   "initials": zod.string(),
-  "accent": zod.string()
+  "accent": zod.string(),
+  "profilePhotoUrl": zod.string().nullish(),
+  "profilePhotoPositionX": zod.number().min(getProjectResponseTwoTradesItemProfilePhotoPositionXMin).max(getProjectResponseTwoTradesItemProfilePhotoPositionXMax).optional(),
+  "profilePhotoPositionY": zod.number().min(getProjectResponseTwoTradesItemProfilePhotoPositionYMin).max(getProjectResponseTwoTradesItemProfilePhotoPositionYMax).optional(),
+  "profilePhotoZoom": zod.number().min(1).max(getProjectResponseTwoTradesItemProfilePhotoZoomMax).optional(),
+  "phone": zod.string().optional(),
+  "email": zod.string().optional(),
+  "website": zod.string().optional(),
+  "regions": zod.array(zod.string()).optional(),
+  "licence": zod.string().optional(),
+  "insurance": zod.string().optional(),
+  "insuranceExpiry": zod.string().optional()
 })),
   "photos": zod.array(zod.object({
   "id": zod.string(),
@@ -624,6 +643,16 @@ export const GetTradesQueryParams = zod.object({
   "region": zod.coerce.string().optional()
 })
 
+export const getTradesResponseProfilePhotoPositionXMin = 0;
+export const getTradesResponseProfilePhotoPositionXMax = 100;
+
+export const getTradesResponseProfilePhotoPositionYMin = 0;
+export const getTradesResponseProfilePhotoPositionYMax = 100;
+
+export const getTradesResponseProfilePhotoZoomMax = 2;
+
+
+
 export const GetTradesResponseItem = zod.object({
   "id": zod.string(),
   "companyName": zod.string(),
@@ -634,7 +663,18 @@ export const GetTradesResponseItem = zod.object({
   "reviewCount": zod.number().int(),
   "completedJobs": zod.number().int(),
   "initials": zod.string(),
-  "accent": zod.string()
+  "accent": zod.string(),
+  "profilePhotoUrl": zod.string().nullish(),
+  "profilePhotoPositionX": zod.number().min(getTradesResponseProfilePhotoPositionXMin).max(getTradesResponseProfilePhotoPositionXMax).optional(),
+  "profilePhotoPositionY": zod.number().min(getTradesResponseProfilePhotoPositionYMin).max(getTradesResponseProfilePhotoPositionYMax).optional(),
+  "profilePhotoZoom": zod.number().min(1).max(getTradesResponseProfilePhotoZoomMax).optional(),
+  "phone": zod.string().optional(),
+  "email": zod.string().optional(),
+  "website": zod.string().optional(),
+  "regions": zod.array(zod.string()).optional(),
+  "licence": zod.string().optional(),
+  "insurance": zod.string().optional(),
+  "insuranceExpiry": zod.string().optional()
 })
 export const GetTradesResponse = zod.array(GetTradesResponseItem)
 
@@ -646,6 +686,16 @@ export const GetTradeParams = zod.object({
   "tradeId": zod.coerce.string()
 })
 
+export const getTradeResponseOneProfilePhotoPositionXMin = 0;
+export const getTradeResponseOneProfilePhotoPositionXMax = 100;
+
+export const getTradeResponseOneProfilePhotoPositionYMin = 0;
+export const getTradeResponseOneProfilePhotoPositionYMax = 100;
+
+export const getTradeResponseOneProfilePhotoZoomMax = 2;
+
+
+
 export const GetTradeResponse = zod.object({
   "id": zod.string(),
   "companyName": zod.string(),
@@ -656,13 +706,28 @@ export const GetTradeResponse = zod.object({
   "reviewCount": zod.number().int(),
   "completedJobs": zod.number().int(),
   "initials": zod.string(),
-  "accent": zod.string()
+  "accent": zod.string(),
+  "profilePhotoUrl": zod.string().nullish(),
+  "profilePhotoPositionX": zod.number().min(getTradeResponseOneProfilePhotoPositionXMin).max(getTradeResponseOneProfilePhotoPositionXMax),
+  "profilePhotoPositionY": zod.number().min(getTradeResponseOneProfilePhotoPositionYMin).max(getTradeResponseOneProfilePhotoPositionYMax),
+  "profilePhotoZoom": zod.number().min(1).max(getTradeResponseOneProfilePhotoZoomMax),
+  "phone": zod.string(),
+  "email": zod.string(),
+  "website": zod.string(),
+  "regions": zod.array(zod.string()),
+  "licence": zod.string(),
+  "insurance": zod.string(),
+  "insuranceExpiry": zod.string()
 }).and(zod.object({
   "phone": zod.string(),
   "email": zod.string(),
   "website": zod.string(),
   "licence": zod.string(),
+  "insurance": zod.string(),
   "insuranceExpiry": zod.string(),
+  "profilePhotoPositionX": zod.number(),
+  "profilePhotoPositionY": zod.number(),
+  "profilePhotoZoom": zod.number(),
   "regions": zod.array(zod.string()),
   "reviews": zod.array(zod.object({
   "id": zod.string(),
@@ -694,6 +759,136 @@ export const GetTradeResponse = zod.object({
   "outcome": zod.string()
 }))
 }))
+
+
+/**
+ * @summary Update a vendor profile
+ */
+export const UpdateTradeParams = zod.object({
+  "tradeId": zod.coerce.string()
+})
+
+export const updateTradeBodyPhoneMax = 40;
+
+export const updateTradeBodyEmailMax = 254;
+
+export const updateTradeBodyWebsiteMax = 500;
+
+export const updateTradeBodyRegionsItemMax = 100;
+
+export const updateTradeBodyRegionsMax = 20;
+
+export const updateTradeBodyLicenceMax = 160;
+
+export const updateTradeBodyInsuranceMax = 160;
+
+export const updateTradeBodyInsuranceExpiryRegExp = new RegExp('^$|^\\d{4}-\\d{2}-\\d{2}$');
+export const updateTradeBodyProfilePhotoObjectPathRegExp = new RegExp('^/objects/uploads/[A-Za-z0-9_-]+$');
+export const updateTradeBodyProfilePhotoPositionXMin = 0;
+export const updateTradeBodyProfilePhotoPositionXMax = 100;
+
+export const updateTradeBodyProfilePhotoPositionYMin = 0;
+export const updateTradeBodyProfilePhotoPositionYMax = 100;
+
+export const updateTradeBodyProfilePhotoZoomMax = 2;
+
+
+
+export const UpdateTradeBody = zod.object({
+  "phone": zod.string().max(updateTradeBodyPhoneMax),
+  "email": zod.string().max(updateTradeBodyEmailMax),
+  "website": zod.string().max(updateTradeBodyWebsiteMax),
+  "regions": zod.array(zod.string().min(1).max(updateTradeBodyRegionsItemMax)).max(updateTradeBodyRegionsMax),
+  "licence": zod.string().max(updateTradeBodyLicenceMax),
+  "insurance": zod.string().max(updateTradeBodyInsuranceMax),
+  "insuranceExpiry": zod.string().regex(updateTradeBodyInsuranceExpiryRegExp),
+  "profilePhotoObjectPath": zod.string().regex(updateTradeBodyProfilePhotoObjectPathRegExp).nullish(),
+  "profilePhotoPositionX": zod.number().min(updateTradeBodyProfilePhotoPositionXMin).max(updateTradeBodyProfilePhotoPositionXMax),
+  "profilePhotoPositionY": zod.number().min(updateTradeBodyProfilePhotoPositionYMin).max(updateTradeBodyProfilePhotoPositionYMax),
+  "profilePhotoZoom": zod.number().min(1).max(updateTradeBodyProfilePhotoZoomMax)
+})
+
+export const updateTradeResponseProfilePhotoPositionXMin = 0;
+export const updateTradeResponseProfilePhotoPositionXMax = 100;
+
+export const updateTradeResponseProfilePhotoPositionYMin = 0;
+export const updateTradeResponseProfilePhotoPositionYMax = 100;
+
+export const updateTradeResponseProfilePhotoZoomMax = 2;
+
+
+
+export const UpdateTradeResponse = zod.object({
+  "id": zod.string(),
+  "companyName": zod.string(),
+  "contactName": zod.string(),
+  "tradeType": zod.string(),
+  "region": zod.string(),
+  "rating": zod.number(),
+  "reviewCount": zod.number().int(),
+  "completedJobs": zod.number().int(),
+  "initials": zod.string(),
+  "accent": zod.string(),
+  "profilePhotoUrl": zod.string().nullish(),
+  "profilePhotoPositionX": zod.number().min(updateTradeResponseProfilePhotoPositionXMin).max(updateTradeResponseProfilePhotoPositionXMax).optional(),
+  "profilePhotoPositionY": zod.number().min(updateTradeResponseProfilePhotoPositionYMin).max(updateTradeResponseProfilePhotoPositionYMax).optional(),
+  "profilePhotoZoom": zod.number().min(1).max(updateTradeResponseProfilePhotoZoomMax).optional(),
+  "phone": zod.string().optional(),
+  "email": zod.string().optional(),
+  "website": zod.string().optional(),
+  "regions": zod.array(zod.string()).optional(),
+  "licence": zod.string().optional(),
+  "insurance": zod.string().optional(),
+  "insuranceExpiry": zod.string().optional()
+})
+
+
+/**
+ * @summary Request a private vendor profile photo upload
+ */
+export const RequestTradeProfilePhotoUploadParams = zod.object({
+  "tradeId": zod.coerce.string()
+})
+
+
+export const requestTradeProfilePhotoUploadBodyNameMax = 255;
+
+
+export const requestTradeProfilePhotoUploadBodyContentTypeMax = 255;
+
+export const requestTradeProfilePhotoUploadBodyRelativePathMax = 1024;
+
+
+
+export const RequestTradeProfilePhotoUploadBody = zod.object({
+  "importId": zod.string().min(1).optional(),
+  "name": zod.string().min(1).max(requestTradeProfilePhotoUploadBodyNameMax),
+  "size": zod.number().int().min(1),
+  "contentType": zod.string().max(requestTradeProfilePhotoUploadBodyContentTypeMax),
+  "relativePath": zod.string().min(1).max(requestTradeProfilePhotoUploadBodyRelativePathMax).optional()
+})
+
+
+export const requestTradeProfilePhotoUploadResponseMetadataNameMax = 255;
+
+
+export const requestTradeProfilePhotoUploadResponseMetadataContentTypeMax = 255;
+
+export const requestTradeProfilePhotoUploadResponseMetadataRelativePathMax = 1024;
+
+
+
+export const RequestTradeProfilePhotoUploadResponse = zod.object({
+  "uploadURL": zod.string().url(),
+  "objectPath": zod.string(),
+  "metadata": zod.object({
+  "importId": zod.string().min(1).optional(),
+  "name": zod.string().min(1).max(requestTradeProfilePhotoUploadResponseMetadataNameMax),
+  "size": zod.number().int().min(1),
+  "contentType": zod.string().max(requestTradeProfilePhotoUploadResponseMetadataContentTypeMax),
+  "relativePath": zod.string().min(1).max(requestTradeProfilePhotoUploadResponseMetadataRelativePathMax).optional()
+}).optional()
+})
 
 
 /**

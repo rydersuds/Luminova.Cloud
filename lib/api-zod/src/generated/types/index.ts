@@ -43,6 +43,7 @@ export * from './trade';
 export * from './tradeBid';
 export * from './tradeDetail';
 export * from './tradeDetailJobHistoryItem';
+export * from './updateTradeProfileInput';
 export * from './uploadUrlRequest';
 export * from './uploadUrlResponse';
 export * from './vendorJobHistory';

@@ -15,7 +15,11 @@ export type TradeDetail = Trade & {
   email: string;
   website: string;
   licence: string;
+  insurance: string;
   insuranceExpiry: string;
+  profilePhotoPositionX: number;
+  profilePhotoPositionY: number;
+  profilePhotoZoom: number;
   regions: string[];
   reviews: Review[];
   jobHistory: TradeDetailJobHistoryItem[];

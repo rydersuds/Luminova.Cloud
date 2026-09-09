@@ -83,6 +83,11 @@ export class ObjectStorageService {
     await setObjectAclPolicy(await this.getObjectEntityFile(objectPath), policy);
   }
 
+  async deleteObject(objectPath: string): Promise<void> {
+    const file = await this.getObjectEntityFile(objectPath);
+    await file.delete({ ignoreNotFound: true });
+  }
+
   async verifyPanorama(objectPath: string): Promise<void> {
     const file = await this.getObjectEntityFile(objectPath);
     const [metadata] = await file.getMetadata();

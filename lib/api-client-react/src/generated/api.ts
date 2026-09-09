@@ -47,6 +47,7 @@ import type {
   Review,
   Trade,
   TradeDetail,
+  UpdateTradeProfileInput,
   UploadUrlRequest,
   UploadUrlResponse,
   VendorJobHistory,
@@ -1500,6 +1501,150 @@ export function useGetTrade<TData = Awaited<ReturnType<typeof getTrade>>, TError
 
 
 
+
+export const getUpdateTradeUrl = (tradeId: string,) => {
+
+
+
+
+  return `/api/trades/${tradeId}`
+}
+
+/**
+ * @summary Update a vendor profile
+ */
+export const updateTrade = async (tradeId: string,
+    updateTradeProfileInput: UpdateTradeProfileInput, options?: Parameters<typeof customFetch>[1]): Promise<Trade> => {
+
+  return customFetch<Trade>(getUpdateTradeUrl(tradeId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(updateTradeProfileInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateTradeMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTrade>>, TError,{tradeId: string;data: BodyType<UpdateTradeProfileInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateTrade>>, TError,{tradeId: string;data: BodyType<UpdateTradeProfileInput>}, TContext> => {
+
+const mutationKey = ['updateTrade'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTrade>>, {tradeId: string;data: BodyType<UpdateTradeProfileInput>}> = (props) => {
+          const {tradeId,data} = props ?? {};
+
+          return  updateTrade(tradeId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateTradeMutationResult = NonNullable<Awaited<ReturnType<typeof updateTrade>>>
+    export type UpdateTradeMutationBody = BodyType<UpdateTradeProfileInput>
+    export type UpdateTradeMutationError = ErrorType<void>
+
+    /**
+ * @summary Update a vendor profile
+ */
+export const useUpdateTrade = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTrade>>, TError,{tradeId: string;data: BodyType<UpdateTradeProfileInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateTrade>>,
+        TError,
+        {tradeId: string;data: BodyType<UpdateTradeProfileInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateTradeMutationOptions(options));
+    }
+
+export const getRequestTradeProfilePhotoUploadUrl = (tradeId: string,) => {
+
+
+
+
+  return `/api/trades/${tradeId}/profile-photo-upload`
+}
+
+/**
+ * @summary Request a private vendor profile photo upload
+ */
+export const requestTradeProfilePhotoUpload = async (tradeId: string,
+    uploadUrlRequest: UploadUrlRequest, options?: Parameters<typeof customFetch>[1]): Promise<UploadUrlResponse> => {
+
+  return customFetch<UploadUrlResponse>(getRequestTradeProfilePhotoUploadUrl(tradeId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(uploadUrlRequest)
+  }
+);}
+
+
+
+
+
+export const getRequestTradeProfilePhotoUploadMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestTradeProfilePhotoUpload>>, TError,{tradeId: string;data: BodyType<UploadUrlRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestTradeProfilePhotoUpload>>, TError,{tradeId: string;data: BodyType<UploadUrlRequest>}, TContext> => {
+
+const mutationKey = ['requestTradeProfilePhotoUpload'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestTradeProfilePhotoUpload>>, {tradeId: string;data: BodyType<UploadUrlRequest>}> = (props) => {
+          const {tradeId,data} = props ?? {};
+
+          return  requestTradeProfilePhotoUpload(tradeId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestTradeProfilePhotoUploadMutationResult = NonNullable<Awaited<ReturnType<typeof requestTradeProfilePhotoUpload>>>
+    export type RequestTradeProfilePhotoUploadMutationBody = BodyType<UploadUrlRequest>
+    export type RequestTradeProfilePhotoUploadMutationError = ErrorType<void>
+
+    /**
+ * @summary Request a private vendor profile photo upload
+ */
+export const useRequestTradeProfilePhotoUpload = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestTradeProfilePhotoUpload>>, TError,{tradeId: string;data: BodyType<UploadUrlRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestTradeProfilePhotoUpload>>,
+        TError,
+        {tradeId: string;data: BodyType<UploadUrlRequest>},
+        TContext
+      > => {
+      return useMutation(getRequestTradeProfilePhotoUploadMutationOptions(options));
+    }
 
 export const getCreateTradeJobHistoryUrl = (tradeId: string,) => {
 

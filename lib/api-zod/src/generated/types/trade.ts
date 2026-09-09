@@ -17,4 +17,27 @@ export interface Trade {
   completedJobs: number;
   initials: string;
   accent: string;
+  profilePhotoUrl?: string | null;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  profilePhotoPositionX?: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  profilePhotoPositionY?: number;
+  /**
+     * @minimum 1
+     * @maximum 2
+     */
+  profilePhotoZoom?: number;
+  phone?: string;
+  email?: string;
+  website?: string;
+  regions?: string[];
+  licence?: string;
+  insurance?: string;
+  insuranceExpiry?: string;
 }

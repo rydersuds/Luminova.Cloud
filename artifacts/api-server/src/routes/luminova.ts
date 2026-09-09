@@ -32,6 +32,12 @@ import {
   GetTradeResponse,
   GetTradesQueryParams,
   GetTradesResponse,
+  UpdateTradeBody,
+  UpdateTradeParams,
+  UpdateTradeResponse,
+  RequestTradeProfilePhotoUploadBody,
+  RequestTradeProfilePhotoUploadParams,
+  RequestTradeProfilePhotoUploadResponse,
   UpdateProjectBody,
   UpdateProjectParams,
   UpdateProjectResponse,
@@ -670,7 +676,20 @@ type Invoice = (typeof invoices)[number] & {
   direction?: "luminova_to_client" | "company_to_luminova";
   ownerId?: string;
 };
-type Trade = (typeof trades)[number];
+type Trade = (typeof trades)[number] & {
+  phone?: string;
+  email?: string;
+  website?: string;
+  regions?: string[];
+  licence?: string;
+  insurance?: string;
+  insuranceExpiry?: string;
+  profilePhotoObjectPath?: string | null;
+  pendingProfilePhotoObjectPath?: string | null;
+  profilePhotoPositionX?: number;
+  profilePhotoPositionY?: number;
+  profilePhotoZoom?: number;
+};
 type VendorQuote = (typeof vendorQuotes)[number] & {
   isProjectTotal?: boolean;
   ownerId?: string;
@@ -696,6 +715,8 @@ const durableData = async <T>(table: typeof importedProjectsTable | typeof impor
   (await db.select({ data: table.data }).from(table)).map((row) => row.data as T);
 
 const normalizePartyName = (value: string) => value.replace(/[^a-z0-9]/gi, "").toLowerCase();
+const tradeProfilePhotoUrl = (trade: Trade) =>
+  trade.profilePhotoObjectPath ? `/api/storage${trade.profilePhotoObjectPath}` : null;
 const isDirectoryTrade = (trade: Pick<Trade, "companyName">) => {
   const normalizedName = normalizePartyName(trade.companyName);
   return !normalizedName.startsWith("luminova") && !normalizedName.startsWith("weidner");
@@ -910,6 +931,10 @@ const tradesForOwner = async (ownerId: string) => {
     .filter(isDirectoryTrade)
     .map((trade) => ({
       ...trade,
+      profilePhotoUrl: tradeProfilePhotoUrl(trade),
+      profilePhotoPositionX: trade.profilePhotoPositionX ?? 50,
+      profilePhotoPositionY: trade.profilePhotoPositionY ?? 50,
+      profilePhotoZoom: trade.profilePhotoZoom ?? 1,
       completedJobs: (
         completedProjectsByVendor.get(trade.id)
         ?? completedProjectsByVendor.get(normalizePartyName(trade.companyName))
@@ -2158,12 +2183,17 @@ router.get("/trades/:tradeId", async (req: AuthenticatedRequest, res) => {
   const reviews = await reviewsForTrade(trade, req.userId);
   res.json(GetTradeResponse.parse({
     ...trade,
-    phone: "403-555-0188",
-    email: `hello@${trade.companyName.toLowerCase().replace(/[^a-z0-9]/g, "")}.ca`,
-    website: "https://example.com",
-    licence: "AB-WCB-449218",
-    insuranceExpiry: "2027-04-30",
-    regions: [trade.region, "Calgary", "Canmore"],
+    profilePhotoUrl: tradeProfilePhotoUrl(trade),
+    profilePhotoPositionX: trade.profilePhotoPositionX ?? 50,
+    profilePhotoPositionY: trade.profilePhotoPositionY ?? 50,
+    profilePhotoZoom: trade.profilePhotoZoom ?? 1,
+    phone: trade.phone ?? "",
+    email: trade.email ?? "",
+    website: trade.website ?? "",
+    licence: trade.licence ?? "",
+    insurance: trade.insurance ?? "",
+    insuranceExpiry: trade.insuranceExpiry ?? "",
+    regions: trade.regions ?? (trade.region ? [trade.region] : []),
     reviews,
     completedJobs: jobHistory.length,
     reviewCount: reviews.length,
@@ -2173,6 +2203,157 @@ router.get("/trades/:tradeId", async (req: AuthenticatedRequest, res) => {
     jobHistory,
     bids,
   }));
+});
+
+router.post("/trades/:tradeId/profile-photo-upload", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  const params = RequestTradeProfilePhotoUploadParams.safeParse(req.params);
+  const body = RequestTradeProfilePhotoUploadBody.safeParse(req.body);
+  if (!params.success || !body.success ||
+    !["image/jpeg", "image/png", "image/webp"].includes(body.data.contentType) ||
+    body.data.size > 8 * 1024 * 1024) {
+    res.status(400).json({ error: "Choose a JPEG, PNG, or WebP image under 8 MB." });
+    return;
+  }
+  const [tradeRow] = await db.select({ data: importedVendorsTable.data })
+    .from(importedVendorsTable)
+    .where(and(
+      eq(importedVendorsTable.id, params.data.tradeId),
+      eq(importedVendorsTable.ownerId, req.userId),
+    ))
+    .limit(1);
+  const trade = tradeRow?.data as Trade | undefined;
+  if (!trade) {
+    res.status(404).json({ error: "Vendor not found" });
+    return;
+  }
+  try {
+    const uploadURL = await storage.getObjectEntityUploadURL();
+    const objectPath = storage.normalizeObjectEntityPath(uploadURL);
+    await db.update(importedVendorsTable)
+      .set({ data: { ...trade, pendingProfilePhotoObjectPath: objectPath } })
+      .where(and(
+        eq(importedVendorsTable.id, params.data.tradeId),
+        eq(importedVendorsTable.ownerId, req.userId),
+      ));
+    res.json(RequestTradeProfilePhotoUploadResponse.parse({
+      uploadURL,
+      objectPath,
+      metadata: body.data,
+    }));
+  } catch (error) {
+    req.log.error({ err: error, tradeId: params.data.tradeId }, "Failed to start vendor photo upload");
+    res.status(500).json({ error: "The profile photo upload could not be started." });
+  }
+});
+
+router.patch("/trades/:tradeId", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  const params = UpdateTradeParams.safeParse(req.params);
+  const body = UpdateTradeBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: "Check the vendor profile details." });
+    return;
+  }
+  const [tradeRow] = await db.select({ data: importedVendorsTable.data })
+    .from(importedVendorsTable)
+    .where(and(
+      eq(importedVendorsTable.id, params.data.tradeId),
+      eq(importedVendorsTable.ownerId, req.userId),
+    ))
+    .limit(1);
+  const trade = tradeRow?.data as Trade | undefined;
+  if (!trade) {
+    res.status(404).json({ error: "Vendor not found" });
+    return;
+  }
+
+  const email = body.data.email.trim();
+  if (email && !z.string().email().safeParse(email).success) {
+    res.status(400).json({ error: "Enter a valid email address." });
+    return;
+  }
+  let website = body.data.website.trim();
+  if (website && !/^https?:\/\//i.test(website)) website = `https://${website}`;
+  if (website) {
+    try {
+      const parsedWebsite = new URL(website);
+      if (!["http:", "https:"].includes(parsedWebsite.protocol)) throw new Error("Unsupported protocol");
+      website = parsedWebsite.toString();
+    } catch {
+      res.status(400).json({ error: "Enter a valid website address." });
+      return;
+    }
+  }
+  const regions = [...new Map(
+    body.data.regions
+      .map((region) => region.trim())
+      .filter(Boolean)
+      .map((region) => [region.toLowerCase(), region] as const),
+  ).values()];
+  if (body.data.insuranceExpiry && !isValidCalendarDate(body.data.insuranceExpiry)) {
+    res.status(400).json({ error: "Insurance expiry must be a valid calendar date." });
+    return;
+  }
+
+  if (typeof body.data.profilePhotoObjectPath === "string" &&
+    body.data.profilePhotoObjectPath !== trade.pendingProfilePhotoObjectPath) {
+    res.status(403).json({ error: "This photo upload was not issued for this vendor." });
+    return;
+  }
+
+  try {
+    if (typeof body.data.profilePhotoObjectPath === "string") {
+      await storage.verifyPanorama(body.data.profilePhotoObjectPath);
+      await storage.setAcl(body.data.profilePhotoObjectPath, { owner: req.userId, visibility: "private" });
+    }
+    const updated: Trade = {
+      ...trade,
+      phone: body.data.phone.trim(),
+      email,
+      website,
+      regions,
+      region: regions[0] ?? "",
+      licence: body.data.licence.trim(),
+      insurance: body.data.insurance.trim(),
+      insuranceExpiry: body.data.insuranceExpiry,
+      profilePhotoPositionX: body.data.profilePhotoPositionX,
+      profilePhotoPositionY: body.data.profilePhotoPositionY,
+      profilePhotoZoom: body.data.profilePhotoZoom,
+      pendingProfilePhotoObjectPath: null,
+      ...("profilePhotoObjectPath" in body.data
+        ? { profilePhotoObjectPath: body.data.profilePhotoObjectPath ?? null }
+        : {}),
+    };
+    const response = UpdateTradeResponse.parse({
+      ...updated,
+      profilePhotoUrl: tradeProfilePhotoUrl(updated),
+      profilePhotoPositionX: updated.profilePhotoPositionX,
+      profilePhotoPositionY: updated.profilePhotoPositionY,
+      profilePhotoZoom: updated.profilePhotoZoom,
+    });
+    await db.update(importedVendorsTable)
+      .set({ data: updated })
+      .where(and(
+        eq(importedVendorsTable.id, params.data.tradeId),
+        eq(importedVendorsTable.ownerId, req.userId),
+      ));
+    if (trade.profilePhotoObjectPath && trade.profilePhotoObjectPath !== updated.profilePhotoObjectPath) {
+      storage.deleteObject(trade.profilePhotoObjectPath).catch((error) => {
+        req.log.warn({ err: error, tradeId: params.data.tradeId }, "Failed to remove replaced vendor photo");
+      });
+    }
+    res.json(response);
+  } catch (error) {
+    req.log.error({ err: error, tradeId: params.data.tradeId }, "Failed to update vendor profile");
+    res.status(500).json({ error: "The vendor profile could not be saved." });
+  }
 });
 
 router.get("/invoices", async (req: AuthenticatedRequest, res) => {

@@ -385,6 +385,55 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TradeDetail"
+    patch:
+      operationId: updateTrade
+      tags: [trades]
+      summary: Update a vendor profile
+      parameters:
+        - $ref: "#/components/parameters/TradeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTradeProfileInput"
+      responses:
+        "200":
+          description: Updated vendor profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trade"
+        "400":
+          description: Invalid vendor profile
+        "401":
+          description: Authentication required
+        "404":
+          description: Vendor not found
+  /trades/{tradeId}/profile-photo-upload:
+    post:
+      operationId: requestTradeProfilePhotoUpload
+      tags: [trades]
+      summary: Request a private vendor profile photo upload
+      parameters:
+        - $ref: "#/components/parameters/TradeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadUrlRequest"
+      responses:
+        "200":
+          description: Vendor photo upload URL generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrlResponse"
+        "400":
+          description: Invalid photo metadata
+        "404":
+          description: Vendor not found
   /trades/{tradeId}/job-history:
     post:
       operationId: createTradeJobHistory
@@ -1100,17 +1149,36 @@ components:
         completedJobs: { type: integer }
         initials: { type: string }
         accent: { type: string }
+        profilePhotoUrl:
+          type: string
+          nullable: true
+        profilePhotoPositionX: { type: number, minimum: 0, maximum: 100 }
+        profilePhotoPositionY: { type: number, minimum: 0, maximum: 100 }
+        profilePhotoZoom: { type: number, minimum: 1, maximum: 2 }
+        phone: { type: string }
+        email: { type: string }
+        website: { type: string }
+        regions:
+          type: array
+          items: { type: string }
+        licence: { type: string }
+        insurance: { type: string }
+        insuranceExpiry: { type: string }
     TradeDetail:
       allOf:
         - $ref: "#/components/schemas/Trade"
         - type: object
-          required: [phone, email, website, licence, insuranceExpiry, regions, reviews, jobHistory, bids]
+          required: [phone, email, website, licence, insurance, insuranceExpiry, regions, profilePhotoPositionX, profilePhotoPositionY, profilePhotoZoom, reviews, jobHistory, bids]
           properties:
             phone: { type: string }
             email: { type: string }
             website: { type: string }
             licence: { type: string }
+            insurance: { type: string }
             insuranceExpiry: { type: string }
+            profilePhotoPositionX: { type: number }
+            profilePhotoPositionY: { type: number }
+            profilePhotoZoom: { type: number }
             regions:
               type: array
               items: { type: string }
@@ -1136,6 +1204,43 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/TradeBid"
+    UpdateTradeProfileInput:
+      type: object
+      required: [phone, email, website, regions, licence, insurance, insuranceExpiry, profilePhotoPositionX, profilePhotoPositionY, profilePhotoZoom]
+      properties:
+        phone:
+          type: string
+          maxLength: 40
+        email:
+          type: string
+          maxLength: 254
+        website:
+          type: string
+          maxLength: 500
+        regions:
+          type: array
+          maxItems: 20
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 100
+        licence:
+          type: string
+          maxLength: 160
+        insurance:
+          type: string
+          maxLength: 160
+        insuranceExpiry:
+          type: string
+          pattern: '^$|^\d{4}-\d{2}-\d{2}$'
+        profilePhotoObjectPath:
+          type: string
+          nullable: true
+          pattern: '^/objects/uploads/[A-Za-z0-9_-]+$'
+        profilePhotoPositionX: { type: number, minimum: 0, maximum: 100 }
+        profilePhotoPositionY: { type: number, minimum: 0, maximum: 100 }
+        profilePhotoZoom: { type: number, minimum: 1, maximum: 2 }
     Review:
       type: object
       required: [id, vendorId, projectId, projectName, reviewerId, reviewer, date, rating, comment, source]

@@ -188,6 +188,29 @@ export interface Trade {
   completedJobs: number;
   initials: string;
   accent: string;
+  profilePhotoUrl?: string | null;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  profilePhotoPositionX?: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  profilePhotoPositionY?: number;
+  /**
+     * @minimum 1
+     * @maximum 2
+     */
+  profilePhotoZoom?: number;
+  phone?: string;
+  email?: string;
+  website?: string;
+  regions?: string[];
+  licence?: string;
+  insurance?: string;
+  insuranceExpiry?: string;
 }
 
 export interface Photo {
@@ -280,12 +303,54 @@ export type TradeDetail = Trade & {
   email: string;
   website: string;
   licence: string;
+  insurance: string;
   insuranceExpiry: string;
+  profilePhotoPositionX: number;
+  profilePhotoPositionY: number;
+  profilePhotoZoom: number;
   regions: string[];
   reviews: Review[];
   jobHistory: TradeDetailJobHistoryItem[];
   bids: TradeBid[];
 };
+
+export interface UpdateTradeProfileInput {
+  /** @maxLength 40 */
+  phone: string;
+  /** @maxLength 254 */
+  email: string;
+  /** @maxLength 500 */
+  website: string;
+  /**
+     * @maxItems 20
+     * @items.minLength 1
+     * @items.maxLength 100
+     */
+  regions: string[];
+  /** @maxLength 160 */
+  licence: string;
+  /** @maxLength 160 */
+  insurance: string;
+  /** @pattern ^$|^\d{4}-\d{2}-\d{2}$ */
+  insuranceExpiry: string;
+  /** @pattern ^/objects/uploads/[A-Za-z0-9_-]+$ */
+  profilePhotoObjectPath?: string | null;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  profilePhotoPositionX: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  profilePhotoPositionY: number;
+  /**
+     * @minimum 1
+     * @maximum 2
+     */
+  profilePhotoZoom: number;
+}
 
 export interface VendorJobHistoryInput {
   /** @minLength 1 */

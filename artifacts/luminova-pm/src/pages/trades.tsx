@@ -92,10 +92,21 @@ export default function TradesDirectory() {
                   <CardContent className="p-0">
                     <div className="flex flex-col sm:flex-row sm:items-center p-4 sm:p-6 gap-4 sm:gap-6">
                       <div 
-                        className="h-16 w-16 shrink-0 rounded-xl flex items-center justify-center font-heading font-bold text-xl shadow-inner" 
+                        className="h-16 w-16 shrink-0 overflow-hidden rounded-xl flex items-center justify-center font-heading font-bold text-xl shadow-inner"
                         style={{ backgroundColor: `${trade.accent}15`, color: trade.accent, border: `1px solid ${trade.accent}30` }}
                       >
-                        {trade.initials}
+                        {trade.profilePhotoUrl
+                            ? <img
+                                src={trade.profilePhotoUrl}
+                                alt=""
+                                className="h-full w-full object-cover"
+                                style={{
+                                  objectPosition: `${trade.profilePhotoPositionX ?? 50}% ${trade.profilePhotoPositionY ?? 50}%`,
+                                  transform: `scale(${trade.profilePhotoZoom ?? 1})`,
+                                  transformOrigin: `${trade.profilePhotoPositionX ?? 50}% ${trade.profilePhotoPositionY ?? 50}%`,
+                                }}
+                              />
+                          : trade.initials}
                       </div>
                       
                       <div className="flex-1 space-y-1">

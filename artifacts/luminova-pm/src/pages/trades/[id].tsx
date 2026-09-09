@@ -6,6 +6,8 @@ import {
   useGetTrade, 
   getGetTradeQueryKey,
   getGetTradesQueryKey,
+  useUpdateTrade,
+  useRequestTradeProfilePhotoUpload,
   useGetProjects,
   useGetCurrentWorkspaceUser,
   useCreateTradeJobHistory,
@@ -21,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { 
-  MapPin, Star, Phone, Mail, Globe, ShieldCheck, FileCheck, ArrowLeft, History, MessageSquare
+  MapPin, Star, Phone, Mail, Globe, ShieldCheck, FileCheck, ArrowLeft, History, MessageSquare, Pencil, Camera, Trash2
 } from "lucide-react"
 import { cn, formatCurrency, formatDate } from "@/lib/utils"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -31,6 +33,18 @@ import { Label } from "@/components/ui/label"
 
 type Feedback = { kind: "success" | "error"; message: string } | null
 type ErrorWithData = { data?: { error?: string }; message?: string }
+type ProfileForm = {
+  phone: string
+  email: string
+  website: string
+  regions: string
+  licence: string
+  insurance: string
+  insuranceExpiry: string
+  profilePhotoPositionX: number
+  profilePhotoPositionY: number
+  profilePhotoZoom: number
+}
 
 const today = () => {
   const date = new Date()
@@ -56,6 +70,8 @@ export default function TradeDetail() {
   })
   const { data: projects } = useGetProjects()
   const { data: currentUser } = useGetCurrentWorkspaceUser()
+  const updateTrade = useUpdateTrade()
+  const requestProfilePhotoUpload = useRequestTradeProfilePhotoUpload()
   const createJobHistory = useCreateTradeJobHistory()
   const updateJobHistory = useUpdateTradeJobHistory()
   const deleteJobHistory = useDeleteTradeJobHistory()
@@ -68,6 +84,29 @@ export default function TradeDetail() {
   const [editReviewDialog, setEditReviewDialog] = React.useState(false)
   const [editingReviewId, setEditingReviewId] = React.useState<string | null>(null)
   const [feedback, setFeedback] = React.useState<Feedback>(null)
+  const [profileDialog, setProfileDialog] = React.useState(false)
+  const [profileError, setProfileError] = React.useState("")
+  const [profilePhoto, setProfilePhoto] = React.useState<File | null>(null)
+  const [removeProfilePhoto, setRemoveProfilePhoto] = React.useState(false)
+  const [profileForm, setProfileForm] = React.useState<ProfileForm>({
+    phone: "",
+    email: "",
+    website: "",
+    regions: "",
+    licence: "",
+    insurance: "",
+    insuranceExpiry: "",
+    profilePhotoPositionX: 50,
+    profilePhotoPositionY: 50,
+    profilePhotoZoom: 1,
+  })
+  const profilePhotoPreview = React.useMemo(
+    () => profilePhoto ? URL.createObjectURL(profilePhoto) : "",
+    [profilePhoto],
+  )
+  React.useEffect(() => () => {
+    if (profilePhotoPreview) URL.revokeObjectURL(profilePhotoPreview)
+  }, [profilePhotoPreview])
   const [historyForm, setHistoryForm] = React.useState({ projectId: "", date: today(), amount: "", source: "" })
   const [reviewForm, setReviewForm] = React.useState({ projectId: "", date: today(), rating: "5", comment: "", source: "" })
 
@@ -80,6 +119,92 @@ export default function TradeDetail() {
     queryClient.invalidateQueries({ queryKey: getGetTradeQueryKey(tradeId) }),
     queryClient.invalidateQueries({ queryKey: getGetTradesQueryKey() }),
   ])
+
+  const openProfileEditor = () => {
+    if (!trade) return
+    setProfileError("")
+    setProfilePhoto(null)
+    setRemoveProfilePhoto(false)
+    setProfileForm({
+      phone: trade.phone,
+      email: trade.email,
+      website: trade.website,
+      regions: trade.regions.join(", "),
+      licence: trade.licence,
+      insurance: trade.insurance,
+      insuranceExpiry: trade.insuranceExpiry,
+      profilePhotoPositionX: trade.profilePhotoPositionX,
+      profilePhotoPositionY: trade.profilePhotoPositionY,
+      profilePhotoZoom: trade.profilePhotoZoom,
+    })
+    setProfileDialog(true)
+  }
+
+  const chooseProfilePhoto = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null
+    if (!file) return
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 8 * 1024 * 1024) {
+      setProfileError("Choose a JPEG, PNG, or WebP image under 8 MB.")
+      event.target.value = ""
+      return
+    }
+    setProfileError("")
+    setProfilePhoto(file)
+    setRemoveProfilePhoto(false)
+  }
+
+  const submitProfile = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setProfileError("")
+    try {
+      let profilePhotoObjectPath: string | null | undefined
+      if (profilePhoto) {
+        const upload = await requestProfilePhotoUpload.mutateAsync({
+          tradeId,
+          data: {
+            name: profilePhoto.name,
+            size: profilePhoto.size,
+            contentType: profilePhoto.type,
+          },
+        })
+        const stored = await fetch(upload.uploadURL, {
+          method: "PUT",
+          headers: { "Content-Type": profilePhoto.type },
+          body: profilePhoto,
+        })
+        if (!stored.ok) throw new Error("The profile photo could not be stored.")
+        profilePhotoObjectPath = upload.objectPath
+      } else if (removeProfilePhoto) {
+        profilePhotoObjectPath = null
+      }
+
+      const regions = profileForm.regions
+        .split(/[,\n]/)
+        .map((region) => region.trim())
+        .filter(Boolean)
+      await updateTrade.mutateAsync({
+        tradeId,
+        data: {
+          phone: profileForm.phone,
+          email: profileForm.email,
+          website: profileForm.website,
+          regions,
+          licence: profileForm.licence,
+          insurance: profileForm.insurance,
+          insuranceExpiry: profileForm.insuranceExpiry,
+          profilePhotoPositionX: profileForm.profilePhotoPositionX,
+          profilePhotoPositionY: profileForm.profilePhotoPositionY,
+          profilePhotoZoom: profileForm.profilePhotoZoom,
+          ...(profilePhotoObjectPath !== undefined ? { profilePhotoObjectPath } : {}),
+        },
+      })
+      setProfileDialog(false)
+      await refreshTrade()
+      setFeedback({ kind: "success", message: "Vendor profile updated." })
+    } catch (error) {
+      setProfileError(errorMessage(error, "Unable to update the vendor profile."))
+    }
+  }
 
   const openNewHistory = () => {
     setFeedback(null)
@@ -257,11 +382,22 @@ export default function TradeDetail() {
             </button>
 
             <div className="flex flex-col md:flex-row gap-8 items-start md:items-center">
-              <div 
-                className="h-24 w-24 shrink-0 rounded-2xl flex items-center justify-center font-heading font-bold text-3xl shadow-sm" 
+              <div
+                className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl flex items-center justify-center font-heading font-bold text-3xl shadow-sm"
                 style={{ backgroundColor: `${trade.accent}15`, color: trade.accent, border: `1px solid ${trade.accent}30` }}
               >
-                {trade.initials}
+                {trade.profilePhotoUrl
+                  ? <img
+                      src={trade.profilePhotoUrl}
+                      alt={`${trade.companyName} profile`}
+                      className="h-full w-full object-cover"
+                      style={{
+                        objectPosition: `${trade.profilePhotoPositionX}% ${trade.profilePhotoPositionY}%`,
+                        transform: `scale(${trade.profilePhotoZoom})`,
+                        transformOrigin: `${trade.profilePhotoPositionX}% ${trade.profilePhotoPositionY}%`,
+                      }}
+                    />
+                  : trade.initials}
               </div>
 
               <div className="flex-1 space-y-2">
@@ -289,6 +425,10 @@ export default function TradeDetail() {
               </div>
 
               <div className="flex flex-col w-full md:w-auto gap-3">
+                <Button variant="outline" className="w-full gap-2" onClick={openProfileEditor}>
+                  <Pencil className="h-4 w-4" />
+                  Edit Profile
+                </Button>
                 <Button className="w-full" onClick={() => setLocation(`/quotes?vendorId=${trade.id}`)}>View Vendor Quotes</Button>
                 <Button variant="outline" className="w-full gap-2">
                   <MessageSquare className="h-4 w-4" />
@@ -314,23 +454,23 @@ export default function TradeDetail() {
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-3 text-sm">
                     <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span>{trade.phone}</span>
+                    {trade.phone ? <a href={`tel:${trade.phone}`} className="hover:underline">{trade.phone}</a> : <span className="text-muted-foreground">Not added</span>}
                   </div>
                   <div className="flex items-center gap-3 text-sm">
                     <Mail className="h-4 w-4 text-muted-foreground" />
-                    <a href={`mailto:${trade.email}`} className="text-primary hover:underline">{trade.email}</a>
+                    {trade.email ? <a href={`mailto:${trade.email}`} className="break-all text-primary hover:underline">{trade.email}</a> : <span className="text-muted-foreground">Not added</span>}
                   </div>
                   <div className="flex items-center gap-3 text-sm">
                     <Globe className="h-4 w-4 text-muted-foreground" />
-                    <a href={`https://${trade.website}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">{trade.website}</a>
+                    {trade.website ? <a href={trade.website} target="_blank" rel="noreferrer" className="break-all text-primary hover:underline">{trade.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}</a> : <span className="text-muted-foreground">Not added</span>}
                   </div>
                   <div className="flex items-start gap-3 text-sm">
                     <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
                     <div>
                       <p className="font-medium mb-1">Service Regions:</p>
-                      <div className="flex flex-wrap gap-1">
+                      {trade.regions.length ? <div className="flex flex-wrap gap-1">
                         {trade.regions.map(r => <Badge key={r} variant="secondary" className="text-[10px] px-1.5 py-0">{r}</Badge>)}
-                      </div>
+                      </div> : <p className="text-muted-foreground">Not added</p>}
                     </div>
                   </div>
                 </CardContent>
@@ -345,14 +485,15 @@ export default function TradeDetail() {
                     <FileCheck className="h-4 w-4 text-success mt-0.5" />
                     <div>
                       <p className="font-medium text-foreground">Licence</p>
-                      <p className="text-muted-foreground font-mono mt-0.5">{trade.licence}</p>
+                      <p className="text-muted-foreground font-mono mt-0.5">{trade.licence || "Not added"}</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3 text-sm">
                     <ShieldCheck className="h-4 w-4 text-success mt-0.5" />
                     <div>
                       <p className="font-medium text-foreground">Insurance</p>
-                      <p className="text-muted-foreground mt-0.5">Expires {formatDate(trade.insuranceExpiry)}</p>
+                      <p className="text-muted-foreground mt-0.5">{trade.insurance || "Not added"}</p>
+                      {trade.insuranceExpiry && <p className="text-xs text-muted-foreground mt-1">Expires {formatDate(trade.insuranceExpiry)}</p>}
                     </div>
                   </div>
                 </CardContent>
@@ -489,6 +630,110 @@ export default function TradeDetail() {
           </div>
         </div>
       </div>
+      <Dialog open={profileDialog} onOpenChange={setProfileDialog}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit vendor profile</DialogTitle>
+            <DialogDescription>Add the contact, service area, credentials, and profile photo shown on this vendor page.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(event) => void submitProfile(event)} className="space-y-5">
+            <div className="flex flex-col gap-4 rounded-lg border border-border p-4 sm:flex-row sm:items-center">
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted font-heading text-2xl font-bold text-muted-foreground">
+                {profilePhotoPreview
+                  ? <img
+                      src={profilePhotoPreview}
+                      alt="New vendor profile preview"
+                      className="h-full w-full object-cover"
+                      style={{
+                        objectPosition: `${profileForm.profilePhotoPositionX}% ${profileForm.profilePhotoPositionY}%`,
+                        transform: `scale(${profileForm.profilePhotoZoom})`,
+                        transformOrigin: `${profileForm.profilePhotoPositionX}% ${profileForm.profilePhotoPositionY}%`,
+                      }}
+                    />
+                  : trade.profilePhotoUrl && !removeProfilePhoto
+                    ? <img
+                        src={trade.profilePhotoUrl}
+                        alt={`${trade.companyName} profile`}
+                        className="h-full w-full object-cover"
+                        style={{
+                          objectPosition: `${profileForm.profilePhotoPositionX}% ${profileForm.profilePhotoPositionY}%`,
+                          transform: `scale(${profileForm.profilePhotoZoom})`,
+                          transformOrigin: `${profileForm.profilePhotoPositionX}% ${profileForm.profilePhotoPositionY}%`,
+                        }}
+                      />
+                    : trade.initials}
+              </div>
+              <div className="min-w-0 flex-1 space-y-2">
+                <Label htmlFor="vendor-profile-photo">Profile photo</Label>
+                <Input id="vendor-profile-photo" type="file" accept="image/jpeg,image/png,image/webp" onChange={chooseProfilePhoto} />
+                <p className="text-xs text-muted-foreground">JPEG, PNG, or WebP. Maximum 8 MB.</p>
+                {trade.profilePhotoUrl && !removeProfilePhoto && !profilePhoto && (
+                  <Button type="button" variant="ghost" size="sm" className="h-auto gap-2 px-0 text-destructive hover:text-destructive" onClick={() => setRemoveProfilePhoto(true)}>
+                    <Trash2 className="h-4 w-4" />
+                    Remove current photo
+                  </Button>
+                )}
+              </div>
+            </div>
+            {(profilePhotoPreview || (trade.profilePhotoUrl && !removeProfilePhoto)) && (
+              <div className="space-y-4 rounded-lg border border-border p-4">
+                <div>
+                  <Label htmlFor="vendor-photo-horizontal">Horizontal framing</Label>
+                  <Input id="vendor-photo-horizontal" type="range" min="0" max="100" value={profileForm.profilePhotoPositionX} onChange={(event) => setProfileForm((current) => ({ ...current, profilePhotoPositionX: Number(event.target.value) }))} />
+                </div>
+                <div>
+                  <Label htmlFor="vendor-photo-vertical">Vertical framing</Label>
+                  <Input id="vendor-photo-vertical" type="range" min="0" max="100" value={profileForm.profilePhotoPositionY} onChange={(event) => setProfileForm((current) => ({ ...current, profilePhotoPositionY: Number(event.target.value) }))} />
+                </div>
+                <div>
+                  <Label htmlFor="vendor-photo-zoom">Zoom</Label>
+                  <Input id="vendor-photo-zoom" type="range" min="1" max="2" step="0.05" value={profileForm.profilePhotoZoom} onChange={(event) => setProfileForm((current) => ({ ...current, profilePhotoZoom: Number(event.target.value) }))} />
+                </div>
+              </div>
+            )}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="vendor-phone">Phone number</Label>
+                <Input id="vendor-phone" type="tel" value={profileForm.phone} onChange={(event) => setProfileForm((current) => ({ ...current, phone: event.target.value }))} maxLength={40} placeholder="403-555-0123" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="vendor-email">Email</Label>
+                <Input id="vendor-email" type="email" value={profileForm.email} onChange={(event) => setProfileForm((current) => ({ ...current, email: event.target.value }))} maxLength={254} placeholder="contact@vendor.ca" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="vendor-website">Website</Label>
+              <Input id="vendor-website" type="text" value={profileForm.website} onChange={(event) => setProfileForm((current) => ({ ...current, website: event.target.value }))} maxLength={500} placeholder="vendor.ca" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="vendor-regions">Service regions</Label>
+              <Textarea id="vendor-regions" value={profileForm.regions} onChange={(event) => setProfileForm((current) => ({ ...current, regions: event.target.value }))} placeholder="Calgary, Canmore, Airdrie" />
+              <p className="text-xs text-muted-foreground">Separate regions with commas or new lines.</p>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="vendor-licence">License number</Label>
+                <Input id="vendor-licence" value={profileForm.licence} onChange={(event) => setProfileForm((current) => ({ ...current, licence: event.target.value }))} maxLength={160} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="vendor-insurance-expiry">Insurance expiry</Label>
+                <Input id="vendor-insurance-expiry" type="date" value={profileForm.insuranceExpiry} onChange={(event) => setProfileForm((current) => ({ ...current, insuranceExpiry: event.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="vendor-insurance">Insurance</Label>
+              <Input id="vendor-insurance" value={profileForm.insurance} onChange={(event) => setProfileForm((current) => ({ ...current, insurance: event.target.value }))} maxLength={160} placeholder="Provider, policy, or coverage details" />
+            </div>
+            {profileError && <p role="alert" className="text-sm text-destructive">{profileError}</p>}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setProfileDialog(false)}>Cancel</Button>
+              <Button type="submit" disabled={updateTrade.isPending || requestProfilePhotoUpload.isPending}>
+                {updateTrade.isPending || requestProfilePhotoUpload.isPending ? "Saving…" : "Save profile"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       <Dialog open={historyDialog !== null} onOpenChange={(open) => !open && setHistoryDialog(null)}>
         <DialogContent>
           <DialogHeader>
