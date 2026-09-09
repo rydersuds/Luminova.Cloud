@@ -808,9 +808,9 @@ components:
         new360Photos:
           type: integer
         budgeted:
-          type: integer
+          type: number
         invoiced:
-          type: integer
+          type: number
         recentActivity:
           type: array
           items:
@@ -843,7 +843,7 @@ components:
         pmName: { type: string }
         clientName: { type: string }
         targetDate: { type: string }
-        budgeted: { type: integer }
+        budgeted: { type: number }
         description: { type: string }
         exteriorImage: { type: string }
     ProjectUpdate:
@@ -960,7 +960,7 @@ components:
                 properties:
                   projectName: { type: string }
                   date: { type: string }
-                    amount: { type: number }
+                  amount: { type: number }
             bids:
               type: array
               items:
@@ -980,7 +980,7 @@ components:
       properties:
         projectName: { type: string }
         scope: { type: string }
-        amount: { type: integer }
+        amount: { type: number }
         date: { type: string }
         outcome: { type: string }
     Invoice:

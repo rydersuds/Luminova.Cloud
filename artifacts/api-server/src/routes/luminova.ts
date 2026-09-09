@@ -704,7 +704,7 @@ const allProjects = async () => {
   });
   return [...importedProjects, ...seededProjects];
 };
-const allInvoices = async () => [...await durableData<Invoice>(importedInvoicesTable), ...invoices];
+const allInvoices = async (): Promise<Invoice[]> => [...await durableData<Invoice>(importedInvoicesTable), ...invoices];
 const allTrades = async () => {
   const [importedTrades, invoices] = await Promise.all([
     durableData<Trade>(importedVendorsTable),
