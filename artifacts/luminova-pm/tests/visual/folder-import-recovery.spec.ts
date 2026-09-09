@@ -106,6 +106,23 @@ async function selectAndStart(page: Page) {
   await page.getByRole('button', { name: 'Start import' }).click();
 }
 
+async function makeDismissalStorageUnavailable(page: Page) {
+  await page.addInitScript(() => {
+    const originalGetItem = Storage.prototype.getItem;
+    const originalSetItem = Storage.prototype.setItem;
+    const isImportDismissalKey = (key: string | null) => key?.startsWith('luminova-folder-import-dismissed:') === true;
+
+    Storage.prototype.getItem = function (key) {
+      if (isImportDismissalKey(key)) throw new Error('Dismissal storage is unavailable');
+      return originalGetItem.call(this, key);
+    };
+    Storage.prototype.setItem = function (key, value) {
+      if (isImportDismissalKey(key)) throw new Error('Dismissal storage is unavailable');
+      return originalSetItem.call(this, key, value);
+    };
+  });
+}
+
 test('reload resumes an interrupted import by uploading only missing files', async ({ page }) => {
   const api = await installImportApi(page);
   api.blockAdditionalAttaches(true);
@@ -144,6 +161,37 @@ test('reload while building polls until the existing build resolves', async ({ p
   api.setStatus('completed');
   await expect(page.getByLabel('Import status')).toHaveText('success', { timeout: 5_000 });
   expect(api.buildRequests).toBe(1);
+});
+
+test('dismissed import errors stay hidden for the session when dismissal storage is unavailable', async ({ page }) => {
+  const api = await installImportApi(page);
+  api.setImportId('import-storage-unavailable');
+  api.failUploads(true);
+  await makeDismissalStorageUnavailable(page);
+
+  await selectAndStart(page);
+  const activity = page.getByRole('complementary', { name: 'Project folder import activity' });
+  const dashboardAlert = page.getByTestId('dashboard-import-alert');
+  await expect(activity.getByRole('alert')).toContainText('2 files still need to be uploaded');
+  await expect(dashboardAlert).toContainText('2 files still need to be uploaded');
+
+  await activity.getByRole('button', { name: 'Dismiss error' }).click();
+  await expect(activity).not.toBeVisible();
+  await expect(dashboardAlert).not.toBeVisible();
+  await expect(page.evaluate(() => {
+    try {
+      localStorage.getItem('luminova-folder-import-dismissed:import-storage-unavailable');
+      return false;
+    } catch {
+      return true;
+    }
+  })).resolves.toBe(true);
+
+  // With persistence unavailable, dismissal suppression is intentionally session-scoped.
+  // A full page refresh cannot restore the marker, so the server's still-failed import is shown again.
+  await page.reload();
+  await expect(activity.getByRole('alert')).toContainText('2 files still need to be uploaded', { timeout: 10_000 });
+  await expect(dashboardAlert).toContainText('2 files still need to be uploaded');
 });
 
 test('dismissed import errors stay hidden after refresh without suppressing a new import', async ({ page }) => {
