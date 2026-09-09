@@ -39,7 +39,7 @@ test('renders portfolio totals above the existing invoice intake workflow', asyn
   await expect(summary.getByText('$750,000')).toBeVisible();
   await expect(summary.getByText('$2,000,000.00 accepted client work')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Invoice intake queue' })).toBeVisible();
-  await expect(page.getByText('CLIENT-100')).toBeVisible();
+  await expect(page.getByText('CLIENT-100').last()).toBeVisible();
 });
 
 test('renders real zero totals without treating them as unavailable', async ({ page }) => {
@@ -75,7 +75,7 @@ test('keeps invoice intake available when the summary fails and retries it', asy
   await page.goto('/__visual/financials');
 
   await expect(page.getByText('Financial totals are unavailable')).toBeVisible();
-  await expect(page.getByText('CLIENT-100')).toBeVisible();
+  await expect(page.getByText('CLIENT-100').last()).toBeVisible();
   available = true;
   await page.getByRole('button', { name: 'Retry totals' }).click();
   await expect(page.getByText('$150')).toBeVisible();

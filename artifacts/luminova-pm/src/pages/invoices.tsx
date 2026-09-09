@@ -165,7 +165,51 @@ export default function Invoices() {
             )}
           </div>
 
-          <Card>
+          <Card className="lg:hidden">
+            <CardContent className="space-y-3 p-3">
+              {isLoading ? (
+                <p className="py-8 text-center text-muted-foreground">Loading invoices...</p>
+              ) : invoices?.length === 0 ? (
+                <p className="py-8 text-center text-muted-foreground">No invoices found.</p>
+              ) : invoices?.map((invoice) => (
+                <article key={invoice.id} className="min-w-0 rounded-lg border border-border/70 bg-background/50 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="break-words font-mono text-sm font-medium">{invoice.invoiceNumber}</p>
+                      <p className="mt-1 break-words font-medium text-foreground">{invoice.projectName}</p>
+                      <p className="break-words text-xs text-muted-foreground">{invoice.vendor}</p>
+                    </div>
+                    <Badge variant={getStatusColor(invoice.status) as any}>{invoice.status}</Badge>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-3 border-y border-border/50 py-3 text-sm">
+                    <div className="min-w-0">
+                      <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Date</p>
+                      <p className="mt-1 break-words">{formatDate(invoice.date)}</p>
+                    </div>
+                    <div className="min-w-0 text-right">
+                      <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Amount</p>
+                      <p className="mt-1 break-words font-medium tabular-nums">{formatCurrency(invoice.amount)}</p>
+                    </div>
+                    <div className="col-span-2 min-w-0">
+                      <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Budget line item</p>
+                      <p className="mt-1 break-words text-muted-foreground">{invoice.lineItem}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                    {invoice.overage > 0 ? (
+                      <p className="flex min-w-0 items-start gap-1 text-[10px] text-destructive">
+                        <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                        <span className="break-words">+{formatCurrency(invoice.overage)} overage</span>
+                      </p>
+                    ) : <span />}
+                    <InvoiceActions status={invoice.status} />
+                  </div>
+                </article>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card className="hidden lg:block">
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
@@ -207,21 +251,7 @@ export default function Invoices() {
                         <Badge variant={getStatusColor(invoice.status) as any}>{invoice.status}</Badge>
                       </TableCell>
                       <TableCell className="min-w-[8rem] text-right">
-                        <div className="flex flex-wrap justify-end gap-1">
-                        <Button variant="ghost" size="icon" title="View PDF">
-                          <FileText className="h-4 w-4" />
-                        </Button>
-                        {invoice.status === 'Pending' && (
-                          <>
-                            <Button variant="ghost" size="icon" className="text-success hover:text-success hover:bg-success/10" title="Approve">
-                              <Check className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10" title="Reject">
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                        </div>
+                        <InvoiceActions status={invoice.status} />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -233,6 +263,26 @@ export default function Invoices() {
         </div>
       </div>
     </AppLayout>
+  )
+}
+
+function InvoiceActions({ status }: { status: string }) {
+  return (
+    <div className="flex flex-wrap justify-end gap-1">
+      <Button variant="ghost" size="icon" title="View PDF" aria-label="View PDF">
+        <FileText className="h-4 w-4" />
+      </Button>
+      {status === 'Pending' && (
+        <>
+          <Button variant="ghost" size="icon" className="text-success hover:bg-success/10 hover:text-success" title="Approve" aria-label="Approve invoice">
+            <Check className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" title="Reject" aria-label="Reject invoice">
+            <X className="h-4 w-4" />
+          </Button>
+        </>
+      )}
+    </div>
   )
 }
 
@@ -307,15 +357,15 @@ function FinancialSummary({
         <Card key={label} className="border-border/60 bg-card/80">
           <CardContent className="p-5">
             <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
-                <p className="mt-3 text-2xl font-extrabold tabular-nums sm:text-3xl">{formatCurrency(value)}</p>
+              <div className="min-w-0">
+                <p className="break-words font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+                <p className="mt-3 break-words text-2xl font-extrabold tabular-nums sm:text-3xl">{formatCurrency(value)}</p>
               </div>
               <div className={`flex h-10 w-10 shrink-0 items-center justify-center ${accent}`}>
                 <Icon className="h-5 w-5" />
               </div>
             </div>
-            <p className="mt-4 border-t border-border/50 pt-3 text-xs text-muted-foreground">{detail}</p>
+            <p className="mt-4 break-words border-t border-border/50 pt-3 text-xs text-muted-foreground">{detail}</p>
           </CardContent>
         </Card>
       ))}
