@@ -488,9 +488,9 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
 
   return (
     <AppLayout>
-      <div className="flex-1 overflow-x-hidden overflow-y-auto bg-background flex flex-col">
+      <div className="flex-1 overflow-x-hidden overflow-y-auto bg-transparent flex flex-col">
         {/* Project Header (Dark Chrome) */}
-        <div className="bg-sidebar text-sidebar-foreground shrink-0 border-b border-sidebar-border">
+        <div className="bg-sidebar/80 text-sidebar-foreground shrink-0 border-b border-sidebar-border backdrop-blur-xl">
           <div className="max-w-[1400px] mx-auto p-6 md:p-8 space-y-6">
             <button 
               onClick={() => setLocation("/")}
@@ -587,26 +587,26 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
               </div>
             </div>
             
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-sidebar-border rounded-lg overflow-hidden border border-sidebar-border">
-              <div className="bg-sidebar p-4 space-y-1">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-sidebar-border/60 rounded-lg overflow-hidden border border-sidebar-border/70">
+              <div className="bg-sidebar/55 p-4 space-y-1 backdrop-blur-sm">
                 <p className="text-sm text-sidebar-foreground/60">Internal Budget</p>
                 <p className="text-xl font-bold tabular-nums">{formatCurrency(project.budgeted)}</p>
               </div>
-              <div className="bg-sidebar p-4 space-y-1">
+              <div className="bg-sidebar/55 p-4 space-y-1 backdrop-blur-sm">
                 <p className="text-sm text-sidebar-foreground/60">Invoiced expenses</p>
                 <p className="text-xl font-bold tabular-nums">{formatCurrency(actualCost)}</p>
               </div>
-              <div className="bg-sidebar p-4 space-y-1">
+              <div className="bg-sidebar/55 p-4 space-y-1 backdrop-blur-sm">
                 <p className="text-sm text-sidebar-foreground/60">Budget Remaining</p>
                 <p className={cn("text-xl font-bold tabular-nums", varianceIsPositive ? "text-success" : "text-destructive")}>
                   {varianceIsPositive ? "+" : ""}{formatCurrency(budgetVariance)}
                 </p>
               </div>
-              <div className="bg-sidebar p-4 space-y-1">
+              <div className="bg-sidebar/55 p-4 space-y-1 backdrop-blur-sm">
                 <p className="text-sm text-sidebar-foreground/60">Total Progress</p>
                 <div className="flex items-center gap-2">
                   <p className="text-xl font-bold tabular-nums">{clientQuoteInvoicedPercent.toFixed(1)}%</p>
-                  <div className="flex-1 h-1.5 bg-sidebar-accent rounded-full overflow-hidden">
+                  <div className="flex-1 h-1.5 bg-sidebar-accent/70 rounded-full overflow-hidden">
                     <div className="h-full bg-sidebar-primary rounded-full" style={{ width: `${clientQuoteInvoicedPercent}%` }} />
                   </div>
                 </div>
@@ -779,7 +779,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {project.panoramas.map(pano => (
-                  <div key={pano.id} className="group relative h-[250px] overflow-hidden rounded-lg border border-border bg-sidebar">
+                  <div key={pano.id} className="group relative h-[250px] overflow-hidden rounded-lg border border-border bg-muted/35">
                     <button
                       type="button"
                       onClick={() => setActivePanorama(pano)}

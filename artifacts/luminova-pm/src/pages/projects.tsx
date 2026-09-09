@@ -150,7 +150,7 @@ export default function Projects() {
                         className="h-full w-full object-cover saturate-110 transition-transform duration-700 group-hover:scale-105"
                       />
                     ) : (
-                      <div className="flex h-full items-center justify-center bg-sidebar">
+                        <div className="flex h-full items-center justify-center bg-muted/50">
                         <Building2 className="h-12 w-12 text-primary/45" />
                       </div>
                     )}
