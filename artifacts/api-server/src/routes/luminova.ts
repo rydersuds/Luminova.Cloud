@@ -665,6 +665,28 @@ vendorQuotes.length = 0;
 const durableData = async <T>(table: typeof importedProjectsTable | typeof importedVendorsTable | typeof importedVendorQuotesTable | typeof importedInvoicesTable) =>
   (await db.select({ data: table.data }).from(table)).map((row) => row.data as T);
 
+const normalizePartyName = (value: string) => value.replace(/[^a-z0-9]/gi, "").toLowerCase();
+
+const jobHistoryForTrade = async (trade: Trade) => {
+  const [projects, invoices] = await Promise.all([allProjects(), allInvoices()]);
+  const projectById = new Map(projects.map((project) => [project.id, project]));
+  const grouped = new Map<string, { projectName: string; date: string; amount: number }>();
+  for (const invoice of invoices) {
+    if (
+      invoice.direction !== "company_to_luminova" ||
+      normalizePartyName(invoice.vendor) !== normalizePartyName(trade.companyName) ||
+      !invoice.projectId
+    ) continue;
+    const current = grouped.get(invoice.projectId);
+    grouped.set(invoice.projectId, {
+      projectName: invoice.projectName || projectById.get(invoice.projectId)?.name || invoice.projectId,
+      date: invoice.date > (current?.date ?? "") ? invoice.date : (current?.date ?? invoice.date),
+      amount: Math.round(((current?.amount ?? 0) + invoice.amount) * 100) / 100,
+    });
+  }
+  return [...grouped.values()];
+};
+
 const allProjects = async () => {
   const [importedProjectRows, exteriorPhotos] = await Promise.all([
     db.select({ data: importedProjectsTable.data, ownerId: importedProjectsTable.ownerId }).from(importedProjectsTable),
@@ -683,7 +705,27 @@ const allProjects = async () => {
   return [...importedProjects, ...seededProjects];
 };
 const allInvoices = async () => [...await durableData<Invoice>(importedInvoicesTable), ...invoices];
-const allTrades = async () => [...await durableData<Trade>(importedVendorsTable), ...trades];
+const allTrades = async () => {
+  const [importedTrades, invoices] = await Promise.all([
+    durableData<Trade>(importedVendorsTable),
+    allInvoices(),
+  ]);
+  const completedProjectsByVendor = new Map<string, Set<string>>();
+  for (const invoice of invoices) {
+    if (invoice.direction !== "company_to_luminova" || !invoice.projectId) continue;
+    const key = normalizePartyName(invoice.vendor);
+    const projectsForVendor = completedProjectsByVendor.get(key) ?? new Set<string>();
+    projectsForVendor.add(invoice.projectId);
+    completedProjectsByVendor.set(key, projectsForVendor);
+  }
+  return [
+    ...importedTrades.map((trade) => ({
+      ...trade,
+      completedJobs: completedProjectsByVendor.get(normalizePartyName(trade.companyName))?.size ?? 0,
+    })),
+    ...trades,
+  ];
+};
 const allVendorQuotes = async (): Promise<VendorQuote[]> => [
   ...(await durableData<VendorQuote>(importedVendorQuotesTable)).map((quote) => ({
     ...quote,
@@ -1626,6 +1668,7 @@ router.get("/trades/:tradeId", async (req, res) => {
           ? "Lost"
           : "Pending",
     }));
+  const jobHistory = await jobHistoryForTrade(trade);
   res.json(GetTradeResponse.parse({
     ...trade,
     phone: "403-555-0188",
@@ -1635,10 +1678,8 @@ router.get("/trades/:tradeId", async (req, res) => {
     insuranceExpiry: "2027-04-30",
     regions: [trade.region, "Calgary", "Canmore"],
     reviews: [],
-    jobHistory: [
-      { projectName: "Riverstone Residence", date: "2026", amount: 26850000 },
-      { projectName: "Elbow Park Renovation", date: "2025", amount: 14900000 },
-    ],
+    completedJobs: jobHistory.length,
+    jobHistory,
     bids,
   }));
 });

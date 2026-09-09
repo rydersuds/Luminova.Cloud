@@ -179,13 +179,20 @@ export default function TradeDetail() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {trade.jobHistory.map((job, i) => (
+                          {trade.jobHistory.length > 0 ? trade.jobHistory.map((job, i) => (
                             <TableRow key={i}>
                               <TableCell className="font-medium">{job.projectName}</TableCell>
                               <TableCell>{formatDate(job.date)}</TableCell>
                               <TableCell className="text-right tabular-nums">{formatCurrency(job.amount)}</TableCell>
                             </TableRow>
-                          ))}
+                          )) : (
+                            <TableRow>
+                              <TableCell colSpan={3} className="h-24 text-center">
+                                <p className="font-medium">No verified job history</p>
+                                <p className="mt-1 text-sm text-muted-foreground">Completed work will appear after a real vendor invoice is linked to a project.</p>
+                              </TableCell>
+                            </TableRow>
+                          )}
                         </TableBody>
                       </Table>
                     </CardContent>

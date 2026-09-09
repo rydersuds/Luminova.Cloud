@@ -960,7 +960,7 @@ components:
                 properties:
                   projectName: { type: string }
                   date: { type: string }
-                  amount: { type: integer }
+                    amount: { type: number }
             bids:
               type: array
               items:
