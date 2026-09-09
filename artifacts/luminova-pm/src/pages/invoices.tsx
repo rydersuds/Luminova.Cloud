@@ -304,8 +304,8 @@ function FinancialSummary({
 }) {
   if (isLoading) {
     return (
-      <section aria-label="Portfolio financial summary" aria-busy="true" className="grid gap-4 md:grid-cols-3">
-        {Array.from({ length: 3 }).map((_, index) => (
+      <section aria-label="Portfolio financial summary" aria-busy="true" className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {Array.from({ length: 4 }).map((_, index) => (
           <Card key={index} className="h-36 animate-pulse border-border/60 bg-muted/30" />
         ))}
         <p className="sr-only">Loading portfolio financial totals</p>
@@ -343,6 +343,15 @@ function FinancialSummary({
       accent: "text-warning bg-warning/10",
     },
     {
+      label: "Total profit",
+      value: data.invoicedRevenue - data.invoicedExpenses,
+      detail: "Invoiced revenue less invoiced expenses",
+      icon: ArrowUpRight,
+      accent: data.invoicedRevenue - data.invoicedExpenses >= 0
+        ? "text-success bg-success/10"
+        : "text-destructive bg-destructive/10",
+    },
+    {
       label: "Upcoming client payments",
       value: data.upcomingClientPayments,
       detail: `${formatCurrency(data.acceptedClientQuoteValue)} accepted client work`,
@@ -352,7 +361,7 @@ function FinancialSummary({
   ]
 
   return (
-    <section aria-label="Portfolio financial summary" className="grid gap-4 md:grid-cols-3">
+    <section aria-label="Portfolio financial summary" className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       {cards.map(({ label, value, detail, icon: Icon, accent }) => (
         <Card key={label} className="border-border/60 bg-card/80">
           <CardContent className="p-5">

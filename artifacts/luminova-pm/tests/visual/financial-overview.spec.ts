@@ -36,6 +36,7 @@ test('renders portfolio totals above the existing invoice intake workflow', asyn
   const summary = page.getByRole('region', { name: 'Portfolio financial summary' });
   await expect(summary.getByText('$1,250,000')).toBeVisible();
   await expect(summary.getByText('$485,000')).toBeVisible();
+  await expect(summary.getByText('$765,000')).toBeVisible();
   await expect(summary.getByText('$750,000')).toBeVisible();
   await expect(summary.getByText('$2,000,000.00 accepted client work')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Invoice intake queue' })).toBeVisible();
@@ -51,7 +52,7 @@ test('renders real zero totals without treating them as unavailable', async ({ p
   });
 
   const summary = page.getByRole('region', { name: 'Portfolio financial summary' });
-  await expect(summary.getByText('$0.00')).toHaveCount(4);
+  await expect(summary.getByText('$0.00')).toHaveCount(5);
   await expect(page.getByText('Financial totals are unavailable')).toHaveCount(0);
 });
 
