@@ -456,6 +456,16 @@ test("reviews require reviewer roles and verified completed projects, then aggre
     },
   );
 
+  const duplicateReview = await fetch(base + reviewPath, {
+    method: "POST",
+    headers: jsonHeaders("pm"),
+    body: JSON.stringify(reviewBody),
+  });
+  assert.equal(duplicateReview.status, 409);
+  assert.deepEqual(await duplicateReview.json(), {
+    error: "You have already reviewed this project for this vendor",
+  });
+
   const freshBase = await startApi(t);
   const listed = await fetch(freshBase + "/trades", {
     headers: { "x-test-user": fixture.ownerId },
