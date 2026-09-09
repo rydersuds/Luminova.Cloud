@@ -1,6 +1,8 @@
 const TEXT_EXTENSIONS = new Set(["csv", "txt", "md", "json", "rtf"])
 export const dismissedImportStoragePrefix = "luminova-folder-import-dismissed:"
 
+export const importFileStorageUnavailableMessage =
+  "Browser file storage is unavailable, so the interrupted import cannot be restored. Select the project folder again to retry."
 type DismissalStorage = Pick<Storage, "getItem" | "setItem" | "removeItem" | "length" | "key">
 
 export type FolderCandidate = {
@@ -165,4 +167,11 @@ export const isBrowserExtractableText = (file: File) => TEXT_EXTENSIONS.has(exte
 export const boundedTextSnippet = async (file: File, maxBytes = 24_000): Promise<string | undefined> => {
   if (!isBrowserExtractableText(file)) return undefined
   return file.slice(0, maxBytes).text()
+}
+
+export class ImportFileStorageError extends Error {
+  constructor() {
+    super(importFileStorageUnavailableMessage)
+    this.name = "ImportFileStorageError"
+  }
 }

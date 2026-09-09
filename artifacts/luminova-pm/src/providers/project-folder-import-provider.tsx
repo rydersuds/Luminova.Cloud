@@ -4,7 +4,7 @@ import { getGetDashboardSummaryQueryKey, getGetProjectsQueryKey } from "@workspa
 import { useAuth } from "@clerk/react"
 import { CheckCircle2, ChevronDown, ChevronUp, LoaderCircle, UploadCloud, XCircle } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
-import { boundedTextSnippet, cleanupDismissedImportErrors, collectFolderCandidates, forgetDismissedImportError, pendingDismissedImportStorageKey, rememberDismissedImportError, readBatchImportResponse, wasImportErrorDismissed, type FolderCandidate, type SkippedFolderFile } from "@/lib/project-folder-import"
+import { boundedTextSnippet, cleanupDismissedImportErrors, collectFolderCandidates, forgetDismissedImportError, importFileStorageUnavailableMessage, ImportFileStorageError, pendingDismissedImportStorageKey, rememberDismissedImportError, readBatchImportResponse, wasImportErrorDismissed, type FolderCandidate, type SkippedFolderFile } from "@/lib/project-folder-import"
 
 export type FolderImportStatus = "idle" | "uploading" | "building" | "success" | "error"
 type FolderImportProgress = { uploaded: number; failed: number }
@@ -34,18 +34,31 @@ const ProjectFolderImportContext = React.createContext<FolderImportContextValue 
 const importFileDatabase = "luminova-folder-imports"
 
 async function withImportFiles<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest<T> | void): Promise<T | undefined> {
-  const database = await new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(importFileDatabase, 1)
-    request.onupgradeneeded = () => request.result.createObjectStore("files")
-    request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error)
-  })
-  return new Promise<T | undefined>((resolve, reject) => {
-    const transaction = database.transaction("files", mode)
-    const request = run(transaction.objectStore("files"))
-    transaction.oncomplete = () => { database.close(); resolve(request?.result) }
-    transaction.onerror = () => { database.close(); reject(transaction.error) }
-  })
+  let database: IDBDatabase
+  try {
+    database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(importFileDatabase, 1)
+      request.onupgradeneeded = () => request.result.createObjectStore("files")
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+  } catch {
+    throw new ImportFileStorageError()
+  }
+
+  try {
+    return await new Promise<T | undefined>((resolve, reject) => {
+      const transaction = database.transaction("files", mode)
+      const request = run(transaction.objectStore("files"))
+      transaction.oncomplete = () => resolve(request?.result)
+      transaction.onerror = () => reject(transaction.error)
+      transaction.onabort = () => reject(transaction.error)
+    })
+  } catch {
+    throw new ImportFileStorageError()
+  } finally {
+    database.close()
+  }
 }
 
 const saveImportFiles = (importId: string, files: FolderCandidate[]) =>
@@ -154,7 +167,10 @@ export function ProjectFolderImportProvider({
         await saveImportFiles(body.importId, candidates)
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Could not preserve the import session."
+      const message = error instanceof ImportFileStorageError
+        ? importFileStorageUnavailableMessage
+        : error instanceof Error ? error.message : "Could not preserve the import session."
+      if (error instanceof ImportFileStorageError) sessionRef.current = null
       setFolderStatus("error"); setFolderError(message); activeImportRef.current = false
       return
     }
@@ -296,11 +312,11 @@ export function ProjectFolderImportProvider({
           if (sessionRef.current?.importId === session.importId) clearFolderImport()
           return
         }
-        sessionRef.current = session
         const restored = (await Promise.all(session.documents.map(async (document) => {
           const file = await loadImportFile(session.importId, document.relativePath)
           return file ? { file, relativePath: document.relativePath } : null
         }))).filter((item): item is FolderCandidate => item !== null)
+        sessionRef.current = session
         folderFilesRef.current = restored
         setFolderFiles(restored)
         setFolderProgress({ uploaded: session.uploaded, failed: Math.max(session.documents.length - session.uploaded - restored.filter((item) => !session.uploadedPaths.includes(item.relativePath)).length, 0) })
@@ -348,9 +364,18 @@ export function ProjectFolderImportProvider({
         }
       } catch (error) {
         if (!cancelled) {
+          if (error instanceof ImportFileStorageError) {
+            sessionRef.current = null
+            folderFilesRef.current = []
+            setFolderFiles([])
+            setSkippedFolderFiles([])
+            setFolderProgress({ uploaded: 0, failed: 0 })
+          }
           if (dismissedPendingErrorRef.current || wasImportErrorDismissed("__pending__")) return
           setFolderStatus("error")
-          setFolderError(error instanceof Error ? error.message : "Restoring the import session failed. Start a new import or retry.")
+          setFolderError(error instanceof ImportFileStorageError
+            ? importFileStorageUnavailableMessage
+            : error instanceof Error ? error.message : "Restoring the import session failed. Start a new import or retry.")
         }
       }
     }

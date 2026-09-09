@@ -123,6 +123,37 @@ async function makeDismissalStorageUnavailable(page: Page) {
   });
 }
 
+async function makeImportFileStorageUnavailable(page: Page, failure: 'open' | 'transaction') {
+  await page.addInitScript((failureType: 'open' | 'transaction') => {
+    if (failureType === 'open') {
+      const originalOpen = IDBFactory.prototype.open;
+      let failed = false;
+      IDBFactory.prototype.open = function (name: string, version?: number) {
+        if (!failed) {
+          failed = true;
+          throw new DOMException('IndexedDB open failed', 'UnknownError');
+        }
+        return originalOpen.call(this, name, version);
+      };
+      return;
+    }
+
+    const originalTransaction = IDBDatabase.prototype.transaction;
+    let failed = false;
+    IDBDatabase.prototype.transaction = function (
+      storeNames: string | string[],
+      mode?: IDBTransactionMode,
+      options?: IDBTransactionOptions,
+    ) {
+      if (!failed) {
+        failed = true;
+        throw new DOMException('IndexedDB transaction failed', 'UnknownError');
+      }
+      return originalTransaction.call(this, storeNames, mode, options);
+    };
+  }, failure);
+}
+
 test('reload resumes an interrupted import by uploading only missing files', async ({ page }) => {
   const api = await installImportApi(page);
   api.blockAdditionalAttaches(true);
@@ -221,6 +252,30 @@ test('dismissed import errors stay hidden after refresh without suppressing a ne
   await expect(dashboardAlert).toContainText('2 files still need to be uploaded');
   await expect(page.evaluate(() => localStorage.getItem('luminova-folder-import-dismissed:import-new'))).resolves.toBeNull();
 });
+
+for (const failure of ['open', 'transaction'] as const) {
+  test(`a ${failure} failure during recovery explains the retry and accepts a new folder`, async ({ page }) => {
+    const api = await installImportApi(page);
+    api.setImportId(`import-storage-${failure}`);
+    api.seedDocuments();
+    api.setStatus('failed', 'The previous build was interrupted. Retry to continue.');
+    await makeImportFileStorageUnavailable(page, failure);
+
+    await page.goto('/__visual/folder-import');
+    const activity = page.getByRole('complementary', { name: 'Project folder import activity' });
+    const dashboardAlert = page.getByTestId('dashboard-import-alert');
+    await expect(activity.getByRole('alert')).toContainText('Browser file storage is unavailable');
+    await expect(activity.getByRole('alert')).toContainText('Select the project folder again to retry');
+    await expect(dashboardAlert).toContainText('Browser file storage is unavailable');
+    await expect(dashboardAlert).toContainText('Select the project folder again to retry');
+
+    await page.getByLabel('Project folder files').setInputFiles(files);
+    await page.getByRole('button', { name: 'Start import' }).click();
+    await expect(page.getByLabel('Import status')).toHaveText('success', { timeout: 10_000 });
+    expect(api.projectsCreated).toBe(1);
+    expect(api.uploadedPaths.size).toBe(2);
+  });
+}
 
 test('a stale build becomes retryable without duplicating attached documents', async ({ page }) => {
   const api = await installImportApi(page);
