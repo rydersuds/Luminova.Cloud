@@ -22,3 +22,4 @@ export * from "./projectImports";
 export * from "./projectExteriorPhotos";
 export * from "./vendorRecords";
 export * from "./projectConversations";
+export * from "./clients";

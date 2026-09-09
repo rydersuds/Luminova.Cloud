@@ -33,6 +33,36 @@ export interface WorkspaceUser {
   imageUrl: string;
 }
 
+export interface ClientMember {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  imageUrl: string;
+  role: WorkspaceRole;
+  addedAt: number;
+}
+
+export interface Client {
+  id: string;
+  name: string;
+  createdAt: number;
+  members: ClientMember[];
+}
+
+export interface ClientInput {
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  name: string;
+}
+
+export interface ClientMemberInput {
+  /** @minLength 1 */
+  userId: string;
+}
+
 export interface WorkspaceInvitationInput {
   /**
      * @minLength 3

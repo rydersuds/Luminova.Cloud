@@ -3,6 +3,12 @@ import { useUser } from "@clerk/react"
 import {
   getGetWorkspaceUsersQueryKey,
   getGetWorkspaceInvitationsQueryKey,
+  getGetClientsQueryKey,
+  useCreateClient,
+  useDeleteClient,
+  useGetClients,
+  useGrantClientAccess,
+  useRevokeClientAccess,
   useDeleteWorkspaceUser,
   useGetWorkspaceInvitations,
   useGetWorkspaceUsers,
@@ -13,6 +19,7 @@ import {
   type WorkspaceRole,
   type WorkspaceInvitation,
   type WorkspaceUser,
+  type Client as ClientOrganization,
 } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { AppLayout } from "@/components/layout/app-layout"
@@ -31,7 +38,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Loader2, MailPlus, Pencil, RefreshCw, Search, ShieldCheck, Trash2, Users as UsersIcon, X } from "lucide-react"
+import { Building2, Loader2, MailPlus, Pencil, Plus, RefreshCw, Search, ShieldCheck, Trash2, UserPlus, UserRoundMinus, Users as UsersIcon, X } from "lucide-react"
 
 const ROLES: WorkspaceRole[] = ["Admin", "Project Manager", "Field Team", "Client"]
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -68,7 +75,12 @@ export default function Users() {
   const { user: currentUser } = useUser()
   const usersQuery = useGetWorkspaceUsers()
   const invitationsQuery = useGetWorkspaceInvitations()
+  const clientsQuery = useGetClients()
   const inviteUser = useInviteWorkspaceUser()
+  const createClient = useCreateClient()
+  const deleteClient = useDeleteClient()
+  const grantClientAccess = useGrantClientAccess()
+  const revokeClientAccess = useRevokeClientAccess()
   const resendInvitation = useResendWorkspaceInvitation()
   const revokeInvitation = useRevokeWorkspaceInvitation()
   const updateUser = useUpdateWorkspaceUser()
@@ -82,15 +94,82 @@ export default function Users() {
   const [revoking, setRevoking] = React.useState<WorkspaceInvitation | null>(null)
   const [resendingId, setResendingId] = React.useState<string | null>(null)
   const [feedback, setFeedback] = React.useState<Feedback>(null)
+  const [activeTab, setActiveTab] = React.useState<"users" | "clients">("users")
+  const [clientName, setClientName] = React.useState("")
+  const [selectedMemberByClient, setSelectedMemberByClient] = React.useState<Record<string, string>>({})
+  const [deletingClient, setDeletingClient] = React.useState<ClientOrganization | null>(null)
 
   const users = usersQuery.data ?? []
   const pending = inviteUser.isPending || updateUser.isPending || deleteUser.isPending || resendInvitation.isPending || revokeInvitation.isPending
+  const clientsPending = createClient.isPending || deleteClient.isPending || grantClientAccess.isPending || revokeClientAccess.isPending
   const visible = users.filter((user) =>
     `${user.name} ${user.email} ${user.role}`.toLowerCase().includes(search.trim().toLowerCase()),
   )
 
   const refreshUsers = () => queryClient.invalidateQueries({ queryKey: getGetWorkspaceUsersQueryKey() })
   const refreshInvitations = () => queryClient.invalidateQueries({ queryKey: getGetWorkspaceInvitationsQueryKey() })
+  const refreshClients = () => queryClient.invalidateQueries({ queryKey: getGetClientsQueryKey() })
+
+  const submitClient = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setFeedback(null)
+    const name = clientName.trim()
+    if (!name) {
+      setFeedback({ kind: "error", message: "Enter a client name." })
+      return
+    }
+    try {
+      await createClient.mutateAsync({ data: { name } })
+      setClientName("")
+      await refreshClients()
+      setFeedback({ kind: "success", message: `${name} was added as a client.` })
+    } catch (error) {
+      setFeedback({ kind: "error", message: errorMessage(error, "Unable to add this client.") })
+    }
+  }
+
+  const grantAccess = async (client: ClientOrganization) => {
+    const userId = selectedMemberByClient[client.id]
+    if (!userId) {
+      setFeedback({ kind: "error", message: "Select a Client user before granting access." })
+      return
+    }
+    setFeedback(null)
+    try {
+      await grantClientAccess.mutateAsync({ clientId: client.id, data: { userId } })
+      setSelectedMemberByClient((current) => ({ ...current, [client.id]: "" }))
+      await refreshClients()
+      setFeedback({ kind: "success", message: "Client access granted." })
+    } catch (error) {
+      setFeedback({ kind: "error", message: errorMessage(error, "Unable to grant client access.") })
+    }
+  }
+
+  const revokeAccess = async (client: ClientOrganization, userId: string, name: string) => {
+    setFeedback(null)
+    try {
+      await revokeClientAccess.mutateAsync({ clientId: client.id, userId })
+      await refreshClients()
+      setFeedback({ kind: "success", message: `${name}'s access was revoked.` })
+    } catch (error) {
+      setFeedback({ kind: "error", message: errorMessage(error, "Unable to revoke client access.") })
+    }
+  }
+
+  const confirmDeleteClient = async () => {
+    if (!deletingClient) return
+    const name = deletingClient.name
+    setFeedback(null)
+    try {
+      await deleteClient.mutateAsync({ clientId: deletingClient.id })
+      setDeletingClient(null)
+      await refreshClients()
+      setFeedback({ kind: "success", message: `${name} was deleted.` })
+    } catch (error) {
+      setDeletingClient(null)
+      setFeedback({ kind: "error", message: errorMessage(error, "Unable to delete this client.") })
+    }
+  }
 
   const submitInvitation = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -198,13 +277,40 @@ export default function Users() {
                 <ShieldCheck className="h-4 w-4" />Access control
               </div>
               <h1 className="text-3xl font-extrabold sm:text-4xl">Users & Roles</h1>
-              <p className="mt-2 text-muted-foreground">Manage who can access the Luminova workspace and assign their responsibility.</p>
+              <p className="mt-2 text-muted-foreground">
+                {activeTab === "users"
+                  ? "Manage who can access the Luminova workspace and assign their responsibility."
+                  : "Organize client accounts and control which client users can access each one."}
+              </p>
             </div>
-            <Button onClick={() => { setInviteOpen((open) => !open); setFeedback(null) }} disabled={pending} className="w-full sm:w-auto">
-              {inviteOpen ? <X className="mr-2 h-4 w-4" /> : <MailPlus className="mr-2 h-4 w-4" />}
-              {inviteOpen ? "Cancel invite" : "Invite user"}
-            </Button>
+            {activeTab === "users" && (
+              <Button onClick={() => { setInviteOpen((open) => !open); setFeedback(null) }} disabled={pending} className="w-full sm:w-auto">
+                {inviteOpen ? <X className="mr-2 h-4 w-4" /> : <MailPlus className="mr-2 h-4 w-4" />}
+                {inviteOpen ? "Cancel invite" : "Invite user"}
+              </Button>
+            )}
           </header>
+
+          <div role="tablist" aria-label="Access management sections" className="grid grid-cols-2 gap-2 rounded-lg border border-border/70 bg-card/30 p-1 sm:inline-flex">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "users"}
+              onClick={() => { setActiveTab("users"); setFeedback(null) }}
+              className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${activeTab === "users" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:bg-card/70 hover:text-foreground"}`}
+            >
+              <UsersIcon className="mr-2 inline-block h-4 w-4" />Users & Roles
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "clients"}
+              onClick={() => { setActiveTab("clients"); setInviteOpen(false); setFeedback(null) }}
+              className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${activeTab === "clients" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:bg-card/70 hover:text-foreground"}`}
+            >
+              <Building2 className="mr-2 inline-block h-4 w-4" />Clients
+            </button>
+          </div>
 
           <div aria-live="polite" aria-atomic="true">
             {feedback && (
@@ -214,7 +320,9 @@ export default function Users() {
             )}
           </div>
 
-          {inviteOpen && (
+          {activeTab === "users" ? (
+            <>
+            {inviteOpen && (
             <Card className="p-4 sm:p-6">
               <form onSubmit={submitInvitation} className="grid gap-4 sm:grid-cols-[1fr_220px_auto] sm:items-end" noValidate>
                 <div className="space-y-2">
@@ -231,7 +339,7 @@ export default function Users() {
                 </Button>
               </form>
             </Card>
-          )}
+            )}
 
           <section aria-labelledby="pending-invitations-heading" className="space-y-3">
             <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-muted-foreground">
@@ -325,6 +433,107 @@ export default function Users() {
               )}
             </>
           )}
+            </>
+          ) : (
+            <>
+              <Card className="p-4 sm:p-6">
+                <form onSubmit={submitClient} className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end" noValidate>
+                  <div className="space-y-2">
+                    <Label htmlFor="client-name">Client name</Label>
+                    <Input id="client-name" value={clientName} onChange={(event) => setClientName(event.target.value)} placeholder="e.g. North Ridge Development" disabled={clientsPending} required />
+                  </div>
+                  <Button type="submit" disabled={clientsPending}>
+                    {createClient.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                    Add client
+                  </Button>
+                </form>
+              </Card>
+
+              {clientsQuery.isLoading ? (
+                <Card className="flex items-center justify-center gap-3 p-10" role="status">
+                  <Loader2 className="h-5 w-5 animate-spin" />Loading clients…
+                </Card>
+              ) : clientsQuery.isError ? (
+                <Card className="p-10 text-center" role="alert">
+                  <Building2 className="mx-auto mb-3 h-10 w-10 text-primary" />
+                  <p>{errorMessage(clientsQuery.error, "Unable to load clients.")}</p>
+                  <Button variant="outline" className="mt-4" onClick={() => void clientsQuery.refetch()}>Try again</Button>
+                </Card>
+              ) : clientsQuery.data?.length ? (
+                <div className="space-y-4">
+                  {clientsQuery.data.map((client) => {
+                    const memberIds = new Set(client.members.map((member) => member.userId))
+                    const availableUsers = users.filter((user) => user.role === "Client" && !memberIds.has(user.id))
+                    return (
+                      <Card key={client.id} className="space-y-5 p-4 sm:p-6">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="flex min-w-0 items-start gap-3">
+                            <div className="rounded-lg border border-primary/30 bg-primary/10 p-2 text-primary"><Building2 className="h-5 w-5" /></div>
+                            <div className="min-w-0">
+                              <h2 className="truncate text-lg font-semibold">{client.name}</h2>
+                              <p className="text-sm text-muted-foreground">{client.members.length} {client.members.length === 1 ? "person" : "people"} with access</p>
+                            </div>
+                          </div>
+                          <Button variant="outline" size="sm" className="self-start text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setDeletingClient(client)} disabled={clientsPending}>
+                            <Trash2 className="mr-2 h-4 w-4" />Delete client
+                          </Button>
+                        </div>
+
+                        <div className="grid gap-3 rounded-lg border border-border/70 bg-card/30 p-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                          <div className="space-y-2">
+                            <Label htmlFor={`client-member-${client.id}`}>Grant access to a Client user</Label>
+                            <select
+                              id={`client-member-${client.id}`}
+                              value={selectedMemberByClient[client.id] ?? ""}
+                              onChange={(event) => setSelectedMemberByClient((current) => ({ ...current, [client.id]: event.target.value }))}
+                              disabled={clientsPending || availableUsers.length === 0}
+                              className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <option value="">{availableUsers.length ? "Select a person…" : "No unassigned Client users"}</option>
+                              {availableUsers.map((user) => <option key={user.id} value={user.id}>{user.name} — {user.email}</option>)}
+                            </select>
+                          </div>
+                          <Button type="button" onClick={() => void grantAccess(client)} disabled={clientsPending || !selectedMemberByClient[client.id]}>
+                            {grantClientAccess.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            <UserPlus className="mr-2 h-4 w-4" />Grant access
+                          </Button>
+                        </div>
+
+                        {client.members.length ? (
+                          <div className="space-y-2">
+                            <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">People with access</p>
+                            <div className="space-y-2">
+                              {client.members.map((member) => (
+                                <div key={member.id} className="flex flex-col gap-3 rounded-md border border-border/60 p-3 sm:flex-row sm:items-center">
+                                  <img src={member.imageUrl} alt="" className="h-9 w-9 rounded-full object-cover" />
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-medium">{member.name}</p>
+                                    <p className="truncate text-sm text-muted-foreground">{member.email}</p>
+                                  </div>
+                                  <Badge variant="secondary">{member.role}</Badge>
+                                  <Button type="button" variant="ghost" size="sm" className="self-start text-muted-foreground hover:text-destructive sm:self-auto" onClick={() => void revokeAccess(client, member.userId, member.name)} disabled={clientsPending}>
+                                    <UserRoundMinus className="mr-2 h-4 w-4" />Revoke
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">No people have access to this client yet.</p>
+                        )}
+                      </Card>
+                    )
+                  })}
+                </div>
+              ) : (
+                <Card className="p-10 text-center">
+                  <Building2 className="mx-auto mb-3 h-10 w-10 text-primary" />
+                  <p className="font-medium">No clients have been added yet.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Add a client above, then grant access to their Client users.</p>
+                </Card>
+              )}
+            </>
+          )}
         </div>
       </div>
 
@@ -380,6 +589,23 @@ export default function Users() {
             <AlertDialogCancel disabled={pending}>Keep invitation</AlertDialogCancel>
             <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={pending} onClick={() => void confirmRevoke()}>
               {revokeInvitation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Cancel invitation
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={Boolean(deletingClient)} onOpenChange={(open) => !open && !deleteClient.isPending && setDeletingClient(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {deletingClient?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the client organization and revokes access for everyone assigned to it. The workspace users themselves will not be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={clientsPending}>Keep client</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={clientsPending} onClick={() => void confirmDeleteClient()}>
+              {deleteClient.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Delete client
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

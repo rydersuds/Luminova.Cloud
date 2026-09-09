@@ -1,13 +1,20 @@
 import { createClerkClient, type Invitation, type User } from "@clerk/backend";
 import { getAuth } from "@clerk/express";
-import { pool } from "@workspace/db";
+import { clientMembersTable, clientsTable, db, pool } from "@workspace/db";
 import {
+  CreateClientBody,
+  CreateClientResponse,
+  DeleteClientParams,
+  GetClientsResponse,
   DeleteWorkspaceUserParams,
   GetWorkspaceInvitationsResponse,
   GetCurrentWorkspaceUserResponse,
   GetWorkspaceUsersResponse,
+  GrantClientAccessBody,
+  GrantClientAccessParams,
   InviteWorkspaceUserBody,
   InviteWorkspaceUserResponse,
+  RevokeClientAccessParams,
   ResendWorkspaceInvitationParams,
   ResendWorkspaceInvitationResponse,
   RevokeWorkspaceInvitationParams,
@@ -16,6 +23,8 @@ import {
   UpdateWorkspaceUserResponse,
 } from "@workspace/api-zod";
 import { Router, type Request, type Response, type NextFunction } from "express";
+import { and, asc, eq, inArray } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 export const ROLES = ["Admin", "Project Manager", "Field Team", "Client"] as const;
@@ -75,6 +84,50 @@ function serializeInvitation(invitation: Invitation) {
     status: invitation.status,
     createdAt: invitation.createdAt,
   };
+}
+
+function workspaceId(req: AuthenticatedRequest) {
+  return getAuth(req).orgId || "default";
+}
+
+async function serializeClients(client: ClerkClient, scope: string, clientId?: string) {
+  const records = await db
+    .select()
+    .from(clientsTable)
+    .where(clientId
+      ? and(eq(clientsTable.id, clientId), eq(clientsTable.workspaceId, scope))
+      : eq(clientsTable.workspaceId, scope))
+    .orderBy(asc(clientsTable.name));
+  if (!records.length) return [];
+
+  const memberships = await db
+    .select()
+    .from(clientMembersTable)
+    .where(inArray(clientMembersTable.clientId, records.map((record) => record.id)));
+  const users = await client.users.getUserList({ limit: 100 });
+  const usersById = new Map(users.data.map((user) => [user.id, user]));
+
+  return records.map((record) => ({
+    id: record.id,
+    name: record.name,
+    createdAt: record.createdAt.getTime(),
+    members: memberships
+      .filter((membership) => membership.clientId === record.id)
+      .map((membership) => {
+        const user = usersById.get(membership.userId);
+        if (!user) return null;
+        return {
+          id: membership.id,
+          userId: user.id,
+          name: user.fullName || user.username || [user.firstName, user.lastName].filter(Boolean).join(" ") || "Unnamed user",
+          email: user.primaryEmailAddress?.emailAddress || "",
+          imageUrl: user.imageUrl,
+          role: workspaceRole(user),
+          addedAt: membership.createdAt.getTime(),
+        };
+      })
+      .filter((member): member is NonNullable<typeof member> => Boolean(member)),
+  }));
 }
 
 type ClerkClient = typeof clerk;
@@ -170,6 +223,134 @@ router.get("/users", async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!await requireAdmin(client, req, res)) return;
   const result = await client.users.getUserList({ limit: 100, orderBy: "-created_at" });
   res.json(GetWorkspaceUsersResponse.parse(result.data.map(serializeUser)));
+});
+
+router.get("/clients", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!await requireAdmin(client, req, res)) return;
+  try {
+    res.json(GetClientsResponse.parse(await serializeClients(client, workspaceId(req))));
+  } catch (error) {
+    req.log.error({ error }, "Client organization listing failed");
+    res.status(500).json({ error: "Unable to load client organizations" });
+  }
+});
+
+router.post("/clients", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!await requireAdmin(client, req, res)) return;
+  const body = CreateClientBody.safeParse({
+    ...req.body,
+    name: typeof req.body?.name === "string" ? req.body.name.trim() : req.body?.name,
+  });
+  if (!body.success) {
+    res.status(400).json({ error: "Enter a client name" });
+    return;
+  }
+
+  try {
+    const record = await db.insert(clientsTable).values({
+      id: randomUUID(),
+      workspaceId: workspaceId(req),
+      name: body.data.name,
+      createdBy: req.userId!,
+    }).returning();
+    const created = await serializeClients(client, workspaceId(req), record[0].id);
+    res.status(201).json(CreateClientResponse.parse(created[0]));
+  } catch (error) {
+    if ((error as { code?: string }).code === "23505") {
+      res.status(409).json({ error: "A client with that name already exists" });
+      return;
+    }
+    req.log.error({ error }, "Client organization creation failed");
+    res.status(500).json({ error: "Unable to create the client organization" });
+  }
+});
+
+router.delete("/clients/:clientId", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!await requireAdmin(client, req, res)) return;
+  const params = DeleteClientParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Invalid client" });
+    return;
+  }
+  const deleted = await db.delete(clientsTable).where(
+    and(
+      eq(clientsTable.id, params.data.clientId),
+      eq(clientsTable.workspaceId, workspaceId(req)),
+    ),
+  ).returning({ id: clientsTable.id });
+  if (!deleted.length) {
+    res.status(404).json({ error: "Client not found" });
+    return;
+  }
+  await db.delete(clientMembersTable).where(eq(clientMembersTable.clientId, params.data.clientId));
+  res.status(204).send();
+});
+
+router.post("/clients/:clientId/members", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!await requireAdmin(client, req, res)) return;
+  const params = GrantClientAccessParams.safeParse(req.params);
+  const body = GrantClientAccessBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: "Select a workspace client user" });
+    return;
+  }
+  const scope = workspaceId(req);
+  const ownedClient = await db.select({ id: clientsTable.id }).from(clientsTable).where(
+    and(
+      eq(clientsTable.id, params.data.clientId),
+      eq(clientsTable.workspaceId, scope),
+    ),
+  );
+  if (!ownedClient.length) {
+    res.status(404).json({ error: "Client not found" });
+    return;
+  }
+  try {
+    const user = await client.users.getUser(body.data.userId);
+    if (workspaceRole(user) !== "Client") {
+      res.status(403).json({ error: "Only workspace users with the Client role can receive client access" });
+      return;
+    }
+    await db.insert(clientMembersTable).values({
+      id: randomUUID(),
+      clientId: params.data.clientId,
+      userId: body.data.userId,
+      addedBy: req.userId!,
+    });
+    const updated = await serializeClients(client, scope, params.data.clientId);
+    res.status(201).json(updated[0]);
+  } catch (error) {
+    if ((error as { code?: string }).code === "23505") {
+      res.status(409).json({ error: "This user already has access to the client" });
+      return;
+    }
+    if ((error as { status?: number }).status === 404) {
+      res.status(404).json({ error: "Workspace user not found" });
+      return;
+    }
+    req.log.error({ error }, "Client access grant failed");
+    res.status(500).json({ error: "Unable to grant client access" });
+  }
+});
+
+router.delete("/clients/:clientId/members/:userId", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!await requireAdmin(client, req, res)) return;
+  const params = RevokeClientAccessParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Invalid client membership" });
+    return;
+  }
+  const removed = await db.delete(clientMembersTable).where(
+    and(
+      eq(clientMembersTable.clientId, params.data.clientId),
+      eq(clientMembersTable.userId, params.data.userId),
+    ),
+  ).returning({ id: clientMembersTable.id, userId: clientMembersTable.userId });
+  if (!removed.length) {
+    res.status(404).json({ error: "Client membership not found" });
+    return;
+  }
+  res.status(204).send();
 });
 
 router.get("/users/invitations", async (req: AuthenticatedRequest, res): Promise<void> => {

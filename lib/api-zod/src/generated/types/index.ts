@@ -8,6 +8,10 @@
 
 export * from './activity';
 export * from './budgetLineItem';
+export * from './client';
+export * from './clientInput';
+export * from './clientMember';
+export * from './clientMemberInput';
 export * from './clientQuote';
 export * from './currentWorkspaceUser';
 export * from './dashboardSummary';

@@ -891,6 +891,112 @@ paths:
           description: Authentication required
         "403":
           description: Administrator access required
+  /clients:
+    get:
+      operationId: getClients
+      tags: [users]
+      summary: List client organizations and their members
+      responses:
+        "200":
+          description: Client organization list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Client"
+        "401":
+          description: Authentication required
+        "403":
+          description: Administrator access required
+    post:
+      operationId: createClient
+      tags: [users]
+      summary: Create a client organization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientInput"
+      responses:
+        "201":
+          description: Client organization created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "400":
+          description: Invalid client
+        "401":
+          description: Authentication required
+        "403":
+          description: Administrator access required
+        "409":
+          description: Client already exists
+  /clients/{clientId}:
+    delete:
+      operationId: deleteClient
+      tags: [users]
+      summary: Delete a client organization
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+      responses:
+        "204":
+          description: Client organization deleted
+        "401":
+          description: Authentication required
+        "403":
+          description: Administrator access required
+        "404":
+          description: Client not found
+  /clients/{clientId}/members:
+    post:
+      operationId: grantClientAccess
+      tags: [users]
+      summary: Grant a workspace client user access to a client organization
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientMemberInput"
+      responses:
+        "201":
+          description: Client access granted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "400":
+          description: Invalid client member
+        "401":
+          description: Authentication required
+        "403":
+          description: Administrator access required or user is not a Client
+        "404":
+          description: Client or user not found
+        "409":
+          description: User already has access
+  /clients/{clientId}/members/{userId}:
+    delete:
+      operationId: revokeClientAccess
+      tags: [users]
+      summary: Revoke a workspace user's access to a client organization
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "204":
+          description: Client access revoked
+        "401":
+          description: Authentication required
+        "403":
+          description: Administrator access required
+        "404":
+          description: Client membership not found
   /users/invitations:
     get:
       operationId: getWorkspaceInvitations
@@ -1064,6 +1170,13 @@ components:
       schema:
         type: string
         minLength: 1
+    ClientId:
+      name: clientId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
   schemas:
     WorkspaceRole:
       type: string
@@ -1089,6 +1202,46 @@ components:
         createdAt: { type: integer }
         lastSignInAt: { type: [integer, "null"] }
         imageUrl: { type: string }
+    ClientMember:
+      type: object
+      required: [id, userId, name, email, imageUrl, role, addedAt]
+      properties:
+        id: { type: string }
+        userId: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+        imageUrl: { type: string }
+        role:
+          $ref: "#/components/schemas/WorkspaceRole"
+        addedAt: { type: integer }
+    Client:
+      type: object
+      required: [id, name, createdAt, members]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        createdAt: { type: integer }
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/ClientMember"
+    ClientInput:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+    ClientMemberInput:
+      type: object
+      additionalProperties: false
+      required: [userId]
+      properties:
+        userId:
+          type: string
+          minLength: 1
     WorkspaceInvitationInput:
       type: object
       additionalProperties: false

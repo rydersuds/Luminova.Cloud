@@ -21,6 +21,9 @@ import type {
 
 import type {
   Activity,
+  Client,
+  ClientInput,
+  ClientMemberInput,
   CurrentWorkspaceUser,
   DashboardSummary,
   FinancialSummary,
@@ -3161,6 +3164,370 @@ export function useGetWorkspaceUsers<TData = Awaited<ReturnType<typeof getWorksp
 
 
 
+
+export const getGetClientsUrl = () => {
+
+
+
+
+  return `/api/clients`
+}
+
+/**
+ * @summary List client organizations and their members
+ */
+export const getClients = async ( options?: Parameters<typeof customFetch>[1]): Promise<Client[]> => {
+
+  return customFetch<Client[]>(getGetClientsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetClientsQueryKey = () => {
+    return [
+    `/api/clients`
+    ] as const;
+    }
+
+
+export const getGetClientsQueryOptions = <TData = Awaited<ReturnType<typeof getClients>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getClients>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetClientsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getClients>>> = ({ signal }) => getClients({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getClients>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetClientsQueryResult = NonNullable<Awaited<ReturnType<typeof getClients>>>
+export type GetClientsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List client organizations and their members
+ */
+
+export function useGetClients<TData = Awaited<ReturnType<typeof getClients>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getClients>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetClientsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateClientUrl = () => {
+
+
+
+
+  return `/api/clients`
+}
+
+/**
+ * @summary Create a client organization
+ */
+export const createClient = async (clientInput: ClientInput, options?: Parameters<typeof customFetch>[1]): Promise<Client> => {
+
+  return customFetch<Client>(getCreateClientUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(clientInput)
+  }
+);}
+
+
+
+
+
+export const getCreateClientMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createClient>>, TError,{data: BodyType<ClientInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createClient>>, TError,{data: BodyType<ClientInput>}, TContext> => {
+
+const mutationKey = ['createClient'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createClient>>, {data: BodyType<ClientInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createClient(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateClientMutationResult = NonNullable<Awaited<ReturnType<typeof createClient>>>
+    export type CreateClientMutationBody = BodyType<ClientInput>
+    export type CreateClientMutationError = ErrorType<void>
+
+    /**
+ * @summary Create a client organization
+ */
+export const useCreateClient = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createClient>>, TError,{data: BodyType<ClientInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createClient>>,
+        TError,
+        {data: BodyType<ClientInput>},
+        TContext
+      > => {
+      return useMutation(getCreateClientMutationOptions(options));
+    }
+
+export const getDeleteClientUrl = (clientId: string,) => {
+
+
+
+
+  return `/api/clients/${clientId}`
+}
+
+/**
+ * @summary Delete a client organization
+ */
+export const deleteClient = async (clientId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteClientUrl(clientId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteClientMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteClient>>, TError,{clientId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteClient>>, TError,{clientId: string}, TContext> => {
+
+const mutationKey = ['deleteClient'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteClient>>, {clientId: string}> = (props) => {
+          const {clientId} = props ?? {};
+
+          return  deleteClient(clientId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteClientMutationResult = NonNullable<Awaited<ReturnType<typeof deleteClient>>>
+
+    export type DeleteClientMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete a client organization
+ */
+export const useDeleteClient = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteClient>>, TError,{clientId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteClient>>,
+        TError,
+        {clientId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteClientMutationOptions(options));
+    }
+
+export const getGrantClientAccessUrl = (clientId: string,) => {
+
+
+
+
+  return `/api/clients/${clientId}/members`
+}
+
+/**
+ * @summary Grant a workspace client user access to a client organization
+ */
+export const grantClientAccess = async (clientId: string,
+    clientMemberInput: ClientMemberInput, options?: Parameters<typeof customFetch>[1]): Promise<Client> => {
+
+  return customFetch<Client>(getGrantClientAccessUrl(clientId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(clientMemberInput)
+  }
+);}
+
+
+
+
+
+export const getGrantClientAccessMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof grantClientAccess>>, TError,{clientId: string;data: BodyType<ClientMemberInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof grantClientAccess>>, TError,{clientId: string;data: BodyType<ClientMemberInput>}, TContext> => {
+
+const mutationKey = ['grantClientAccess'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof grantClientAccess>>, {clientId: string;data: BodyType<ClientMemberInput>}> = (props) => {
+          const {clientId,data} = props ?? {};
+
+          return  grantClientAccess(clientId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GrantClientAccessMutationResult = NonNullable<Awaited<ReturnType<typeof grantClientAccess>>>
+    export type GrantClientAccessMutationBody = BodyType<ClientMemberInput>
+    export type GrantClientAccessMutationError = ErrorType<void>
+
+    /**
+ * @summary Grant a workspace client user access to a client organization
+ */
+export const useGrantClientAccess = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof grantClientAccess>>, TError,{clientId: string;data: BodyType<ClientMemberInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof grantClientAccess>>,
+        TError,
+        {clientId: string;data: BodyType<ClientMemberInput>},
+        TContext
+      > => {
+      return useMutation(getGrantClientAccessMutationOptions(options));
+    }
+
+export const getRevokeClientAccessUrl = (clientId: string,
+    userId: string,) => {
+
+
+
+
+  return `/api/clients/${clientId}/members/${userId}`
+}
+
+/**
+ * @summary Revoke a workspace user's access to a client organization
+ */
+export const revokeClientAccess = async (clientId: string,
+    userId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getRevokeClientAccessUrl(clientId,userId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getRevokeClientAccessMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeClientAccess>>, TError,{clientId: string;userId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof revokeClientAccess>>, TError,{clientId: string;userId: string}, TContext> => {
+
+const mutationKey = ['revokeClientAccess'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revokeClientAccess>>, {clientId: string;userId: string}> = (props) => {
+          const {clientId,userId} = props ?? {};
+
+          return  revokeClientAccess(clientId,userId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevokeClientAccessMutationResult = NonNullable<Awaited<ReturnType<typeof revokeClientAccess>>>
+
+    export type RevokeClientAccessMutationError = ErrorType<void>
+
+    /**
+ * @summary Revoke a workspace user's access to a client organization
+ */
+export const useRevokeClientAccess = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeClientAccess>>, TError,{clientId: string;userId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof revokeClientAccess>>,
+        TError,
+        {clientId: string;userId: string},
+        TContext
+      > => {
+      return useMutation(getRevokeClientAccessMutationOptions(options));
+    }
 
 export const getGetWorkspaceInvitationsUrl = () => {
 

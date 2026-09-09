@@ -1576,6 +1576,114 @@ export const GetWorkspaceUsersResponse = zod.array(GetWorkspaceUsersResponseItem
 
 
 /**
+ * @summary List client organizations and their members
+ */
+export const GetClientsResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "createdAt": zod.number().int(),
+  "members": zod.array(zod.object({
+  "id": zod.string(),
+  "userId": zod.string(),
+  "name": zod.string(),
+  "email": zod.string().email(),
+  "imageUrl": zod.string(),
+  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client']),
+  "addedAt": zod.number().int()
+}))
+})
+export const GetClientsResponse = zod.array(GetClientsResponseItem)
+
+
+/**
+ * @summary Create a client organization
+ */
+export const createClientBodyNameMax = 160;
+
+
+
+export const CreateClientBody = zod.object({
+  "name": zod.string().min(1).max(createClientBodyNameMax)
+})
+
+export const CreateClientResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "createdAt": zod.number().int(),
+  "members": zod.array(zod.object({
+  "id": zod.string(),
+  "userId": zod.string(),
+  "name": zod.string(),
+  "email": zod.string().email(),
+  "imageUrl": zod.string(),
+  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client']),
+  "addedAt": zod.number().int()
+}))
+})
+
+
+/**
+ * @summary Delete a client organization
+ */
+
+
+
+export const DeleteClientParams = zod.object({
+  "clientId": zod.coerce.string().min(1)
+})
+
+export const DeleteClientResponse = zod.void()
+
+
+/**
+ * @summary Grant a workspace client user access to a client organization
+ */
+
+
+
+export const GrantClientAccessParams = zod.object({
+  "clientId": zod.coerce.string().min(1)
+})
+
+
+
+
+export const GrantClientAccessBody = zod.object({
+  "userId": zod.string().min(1)
+})
+
+export const GrantClientAccessResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "createdAt": zod.number().int(),
+  "members": zod.array(zod.object({
+  "id": zod.string(),
+  "userId": zod.string(),
+  "name": zod.string(),
+  "email": zod.string().email(),
+  "imageUrl": zod.string(),
+  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client']),
+  "addedAt": zod.number().int()
+}))
+})
+
+
+/**
+ * @summary Revoke a workspace user's access to a client organization
+ */
+
+
+
+
+export const RevokeClientAccessParams = zod.object({
+  "clientId": zod.coerce.string().min(1),
+  "userId": zod.coerce.string().min(1)
+})
+
+export const RevokeClientAccessResponse = zod.void()
+
+
+/**
  * @summary List pending workspace invitations
  */
 export const GetWorkspaceInvitationsResponseItem = zod.object({
