@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils"
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useClerk, useUser } from "@clerk/react"
 import { useTheme } from "@/hooks/use-theme"
+import { CookieConsentBanner } from "@/components/cookie-consent-banner"
 
 type IndicatorPhase = "idle" | "travel" | "settle"
 
@@ -44,6 +45,7 @@ type AppLayoutViewProps = {
   initialProfileOpen?: boolean
   hoveredHref?: string
   onNavigate?: (href: string) => void
+  showCookieConsent?: boolean
 }
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "luminova-sidebar-collapsed"
@@ -69,6 +71,7 @@ export function AppLayoutView({
   initialProfileOpen = false,
   hoveredHref,
   onNavigate,
+  showCookieConsent = true,
 }: AppLayoutViewProps) {
   const { theme, toggleTheme } = useTheme()
   const [sidebarOpen, setSidebarOpen] = useState(initialSidebarOpen)
@@ -500,6 +503,7 @@ export function AppLayoutView({
           {children}
         </div>
       </main>
+      {showCookieConsent && <CookieConsentBanner />}
     </div>
   )
 }

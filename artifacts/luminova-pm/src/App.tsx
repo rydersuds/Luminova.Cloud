@@ -316,6 +316,7 @@ function SidebarVisualHarness() {
         }
         initialProfileOpen={params.get('profile') === 'open'}
         hoveredHref={params.get('hover') === 'trades' ? '/trades' : undefined}
+        showCookieConsent={false}
       >
         <section className="m-4 min-h-64 rounded-2xl bg-sidebar p-8 text-sidebar-foreground shadow-xl" data-testid="shared-dark-surface">
           <p className="font-mono text-xs uppercase tracking-widest text-sidebar-foreground/60">Shared dark surface</p>
