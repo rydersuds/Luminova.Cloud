@@ -104,10 +104,16 @@ export default function TradesDirectory() {
                             <MapPin className="h-3.5 w-3.5" />
                             {trade.region}
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Star className="h-3.5 w-3.5 fill-primary text-primary" />
-                            <span className="font-medium">{trade.rating.toFixed(1)}</span>
-                            <span className="text-muted-foreground">({trade.reviewCount})</span>
+                          <div className="flex items-center gap-1 text-muted-foreground">
+                            {trade.reviewCount > 0 ? (
+                              <>
+                                <Star className="h-3.5 w-3.5 fill-primary text-primary" />
+                                <span className="font-medium text-foreground">{trade.rating.toFixed(1)}</span>
+                                <span>({trade.reviewCount} verified)</span>
+                              </>
+                            ) : (
+                              <span>No verified reviews</span>
+                            )}
                           </div>
                           <div className="text-muted-foreground hidden sm:block">
                             • {trade.completedJobs} jobs completed

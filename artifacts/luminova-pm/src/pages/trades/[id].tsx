@@ -77,8 +77,14 @@ export default function TradeDetail() {
                 <p className="text-lg text-muted-foreground">Contact: {trade.contactName}</p>
                 <div className="flex flex-wrap items-center gap-4 text-sm font-medium pt-2">
                   <div className="flex items-center gap-1.5 text-foreground">
-                    <Star className="h-4 w-4 fill-primary text-primary" />
-                    {trade.rating.toFixed(1)} <span className="text-muted-foreground font-normal">({trade.reviewCount} reviews)</span>
+                    {trade.reviewCount > 0 ? (
+                      <>
+                        <Star className="h-4 w-4 fill-primary text-primary" />
+                        {trade.rating.toFixed(1)} <span className="text-muted-foreground font-normal">({trade.reviewCount} verified reviews)</span>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground font-normal">No verified reviews</span>
+                    )}
                   </div>
                   <div className="flex items-center gap-1.5 text-muted-foreground font-normal">
                     <History className="h-4 w-4" />
@@ -218,7 +224,7 @@ export default function TradeDetail() {
                 </TabsContent>
 
                 <TabsContent value="reviews" className="mt-0 space-y-4">
-                  {trade.reviews.map((review, i) => (
+                  {trade.reviews.length > 0 ? trade.reviews.map((review, i) => (
                     <Card key={i}>
                       <CardContent className="p-5 space-y-3">
                         <div className="flex justify-between items-start">
@@ -235,7 +241,14 @@ export default function TradeDetail() {
                         <p className="text-sm text-foreground/80 italic">"{review.comment}"</p>
                       </CardContent>
                     </Card>
-                  ))}
+                  )) : (
+                    <Card>
+                      <CardContent className="p-8 text-center">
+                        <p className="font-medium">No verified reviews yet</p>
+                        <p className="mt-1 text-sm text-muted-foreground">Reviews will appear here after they are submitted and tied to a completed project.</p>
+                      </CardContent>
+                    </Card>
+                  )}
                 </TabsContent>
               </Tabs>
             </div>

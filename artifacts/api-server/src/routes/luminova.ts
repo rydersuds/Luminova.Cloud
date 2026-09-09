@@ -456,15 +456,6 @@ const activities = [
   { id: "act-4", type: "status", title: "Project moved to In progress", description: "Riverstone Residence mobilization is complete.", author: "Maya Chen", date: "2026-09-02T15:20:00.000Z" },
 ];
 
-const trades = [
-  { id: "trade-1", companyName: "Northline Electric", contactName: "Evan Mercer", tradeType: "Electrical", region: "Calgary", rating: 4.9, reviewCount: 18, completedJobs: 31, initials: "NE", accent: "#AD9C4C" },
-  { id: "trade-2", companyName: "Prairie Flow Mechanical", contactName: "Danika Roy", tradeType: "Plumbing", region: "Calgary", rating: 4.7, reviewCount: 14, completedJobs: 26, initials: "PF", accent: "#2563EB" },
-  { id: "trade-3", companyName: "Summit Frame & Form", contactName: "Noah Cardinal", tradeType: "Framing", region: "Canmore", rating: 4.8, reviewCount: 22, completedJobs: 43, initials: "SF", accent: "#2E7D4F" },
-  { id: "trade-4", companyName: "Altitude Exteriors", contactName: "Leah Park", tradeType: "Roofing", region: "Canmore", rating: 4.6, reviewCount: 11, completedJobs: 19, initials: "AE", accent: "#C2410C" },
-  { id: "trade-5", companyName: "True North Concrete", contactName: "Owen Bains", tradeType: "Concrete", region: "Edmonton", rating: 4.5, reviewCount: 16, completedJobs: 38, initials: "TN", accent: "#6B6862" },
-  { id: "trade-6", companyName: "Clearline Interiors", contactName: "Sofia Marquez", tradeType: "Drywall", region: "Calgary", rating: 4.8, reviewCount: 20, completedJobs: 47, initials: "CI", accent: "#7A6626" },
-];
-
 let projects = [
   {
     id: "riverstone",
@@ -633,6 +624,19 @@ let vendorQuotes = [
     updatedAt: "2026-09-03T15:10:00.000Z",
   },
 ];
+
+const trades: Array<{
+  id: string;
+  companyName: string;
+  contactName: string;
+  tradeType: string;
+  region: string;
+  rating: number;
+  reviewCount: number;
+  completedJobs: number;
+  initials: string;
+  accent: string;
+}> = [];
 
 type Project = (typeof projects)[number] & {
   clientQuote?: {
@@ -1630,10 +1634,7 @@ router.get("/trades/:tradeId", async (req, res) => {
     licence: "AB-WCB-449218",
     insuranceExpiry: "2027-04-30",
     regions: [trade.region, "Calgary", "Canmore"],
-    reviews: [
-      { projectName: "Riverstone Residence", reviewer: "Maya Chen", date: "2026-08-28", rating: 5, comment: "Exceptionally organized on site and proactive about coordinating rough-in conflicts." },
-      { projectName: "Elbow Park Renovation", reviewer: "Jordan Bell", date: "2026-05-14", rating: 5, comment: "Clean work, accurate pricing, and excellent communication through closeout." },
-    ],
+    reviews: [],
     jobHistory: [
       { projectName: "Riverstone Residence", date: "2026", amount: 26850000 },
       { projectName: "Elbow Park Renovation", date: "2025", amount: 14900000 },

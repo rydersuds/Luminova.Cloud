@@ -1151,10 +1151,14 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                             <Badge variant="outline">{trade.tradeType}</Badge>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-1">
-                              <span className="font-medium">{trade.rating.toFixed(1)}</span>
-                              <span className="text-xs text-muted-foreground">({trade.reviewCount})</span>
-                            </div>
+                            {trade.reviewCount > 0 ? (
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium">{trade.rating.toFixed(1)}</span>
+                                <span className="text-xs text-muted-foreground">({trade.reviewCount} verified)</span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">No verified reviews</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-right">
                             <Button variant="ghost" size="sm" onClick={() => setLocation(`/trades/${trade.id}`)}>
