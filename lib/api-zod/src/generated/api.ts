@@ -848,7 +848,7 @@ export const UpdateTradeResponse = zod.object({
 
 
 /**
- * @summary Request a private vendor profile photo upload
+ * @summary Request a private vendor logo or profile image upload
  */
 export const RequestTradeProfilePhotoUploadParams = zod.object({
   "tradeId": zod.coerce.string()

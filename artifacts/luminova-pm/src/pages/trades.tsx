@@ -99,7 +99,7 @@ export default function TradesDirectory() {
                             ? <img
                                 src={trade.profilePhotoUrl}
                                 alt=""
-                                className="h-full w-full object-cover"
+                                className="h-full w-full object-contain p-1"
                                 style={{
                                   objectPosition: `${trade.profilePhotoPositionX ?? 50}% ${trade.profilePhotoPositionY ?? 50}%`,
                                   transform: `scale(${trade.profilePhotoZoom ?? 1})`,

@@ -415,7 +415,7 @@ paths:
     post:
       operationId: requestTradeProfilePhotoUpload
       tags: [trades]
-      summary: Request a private vendor profile photo upload
+      summary: Request a private vendor logo or profile image upload
       parameters:
         - $ref: "#/components/parameters/TradeId"
       requestBody:

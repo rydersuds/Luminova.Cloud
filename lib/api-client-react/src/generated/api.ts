@@ -1592,7 +1592,7 @@ export const getRequestTradeProfilePhotoUploadUrl = (tradeId: string,) => {
 }
 
 /**
- * @summary Request a private vendor profile photo upload
+ * @summary Request a private vendor logo or profile image upload
  */
 export const requestTradeProfilePhotoUpload = async (tradeId: string,
     uploadUrlRequest: UploadUrlRequest, options?: Parameters<typeof customFetch>[1]): Promise<UploadUrlResponse> => {
@@ -1642,7 +1642,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type RequestTradeProfilePhotoUploadMutationError = ErrorType<void>
 
     /**
- * @summary Request a private vendor profile photo upload
+ * @summary Request a private vendor logo or profile image upload
  */
 export const useRequestTradeProfilePhotoUpload = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestTradeProfilePhotoUpload>>, TError,{tradeId: string;data: BodyType<UploadUrlRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}

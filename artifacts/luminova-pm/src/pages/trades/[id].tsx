@@ -172,7 +172,7 @@ export default function TradeDetail() {
           headers: { "Content-Type": profilePhoto.type },
           body: profilePhoto,
         })
-        if (!stored.ok) throw new Error("The profile photo could not be stored.")
+        if (!stored.ok) throw new Error("The logo or profile image could not be stored.")
         profilePhotoObjectPath = upload.objectPath
       } else if (removeProfilePhoto) {
         profilePhotoObjectPath = null
@@ -390,7 +390,7 @@ export default function TradeDetail() {
                   ? <img
                       src={trade.profilePhotoUrl}
                       alt={`${trade.companyName} profile`}
-                      className="h-full w-full object-cover"
+                      className="h-full w-full object-contain p-1"
                       style={{
                         objectPosition: `${trade.profilePhotoPositionX}% ${trade.profilePhotoPositionY}%`,
                         transform: `scale(${trade.profilePhotoZoom})`,
@@ -634,7 +634,7 @@ export default function TradeDetail() {
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Edit vendor profile</DialogTitle>
-            <DialogDescription>Add the contact, service area, credentials, and profile photo shown on this vendor page.</DialogDescription>
+             <DialogDescription>Add the contact, service area, credentials, and logo or profile image shown on this vendor page.</DialogDescription>
           </DialogHeader>
           <form onSubmit={(event) => void submitProfile(event)} className="space-y-5">
             <div className="flex flex-col gap-5 rounded-lg border border-border bg-muted/20 p-4 sm:flex-row sm:items-start">
@@ -642,8 +642,8 @@ export default function TradeDetail() {
                 {profilePhotoPreview
                   ? <img
                       src={profilePhotoPreview}
-                      alt="New vendor profile preview"
-                      className="h-full w-full object-cover"
+                      alt="New vendor logo or profile image preview"
+                      className="h-full w-full object-contain p-1"
                       style={{
                         objectPosition: `${profileForm.profilePhotoPositionX}% ${profileForm.profilePhotoPositionY}%`,
                         transform: `scale(${profileForm.profilePhotoZoom})`,
@@ -653,8 +653,8 @@ export default function TradeDetail() {
                   : trade.profilePhotoUrl && !removeProfilePhoto
                     ? <img
                         src={trade.profilePhotoUrl}
-                        alt={`${trade.companyName} profile`}
-                        className="h-full w-full object-cover"
+                        alt={`${trade.companyName} logo or profile image`}
+                        className="h-full w-full object-contain p-1"
                         style={{
                           objectPosition: `${profileForm.profilePhotoPositionX}% ${profileForm.profilePhotoPositionY}%`,
                           transform: `scale(${profileForm.profilePhotoZoom})`,
@@ -664,9 +664,9 @@ export default function TradeDetail() {
                     : trade.initials}
               </div>
               <div className="min-w-0 flex-1 space-y-2">
-                <Label htmlFor="vendor-profile-photo">Profile photo</Label>
-                <Input id="vendor-profile-photo" type="file" accept="image/jpeg,image/png,image/webp" onChange={chooseProfilePhoto} />
-                <p className="text-xs text-muted-foreground">JPEG, PNG, or WebP. Maximum 8 MB.</p>
+                <Label htmlFor="vendor-profile-photo">Logo or profile image</Label>
+                <Input id="vendor-profile-photo" type="file" accept=".png,image/png,image/jpeg,image/webp" onChange={chooseProfilePhoto} />
+                <p className="text-xs text-muted-foreground">Upload a PNG logo, JPEG, or WebP image. Maximum 8 MB. PNG logos are shown in full without cropping.</p>
                 {(profilePhotoPreview || (trade.profilePhotoUrl && !removeProfilePhoto)) && (
                   <div className="space-y-3 pt-2">
                     <div>
@@ -695,7 +695,7 @@ export default function TradeDetail() {
                 {trade.profilePhotoUrl && !removeProfilePhoto && !profilePhoto && (
                   <Button type="button" variant="ghost" size="sm" className="h-auto gap-2 px-0 text-destructive hover:text-destructive" onClick={() => setRemoveProfilePhoto(true)}>
                     <Trash2 className="h-4 w-4" />
-                    Remove current photo
+                    Remove current logo or image
                   </Button>
                 )}
               </div>

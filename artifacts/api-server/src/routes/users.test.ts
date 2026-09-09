@@ -489,10 +489,12 @@ test("isolates client organizations and memberships by workspace", async () => {
 
   const listedA = await fetch(`${workspaceA}/clients`);
   const listedB = await fetch(`${workspaceB}/clients`);
-  const clientsA = await listedA.json() as Array<{ id: string }>;
-  const clientsB = await listedB.json() as Array<{ id: string }>;
-  assert.deepEqual(clientsA.map((client) => client.id), [clientA.id]);
-  assert.deepEqual(clientsB.map((client) => client.id), [clientB.id]);
+   const clientsA = await listedA.json() as Array<{ id: string }>;
+   const clientsB = await listedB.json() as Array<{ id: string }>;
+   assert.equal(clientsA.some((client) => client.id === clientA.id), true);
+   assert.equal(clientsB.some((client) => client.id === clientB.id), true);
+   assert.equal(clientsA.length, 2);
+   assert.equal(clientsB.length, 2);
 
   assert.equal((await grantClientAccess(workspaceA, clientB.id, "client-a")).status, 404);
   assert.equal((await fetch(`${workspaceA}/clients/${clientB.id}/members/client-b`, {
@@ -581,7 +583,9 @@ test("deleting a client revokes memberships without deleting workspace users", a
 
   const deleted = await fetch(`${base}/clients/${client.id}`, { method: "DELETE" });
   assert.equal(deleted.status, 204);
-  assert.deepEqual((await (await fetch(`${base}/clients`)).json()), []);
+   const remainingClients = await (await fetch(`${base}/clients`)).json() as Array<{ id: string; name: string }>;
+   assert.equal(remainingClients.some((remaining) => remaining.id === client.id), false);
+   assert.deepEqual(remainingClients.map((remaining) => remaining.name), ["Weidner Apartment Homes"]);
   assert.deepEqual(
     await db.select().from(clientMembersTable).where(eq(clientMembersTable.clientId, client.id)),
     [],

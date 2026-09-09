@@ -9,3 +9,4 @@
 - [Visual auth harnesses](visual-auth-harnesses.md) — provider-owned UI should use injected auth state in isolated visual mounts instead of relying on Clerk session hydration.
 - [Clerk API test harnesses](clerk-api-test-harnesses.md) — direct Express route tests need a branded Clerk auth handler with a session token to preserve organization scope.
 - [Route animation remounts](route-animation-remounts.md) — navigation motion must survive page-local shell remounts, and tests must recreate that lifecycle.
+- [Vendor logo rendering](vendor-logo-rendering.md) — preserve transparent vendor logos with the existing private upload path and contained rendering.

@@ -2546,7 +2546,7 @@ router.post("/trades/:tradeId/profile-photo-upload", async (req: AuthenticatedRe
   if (!params.success || !body.success ||
     !["image/jpeg", "image/png", "image/webp"].includes(body.data.contentType) ||
     body.data.size > 8 * 1024 * 1024) {
-    res.status(400).json({ error: "Choose a JPEG, PNG, or WebP image under 8 MB." });
+    res.status(400).json({ error: "Choose a PNG logo, JPEG, or WebP image under 8 MB." });
     return;
   }
   const [tradeRow] = await db.select({ data: importedVendorsTable.data })
@@ -2576,8 +2576,8 @@ router.post("/trades/:tradeId/profile-photo-upload", async (req: AuthenticatedRe
       metadata: body.data,
     }));
   } catch (error) {
-    req.log.error({ err: error, tradeId: params.data.tradeId }, "Failed to start vendor photo upload");
-    res.status(500).json({ error: "The profile photo upload could not be started." });
+    req.log.error({ err: error, tradeId: params.data.tradeId }, "Failed to start vendor logo or profile image upload");
+    res.status(500).json({ error: "The logo or profile image upload could not be started." });
   }
 });
 
