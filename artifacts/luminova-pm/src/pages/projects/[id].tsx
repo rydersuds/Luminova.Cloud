@@ -30,6 +30,7 @@ import { cn, formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "@/hooks/use-toast"
 import { PanoramaViewer } from "@/components/panorama-viewer"
+import { ClientIdentity } from "@/components/client-identity"
 
 const PANORAMA_TYPES = ["image/jpeg", "image/png", "image/webp"]
 const MAX_PANORAMA_BYTES = 8 * 1024 * 1024
@@ -519,8 +520,8 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                     Target: {formatDate(project.targetDate)}
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <Briefcase className="h-4 w-4 text-primary" />
-                    Client: {project.clientName}
+                    <ClientIdentity name={project.clientName} logoUrl={project.clientLogoUrl} size="sm" />
+                    <span>Client: {project.clientName}</span>
                   </div>
                 </div>
               </div>
@@ -686,9 +687,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                       <div>
                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Client</p>
                         <div className="flex items-center gap-2">
-                          <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center text-secondary-foreground font-heading font-bold text-xs">
-                            {project.clientName.charAt(0)}
-                          </div>
+                          <ClientIdentity name={project.clientName} logoUrl={project.clientLogoUrl} size="sm" />
                           <span className="font-medium">{project.clientName}</span>
                         </div>
                       </div>

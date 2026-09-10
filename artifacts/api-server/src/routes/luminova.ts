@@ -1,4 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
+import { getAuth } from "@clerk/express";
 import {
   CreateInvoiceBody,
   CreateInvoiceResponse,
@@ -93,6 +94,7 @@ import {
   projectMessagesTable,
   vendorJobHistoryTable,
   vendorReviewTable,
+  clientsTable,
 } from "@workspace/db";
 import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
@@ -737,6 +739,31 @@ const durableData = async <T>(table: typeof importedProjectsTable | typeof impor
 
 const tradeProfilePhotoUrl = (trade: Trade) =>
   trade.profilePhotoObjectPath ? `/api/storage${trade.profilePhotoObjectPath}` : null;
+const clientBrandingForWorkspace = async (scope: string) =>
+  db.select({ name: clientsTable.name, logoObjectPath: clientsTable.logoObjectPath })
+    .from(clientsTable)
+    .where(eq(clientsTable.workspaceId, scope));
+const enrichProjectClient = (project: Project, clients: Array<{ name: string; logoObjectPath: string | null }>) => {
+  const normalizedProjectClient = normalizePartyName(project.clientName);
+  const client = clients.find((candidate) =>
+    normalizePartyName(candidate.name) === normalizedProjectClient,
+  );
+  return {
+    ...project,
+    clientLogoUrl: client?.logoObjectPath ? `/api/storage${client.logoObjectPath}` : null,
+  };
+};
+const enrichProjectsWithClientBranding = async (projects: Project[], scope: string) => {
+  const clients = await clientBrandingForWorkspace(scope);
+  return projects.map((project) => enrichProjectClient(project, clients));
+};
+const requestWorkspaceId = (req: Request) => {
+  try {
+    return getAuth(req).orgId || "default";
+  } catch {
+    return "default";
+  }
+};
 const isDirectoryTrade = (trade: Pick<Trade, "companyName">) => {
   return isDirectoryVendorName(trade.companyName);
 };
@@ -1553,7 +1580,7 @@ router.get("/projects", async (req, res) => {
       (!region || project.region === region) &&
       (!search || `${project.name} ${project.address} ${project.clientName}`.toLowerCase().includes(search.toLowerCase())),
     );
-    res.json(GetProjectsResponse.parse(result));
+    res.json(GetProjectsResponse.parse(await enrichProjectsWithClientBranding(result, requestWorkspaceId(req))));
   } catch (error) {
     req.log.error({ err: error }, "Failed to load projects");
     res.status(500).json({ error: "Projects could not be loaded." });
@@ -1996,7 +2023,11 @@ router.get("/projects/:projectId", async (req: AuthenticatedRequest, res): Promi
     return;
   }
   try {
-    res.json(GetProjectResponse.parse(await detailsFor(project, req.userId)));
+    const clients = await clientBrandingForWorkspace(requestWorkspaceId(req));
+    res.json(GetProjectResponse.parse(enrichProjectClient(
+      await detailsFor(project, req.userId),
+      clients,
+    )));
   } catch (error) {
     req.log.error({ err: error, projectId: project.id }, "Failed to load project panoramas");
     res.status(500).json({ error: "Project details could not be loaded." });

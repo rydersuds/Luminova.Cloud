@@ -6,6 +6,8 @@ export const clientsTable = pgTable("clients", {
   id: text("id").primaryKey(),
   workspaceId: text("workspace_id").notNull(),
   name: text("name").notNull(),
+  logoObjectPath: text("logo_object_path"),
+  pendingLogoObjectPath: text("pending_logo_object_path"),
   createdBy: text("created_by").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

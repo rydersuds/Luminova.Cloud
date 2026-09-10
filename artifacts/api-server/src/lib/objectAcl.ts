@@ -5,6 +5,7 @@ const ACL_POLICY_METADATA_KEY = "custom:aclPolicy";
 export interface ObjectAclPolicy {
   owner: string;
   visibility: "public" | "private";
+  workspaceId?: string;
 }
 
 export enum ObjectPermission {
@@ -26,15 +27,19 @@ export async function getObjectAclPolicy(file: File): Promise<ObjectAclPolicy | 
 
 export async function canAccessObject({
   userId,
+  workspaceId,
   objectFile,
   requestedPermission,
 }: {
   userId?: string;
+  workspaceId?: string;
   objectFile: File;
   requestedPermission: ObjectPermission;
 }): Promise<boolean> {
   const policy = await getObjectAclPolicy(objectFile);
   if (!policy) return false;
   if (policy.visibility === "public" && requestedPermission === ObjectPermission.READ) return true;
+  if (policy.workspaceId && policy.workspaceId !== workspaceId) return false;
+  if (policy.workspaceId && requestedPermission === ObjectPermission.READ) return Boolean(userId && workspaceId);
   return Boolean(userId && policy.owner === userId);
 }

@@ -47,6 +47,8 @@ export interface ClientMember {
 export interface Client {
   id: string;
   name: string;
+  /** @nullable */
+  logoUrl: string | null;
   createdAt: number;
   members: ClientMember[];
 }
@@ -57,6 +59,34 @@ export interface ClientInput {
      * @maxLength 160
      */
   name: string;
+}
+
+export type ClientLogoUploadInputContentType = typeof ClientLogoUploadInputContentType[keyof typeof ClientLogoUploadInputContentType];
+
+
+export const ClientLogoUploadInputContentType = {
+  'image/jpeg': 'image/jpeg',
+  'image/png': 'image/png',
+  'image/webp': 'image/webp',
+} as const;
+
+export interface ClientLogoUploadInput {
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  name: string;
+  /**
+     * @minimum 1
+     * @maximum 8388608
+     */
+  size: number;
+  contentType: ClientLogoUploadInputContentType;
+}
+
+export interface ClientLogoInput {
+  /** @pattern ^/objects/uploads/[A-Za-z0-9_-]+$ */
+  objectPath: string;
 }
 
 export interface ClientMemberInput {
@@ -191,6 +221,8 @@ export interface Project {
   progress: number;
   pmName: string;
   clientName: string;
+  /** @nullable */
+  clientLogoUrl?: string | null;
   targetDate: string;
   budgeted: number;
   invoiced: number;

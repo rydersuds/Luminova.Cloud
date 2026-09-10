@@ -952,6 +952,81 @@ paths:
           description: Administrator access required
         "409":
           description: Client already exists
+  /clients/{clientId}/logo-upload:
+    post:
+      operationId: requestClientLogoUpload
+      tags: [users]
+      summary: Request a direct upload URL for a client logo
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientLogoUploadInput"
+      responses:
+        "200":
+          description: Client logo upload URL generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrlResponse"
+        "400":
+          description: Invalid client logo metadata
+        "401":
+          description: Authentication required
+        "403":
+          description: Administrator access required
+        "404":
+          description: Client not found
+  /clients/{clientId}/logo:
+    put:
+      operationId: attachClientLogo
+      tags: [users]
+      summary: Attach an uploaded client logo
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientLogoInput"
+      responses:
+        "200":
+          description: Client with the attached logo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "400":
+          description: Invalid or incomplete client logo upload
+        "401":
+          description: Authentication required
+        "403":
+          description: Administrator access required
+        "404":
+          description: Client or upload not found
+    delete:
+      operationId: clearClientLogo
+      tags: [users]
+      summary: Remove a client logo
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+      responses:
+        "200":
+          description: Client without a logo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "401":
+          description: Authentication required
+        "403":
+          description: Administrator access required
+        "404":
+          description: Client not found
   /clients/{clientId}:
     delete:
       operationId: deleteClient
@@ -1235,10 +1310,11 @@ components:
         addedAt: { type: integer }
     Client:
       type: object
-      required: [id, name, createdAt, members]
+      required: [id, name, logoUrl, createdAt, members]
       properties:
         id: { type: string }
         name: { type: string }
+        logoUrl: { type: [string, "null"] }
         createdAt: { type: integer }
         members:
           type: array
@@ -1253,6 +1329,22 @@ components:
           type: string
           minLength: 1
           maxLength: 160
+    ClientLogoUploadInput:
+      type: object
+      additionalProperties: false
+      required: [name, size, contentType]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 255 }
+        size: { type: integer, minimum: 1, maximum: 8388608 }
+        contentType: { type: string, enum: [image/jpeg, image/png, image/webp] }
+    ClientLogoInput:
+      type: object
+      additionalProperties: false
+      required: [objectPath]
+      properties:
+        objectPath:
+          type: string
+          pattern: '^/objects/uploads/[A-Za-z0-9_-]+$'
     ClientMemberInput:
       type: object
       additionalProperties: false
@@ -1395,6 +1487,7 @@ components:
         progress: { type: number }
         pmName: { type: string }
         clientName: { type: string }
+        clientLogoUrl: { type: [string, "null"] }
         targetDate: { type: string }
         budgeted: { type: number }
         invoiced: { type: number }

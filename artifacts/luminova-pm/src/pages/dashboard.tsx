@@ -24,6 +24,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useProjectFolderImport } from "@/providers/project-folder-import-provider"
 import { GlobalSearch } from "@/components/global-search"
+import { ClientIdentity } from "@/components/client-identity"
 
 // Strict validation schema, zero defaults
 const projectSchema = z.object({
@@ -461,7 +462,12 @@ export default function Dashboard() {
                                             )}
                                           </td>
                                           <td className="px-4 py-3 truncate max-w-[150px]">{row.original.name || '-'}</td>
-                                          <td className="px-4 py-3 truncate max-w-[150px]">{row.original.clientName || '-'}</td>
+                                          <td className="px-4 py-3 max-w-[180px]">
+                                            <div className="flex min-w-0 items-center gap-2">
+                                              <ClientIdentity name={row.original.clientName} logoUrl={row.original.clientLogoUrl} size="sm" />
+                                              <span className="truncate">{row.original.clientName || '-'}</span>
+                                            </div>
+                                          </td>
                                           <td className="px-4 py-3">${row.original.budgeted || '0.00'}</td>
                                           <td className="px-4 py-3 text-destructive truncate max-w-[200px]">
                                             {!row.valid && row.errors?.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ')}

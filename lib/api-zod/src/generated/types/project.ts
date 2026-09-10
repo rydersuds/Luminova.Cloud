@@ -15,6 +15,8 @@ export interface Project {
   progress: number;
   pmName: string;
   clientName: string;
+  /** @nullable */
+  clientLogoUrl?: string | null;
   targetDate: string;
   budgeted: number;
   invoiced: number;

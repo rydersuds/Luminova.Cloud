@@ -97,6 +97,15 @@ export class ObjectStorageService {
     }
   }
 
+  async verifyClientLogo(objectPath: string): Promise<void> {
+    const file = await this.getObjectEntityFile(objectPath);
+    const [metadata] = await file.getMetadata();
+    const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+    if (!allowedTypes.has(String(metadata.contentType)) || Number(metadata.size) > 8 * 1024 * 1024) {
+      throw new Error("Stored object is not a supported client logo image");
+    }
+  }
+
   async verifyConstructionDocument(input: { objectPath: string; name: string; size: number; contentType: string }): Promise<void> {
     const file = await this.getObjectEntityFile(input.objectPath);
     const [metadata] = await file.getMetadata();
@@ -106,8 +115,8 @@ export class ObjectStorageService {
     }
   }
 
-  async canRead(userId: string | undefined, file: File): Promise<boolean> {
-    return canAccessObject({ userId, objectFile: file, requestedPermission: ObjectPermission.READ });
+  async canRead(userId: string | undefined, file: File, workspaceId?: string): Promise<boolean> {
+    return canAccessObject({ userId, workspaceId, objectFile: file, requestedPermission: ObjectPermission.READ });
   }
 
   async downloadObject(file: File): Promise<Response> {

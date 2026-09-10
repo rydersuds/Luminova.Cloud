@@ -4,6 +4,7 @@ import { RequestUploadUrlBody, RequestUploadUrlResponse } from "@workspace/api-z
 import { ObjectNotFoundError, ObjectStorageService } from "../lib/objectStorage";
 import { and, eq } from "drizzle-orm";
 import { db, projectImportBatchesTable } from "@workspace/db";
+import { getAuth } from "@clerk/express";
 
 type AuthenticatedRequest = Request & { userId?: string };
 type ImportManifestDocument = { relativePath: string; name: string; size: number; contentType: string };
@@ -64,7 +65,7 @@ router.get("/storage/objects/*path", async (req: AuthenticatedRequest, res: Resp
     const raw = req.params.path;
     const objectPath = `/objects/${Array.isArray(raw) ? raw.join("/") : raw}`;
     const file = await storage.getObjectEntityFile(objectPath);
-    if (!await storage.canRead(req.userId, file)) {
+    if (!await storage.canRead(req.userId, file, getAuth(req).orgId || "default")) {
       res.status(403).json({ error: "Forbidden" });
       return;
     }

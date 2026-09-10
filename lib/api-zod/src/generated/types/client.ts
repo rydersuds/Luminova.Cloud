@@ -10,6 +10,8 @@ import type { ClientMember } from './clientMember';
 export interface Client {
   id: string;
   name: string;
+  /** @nullable */
+  logoUrl: string | null;
   createdAt: number;
   members: ClientMember[];
 }

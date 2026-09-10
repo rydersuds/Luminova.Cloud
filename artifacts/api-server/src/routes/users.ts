@@ -4,6 +4,14 @@ import { clientAccessCleanupTable, clientMembersTable, clientsTable, db, pool } 
 import {
   CreateClientBody,
   CreateClientResponse,
+  RequestClientLogoUploadBody,
+  RequestClientLogoUploadParams,
+  RequestClientLogoUploadResponse,
+  AttachClientLogoBody,
+  AttachClientLogoParams,
+  AttachClientLogoResponse,
+  ClearClientLogoParams,
+  ClearClientLogoResponse,
   DeleteClientParams,
   GetClientsResponse,
   DeleteWorkspaceUserParams,
@@ -26,6 +34,7 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { WEIDNER_CLIENT_NAME } from "../lib/partyClassification";
+import { ObjectStorageService } from "../lib/objectStorage";
 
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 export const ROLES = ["Admin", "Project Manager", "Field Team", "Client"] as const;
@@ -36,13 +45,13 @@ type ClerkError = {
   status?: number;
   errors?: Array<{ code?: string; message?: string; longMessage?: string }>;
 };
-
 class ClientMemberProfileLookupError extends Error {
   constructor(public readonly clerkError: ClerkError) {
     super("Unable to load client member profiles");
     this.name = "ClientMemberProfileLookupError";
   }
 }
+
 function postgresErrorCode(error: unknown): string | undefined {
   const candidate = error as { code?: unknown; cause?: { code?: unknown } };
   if (typeof candidate.code === "string") return candidate.code;
@@ -79,6 +88,7 @@ function serializeUser(user: User) {
     createdAt: user.createdAt,
     lastSignInAt: user.lastSignInAt,
     imageUrl: user.imageUrl,
+    clientAccessCleanupPending: false,
   };
 }
 
@@ -103,6 +113,10 @@ function workspaceId(req: AuthenticatedRequest) {
   return getAuth(req).orgId || "default";
 }
 
+function clientLogoUrl(objectPath: string | null) {
+  return objectPath ? `/api/storage${objectPath}` : null;
+}
+
 async function resolveClientMemberUsers(client: ClerkClient, memberUserIds: string[]) {
   const usersById = new Map<string, User>();
   let profileLookupError: ClerkError | undefined;
@@ -118,9 +132,7 @@ async function resolveClientMemberUsers(client: ClerkClient, memberUserIds: stri
         usersById.set(userId, await client.users.getUser(userId));
       } catch (error) {
         const clerkError = error as ClerkError;
-        if (clerkError.status !== 404 && !profileLookupError) {
-          profileLookupError = clerkError;
-        }
+        if (clerkError.status !== 404 && !profileLookupError) profileLookupError = clerkError;
       }
     }
   }
@@ -131,12 +143,9 @@ async function resolveClientMemberUsers(client: ClerkClient, memberUserIds: stri
       () => resolveNextUser(),
     ),
   );
-  if (profileLookupError) {
-    throw new ClientMemberProfileLookupError(profileLookupError);
-  }
+  if (profileLookupError) throw new ClientMemberProfileLookupError(profileLookupError);
   return usersById;
 }
-
 async function serializeClients(client: ClerkClient, scope: string, clientId?: string) {
   const records = await db
     .select()
@@ -157,6 +166,7 @@ async function serializeClients(client: ClerkClient, scope: string, clientId?: s
   return records.map((record) => ({
     id: record.id,
     name: record.name,
+    logoUrl: clientLogoUrl(record.logoObjectPath),
     createdAt: record.createdAt.getTime(),
     members: memberships
       .filter((membership) => membership.clientId === record.id)
@@ -202,23 +212,22 @@ export async function revokeClientMemberships(userId: string, scope: string) {
     inArray(clientMembersTable.clientId, clients.map((client) => client.id)),
   ));
 }
-
 async function markClientAccessCleanup(userId: string, scope: string) {
-  await db.insert(clientAccessCleanupTable).values({
-    workspaceId: scope,
-    userId,
-  }).onConflictDoUpdate({
-    target: [clientAccessCleanupTable.workspaceId, clientAccessCleanupTable.userId],
-    set: { updatedAt: new Date() },
-  });
+  await clearClientAccessCleanup(userId, scope);
+  await db.insert(clientAccessCleanupTable).values({ workspaceId: scope, userId });
+}
+async function clearClientAccessCleanup(userId: string, scope: string) {
+  await db.delete(clientAccessCleanupTable).where(and(
+    eq(clientAccessCleanupTable.userId, userId),
+    eq(clientAccessCleanupTable.workspaceId, scope),
+  ));
 }
 async function deleteClientMemberships(userId: string) {
   await db.delete(clientMembersTable).where(eq(clientMembersTable.userId, userId));
 }
 type ClerkClient = typeof clerk;
 type AdminLock = <T>(operation: () => Promise<T>) => Promise<T>;
-
-type RevokeClientMemberships = (userId: string, scope: string) => Promise<void>;
+export type RevokeClientMemberships = (userId: string, scope: string) => Promise<void>;
 async function withWorkspaceAdminLock<T>(operation: () => Promise<T>): Promise<T> {
   const connection = await pool.connect();
   try {
@@ -285,6 +294,14 @@ async function isFinalAdmin(client: ClerkClient, target: User): Promise<boolean>
   return users.data.filter((user) => workspaceRole(user) === "Admin").length <= 1;
 }
 
+async function deleteObjectQuietly(storage: ObjectStorageService, objectPath: string | null | undefined, log: Request["log"]) {
+  if (!objectPath) return;
+  try {
+    await storage.deleteObject(objectPath);
+  } catch (error) {
+    log.warn({ err: error, objectPath }, "Client logo object cleanup failed");
+  }
+}
 export function clerkErrorResponse(error: unknown, fallback: string) {
   const clerkError = error as ClerkError;
   const detail = clerkError.errors?.[0];
@@ -301,6 +318,7 @@ export function createUsersRouter(
   client: ClerkClient = clerk,
   withAdminLock: AdminLock = withWorkspaceAdminLock,
   revokeMemberships: RevokeClientMemberships = revokeClientMemberships,
+  logoStorage: ObjectStorageService = new ObjectStorageService(),
 ) {
 const router = Router();
 
@@ -312,8 +330,7 @@ router.get("/users/me", async (req: AuthenticatedRequest, res): Promise<void> =>
 router.get("/users", async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!await requireAdmin(client, req, res)) return;
   const result = await client.users.getUserList({ limit: 100, orderBy: "-created_at" });
-  const pendingCleanup = await db
-    .select({ userId: clientAccessCleanupTable.userId })
+  const pendingCleanup = await db.select({ userId: clientAccessCleanupTable.userId })
     .from(clientAccessCleanupTable)
     .where(eq(clientAccessCleanupTable.workspaceId, workspaceId(req)));
   const pendingUserIds = new Set(pendingCleanup.map(({ userId }) => userId));
@@ -330,9 +347,8 @@ router.post("/users/:userId/client-access-reconciliation", async (req: Authentic
     res.status(400).json({ error: "Invalid user" });
     return;
   }
-
   try {
-    await withWorkspaceAdminLock(async () => {
+    await withAdminLock(async () => {
       await client.users.getUser(params.data.userId);
       await revokeClientMemberships(params.data.userId, workspaceId(req));
       await clearClientAccessCleanup(params.data.userId, workspaceId(req));
@@ -396,6 +412,152 @@ router.post("/clients", async (req: AuthenticatedRequest, res): Promise<void> =>
   }
 });
 
+  router.post("/clients/:clientId/logo-upload", async (req: AuthenticatedRequest, res): Promise<void> => {
+    if (!await requireAdmin(client, req, res)) return;
+    const params = RequestClientLogoUploadParams.safeParse(req.params);
+    const body = RequestClientLogoUploadBody.safeParse(req.body);
+    if (!params.success || !body.success) {
+      res.status(400).json({ error: "Choose a JPEG, PNG, or WebP logo up to 8 MB." });
+      return;
+    }
+    const scope = workspaceId(req);
+    const [record] = await db.select().from(clientsTable).where(and(
+      eq(clientsTable.id, params.data.clientId),
+      eq(clientsTable.workspaceId, scope),
+    )).limit(1);
+    if (!record) {
+      res.status(404).json({ error: "Client not found" });
+      return;
+    }
+
+    let objectPath: string | undefined;
+    try {
+      const uploadURL = await logoStorage.getObjectEntityUploadURL();
+      objectPath = logoStorage.normalizeObjectEntityPath(uploadURL);
+      await db.update(clientsTable)
+        .set({ pendingLogoObjectPath: objectPath })
+        .where(and(eq(clientsTable.id, record.id), eq(clientsTable.workspaceId, scope)));
+      await deleteObjectQuietly(logoStorage, record.pendingLogoObjectPath, req.log);
+      res.json(RequestClientLogoUploadResponse.parse({
+        uploadURL,
+        objectPath,
+        metadata: body.data,
+      }));
+    } catch (error) {
+      await deleteObjectQuietly(logoStorage, objectPath, req.log);
+      req.log.error({ err: error }, "Client logo upload URL generation failed");
+      res.status(500).json({ error: "The client logo upload could not be started." });
+    }
+  });
+
+  router.put("/clients/:clientId/logo", async (req: AuthenticatedRequest, res): Promise<void> => {
+    if (!await requireAdmin(client, req, res)) return;
+    const params = AttachClientLogoParams.safeParse(req.params);
+    const body = AttachClientLogoBody.safeParse(req.body);
+    if (!params.success || !body.success) {
+      res.status(400).json({ error: "The uploaded client logo is invalid." });
+      return;
+    }
+    const scope = workspaceId(req);
+    const [record] = await db.select().from(clientsTable).where(and(
+      eq(clientsTable.id, params.data.clientId),
+      eq(clientsTable.workspaceId, scope),
+    )).limit(1);
+    if (!record) {
+      res.status(404).json({ error: "Client not found" });
+      return;
+    }
+    if (record.pendingLogoObjectPath !== body.data.objectPath) {
+      res.status(400).json({ error: "Request a new client logo upload before saving it." });
+      return;
+    }
+
+    try {
+      await logoStorage.verifyClientLogo(body.data.objectPath);
+      await logoStorage.setAcl(body.data.objectPath, {
+        owner: req.userId!,
+        visibility: "private",
+        workspaceId: scope,
+      });
+    } catch (error) {
+      await deleteObjectQuietly(logoStorage, body.data.objectPath, req.log);
+      await db.update(clientsTable).set({ pendingLogoObjectPath: null }).where(and(
+        eq(clientsTable.id, record.id),
+        eq(clientsTable.workspaceId, scope),
+        eq(clientsTable.pendingLogoObjectPath, body.data.objectPath),
+      ));
+      req.log.error({ err: error }, "Client logo attachment failed");
+      res.status(500).json({ error: "The client logo could not be saved." });
+      return;
+    }
+
+    let committed: { logoObjectPath: string | null } | undefined;
+    try {
+      [committed] = await db.update(clientsTable).set({
+        logoObjectPath: body.data.objectPath,
+        pendingLogoObjectPath: null,
+      }).where(and(
+        eq(clientsTable.id, record.id),
+        eq(clientsTable.workspaceId, scope),
+        eq(clientsTable.pendingLogoObjectPath, body.data.objectPath),
+      )).returning({ logoObjectPath: clientsTable.logoObjectPath });
+    } catch (error) {
+      await deleteObjectQuietly(logoStorage, body.data.objectPath, req.log);
+      req.log.error({ err: error }, "Client logo database update failed");
+      res.status(500).json({ error: "The client logo could not be saved." });
+      return;
+    }
+
+    if (!committed) {
+      const [current] = await db.select({ logoObjectPath: clientsTable.logoObjectPath })
+        .from(clientsTable)
+        .where(and(eq(clientsTable.id, record.id), eq(clientsTable.workspaceId, scope)))
+        .limit(1);
+      if (current?.logoObjectPath !== body.data.objectPath) {
+        await deleteObjectQuietly(logoStorage, body.data.objectPath, req.log);
+      }
+      res.status(409).json({ error: "A newer client logo upload replaced this one." });
+      return;
+    }
+
+    await deleteObjectQuietly(logoStorage, record.logoObjectPath, req.log);
+    try {
+      const [updated] = await serializeClients(client, scope, record.id);
+      res.json(AttachClientLogoResponse.parse(updated));
+    } catch (error) {
+      req.log.error({ err: error }, "Client logo saved but response serialization failed");
+      res.status(500).json({ error: "The client logo was saved, but the client details could not be refreshed." });
+    }
+  });
+
+  router.delete("/clients/:clientId/logo", async (req: AuthenticatedRequest, res): Promise<void> => {
+    if (!await requireAdmin(client, req, res)) return;
+    const params = ClearClientLogoParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Invalid client" });
+      return;
+    }
+    const scope = workspaceId(req);
+    const [record] = await db.select().from(clientsTable).where(and(
+      eq(clientsTable.id, params.data.clientId),
+      eq(clientsTable.workspaceId, scope),
+    )).limit(1);
+    if (!record) {
+      res.status(404).json({ error: "Client not found" });
+      return;
+    }
+    await db.update(clientsTable).set({
+      logoObjectPath: null,
+      pendingLogoObjectPath: null,
+    }).where(and(eq(clientsTable.id, record.id), eq(clientsTable.workspaceId, scope)));
+    await deleteObjectQuietly(logoStorage, record.logoObjectPath, req.log);
+    if (record.pendingLogoObjectPath !== record.logoObjectPath) {
+      await deleteObjectQuietly(logoStorage, record.pendingLogoObjectPath, req.log);
+    }
+    const [updated] = await serializeClients(client, scope, record.id);
+    res.json(ClearClientLogoResponse.parse(updated));
+  });
+
 router.delete("/clients/:clientId", async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!await requireAdmin(client, req, res)) return;
   const params = DeleteClientParams.safeParse(req.params);
@@ -403,17 +565,29 @@ router.delete("/clients/:clientId", async (req: AuthenticatedRequest, res): Prom
     res.status(400).json({ error: "Invalid client" });
     return;
   }
+  const [record] = await db.select({
+    id: clientsTable.id,
+    logoObjectPath: clientsTable.logoObjectPath,
+    pendingLogoObjectPath: clientsTable.pendingLogoObjectPath,
+  }).from(clientsTable).where(and(
+    eq(clientsTable.id, params.data.clientId),
+    eq(clientsTable.workspaceId, workspaceId(req)),
+  )).limit(1);
   const deleted = await db.delete(clientsTable).where(
     and(
       eq(clientsTable.id, params.data.clientId),
       eq(clientsTable.workspaceId, workspaceId(req)),
     ),
   ).returning({ id: clientsTable.id });
-  if (!deleted.length) {
+  if (!deleted.length || !record) {
     res.status(404).json({ error: "Client not found" });
     return;
   }
   await db.delete(clientMembersTable).where(eq(clientMembersTable.clientId, params.data.clientId));
+  await deleteObjectQuietly(logoStorage, record.logoObjectPath, req.log);
+  if (record.pendingLogoObjectPath !== record.logoObjectPath) {
+    await deleteObjectQuietly(logoStorage, record.pendingLogoObjectPath, req.log);
+  }
   res.status(204).send();
 });
 
@@ -646,12 +820,9 @@ router.patch("/users/:userId", async (req: AuthenticatedRequest, res): Promise<v
         if (body.data.role !== "Client") {
           try {
             await revokeMemberships(updatedTarget.id, workspaceId(req));
-            await clearClientAccessCleanup(updatedTarget.id, workspaceId(req));
           } catch (error) {
             throw new ClientAccessCleanupError(error, updatedTarget.id, workspaceId(req));
           }
-        } else {
-          await clearClientAccessCleanup(updatedTarget.id, workspaceId(req));
         }
       }
       return updatedTarget;
@@ -671,24 +842,10 @@ router.patch("/users/:userId", async (req: AuthenticatedRequest, res): Promise<v
     } else {
       target = await applyUpdate(await client.users.getUser(params.data.userId));
     }
-    const pendingCleanup = await db
-      .select({ userId: clientAccessCleanupTable.userId })
-      .from(clientAccessCleanupTable)
-      .where(and(
-        eq(clientAccessCleanupTable.workspaceId, workspaceId(req)),
-        eq(clientAccessCleanupTable.userId, target.id),
-      ));
-    res.json(UpdateWorkspaceUserResponse.parse({
-      ...serializeUser(target),
-      clientAccessCleanupPending: pendingCleanup.length > 0,
-    }));
+    res.json(UpdateWorkspaceUserResponse.parse(serializeUser(target)));
   } catch (error) {
     if (error instanceof ClientAccessCleanupError) {
-      try {
-        await markClientAccessCleanup(error.userId, error.workspaceId);
-      } catch (recordError) {
-        req.log.error({ error: recordError, userId: error.userId }, "Could not persist client access cleanup state");
-      }
+      await markClientAccessCleanup(error.userId, error.workspaceId);
       req.log.error({ error: error.cause }, "Client access cleanup failed after role update");
       res.status(503).json({ error: error.message });
       return;
@@ -725,6 +882,11 @@ router.delete("/users/:userId", async (req: AuthenticatedRequest, res): Promise<
     }
     res.status(204).send();
   } catch (error) {
+    if (error instanceof ClientAccessCleanupError) {
+      req.log.error({ error: error.cause }, "Client access cleanup failed after user deletion");
+      res.status(503).json({ error: error.message });
+      return;
+    }
     const normalized = clerkErrorResponse(error, "Clerk could not delete this user");
     req.log.warn({ status: normalized.status }, "Clerk user deletion failed");
     res.status(normalized.status).json({ error: normalized.error });
@@ -748,11 +910,4 @@ class ClientAccessCleanupError extends Error {
     this.userId = userId;
     this.workspaceId = workspaceId;
   }
-}
-
-async function clearClientAccessCleanup(userId: string, scope: string) {
-  await db.delete(clientAccessCleanupTable).where(and(
-    eq(clientAccessCleanupTable.userId, userId),
-    eq(clientAccessCleanupTable.workspaceId, scope),
-  ));
 }

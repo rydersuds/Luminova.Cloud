@@ -11,6 +11,7 @@ import {
   createUsersRouter,
   revokeClientMemberships,
 } from "./users";
+import { ObjectStorageService } from "../lib/objectStorage";
 
 type Role = "Admin" | "Project Manager" | "Field Team" | "Client";
 
@@ -133,6 +134,33 @@ function fakeClerk(
   };
 }
 
+class FakeLogoStorage extends ObjectStorageService {
+  readonly deleted: string[] = [];
+  readonly aclPaths: string[] = [];
+  nextPath = "/objects/uploads/client-logo";
+  beforeVerify?: () => Promise<void>;
+
+  override async getObjectEntityUploadURL() {
+    return `https://signed.example${this.nextPath}`;
+  }
+
+  override normalizeObjectEntityPath() {
+    return this.nextPath;
+  }
+
+  override async verifyClientLogo() {
+    await this.beforeVerify?.();
+  }
+
+  override async setAcl(objectPath: string) {
+    this.aclPaths.push(objectPath);
+  }
+
+  override async deleteObject(objectPath: string) {
+    this.deleted.push(objectPath);
+  }
+}
+
 const servers: Server[] = [];
 const testClientIds = new Set<string>();
 
@@ -152,6 +180,7 @@ async function startApi(
   lock: Parameters<typeof createUsersRouter>[1] = async (operation) => operation(),
   organizationId = "default",
   revokeMemberships: Parameters<typeof createUsersRouter>[2] = revokeClientMemberships,
+  logoStorage?: ObjectStorageService,
 ) {
   const app = express();
   app.use(express.json());
@@ -171,6 +200,7 @@ async function startApi(
     client as unknown as Parameters<typeof createUsersRouter>[0],
     lock,
     revokeMemberships,
+    logoStorage,
   ));
   const server = app.listen(0);
   servers.push(server);
@@ -797,4 +827,157 @@ test("deleting a client revokes memberships without deleting workspace users", a
     [],
   );
   assert.deepEqual(fake.getUsers().map((user) => user.id), ["admin", "client-one", "client-two"]);
+});
+
+test("secures client logo uploads and cleans up replacement and clear", async () => {
+  const fake = fakeClerk([makeUser("admin", "Admin"), makeUser("member", "Field Team")]);
+  const storage = new FakeLogoStorage();
+  const base = await startApi("admin", fake.client, undefined, "workspace-logo", revokeClientMemberships, storage);
+  const client = await createTestClient(base, "Logo Lifecycle Client");
+
+  const invalid = await fetch(`${base}/clients/${client.id}/logo-upload`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "logo.gif", size: 12, contentType: "image/gif" }),
+  });
+  assert.equal(invalid.status, 400);
+
+  const requestUpload = () => fetch(`${base}/clients/${client.id}/logo-upload`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "logo.png", size: 12, contentType: "image/png" }),
+  });
+  assert.equal((await requestUpload()).status, 200);
+
+  const wrongPath = await fetch(`${base}/clients/${client.id}/logo`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ objectPath: "/objects/uploads/not-issued" }),
+  });
+  assert.equal(wrongPath.status, 400);
+
+  const attach = (objectPath: string) => fetch(`${base}/clients/${client.id}/logo`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ objectPath }),
+  });
+  const first = await attach(storage.nextPath);
+  assert.equal(first.status, 200);
+  assert.equal((await first.json() as { logoUrl: string }).logoUrl, `/api/storage${storage.nextPath}`);
+
+  storage.nextPath = "/objects/uploads/replacement-logo";
+  assert.equal((await requestUpload()).status, 200);
+  assert.equal((await attach(storage.nextPath)).status, 200);
+  assert.deepEqual(storage.deleted, ["/objects/uploads/client-logo"]);
+
+  const otherWorkspace = await startApi(
+    "admin",
+    fake.client,
+    undefined,
+    "workspace-other",
+    revokeClientMemberships,
+    storage,
+  );
+  assert.equal((await fetch(`${otherWorkspace}/clients/${client.id}/logo`, { method: "DELETE" })).status, 404);
+
+  const nonAdmin = await startApi(
+    "member",
+    fake.client,
+    undefined,
+    "workspace-logo",
+    revokeClientMemberships,
+    storage,
+  );
+  assert.equal((await fetch(`${nonAdmin}/clients/${client.id}/logo-upload`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "logo.png", size: 12, contentType: "image/png" }),
+  })).status, 403);
+
+  const cleared = await fetch(`${base}/clients/${client.id}/logo`, { method: "DELETE" });
+  assert.equal(cleared.status, 200);
+  assert.equal((await cleared.json() as { logoUrl: string | null }).logoUrl, null);
+  assert.deepEqual(storage.deleted, ["/objects/uploads/client-logo", "/objects/uploads/replacement-logo"]);
+});
+
+test("keeps an attached logo when response serialization fails", async () => {
+  const unavailableUserIds = new Set<string>();
+  const fake = fakeClerk(
+    [makeUser("admin", "Admin"), makeUser("member", "Client")],
+    { unavailableUserIds },
+  );
+  const storage = new FakeLogoStorage();
+  const base = await startApi(
+    "admin",
+    fake.client,
+    undefined,
+    "workspace-logo-response",
+    revokeClientMemberships,
+    storage,
+  );
+  const client = await createTestClient(base, "Logo Response Failure Client");
+  await db.insert(clientMembersTable).values({
+    id: "logo-response-member",
+    clientId: client.id,
+    userId: "member",
+    addedBy: "admin",
+  });
+  assert.equal((await fetch(`${base}/clients/${client.id}/logo-upload`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "logo.png", size: 12, contentType: "image/png" }),
+  })).status, 200);
+  unavailableUserIds.add("member");
+
+  const attached = await fetch(`${base}/clients/${client.id}/logo`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ objectPath: storage.nextPath }),
+  });
+  assert.equal(attached.status, 500);
+  const [stored] = await db.select({
+    logoObjectPath: clientsTable.logoObjectPath,
+    pendingLogoObjectPath: clientsTable.pendingLogoObjectPath,
+  }).from(clientsTable).where(eq(clientsTable.id, client.id));
+  assert.deepEqual(stored, { logoObjectPath: storage.nextPath, pendingLogoObjectPath: null });
+  assert.equal(storage.deleted.includes(storage.nextPath), false);
+});
+
+test("rejects a stale logo attach without overwriting a newer pending upload", async () => {
+  const fake = fakeClerk([makeUser("admin", "Admin")]);
+  const storage = new FakeLogoStorage();
+  const base = await startApi(
+    "admin",
+    fake.client,
+    undefined,
+    "workspace-logo-race",
+    revokeClientMemberships,
+    storage,
+  );
+  const client = await createTestClient(base, "Logo Race Client");
+  const stalePath = storage.nextPath;
+  assert.equal((await fetch(`${base}/clients/${client.id}/logo-upload`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "logo.png", size: 12, contentType: "image/png" }),
+  })).status, 200);
+  const newerPath = "/objects/uploads/newer-logo";
+  storage.beforeVerify = async () => {
+    await db.update(clientsTable)
+      .set({ pendingLogoObjectPath: newerPath })
+      .where(eq(clientsTable.id, client.id));
+  };
+
+  const staleAttach = await fetch(`${base}/clients/${client.id}/logo`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ objectPath: stalePath }),
+  });
+  assert.equal(staleAttach.status, 409);
+  const [stored] = await db.select({
+    logoObjectPath: clientsTable.logoObjectPath,
+    pendingLogoObjectPath: clientsTable.pendingLogoObjectPath,
+  }).from(clientsTable).where(eq(clientsTable.id, client.id));
+  assert.deepEqual(stored, { logoObjectPath: null, pendingLogoObjectPath: newerPath });
+  assert.deepEqual(storage.deleted, [stalePath]);
 });

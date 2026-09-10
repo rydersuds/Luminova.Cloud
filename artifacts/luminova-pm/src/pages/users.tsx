@@ -4,12 +4,15 @@ import {
   getGetWorkspaceUsersQueryKey,
   getGetWorkspaceInvitationsQueryKey,
   getGetClientsQueryKey,
+  getGetProjectsQueryKey,
+  useRequestClientLogoUpload,
+  useAttachClientLogo,
+  useClearClientLogo,
   useCreateClient,
   useDeleteClient,
   useGetClients,
   useGrantClientAccess,
   useRevokeClientAccess,
-  useReconcileClientAccess,
   useDeleteWorkspaceUser,
   useGetWorkspaceInvitations,
   useGetWorkspaceUsers,
@@ -39,7 +42,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { AlertTriangle, Building2, Loader2, MailPlus, Pencil, Plus, RefreshCw, Search, ShieldCheck, Trash2, UserPlus, UserRoundMinus, Users as UsersIcon, X } from "lucide-react"
+import { Building2, Loader2, MailPlus, Pencil, Plus, RefreshCw, Search, ShieldCheck, Trash2, UserPlus, UserRoundMinus, Users as UsersIcon, X } from "lucide-react"
+import { ClientIdentity } from "@/components/client-identity"
 
 const ROLES: WorkspaceRole[] = ["Admin", "Project Manager", "Field Team", "Client"]
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -80,9 +84,11 @@ export default function Users() {
   const inviteUser = useInviteWorkspaceUser()
   const createClient = useCreateClient()
   const deleteClient = useDeleteClient()
+  const requestClientLogoUpload = useRequestClientLogoUpload()
+  const attachClientLogo = useAttachClientLogo()
+  const clearClientLogo = useClearClientLogo()
   const grantClientAccess = useGrantClientAccess()
   const revokeClientAccess = useRevokeClientAccess()
-  const reconcileClientAccess = useReconcileClientAccess()
   const resendInvitation = useResendWorkspaceInvitation()
   const revokeInvitation = useRevokeWorkspaceInvitation()
   const updateUser = useUpdateWorkspaceUser()
@@ -100,31 +106,67 @@ export default function Users() {
   const [clientName, setClientName] = React.useState("")
   const [selectedMemberByClient, setSelectedMemberByClient] = React.useState<Record<string, string>>({})
   const [deletingClient, setDeletingClient] = React.useState<ClientOrganization | null>(null)
-  const [reconcilingUserId, setReconcilingUserId] = React.useState<string | null>(null)
 
   const users = usersQuery.data ?? []
   const pending = inviteUser.isPending || updateUser.isPending || deleteUser.isPending || resendInvitation.isPending || revokeInvitation.isPending
   const clientsPending = createClient.isPending || deleteClient.isPending || grantClientAccess.isPending || revokeClientAccess.isPending
+  const [logoBusyClientId, setLogoBusyClientId] = React.useState<string | null>(null)
+  const [logoProgress, setLogoProgress] = React.useState(0)
   const visible = users.filter((user) =>
     `${user.name} ${user.email} ${user.role}`.toLowerCase().includes(search.trim().toLowerCase()),
   )
-  const pendingReconciliations = users.filter((user) => user.clientAccessCleanupPending)
 
   const refreshUsers = () => queryClient.invalidateQueries({ queryKey: getGetWorkspaceUsersQueryKey() })
   const refreshInvitations = () => queryClient.invalidateQueries({ queryKey: getGetWorkspaceInvitationsQueryKey() })
   const refreshClients = () => queryClient.invalidateQueries({ queryKey: getGetClientsQueryKey() })
 
-  const retryClientAccessCleanup = async (user: WorkspaceUser) => {
+  const uploadLogo = async (client: ClientOrganization, file: File) => {
     setFeedback(null)
-    setReconcilingUserId(user.id)
+    setLogoBusyClientId(client.id)
+    setLogoProgress(0)
+    const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"])
     try {
-      await reconcileClientAccess.mutateAsync({ userId: user.id })
-      await refreshUsers()
-      setFeedback({ kind: "success", message: `${user.name}'s client access was reconciled.` })
+      if (!allowedTypes.has(file.type)) throw new Error("Choose a JPEG, PNG, or WebP image.")
+      if (file.size < 1 || file.size > 8 * 1024 * 1024) throw new Error("Client logos must be smaller than 8 MB.")
+      const upload = await requestClientLogoUpload.mutateAsync({
+        clientId: client.id,
+        data: { name: file.name, size: file.size, contentType: file.type as "image/jpeg" | "image/png" | "image/webp" },
+      })
+      await new Promise<void>((resolve, reject) => {
+        const request = new XMLHttpRequest()
+        request.open("PUT", upload.uploadURL)
+        request.setRequestHeader("Content-Type", file.type)
+        request.upload.onprogress = (event) => {
+          if (event.lengthComputable) setLogoProgress(Math.round((event.loaded / event.total) * 100))
+        }
+        request.onerror = () => reject(new Error("The logo upload failed."))
+        request.onload = () => request.status >= 200 && request.status < 300 ? resolve() : reject(new Error("The logo upload failed."))
+        request.send(file)
+      })
+      await attachClientLogo.mutateAsync({ clientId: client.id, data: { objectPath: upload.objectPath } })
+      await refreshClients()
+      await queryClient.invalidateQueries({ queryKey: getGetProjectsQueryKey() })
+      setFeedback({ kind: "success", message: `${client.name}'s logo was saved.` })
     } catch (error) {
-      setFeedback({ kind: "error", message: errorMessage(error, "Unable to reconcile client access.") })
+      setFeedback({ kind: "error", message: errorMessage(error, "Unable to save this client logo.") })
     } finally {
-      setReconcilingUserId(null)
+      setLogoBusyClientId(null)
+      setLogoProgress(0)
+    }
+  }
+
+  const removeLogo = async (client: ClientOrganization) => {
+    setFeedback(null)
+    setLogoBusyClientId(client.id)
+    try {
+      await clearClientLogo.mutateAsync({ clientId: client.id })
+      await refreshClients()
+      await queryClient.invalidateQueries({ queryKey: getGetProjectsQueryKey() })
+      setFeedback({ kind: "success", message: `${client.name}'s logo was removed.` })
+    } catch (error) {
+      setFeedback({ kind: "error", message: errorMessage(error, "Unable to remove this client logo.") })
+    } finally {
+      setLogoBusyClientId(null)
     }
   }
 
@@ -413,39 +455,6 @@ export default function Users() {
             </Card>
           ) : (
             <>
-              {pendingReconciliations.length > 0 && (
-                <Card className="border-amber-500/40 bg-amber-500/10 p-4 sm:p-5" role="alert">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
-                    <div className="min-w-0 flex-1">
-                      <h2 className="font-semibold">Client access needs reconciliation</h2>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Role changes succeeded, but client access could not be removed for these users.
-                      </p>
-                      <div className="mt-4 space-y-2">
-                        {pendingReconciliations.map((user) => (
-                          <div key={user.id} className="flex flex-col gap-3 rounded-md border border-amber-500/30 bg-background/50 p-3 sm:flex-row sm:items-center">
-                            <div className="min-w-0 flex-1">
-                              <p className="font-medium">{user.name}</p>
-                              <p className="truncate text-sm text-muted-foreground">{user.email}</p>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => void retryClientAccessCleanup(user)}
-                              disabled={reconcilingUserId !== null}
-                            >
-                              {reconcilingUserId === user.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                              {reconcilingUserId === user.id ? "Retrying…" : "Retry cleanup"}
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              )}
               <div className="glass-panel p-4">
                 <Label htmlFor="user-search" className="sr-only">Search users</Label>
                 <div className="relative max-w-md">
@@ -519,7 +528,7 @@ export default function Users() {
                       <Card key={client.id} className="space-y-5 p-4 sm:p-6">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div className="flex min-w-0 items-start gap-3">
-                            <div className="rounded-lg border border-primary/30 bg-primary/10 p-2 text-primary"><Building2 className="h-5 w-5" /></div>
+                            <ClientIdentity name={client.name} logoUrl={client.logoUrl} size="lg" />
                             <div className="min-w-0">
                               <h2 className="truncate text-lg font-semibold">{client.name}</h2>
                               <p className="text-sm text-muted-foreground">{client.members.length} {client.members.length === 1 ? "person" : "people"} with access</p>
@@ -528,6 +537,38 @@ export default function Users() {
                           <Button variant="outline" size="sm" className="self-start text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setDeletingClient(client)} disabled={clientsPending}>
                             <Trash2 className="mr-2 h-4 w-4" />Delete client
                           </Button>
+                        </div>
+
+                        <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-card/30 p-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex items-center gap-3">
+                            <ClientIdentity name={client.name} logoUrl={client.logoUrl} size="sm" />
+                            <div>
+                              <p className="font-medium">Client logo</p>
+                              <p className="text-xs text-muted-foreground">JPEG, PNG, or WebP · up to 8 MB</p>
+                              {logoBusyClientId === client.id && <p role="status" className="text-xs text-primary">{logoProgress ? `Uploading ${logoProgress}%` : "Preparing upload…"}</p>}
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <label className="inline-flex h-9 cursor-pointer items-center rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
+                              {client.logoUrl ? "Replace logo" : "Add logo"}
+                              <input
+                                type="file"
+                                className="sr-only"
+                                accept="image/jpeg,image/png,image/webp"
+                                disabled={logoBusyClientId !== null}
+                                onChange={(event) => {
+                                  const file = event.target.files?.[0]
+                                  event.target.value = ""
+                                  if (file) void uploadLogo(client, file)
+                                }}
+                              />
+                            </label>
+                            {client.logoUrl && (
+                              <Button type="button" variant="ghost" size="sm" onClick={() => void removeLogo(client)} disabled={logoBusyClientId !== null}>
+                                {clearClientLogo.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Remove
+                              </Button>
+                            )}
+                          </div>
                         </div>
 
                         <div className="grid gap-3 rounded-lg border border-border/70 bg-card/30 p-3 sm:grid-cols-[1fr_auto] sm:items-end">
