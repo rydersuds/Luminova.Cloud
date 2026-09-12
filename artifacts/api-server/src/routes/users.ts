@@ -294,6 +294,25 @@ async function isFinalAdmin(client: ClerkClient, target: User): Promise<boolean>
   return users.data.filter((user) => workspaceRole(user) === "Admin").length <= 1;
 }
 
+async function listAllWorkspaceUsers(client: ClerkClient): Promise<User[]> {
+  const limit = 100;
+  const users: User[] = [];
+  let offset = 0;
+
+  while (true) {
+    const result = await client.users.getUserList({
+      limit,
+      offset,
+      orderBy: "-created_at",
+    });
+    users.push(...result.data);
+    if (result.data.length < limit || users.length >= result.totalCount) break;
+    offset += result.data.length;
+  }
+
+  return users;
+}
+
 async function deleteObjectQuietly(storage: ObjectStorageService, objectPath: string | null | undefined, log: Request["log"]) {
   if (!objectPath) return;
   try {
@@ -329,12 +348,12 @@ router.get("/users/me", async (req: AuthenticatedRequest, res): Promise<void> =>
 
 router.get("/users", async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!await requireAdmin(client, req, res)) return;
-  const result = await client.users.getUserList({ limit: 100, orderBy: "-created_at" });
+  const users = await listAllWorkspaceUsers(client);
   const pendingCleanup = await db.select({ userId: clientAccessCleanupTable.userId })
     .from(clientAccessCleanupTable)
     .where(eq(clientAccessCleanupTable.workspaceId, workspaceId(req)));
   const pendingUserIds = new Set(pendingCleanup.map(({ userId }) => userId));
-  res.json(GetWorkspaceUsersResponse.parse(result.data.map((user) => ({
+  res.json(GetWorkspaceUsersResponse.parse(users.map((user) => ({
     ...serializeUser(user),
     clientAccessCleanupPending: pendingUserIds.has(user.id),
   }))));

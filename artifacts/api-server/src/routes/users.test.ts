@@ -71,7 +71,14 @@ function fakeClerk(
           activeUserLookups -= 1;
         }
       },
-      getUserList: async () => ({ data: users, totalCount: users.length }),
+      getUserList: async (params?: { limit?: number; offset?: number }) => {
+        const limit = params?.limit ?? 100;
+        const offset = params?.offset ?? 0;
+        return {
+          data: users.slice(offset, offset + limit),
+          totalCount: users.length,
+        };
+      },
       updateUserMetadata: async (id: string, input: { publicMetadata?: Record<string, unknown> }) => {
         const user = await client.users.getUser(id);
         Object.assign(user, { publicMetadata: input.publicMetadata ?? {} });
@@ -461,6 +468,37 @@ test("reports failed client cleanup and retries the same demotion safely", async
   assert.equal(repeated.status, 200);
   assert.deepEqual(
     await db.select().from(clientMembersTable).where(eq(clientMembersTable.clientId, client.id)),
+    [],
+  );
+});
+
+test("lists pending client cleanup for users beyond Clerk's first page", async () => {
+  const pendingUser = makeUser("pending-beyond-first-page", "Field Team");
+  const fake = fakeClerk([
+    makeUser("admin", "Admin"),
+    ...Array.from({ length: 100 }, (_, index) => makeUser(`workspace-user-${index}`, "Field Team")),
+    pendingUser,
+  ]);
+  const base = await startApi("admin", fake.client, undefined, "workspace-pending-large");
+
+  await db.insert(clientAccessCleanupTable).values({
+    workspaceId: "workspace-pending-large",
+    userId: pendingUser.id,
+  });
+
+  const response = await fetch(`${base}/users`);
+  assert.equal(response.status, 200);
+  const users = await response.json() as Array<{
+    id: string;
+    clientAccessCleanupPending: boolean;
+  }>;
+  assert.equal(users.length, 102);
+  assert.equal(users.find((user) => user.id === pendingUser.id)?.clientAccessCleanupPending, true);
+
+  const reconciled = await fetch(`${base}/users/${pendingUser.id}/client-access-reconciliation`, { method: "POST" });
+  assert.equal(reconciled.status, 204);
+  assert.deepEqual(
+    await db.select().from(clientAccessCleanupTable).where(eq(clientAccessCleanupTable.workspaceId, "workspace-pending-large")),
     [],
   );
 });

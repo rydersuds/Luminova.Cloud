@@ -13,6 +13,7 @@ import {
   useGetClients,
   useGrantClientAccess,
   useRevokeClientAccess,
+  useReconcileClientAccess,
   useDeleteWorkspaceUser,
   useGetWorkspaceInvitations,
   useGetWorkspaceUsers,
@@ -89,6 +90,7 @@ export default function Users() {
   const clearClientLogo = useClearClientLogo()
   const grantClientAccess = useGrantClientAccess()
   const revokeClientAccess = useRevokeClientAccess()
+  const reconcileClientAccess = useReconcileClientAccess()
   const resendInvitation = useResendWorkspaceInvitation()
   const revokeInvitation = useRevokeWorkspaceInvitation()
   const updateUser = useUpdateWorkspaceUser()
@@ -108,17 +110,29 @@ export default function Users() {
   const [deletingClient, setDeletingClient] = React.useState<ClientOrganization | null>(null)
 
   const users = usersQuery.data ?? []
-  const pending = inviteUser.isPending || updateUser.isPending || deleteUser.isPending || resendInvitation.isPending || revokeInvitation.isPending
+  const pending = inviteUser.isPending || updateUser.isPending || deleteUser.isPending || resendInvitation.isPending || revokeInvitation.isPending || reconcileClientAccess.isPending
   const clientsPending = createClient.isPending || deleteClient.isPending || grantClientAccess.isPending || revokeClientAccess.isPending
   const [logoBusyClientId, setLogoBusyClientId] = React.useState<string | null>(null)
   const [logoProgress, setLogoProgress] = React.useState(0)
   const visible = users.filter((user) =>
     `${user.name} ${user.email} ${user.role}`.toLowerCase().includes(search.trim().toLowerCase()),
   )
+  const pendingCleanupUsers = users.filter((user) => user.clientAccessCleanupPending)
 
   const refreshUsers = () => queryClient.invalidateQueries({ queryKey: getGetWorkspaceUsersQueryKey() })
   const refreshInvitations = () => queryClient.invalidateQueries({ queryKey: getGetWorkspaceInvitationsQueryKey() })
   const refreshClients = () => queryClient.invalidateQueries({ queryKey: getGetClientsQueryKey() })
+
+  const reconcile = async (user: WorkspaceUser) => {
+    setFeedback(null)
+    try {
+      await reconcileClientAccess.mutateAsync({ userId: user.id })
+      await refreshUsers()
+      setFeedback({ kind: "success", message: `Client access cleanup finished for ${user.name}.` })
+    } catch (error) {
+      setFeedback({ kind: "error", message: errorMessage(error, "Unable to finish client access cleanup.") })
+    }
+  }
 
   const uploadLogo = async (client: ClientOrganization, file: File) => {
     setFeedback(null)
@@ -455,6 +469,37 @@ export default function Users() {
             </Card>
           ) : (
             <>
+              {pendingCleanupUsers.length > 0 && (
+                <section aria-labelledby="client-access-cleanup-heading" className="space-y-3">
+                  <Card className="border-amber-500/50 bg-amber-500/5 p-4 sm:p-5">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <h2 id="client-access-cleanup-heading" className="font-semibold">Client access cleanup needed</h2>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          These users were changed from Client, but some access could not be removed. Retry the cleanup to finish.
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="w-fit border-amber-500/50 text-amber-700 dark:text-amber-300">
+                        {pendingCleanupUsers.length} pending
+                      </Badge>
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      {pendingCleanupUsers.map((user) => (
+                        <div key={user.id} className="flex flex-col gap-3 rounded-md border border-amber-500/30 bg-background/60 p-3 sm:flex-row sm:items-center">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium">{user.name}</p>
+                            <p className="truncate text-sm text-muted-foreground">{user.email}</p>
+                          </div>
+                          <Button type="button" variant="outline" size="sm" onClick={() => void reconcile(user)} disabled={pending}>
+                            {reconcileClientAccess.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            <RefreshCw className="mr-2 h-4 w-4" />Retry cleanup
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                </section>
+              )}
               <div className="glass-panel p-4">
                 <Label htmlFor="user-search" className="sr-only">Search users</Label>
                 <div className="relative max-w-md">
@@ -479,6 +524,9 @@ export default function Users() {
                         <p className="truncate text-sm text-muted-foreground">{user.email}</p>
                       </div>
                       <Badge variant={user.role === "Admin" ? "default" : "secondary"} className="self-start sm:self-auto">{user.role}</Badge>
+                      {user.clientAccessCleanupPending && (
+                        <Badge variant="outline" className="w-fit border-amber-500/50 text-amber-700 dark:text-amber-300">Cleanup pending</Badge>
+                      )}
                       <div className="flex gap-2">
                         <Button variant="outline" size="sm" onClick={() => { setEditing({ ...user }); setFeedback(null) }} disabled={pending}>
                           <Pencil className="mr-2 h-4 w-4" />Edit
