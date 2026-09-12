@@ -38,6 +38,13 @@ export type BulkClientAccessReconciliationResponseFailedItem = {
   userId: string;
   error: string;
 };
+
+
+export interface BulkClientAccessReconciliationResponse {
+  reconciled: string[];
+  failed: BulkClientAccessReconciliationResponseFailedItem[];
+}
+
 export interface ClientMember {
   id: string;
   userId: string;
@@ -629,6 +636,7 @@ export interface VendorQuoteAttachment {
      */
   confidence?: number | null;
 }
+
 export interface VendorQuote {
   id: string;
   quoteNumber: string;
@@ -707,6 +715,36 @@ export interface OrganizeProjectFilesResult {
 }
 
 export type VendorQuoteImportOutcomeStatus = typeof VendorQuoteImportOutcomeStatus[keyof typeof VendorQuoteImportOutcomeStatus];
+
+
+export const VendorQuoteImportOutcomeStatus = {
+  imported: 'imported',
+  skipped: 'skipped',
+  unreadable: 'unreadable',
+} as const;
+
+export interface VendorQuoteImportOutcome {
+  documentId: string;
+  name: string;
+  relativePath: string;
+  status: VendorQuoteImportOutcomeStatus;
+  reason: string;
+  /** @nullable */
+  quoteId?: string | null;
+}
+
+export interface VendorQuoteRescanResult {
+  /** @minimum 0 */
+  documentsScanned: number;
+  /** @minimum 0 */
+  imported: number;
+  /** @minimum 0 */
+  skipped: number;
+  /** @minimum 0 */
+  unreadable: number;
+  outcomes: VendorQuoteImportOutcome[];
+}
+
 export interface PanoramaInput {
   /**
      * App Storage object path returned after a direct upload
@@ -939,32 +977,3 @@ trade?: string;
 status?: VendorQuoteStatus;
 direction?: QuoteDirection;
 };
-export interface BulkClientAccessReconciliationResponse {
-  reconciled: string[];
-  failed: BulkClientAccessReconciliationResponseFailedItem[];
-}
-export interface VendorQuoteRescanResult {
-  /** @minimum 0 */
-  documentsScanned: number;
-  /** @minimum 0 */
-  imported: number;
-  /** @minimum 0 */
-  skipped: number;
-  /** @minimum 0 */
-  unreadable: number;
-  outcomes: VendorQuoteImportOutcome[];
-}
-export interface VendorQuoteImportOutcome {
-  documentId: string;
-  name: string;
-  relativePath: string;
-  status: VendorQuoteImportOutcomeStatus;
-  reason: string;
-  /** @nullable */
-  quoteId?: string | null;
-}
-export const VendorQuoteImportOutcomeStatus = {
-  imported: 'imported',
-  skipped: 'skipped',
-  unreadable: 'unreadable',
-} as const;

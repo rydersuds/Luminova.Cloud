@@ -309,19 +309,7 @@ const importAnalysisSchema = z.object(
     region: z.string().max(100).default(""),
     clientName: z.string().max(160).default(""),
     pmName: z.string().max(160).default(""),
-    targetDate: z.string().regex(/^\d
-{
-4
-}
--\d
-{
-2
-}
--\d
-{
-2
-}
-$/).optional(),
+    targetDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     budgetDollars: z.number().finite().nonnegative().max(100_000_000).optional(),
     description: z.string().max(2000).default(""),
   
@@ -353,32 +341,8 @@ $/).optional(),
     direction: z.enum(["luminova_to_client", "company_to_luminova"]),
     isProjectTotal: z.boolean(),
     trade: z.string().max(100).default("General"),
-    issueDate: z.string().regex(/^\d
-{
-4
-}
--\d
-{
-2
-}
--\d
-{
-2
-}
-$/).optional(),
-    dueDate: z.string().regex(/^\d
-{
-4
-}
--\d
-{
-2
-}
--\d
-{
-2
-}
-$/).optional(),
+    issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     amountDollars: z.number().finite().nonnegative().max(100_000_000),
     lineItems: z.array(z.object(
 {
@@ -401,19 +365,7 @@ $/).optional(),
     vendor: z.string().min(1).max(160),
     invoiceNumber: z.string().min(1).max(100),
     direction: z.enum(["luminova_to_client", "company_to_luminova"]),
-    date: z.string().regex(/^\d
-{
-4
-}
--\d
-{
-2
-}
--\d
-{
-2
-}
-$/).optional(),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     amountDollars: z.number().finite().nonnegative().max(100_000_000),
     lineItem: z.string().max(200).default("Imported document"),
   
@@ -439,19 +391,7 @@ const importAnalysisModelSchema = z.object(
     region: z.string().max(100).nullable(),
     clientName: z.string().max(160).nullable(),
     pmName: z.string().max(160).nullable(),
-    targetDate: z.string().regex(/^\d
-{
-4
-}
--\d
-{
-2
-}
--\d
-{
-2
-}
-$/).nullable(),
+    targetDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
     budgetDollars: z.number().finite().nonnegative().max(100_000_000).nullable(),
     description: z.string().max(2000).nullable(),
   
@@ -483,32 +423,8 @@ $/).nullable(),
     direction: z.enum(["luminova_to_client", "company_to_luminova"]),
     isProjectTotal: z.boolean(),
     trade: z.string().max(100).nullable(),
-    issueDate: z.string().regex(/^\d
-{
-4
-}
--\d
-{
-2
-}
--\d
-{
-2
-}
-$/).nullable(),
-    dueDate: z.string().regex(/^\d
-{
-4
-}
--\d
-{
-2
-}
--\d
-{
-2
-}
-$/).nullable(),
+    issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+    dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
     amountDollars: z.number().finite().nonnegative().max(100_000_000),
     lineItems: z.array(z.object(
 {
@@ -531,19 +447,7 @@ $/).nullable(),
     vendor: z.string().min(1).max(160),
     invoiceNumber: z.string().min(1).max(100),
     direction: z.enum(["luminova_to_client", "company_to_luminova"]),
-    date: z.string().regex(/^\d
-{
-4
-}
--\d
-{
-2
-}
--\d
-{
-2
-}
-$/).nullable(),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
     amountDollars: z.number().finite().nonnegative().max(100_000_000),
     lineItem: z.string().max(200).nullable(),
   
@@ -1069,8 +973,7 @@ async function analyzeProjectImport(documents: Array<
     if (!document.textSnippet || remainingSnippetCharacters <= 0) 
 {
 
-      return 
-{
+      return {
  ...document, textSnippet: undefined 
 }
 ;
@@ -1084,8 +987,7 @@ async function analyzeProjectImport(documents: Array<
     remainingSnippetCharacters -= textSnippet.length
 ;
 
-    return 
-{
+    return {
  ...document, textSnippet 
 }
 ;
@@ -1758,14 +1660,12 @@ const withCalculatedProjectProgress = (project: Project): Project =>
   const quoteTotal = project.clientQuote?.total ?? 0
 ;
 
-  if (quoteTotal <= 0) return 
-{
+  if (quoteTotal <= 0) return {
  ...project, clientName: canonicalClientName(project.clientName) 
 }
 ;
 
-  return 
-{
+  return {
 
     ...project,
     clientName: canonicalClientName(project.clientName),
@@ -1835,8 +1735,7 @@ const enrichProjectClient = (project: Project, clients: Array<
   )
 ;
 
-  return 
-{
+  return {
 
     ...project,
     clientLogoUrl: client?.logoObjectPath ? `/api/storage${client.logoObjectPath}` : null,
@@ -1878,8 +1777,7 @@ const enrichInvoicesWithClientBranding = async (
     if (invoice.direction !== "luminova_to_client") 
 {
 
-      return 
-{
+      return {
  ...invoice, clientName: null, clientLogoUrl: null 
 }
 ;
@@ -1899,8 +1797,7 @@ const enrichInvoicesWithClientBranding = async (
     )
 ;
 
-    return 
-{
+    return {
 
       ...invoice,
       clientName,
@@ -2353,8 +2250,7 @@ const financialRecordsForOwner = async (ownerId: string, scope = ownerId) =>
 ))
 ;
 
-  return 
-{
+  return {
 
     invoices: brandedInvoices,
     quotes: [
@@ -2743,8 +2639,7 @@ const latestClientQuoteDetail = async (project: Project) =>
 }
 
 
-  return 
-{
+  return {
 
     total: latestQuote.total,
     revision: latestQuote.quoteNumber,
@@ -2801,8 +2696,7 @@ export const analyzeImportedQuoteDirections = async (projectId: string, ownerId:
   ])
 ;
 
-  if (quoteRows.length === 0) return 
-{
+  if (quoteRows.length === 0) return {
  quotesAnalyzed: 0 
 }
 ;
@@ -2825,8 +2719,7 @@ export const analyzeImportedQuoteDirections = async (projectId: string, ownerId:
     const quote = row.data as VendorQuote
 ;
 
-    return 
-{
+    return {
 
       id: quote.id,
       quoteNumber: quote.quoteNumber,
@@ -2927,8 +2820,7 @@ export const analyzeImportedQuoteDirections = async (projectId: string, ownerId:
   
 }
 
-  return 
-{
+  return {
  quotesAnalyzed 
 }
 ;
@@ -3144,8 +3036,7 @@ export const organizeImportedProjectFiles = async (projectId: string, ownerId: s
   
 }
 
-  return 
-{
+  return {
  filesOrganized: documents.length, collectionsCreated: new Set(collectionByFolder.values()).size, attachmentsMatched 
 }
 ;
@@ -3224,8 +3115,7 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
         const parentFolder = document.collection || (pathParts.length > 1 ? pathParts.at(-2) ?? "" : "Project photos")
 ;
 
-        return 
-{
+        return {
 
           id: document.id,
           url: `/api/storage${document.objectPath}`,
@@ -3244,8 +3134,7 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
 ;
 
 
-    return 
-{
+    return {
 
       ...project,
       startDate: "",
@@ -3285,8 +3174,7 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
   const clientQuote = await latestClientQuoteDetail(project)
 ;
 
-  return 
-{
+  return {
 
     ...project,
     startDate: "",
@@ -4154,8 +4042,7 @@ const importSessionResponse = async (batch: typeof projectImportBatchesTable.$in
     .where(eq(projectDocumentsTable.importBatchId, batch.id))
 ;
 
-  return 
-{
+  return {
 
     importId: batch.id,
     status: batch.status,
@@ -4657,8 +4544,7 @@ const createProjectImportHandler = async (req: Request, res: Response): Promise<
         const normalized = normalizeFinancialParty(quote, isLuminovaParty(quote.vendorName) ? analysis.project.clientName : undefined)
 ;
 
-        return 
-{
+        return {
 
           ...normalized,
           vendorName: isClientParty(normalized.vendorName) ? canonicalClientName(normalized.vendorName) : normalized.vendorName,
@@ -6949,26 +6835,22 @@ project.id
       const enrichedDocument = enriched.find((item) => item.relativePath === document.relativePath)
 ;
 
-      if (processingFailures.has(document.relativePath)) return 
-{
+      if (processingFailures.has(document.relativePath)) return {
  documentId: document.id, name: document.name, relativePath: document.relativePath, status: "unreadable" as const, reason: analysisFailures.has(document.relativePath) ? "The document could not be classified." : "No readable financial text could be extracted.", quoteId: match?.id ?? null 
 }
 ;
 
-      if (match) return 
-{
+      if (match) return {
  documentId: document.id, name: document.name, relativePath: document.relativePath, status: "imported" as const, reason: "Matched a vendor-originated quote.", quoteId: match.id 
 }
 ;
 
-      if (supportedDocument(document) && !enrichedDocument?.textSnippet?.trim()) return 
-{
+      if (supportedDocument(document) && !enrichedDocument?.textSnippet?.trim()) return {
  documentId: document.id, name: document.name, relativePath: document.relativePath, status: "unreadable" as const, reason: "No readable financial text could be extracted.", quoteId: null 
 }
 ;
 
-      return 
-{
+      return {
  documentId: document.id, name: document.name, relativePath: document.relativePath, status: "skipped" as const, reason: supportedDocument(document) ? "Not confidently classified as a vendor quote to Luminova." : "Not a supported quote document.", quoteId: null 
 }
 ;

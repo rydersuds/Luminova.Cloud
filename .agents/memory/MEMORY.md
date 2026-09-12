@@ -3,6 +3,7 @@
 - [Resumable browser imports](resumable-browser-imports.md) — persist selected blobs locally, but treat server-attached paths as the authoritative upload progress.
 - [Drizzle integration isolation](drizzle-integration-isolation.md) — use temporary databases, not search_path-only schemas, for drizzle-kit integration tests.
 - [Merged route reloads](merged-route-reloads.md) — force a watcher event after post-merge API builds so managed previews cannot keep an old route table.
+- [Route merge syntax corruption](route-merge-syntax-corruption.md) — after concurrent route merges, one parser error can indicate widespread source-token splitting.
 - [Photo analysis isolation](photo-analysis-isolation.md) — keep private visual analysis bounded and per-photo so one AI or decoder failure never rolls back a valid import.
 - [Workspace-scoped package installs](workspace-scoped-package-installs.md) — when package tooling cannot target a pnpm child package, edit its manifest and install from the workspace root.
 - [Internal budget semantics](internal-budget-semantics.md) — compare internal costs and commitments to internal budgets; never treat client billings as project costs.
