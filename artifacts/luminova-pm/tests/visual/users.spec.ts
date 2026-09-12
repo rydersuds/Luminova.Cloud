@@ -138,25 +138,40 @@ test.describe('Users & Roles background treatment', () => {
 
   test('retries pending client access cleanup and hides the warning after reconciliation', async ({ page }) => {
     let usersResponse = workspaceUsers.map((user) => (
-      user.id === 'user-sam' ? { ...user, clientAccessCleanupPending: true } : user
+      user.id === 'user-sam' || user.id === 'user-jordan'
+        ? { ...user, clientAccessCleanupPending: true }
+        : user
     ));
-    let reconciliationRequests = 0;
+    const reconciliationRequests: string[] = [];
 
     await page.route('**/api/users', (route) => route.fulfill({ json: usersResponse }));
-    await page.route('**/api/users/user-sam/client-access-reconciliation', async (route) => {
-      expect(route.request().method()).toBe('POST');
-      reconciliationRequests += 1;
-      usersResponse = usersResponse.map((user) => ({ ...user, clientAccessCleanupPending: false }));
-      await route.fulfill({ status: 204, body: '' });
-    });
+    for (const userId of ['user-sam', 'user-jordan']) {
+      await page.route(`**/api/users/${userId}/client-access-reconciliation`, async (route) => {
+        expect(route.request().method()).toBe('POST');
+        reconciliationRequests.push(userId);
+        usersResponse = usersResponse.map((user) => (
+          user.id === userId ? { ...user, clientAccessCleanupPending: false } : user
+        ));
+        await route.fulfill({ status: 204, body: '' });
+      });
+    }
 
     await page.goto('/__visual/users');
-    await expect(page.getByRole('heading', { name: 'Client access needs reconciliation' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Retry cleanup' })).toBeVisible();
+    const cleanupWarning = page.getByRole('alert').filter({ hasText: 'Role changes succeeded' });
+    await expect(cleanupWarning.getByRole('heading', { name: 'Client access needs reconciliation' })).toBeVisible();
+    await expect(cleanupWarning.getByText('2 pending')).toBeVisible();
+    await expect(cleanupWarning.getByRole('button', { name: 'Retry cleanup' })).toHaveCount(2);
 
-    await page.getByRole('button', { name: 'Retry cleanup' }).click();
-    await expect.poll(() => reconciliationRequests).toBe(1);
+    await cleanupWarning.getByText('Sam Carter', { exact: true }).locator('../..').getByRole('button', { name: 'Retry cleanup' }).click();
+    await expect.poll(() => reconciliationRequests).toEqual(['user-sam']);
+    await expect(cleanupWarning.getByText('2 pending')).toBeHidden();
+    await expect(cleanupWarning.getByText('1 pending')).toBeVisible();
+    await expect(cleanupWarning.getByText('Sam Carter', { exact: true })).toBeHidden();
+    await expect(cleanupWarning.getByText('Jordan Lee', { exact: true })).toBeVisible();
+
+    await cleanupWarning.getByText('Jordan Lee', { exact: true }).locator('../..').getByRole('button', { name: 'Retry cleanup' }).click();
+    await expect.poll(() => reconciliationRequests).toEqual(['user-sam', 'user-jordan']);
     await expect(page.getByRole('heading', { name: 'Client access needs reconciliation' })).toBeHidden();
-    await expect(page.getByText("Sam Carter's client access was reconciled.")).toBeVisible();
+    await expect(page.getByText("Jordan Lee's client access was reconciled.")).toBeVisible();
   });
 });
