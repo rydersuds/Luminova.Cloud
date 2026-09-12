@@ -13,7 +13,15 @@ import { Building2, Grid2X2, List, MapPin, Search, SlidersHorizontal, X } from "
 import { cn, formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
 
 const STATUSES = ["Pre-construction", "Planning", "Active", "In progress", "On hold", "Completed", "Rejected for bid"]
-const REGIONS = ["Calgary", "Canmore", "Edmonton"]
+const REGION_OPTIONS_QUERY_KEY = [...getGetProjectsQueryKey(), "region-options"] as const
+
+export function getProjectRegionOptions(projects: Array<{ region?: string }> | undefined) {
+  return Array.from(new Set(
+    projects
+      ?.map((project) => project.region)
+      .filter((item): item is string => typeof item === "string" && item.trim().length > 0) ?? [],
+  )).sort()
+}
 
 export default function Projects() {
   const [, setLocation] = useLocation()
@@ -30,6 +38,16 @@ export default function Projects() {
   const { data: projects, isLoading } = useGetProjects(params, {
     query: { queryKey: getGetProjectsQueryKey(params) },
   })
+  const { data: allProjects, isLoading: areRegionsLoading } = useGetProjects(undefined, {
+    query: { queryKey: REGION_OPTIONS_QUERY_KEY },
+  })
+  const regionOptions = React.useMemo(() => getProjectRegionOptions(allProjects), [allProjects])
+
+  React.useEffect(() => {
+    if (region && allProjects && !regionOptions.includes(region)) {
+      setRegion("")
+    }
+  }, [allProjects, region, regionOptions])
 
   const clearFilters = () => {
     setSearch("")
@@ -93,6 +111,7 @@ export default function Projects() {
               <select
                 value={status}
                 onChange={(event) => setStatus(event.target.value)}
+                aria-label="Project status"
                 className="h-10 border border-border bg-background/70 px-3 text-sm outline-none focus:border-primary"
               >
                 <option value="">All statuses</option>
@@ -101,10 +120,12 @@ export default function Projects() {
               <select
                 value={region}
                 onChange={(event) => setRegion(event.target.value)}
+                aria-label="Project region"
+                disabled={areRegionsLoading && regionOptions.length === 0}
                 className="h-10 border border-border bg-background/70 px-3 text-sm outline-none focus:border-primary"
               >
                 <option value="">All regions</option>
-                {REGIONS.map((item) => <option key={item} value={item}>{item}</option>)}
+                {regionOptions.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
               <Button type="button" variant="outline" onClick={clearFilters} disabled={!hasFilters} className="gap-2">
                 <X className="h-4 w-4" />
