@@ -25,7 +25,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { 
   Building, MapPin, Calendar, DollarSign, ArrowLeft, 
   Camera, Briefcase, FileText, CheckCircle2, ChevronRight, Activity, Clock,
-  Maximize2, ChevronLeft, ChevronDown, Pencil, Search, Trash2
+  Maximize2, ChevronLeft, ChevronDown, Pencil, Search, Trash2, ExternalLink
 } from "lucide-react"
 import { cn, formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
@@ -183,6 +183,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   }, [photoFolderTree, photoSearch, project, projectId])
   const invoiceFiles = project?.files.filter((file) => file.classification === "invoice") || []
   const quoteFiles = project?.files.filter((file) => file.classification === "quote") || []
+  const agreementFiles = project?.files.filter((file) => file.classification === "contract") || []
 
   const handleOrganizeFiles = async () => {
     try {
@@ -791,6 +792,47 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                           <span className="font-medium">{project.clientName}</span>
                         </div>
                       </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>On-site agreement</CardTitle>
+                      <CardDescription>
+                        {agreementFiles.length > 0
+                          ? "Open the imported agreement documents for this project."
+                          : "No on-site agreement has been imported yet."}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {agreementFiles.length > 0 ? (
+                        <div className="space-y-3">
+                          {agreementFiles.map((file) => (
+                            <div key={file.id} className="flex min-w-0 items-center gap-3 rounded-lg border border-border bg-muted/20 p-3">
+                              <FileText className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-medium" title={file.name}>{file.name}</p>
+                                {file.relativePath !== file.name && (
+                                  <p className="truncate text-xs text-muted-foreground" title={file.relativePath}>{file.relativePath}</p>
+                                )}
+                              </div>
+                              <a
+                                href={file.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                aria-label={`Open on-site agreement ${file.name}`}
+                                title={file.name}
+                              >
+                                Open
+                                <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                              </a>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Import a contract file to make it available here.</p>
+                      )}
                     </CardContent>
                   </Card>
                   

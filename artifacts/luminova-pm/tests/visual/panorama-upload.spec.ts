@@ -45,6 +45,12 @@ async function openGallery(page: Page) {
   if (await photoCollection.isVisible()) await photoCollection.click();
 }
 
+async function openOverview(page: Page) {
+  await page.goto('/__visual/project-panorama');
+  await expect(page.getByRole('heading', { name: 'Riverstone Residence' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'On-site agreement' })).toBeVisible();
+}
+
 test.beforeEach(async ({ page }) => {
   let current = structuredClone(project);
   await page.addInitScript(() => {
@@ -65,6 +71,48 @@ test.beforeEach(async ({ page }) => {
     }
     await route.fallback();
   });
+});
+
+test('opens imported on-site agreements from the Overview in a new tab', async ({ page, context }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const fileName = 'Riverstone-Residence-fully-executed-on-site-agreement-and-scope-of-work.pdf';
+  const current = {
+    ...structuredClone(project),
+    files: [{
+      id: 'agreement-1',
+      name: fileName,
+      relativePath: `Contracts/${fileName}`,
+      url: '/api/storage/objects/uploads/riverstone-agreement',
+      contentType: 'application/pdf',
+      classification: 'contract',
+      collection: 'Contracts',
+    }],
+  };
+  await page.unroute('**/api/projects/riverstone');
+  await page.route('**/api/projects/riverstone', route => route.fulfill({ json: current }));
+
+  await openOverview(page);
+  await expect(page.getByText(fileName, { exact: true })).toBeVisible();
+  const agreementLink = page.getByRole('link', { name: `Open on-site agreement ${fileName}` });
+  await expect(agreementLink).toHaveAttribute('href', '/api/storage/objects/uploads/riverstone-agreement');
+  await expect(agreementLink).toHaveAttribute('target', '_blank');
+  await expect(agreementLink).toHaveAttribute('title', fileName);
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(overflow).toBe(false);
+
+  const newPagePromise = context.waitForEvent('page');
+  await agreementLink.click();
+  const newPage = await newPagePromise;
+  await expect(newPage).toHaveURL(/\/api\/storage\/objects\/uploads\/riverstone-agreement$/);
+  await newPage.close();
+});
+
+test('shows a clear Overview empty state when no on-site agreement is imported', async ({ page }) => {
+  await openOverview(page);
+  await expect(page.getByText('No on-site agreement has been imported yet.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Import a contract file to make it available here.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Open on-site agreement/ })).toHaveCount(0);
 });
 
 test('selects a standard photo as the exterior photo and keeps it selected after refresh', async ({ page }) => {
