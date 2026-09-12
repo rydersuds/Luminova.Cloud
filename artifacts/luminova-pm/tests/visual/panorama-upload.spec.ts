@@ -449,6 +449,48 @@ test('confirms schedule image removal, reports failures, and refreshes the galle
   await expect(page.getByText('No schedule images yet', { exact: true })).toBeVisible();
 });
 
+test('restores a project image, reports failures, and refreshes the schedule gallery after retry', async ({ page }) => {
+  const restoredImage = {
+    id: 'removed-schedule',
+    url: '/api/storage/objects/uploads/removed-schedule',
+    name: 'removed-schedule.png',
+    relativePath: 'Archive/removed-schedule.png',
+    contentType: 'image/png',
+    size: 2048,
+  };
+  let current = {
+    ...structuredClone(project),
+    files: [
+      ...structuredClone(project.files),
+      { ...restoredImage, classification: 'other', collection: 'Archive', linkedEntityType: null, linkedEntityId: null, aiConfidence: null },
+    ],
+    scheduleImages: [],
+  };
+  let attempts = 0;
+  await page.unroute('**/api/projects/riverstone');
+  await page.route('**/api/projects/riverstone', route => route.fulfill({ json: current }));
+  await page.route('**/api/projects/riverstone/schedule-images/removed-schedule/restore', async route => {
+    expect(route.request().method()).toBe('POST');
+    attempts += 1;
+    if (attempts === 1) {
+      await route.fulfill({ status: 500, json: { error: 'The schedule image could not be restored. Try again.' } });
+      return;
+    }
+    current = { ...current, scheduleImages: [restoredImage] };
+    await route.fulfill({ status: 200, json: restoredImage });
+  });
+
+  await openOverview(page);
+  const restore = page.getByRole('button', { name: 'Restore schedule image removed-schedule.png' });
+  await expect(restore).toBeVisible();
+  await restore.click();
+  await expect(page.getByText('Restore failed', { exact: true })).toBeVisible();
+  await restore.click();
+  await expect(page.getByText('Schedule image restored', { exact: true })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'removed-schedule.png' })).toBeVisible();
+  await expect(restore).not.toBeVisible();
+});
+
 test('uploads a schedule image, refreshes the project, and supports retry after failure', async ({ page }) => {
   const uploaded = {
     id: 'schedule-new',

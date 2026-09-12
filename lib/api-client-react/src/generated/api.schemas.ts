@@ -943,7 +943,6 @@ export interface BulkClientAccessReconciliationResponse {
   reconciled: string[];
   failed: BulkClientAccessReconciliationResponseFailedItem[];
 }
-
 export interface VendorQuoteRescanResult {
   /** @minimum 0 */
   documentsScanned: number;
@@ -955,7 +954,6 @@ export interface VendorQuoteRescanResult {
   unreadable: number;
   outcomes: VendorQuoteImportOutcome[];
 }
-
 export interface VendorQuoteImportOutcome {
   documentId: string;
   name: string;
@@ -965,7 +963,6 @@ export interface VendorQuoteImportOutcome {
   /** @nullable */
   quoteId?: string | null;
 }
-
 export const VendorQuoteImportOutcomeStatus = {
   imported: 'imported',
   skipped: 'skipped',

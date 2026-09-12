@@ -40,6 +40,8 @@ import
   CreateProjectScheduleImageParams,
   CreateProjectScheduleImageResponse,
   DeleteProjectScheduleImageParams,
+  RestoreProjectScheduleImageParams,
+  RestoreProjectScheduleImageResponse,
   GetDashboardSummaryResponse,
   SearchWorkspaceQueryParams,
   SearchWorkspaceResponse,
@@ -5850,6 +5852,57 @@ router.delete("/projects/:projectId/schedule-images/:scheduleImageId", async (re
 ;
 
 
+router.post("/projects/:projectId/schedule-images/:documentId/restore", async (req: AuthenticatedRequest, res): Promise<void> => {
+  const params = RestoreProjectScheduleImageParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Invalid image document." });
+    return;
+  }
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  const project = await findAuthorizedProject(params.data.projectId, req.userId);
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  try {
+    const [document] = await db.select().from(projectDocumentsTable)
+      .where(and(
+        eq(projectDocumentsTable.id, params.data.documentId),
+        eq(projectDocumentsTable.projectId, project.id),
+        eq(projectDocumentsTable.ownerId, req.userId),
+      ))
+      .limit(1);
+    if (!document || !document.contentType.toLowerCase().startsWith("image/")) {
+      res.status(404).json({ error: "Image document not found" });
+      return;
+    }
+
+    await db.update(projectDocumentsTable)
+      .set({ classification: "schedule" })
+      .where(and(
+        eq(projectDocumentsTable.id, document.id),
+        eq(projectDocumentsTable.projectId, project.id),
+        eq(projectDocumentsTable.ownerId, req.userId),
+      ));
+    res.json(RestoreProjectScheduleImageResponse.parse({
+      id: document.id,
+      url: `/api/storage${document.objectPath}`,
+      name: document.name,
+      relativePath: document.relativePath,
+      contentType: document.contentType,
+      size: document.size,
+    }));
+  } catch (error) {
+    req.log.error({ err: error, projectId: project.id, documentId: params.data.documentId }, "Failed to restore project schedule image");
+    res.status(500).json({ error: "The schedule image could not be restored. Try again." });
+  }
+});
+
 router.patch("/projects/:projectId/panoramas/:panoramaId", async (req, res): Promise<void> => 
 {
 
@@ -5918,7 +5971,6 @@ router.patch("/projects/:projectId/panoramas/:panoramaId", async (req, res): Pro
 
   
 }
-
 
   try 
 {

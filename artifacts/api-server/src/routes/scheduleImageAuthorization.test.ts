@@ -56,6 +56,32 @@ test("schedule images require project authorization and imported schedule images
     size: 2048,
     classification: "schedule",
   });
+  await db.insert(projectDocumentsTable).values([
+    {
+      id: `restorable-document-${suffix}`,
+      importBatchId,
+      projectId,
+      ownerId,
+      objectPath: `/objects/uploads/restorable-${suffix}`,
+      relativePath: "Archive/removed-schedule.webp",
+      name: "removed-schedule.webp",
+      contentType: "image/webp",
+      size: 1024,
+      classification: "other",
+    },
+    {
+      id: `non-image-document-${suffix}`,
+      importBatchId,
+      projectId,
+      ownerId,
+      objectPath: `/objects/uploads/non-image-${suffix}`,
+      relativePath: "Archive/notes.pdf",
+      name: "notes.pdf",
+      contentType: "application/pdf",
+      size: 1024,
+      classification: "other",
+    },
+  ]);
   await db.insert(projectScheduleImagesTable).values({
     id: `manual-schedule-${suffix}`,
     projectId,
@@ -157,6 +183,34 @@ test("schedule images require project authorization and imported schedule images
     .where(eq(projectDocumentsTable.id, `schedule-document-${suffix}`));
   assert.equal(sourceDocument.classification, "other");
   assert.equal(sourceDocument.objectPath, objectPath);
+
+  const restoreUrl = `${base}/projects/${projectId}/schedule-images/restorable-document-${suffix}/restore`;
+  assert.equal((await fetch(restoreUrl, { method: "POST" })).status, 401);
+  assert.equal((await fetch(restoreUrl, {
+    method: "POST",
+    headers: { "x-test-user": otherOwnerId },
+  })).status, 404);
+  assert.equal((await fetch(`${base}/projects/${projectId}/schedule-images/non-image-document-${suffix}/restore`, {
+    method: "POST",
+    headers: { "x-test-user": ownerId },
+  })).status, 404);
+
+  const restored = await fetch(restoreUrl, {
+    method: "POST",
+    headers: { "x-test-user": ownerId },
+  });
+  assert.equal(restored.status, 200);
+  assert.deepEqual(await restored.json(), {
+    id: `restorable-document-${suffix}`,
+    name: "removed-schedule.webp",
+    relativePath: "Archive/removed-schedule.webp",
+    url: `/api/storage/objects/uploads/restorable-${suffix}`,
+    contentType: "image/webp",
+    size: 1024,
+  });
+  const [restoredDocument] = await db.select().from(projectDocumentsTable)
+    .where(eq(projectDocumentsTable.id, `restorable-document-${suffix}`));
+  assert.equal(restoredDocument.classification, "schedule");
 
   const createDirectProject = await fetch(`${base}/projects`, {
     method: "POST",

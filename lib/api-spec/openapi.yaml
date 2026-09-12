@@ -236,6 +236,32 @@ paths:
           description: Project or schedule image not found
         "500":
           description: Schedule image could not be removed
+  /projects/{projectId}/schedule-images/{documentId}/restore:
+    post:
+      operationId: restoreProjectScheduleImage
+      tags: [projects]
+      summary: Restore a project image document to the schedule gallery
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - name: documentId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+      responses:
+        "200":
+          description: Restored schedule image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleImage"
+        "400":
+          description: Invalid image document
+        "401":
+          description: Authentication required
+        "404":
+          description: Project or image document not found
+        "500":
+          description: Schedule image could not be restored
   /storage/uploads/request-url:
     post:
       operationId: requestUploadUrl

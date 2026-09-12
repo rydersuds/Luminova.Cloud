@@ -371,6 +371,12 @@ export const CreateProjectScheduleImageResponse = zod.object({
   "size": zod.number().int().min(1)
 })
 
+
+/**
+ * @summary Remove a schedule image from a project
+ */
+
+
 export const DeleteProjectScheduleImageParams = zod.object({
   "projectId": zod.coerce.string(),
   "scheduleImageId": zod.coerce.string().min(1)
@@ -670,6 +676,7 @@ export const OrganizeProjectFilesResponse = zod.object({
   "collectionsCreated": zod.number().int(),
   "attachmentsMatched": zod.number().int()
 })
+
 
 /**
  * @summary Scan existing project documents for vendor quotes
@@ -1328,6 +1335,7 @@ export const getVendorQuotesResponseLineItemsItemAmountMin = 0;
 
 export const getVendorQuotesResponseTotalMin = 0;
 
+
 export const getVendorQuotesResponseAttachmentsItemConfidenceMin = 0;
 export const GetVendorQuotesResponseItem = zod.object({
   "id": zod.string(),
@@ -1412,6 +1420,7 @@ export const createVendorQuoteResponseLineItemsItemAmountMin = 0;
 
 export const createVendorQuoteResponseTotalMin = 0;
 
+
 export const createVendorQuoteResponseAttachmentsItemConfidenceMin = 0;
 export const CreateVendorQuoteResponse = zod.object({
   "id": zod.string(),
@@ -1469,6 +1478,7 @@ export const getVendorQuoteResponseLineItemsItemAmountMin = 0;
 
 
 export const getVendorQuoteResponseTotalMin = 0;
+
 
 export const getVendorQuoteResponseAttachmentsItemConfidenceMin = 0;
 export const GetVendorQuoteResponse = zod.object({
@@ -1555,6 +1565,7 @@ export const updateVendorQuoteResponseLineItemsItemAmountMin = 0;
 
 
 export const updateVendorQuoteResponseTotalMin = 0;
+
 
 export const updateVendorQuoteResponseAttachmentsItemConfidenceMin = 0;
 export const UpdateVendorQuoteResponse = zod.object({
@@ -1955,19 +1966,17 @@ export const DeleteWorkspaceUserParams = zod.object({
 })
 
 export const DeleteWorkspaceUserResponse = zod.void()
-
 export const DeleteProjectScheduleImageResponse = zod.void()
 
+export const RestoreProjectScheduleImageParams = zod.object({
+  "projectId": zod.coerce.string(),
+  "documentId": zod.coerce.string().min(1)
+})
 export const getVendorQuotesResponseAttachmentsItemConfidenceMax = 100;
-
 export const rescanProjectVendorQuotesResponseSkippedMin = 0;
-
 export const createVendorQuoteResponseAttachmentsItemConfidenceMax = 100;
-
 export const getVendorQuoteResponseAttachmentsItemConfidenceMax = 100;
-
 export const updateVendorQuoteResponseAttachmentsItemConfidenceMax = 100;
-
 export const RescanProjectVendorQuotesResponse = zod.object({
   "documentsScanned": zod.number().int().min(rescanProjectVendorQuotesResponseDocumentsScannedMin),
   "imported": zod.number().int().min(rescanProjectVendorQuotesResponseImportedMin),
@@ -1982,9 +1991,16 @@ export const RescanProjectVendorQuotesResponse = zod.object({
   "quoteId": zod.string().nullish()
 }))
 })
-
 export const rescanProjectVendorQuotesResponseUnreadableMin = 0;
-
 export const rescanProjectVendorQuotesResponseDocumentsScannedMin = 0;
 
 export const rescanProjectVendorQuotesResponseImportedMin = 0;
+
+export const RestoreProjectScheduleImageResponse = zod.object({
+  "id": zod.string(),
+  "url": zod.string(),
+  "name": zod.string(),
+  "relativePath": zod.string(),
+  "contentType": zod.string(),
+  "size": zod.number().int().min(1)
+})

@@ -8,6 +8,7 @@ import {
   useCreateProjectPanorama,
   useCreateProjectScheduleImage,
   useDeleteProjectScheduleImage,
+  useRestoreProjectScheduleImage,
   useUpdateProjectPanorama,
   useUpdateProject,
   useGetProjectActivity,
@@ -27,7 +28,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { 
   Building, MapPin, Calendar, DollarSign, ArrowLeft, 
   Camera, Briefcase, FileText, CheckCircle2, ChevronRight, Activity, Clock,
-  Maximize2, ChevronLeft, ChevronDown, Pencil, Search, Trash2, ExternalLink
+  Maximize2, ChevronLeft, ChevronDown, Pencil, Search, Trash2, ExternalLink, RotateCcw
 } from "lucide-react"
 import { cn, formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
@@ -120,6 +121,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const [activeScheduleImage, setActiveScheduleImage] = React.useState<ProjectScheduleImage | null>(null)
   const [scheduleImageToRemove, setScheduleImageToRemove] = React.useState<ProjectScheduleImage | null>(null)
   const [scheduleRemoveError, setScheduleRemoveError] = React.useState("")
+  const [restoringScheduleDocumentId, setRestoringScheduleDocumentId] = React.useState<string | null>(null)
   const [photoIndex, setPhotoIndex] = React.useState<number | null>(null)
   const [activePanorama, setActivePanorama] = React.useState<ProjectPanorama | null>(null)
   const [editingPanorama, setEditingPanorama] = React.useState<ProjectPanorama | null>(null)
@@ -151,6 +153,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const createPanorama = useCreateProjectPanorama()
   const createScheduleImage = useCreateProjectScheduleImage()
   const deleteScheduleImage = useDeleteProjectScheduleImage()
+  const restoreScheduleImage = useRestoreProjectScheduleImage()
   const updatePanorama = useUpdateProjectPanorama()
   const photoFolderTree = React.useMemo(() => {
     if (!project) return []
@@ -188,6 +191,10 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   }, [photoFolderTree, photoSearch, project, projectId])
   const invoiceFiles = project?.files.filter((file) => file.classification === "invoice") || []
   const quoteFiles = project?.files.filter((file) => file.classification === "quote") || []
+  const restorableScheduleDocuments = project?.files.filter((file) =>
+    file.contentType.toLowerCase().startsWith("image/") &&
+    !project.scheduleImages.some((image) => image.id === file.id)
+  ) || []
   const entryAgreement = project?.files.find(
     (file) => file.classification === "contract" && file.isEntryAgreement,
   )
@@ -402,6 +409,29 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
     } catch (error) {
       const message = error instanceof Error ? error.message : "The schedule image could not be removed. Try again."
       setScheduleRemoveError(message)
+    }
+  }
+
+  const handleScheduleRestore = async (document: { id: string; name: string }) => {
+    setRestoringScheduleDocumentId(document.id)
+    try {
+      await restoreScheduleImage.mutateAsync({
+        projectId,
+        documentId: document.id,
+      })
+      await queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) })
+      toast({
+        title: "Schedule image restored",
+        description: `${document.name} is now available in the project schedule.`,
+      })
+    } catch {
+      toast({
+        title: "Restore failed",
+        description: `${document.name} could not be restored. Try again.`,
+        variant: "destructive",
+      })
+    } finally {
+      setRestoringScheduleDocumentId(null)
     }
   }
 
@@ -848,6 +878,35 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                           </div>
                         </article>
                       ))}
+                    </div>
+                  )}
+                  {restorableScheduleDocuments.length > 0 && (
+                    <div className="mt-6 border-t pt-5">
+                      <h3 className="font-medium">Restore from project files</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">Add a preserved project image back to the schedule gallery.</p>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {restorableScheduleDocuments.map((document) => (
+                          <div key={document.id} className="flex min-w-0 items-center gap-3 rounded-lg border p-3">
+                            <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium">{document.name}</span>
+                              <span className="block truncate text-xs text-muted-foreground">{document.relativePath}</span>
+                            </span>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="shrink-0 gap-1.5"
+                              disabled={restoringScheduleDocumentId !== null}
+                              onClick={() => void handleScheduleRestore(document)}
+                              aria-label={`Restore schedule image ${document.name}`}
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                              {restoringScheduleDocumentId === document.id ? "Restoring…" : "Restore"}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </CardContent>
