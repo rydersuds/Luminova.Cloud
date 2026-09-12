@@ -8,6 +8,7 @@ import { ClerkProvider, Show, useAuth, useClerk } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { ProjectFolderImportProvider, useProjectFolderImport } from '@/providers/project-folder-import-provider';
+import { pageModules, preloadPrimaryPages } from '@/lib/page-preload';
 
 import {
   Route,
@@ -32,15 +33,15 @@ const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 
 const NotFound = lazy(() => import('@/pages/not-found'));
 const Login = lazy(() => import('@/pages/login'));
-const Dashboard = lazy(() => import('@/pages/dashboard'));
-const ProjectDetail = lazy(() => import('@/pages/projects/[id]'));
-const Projects = lazy(() => import('@/pages/projects'));
-const TradesDirectory = lazy(() => import('@/pages/trades'));
-const TradeDetail = lazy(() => import('@/pages/trades/[id]'));
-const Invoices = lazy(() => import('@/pages/invoices'));
-const Messages = lazy(() => import('@/pages/messages'));
-const Users = lazy(() => import('@/pages/users'));
-const Quotes = lazy(() => import('@/pages/quotes'));
+const Dashboard = lazy(pageModules.dashboard);
+const ProjectDetail = lazy(pageModules.projectDetail);
+const Projects = lazy(pageModules.projects);
+const TradesDirectory = lazy(pageModules.trades);
+const TradeDetail = lazy(pageModules.tradeDetail);
+const Invoices = lazy(pageModules.invoices);
+const Messages = lazy(pageModules.messages);
+const Users = lazy(pageModules.users);
+const Quotes = lazy(pageModules.quotes);
 const SignUpPage = lazy(() => import('@/pages/login').then(({ SignUpPage }) => ({ default: SignUpPage })));
 const PrivacyPage = lazy(() => import('@/pages/legal').then(({ PrivacyPage }) => ({ default: PrivacyPage })));
 const TermsPage = lazy(() => import('@/pages/legal').then(({ TermsPage }) => ({ default: TermsPage })));
@@ -153,6 +154,23 @@ function SessionPolicy() {
       void signOut({ redirectUrl: import.meta.env.BASE_URL });
     }
   }, [isLoaded, isSignedIn, signOut]);
+
+  return null;
+}
+
+function AuthenticatedPagePreloader() {
+  const { isLoaded, isSignedIn } = useAuth();
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    const preload = () => preloadPrimaryPages();
+    if ("requestIdleCallback" in window) {
+      const idleId = window.requestIdleCallback(preload, { timeout: 2000 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+    const timeoutId = setTimeout(preload, 400);
+    return () => clearTimeout(timeoutId);
+  }, [isLoaded, isSignedIn]);
 
   return null;
 }
@@ -280,6 +298,7 @@ function App() {
             <ProjectFolderImportProvider>
               <TooltipProvider>
                 <SessionPolicy />
+                 <AuthenticatedPagePreloader />
                 <Suspense fallback={<PageFallback />}><Router /></Suspense>
                 <Toaster />
               </TooltipProvider>

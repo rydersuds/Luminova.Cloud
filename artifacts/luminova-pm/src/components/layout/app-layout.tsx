@@ -17,6 +17,7 @@ import {
   Sun,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { preloadPage } from "@/lib/page-preload"
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useClerk, useUser } from "@clerk/react"
 import { useTheme } from "@/hooks/use-theme"
@@ -475,6 +476,9 @@ export function AppLayoutView({
                   }
                   closeSidebar()
                 }}
+                 onMouseEnter={() => preloadPage(item.href)}
+                 onFocus={() => preloadPage(item.href)}
+                 onTouchStart={() => preloadPage(item.href)}
               >
                 <item.icon
                   size={20}
