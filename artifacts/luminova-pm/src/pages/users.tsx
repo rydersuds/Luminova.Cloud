@@ -13,6 +13,7 @@ import {
   useGetClients,
   useGrantClientAccess,
   useRevokeClientAccess,
+  useReconcileAllClientAccess,
   useReconcileClientAccess,
   useDeleteWorkspaceUser,
   useGetWorkspaceInvitations,
@@ -90,6 +91,7 @@ export default function Users() {
   const clearClientLogo = useClearClientLogo()
   const grantClientAccess = useGrantClientAccess()
   const revokeClientAccess = useRevokeClientAccess()
+  const reconcileAllClientAccess = useReconcileAllClientAccess()
   const reconcileClientAccess = useReconcileClientAccess()
   const resendInvitation = useResendWorkspaceInvitation()
   const revokeInvitation = useRevokeWorkspaceInvitation()
@@ -111,7 +113,7 @@ export default function Users() {
   const [reconcilingUserId, setReconcilingUserId] = React.useState<string | null>(null)
 
   const users = usersQuery.data ?? []
-  const pending = inviteUser.isPending || updateUser.isPending || deleteUser.isPending || resendInvitation.isPending || revokeInvitation.isPending || reconcileClientAccess.isPending
+  const pending = inviteUser.isPending || updateUser.isPending || deleteUser.isPending || resendInvitation.isPending || revokeInvitation.isPending || reconcileClientAccess.isPending || reconcileAllClientAccess.isPending
   const clientsPending = createClient.isPending || deleteClient.isPending || grantClientAccess.isPending || revokeClientAccess.isPending
   const [logoBusyClientId, setLogoBusyClientId] = React.useState<string | null>(null)
   const [logoProgress, setLogoProgress] = React.useState(0)
@@ -135,6 +137,31 @@ export default function Users() {
       setFeedback({ kind: "error", message: errorMessage(error, "Unable to reconcile client access.") })
     } finally {
       setReconcilingUserId(null)
+    }
+  }
+
+  const retryAllClientAccessCleanup = async () => {
+    setFeedback(null)
+    try {
+      const result = await reconcileAllClientAccess.mutateAsync()
+      await refreshUsers()
+      if (result.failed.length) {
+        const succeededMessage = result.reconciled.length
+          ? `${result.reconciled.length} cleanup${result.reconciled.length === 1 ? "" : "s"} reconciled. `
+          : ""
+        setFeedback({
+          kind: "error",
+          message: `${succeededMessage}${result.failed.length} cleanup${result.failed.length === 1 ? "" : "s"} still need attention. Retry them individually.`,
+        })
+      } else {
+        setFeedback({
+          kind: "success",
+          message: `${result.reconciled.length} client access cleanup${result.reconciled.length === 1 ? "" : "s"} reconciled.`,
+        })
+      }
+    } catch (error) {
+      await refreshUsers()
+      setFeedback({ kind: "error", message: errorMessage(error, "Unable to reconcile client access.") })
     }
   }
 
@@ -483,6 +510,21 @@ export default function Users() {
                         <Badge variant="outline" className="border-amber-500/50 text-amber-700 dark:text-amber-300">
                           {pendingReconciliations.length} pending
                         </Badge>
+                        {pendingReconciliations.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="ml-auto"
+                            onClick={() => void retryAllClientAccessCleanup()}
+                            disabled={pending || reconcilingUserId !== null}
+                          >
+                            {reconcileAllClientAccess.isPending
+                              ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              : <RefreshCw className="mr-2 h-4 w-4" />}
+                            {reconcileAllClientAccess.isPending ? "Retrying all…" : "Retry all cleanup"}
+                          </Button>
+                        )}
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
                         Role changes succeeded, but client access could not be removed for these users.

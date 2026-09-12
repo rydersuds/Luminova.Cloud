@@ -174,4 +174,46 @@ test.describe('Users & Roles background treatment', () => {
     await expect(page.getByRole('heading', { name: 'Client access needs reconciliation' })).toBeHidden();
     await expect(page.getByText("Jordan Lee's client access was reconciled.")).toBeVisible();
   });
+
+  test('retries all pending cleanups while keeping a failed user actionable', async ({ page }) => {
+    let usersResponse = workspaceUsers.map((user) => (
+      user.id === 'user-sam' || user.id === 'user-jordan'
+        ? { ...user, clientAccessCleanupPending: true }
+        : user
+    ));
+    let bulkRequests = 0;
+
+    await page.route('**/api/users', (route) => route.fulfill({ json: usersResponse }));
+    await page.route('**/api/users/client-access-reconciliation', async (route) => {
+      expect(route.request().method()).toBe('POST');
+      bulkRequests += 1;
+      usersResponse = usersResponse.map((user) => (
+        user.id === 'user-sam' ? { ...user, clientAccessCleanupPending: false } : user
+      ));
+      await route.fulfill({
+        json: {
+          reconciled: ['user-sam'],
+          failed: [{ userId: 'user-jordan', error: 'Client access cleanup failed again. Try reconciling this user again.' }],
+        },
+      });
+    });
+    await page.route('**/api/users/user-jordan/client-access-reconciliation', async (route) => {
+      expect(route.request().method()).toBe('POST');
+      usersResponse = usersResponse.map((user) => ({ ...user, clientAccessCleanupPending: false }));
+      await route.fulfill({ status: 204, body: '' });
+    });
+
+    await page.goto('/__visual/users');
+    await expect(page.getByRole('heading', { name: 'Client access needs reconciliation' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Retry all cleanup' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Retry all cleanup' }).click();
+    await expect.poll(() => bulkRequests).toBe(1);
+    await expect(page.getByText('1 cleanup reconciled. 1 cleanup still need attention. Retry them individually.')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Jordan Lee' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Retry cleanup' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Retry cleanup' }).click();
+    await expect(page.getByRole('heading', { name: 'Client access needs reconciliation' })).toBeHidden();
+  });
 });

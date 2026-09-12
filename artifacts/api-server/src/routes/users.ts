@@ -359,6 +359,36 @@ router.get("/users", async (req: AuthenticatedRequest, res): Promise<void> => {
   }))));
 });
 
+router.post("/users/client-access-reconciliation", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!await requireAdmin(client, req, res)) return;
+  const scope = workspaceId(req);
+  const pendingCleanup = await db.select({ userId: clientAccessCleanupTable.userId })
+    .from(clientAccessCleanupTable)
+    .where(eq(clientAccessCleanupTable.workspaceId, scope));
+  const reconciled: string[] = [];
+  const failed: Array<{ userId: string; error: string }> = [];
+
+  for (const { userId } of pendingCleanup) {
+    try {
+      await withAdminLock(async () => {
+        await client.users.getUser(userId);
+        await revokeClientMemberships(userId, scope);
+        await clearClientAccessCleanup(userId, scope);
+      });
+      reconciled.push(userId);
+    } catch (error) {
+      if ((error as ClerkError).status === 404) {
+        failed.push({ userId, error: "User not found" });
+        continue;
+      }
+      req.log.error({ error, userId }, "Client access bulk reconciliation failed");
+      failed.push({ userId, error: "Client access cleanup failed again. Try reconciling this user again." });
+    }
+  }
+
+  res.json({ reconciled, failed });
+});
+
 router.post("/users/:userId/client-access-reconciliation", async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!await requireAdmin(client, req, res)) return;
   const params = UpdateWorkspaceUserParams.safeParse(req.params);

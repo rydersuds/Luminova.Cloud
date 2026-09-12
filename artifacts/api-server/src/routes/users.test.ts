@@ -503,6 +503,43 @@ test("lists pending client cleanup for users beyond Clerk's first page", async (
   );
 });
 
+test("reconciles all pending client cleanups independently", async () => {
+  const fake = fakeClerk([
+    makeUser("admin", "Admin"),
+    makeUser("member", "Field Team"),
+    makeUser("failed-member", "Field Team"),
+  ], { unavailableUserIds: new Set(["failed-member"]) });
+  const workspace = "workspace-bulk-reconciliation";
+  const base = await startApi("admin", fake.client, undefined, workspace);
+  const client = await createTestClient(base, "Bulk Retry Client");
+  await grantClientAccess(base, client.id, "member");
+  await db.insert(clientAccessCleanupTable).values([
+    { workspaceId: workspace, userId: "member" },
+    { workspaceId: workspace, userId: "failed-member" },
+  ]);
+
+  const response = await fetch(`${base}/users/client-access-reconciliation`, { method: "POST" });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    reconciled: ["member"],
+    failed: [{
+      userId: "failed-member",
+      error: "Client access cleanup failed again. Try reconciling this user again.",
+    }],
+  });
+  assert.deepEqual(
+    await db.select().from(clientMembersTable).where(eq(clientMembersTable.clientId, client.id)),
+    [],
+  );
+  assert.deepEqual(
+    await db.select({ userId: clientAccessCleanupTable.userId })
+      .from(clientAccessCleanupTable)
+      .where(eq(clientAccessCleanupTable.workspaceId, workspace)),
+    [{ userId: "failed-member" }],
+  );
+  await db.delete(clientAccessCleanupTable).where(eq(clientAccessCleanupTable.workspaceId, workspace));
+});
+
 test("rejects empty and unknown-only profile updates", async () => {
   const fake = fakeClerk([makeUser("admin", "Admin"), makeUser("member", "Client")]);
   const base = await startApi("admin", fake.client);

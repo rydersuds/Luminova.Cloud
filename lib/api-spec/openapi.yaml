@@ -917,6 +917,22 @@ paths:
           description: Authentication required
         "403":
           description: Administrator access required
+  /users/client-access-reconciliation:
+    post:
+      operationId: reconcileAllClientAccess
+      tags: [users]
+      summary: Reconcile all pending client access cleanups
+      responses:
+        "200":
+          description: Per-user client access reconciliation results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkClientAccessReconciliationResponse"
+        "401":
+          description: Authentication required
+        "403":
+          description: Administrator access required
   /users/{userId}/client-access-reconciliation:
     post:
       operationId: reconcileClientAccess
@@ -1322,6 +1338,21 @@ components:
         lastSignInAt: { type: [integer, "null"] }
         imageUrl: { type: string }
         clientAccessCleanupPending: { type: boolean }
+    BulkClientAccessReconciliationResponse:
+      type: object
+      required: [reconciled, failed]
+      properties:
+        reconciled:
+          type: array
+          items: { type: string }
+        failed:
+          type: array
+          items:
+            type: object
+            required: [userId, error]
+            properties:
+              userId: { type: string }
+              error: { type: string }
     ClientMember:
       type: object
       required: [id, userId, name, email, imageUrl, role, addedAt]

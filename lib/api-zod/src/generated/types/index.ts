@@ -8,6 +8,8 @@
 
 export * from './activity';
 export * from './budgetLineItem';
+export * from './bulkClientAccessReconciliationResponse';
+export * from './bulkClientAccessReconciliationResponseFailedItem';
 export * from './client';
 export * from './clientInput';
 export * from './clientLogoInput';

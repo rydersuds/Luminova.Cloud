@@ -34,6 +34,10 @@ export interface WorkspaceUser {
   clientAccessCleanupPending: boolean;
 }
 
+export type BulkClientAccessReconciliationResponseFailedItem = {
+  userId: string;
+  error: string;
+};
 export interface ClientMember {
   id: string;
   userId: string;
@@ -914,3 +918,8 @@ status?: VendorQuoteStatus;
 direction?: QuoteDirection;
 };
 
+
+export interface BulkClientAccessReconciliationResponse {
+  reconciled: string[];
+  failed: BulkClientAccessReconciliationResponseFailedItem[];
+}
