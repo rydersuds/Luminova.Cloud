@@ -14,6 +14,8 @@ export interface Project {
   status: string;
   progress: number;
   pmName: string;
+  /** @nullable */
+  projectManagerId: string | null;
   clientName: string;
   /** @nullable */
   clientLogoUrl?: string | null;

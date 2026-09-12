@@ -9,6 +9,8 @@ import {
   CLIENT_MEMBER_PROFILE_LOOKUP_CONCURRENCY,
   clerkErrorResponse,
   createUsersRouter,
+  listProjectManagers,
+  resolveProjectManager,
   revokeClientMemberships,
 } from "./users";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -256,6 +258,81 @@ test("blocks non-administrators from listing and mutating users", async () => {
     body: JSON.stringify({ role: "Client" }),
   })).status, 403);
   assert.equal((await fetch(`${base}/users/admin`, { method: "DELETE" })).status, 403);
+});
+
+test("lists only eligible Project Managers for administrators", async () => {
+  const unconfigured = makeUser("unconfigured", "Project Manager", "unconfigured@example.com");
+  Object.assign(unconfigured, { publicMetadata: {} });
+  const fake = fakeClerk([
+    makeUser("admin", "Admin", "admin@example.com"),
+    makeUser("manager", "Project Manager", "manager@example.com"),
+    makeUser("field", "Field Team", "field@example.com"),
+    unconfigured,
+  ]);
+  const base = await startApi("admin", fake.client);
+
+  const response = await fetch(`${base}/users/project-managers`);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), [{
+    id: "manager",
+    name: "Morgan Builder",
+    email: "manager@example.com",
+  }]);
+
+  const fieldBase = await startApi("field", fake.client);
+  const forbidden = await fetch(`${fieldBase}/users/project-managers`);
+  assert.equal(forbidden.status, 403);
+});
+
+test("keeps the Project Manager directory scoped across Clerk pagination", async () => {
+  const outsideManager = makeUser("manager-outside", "Project Manager");
+  const insideManager = makeUser("manager-inside", "Project Manager");
+  const fillerUsers = Array.from({ length: 100 }, (_, index) => makeUser(`field-${index}`, "Field Team"));
+  const fake = fakeClerk([
+    makeUser("admin", "Admin"),
+    outsideManager,
+    ...fillerUsers,
+    insideManager,
+  ]);
+  const memberIds = [
+    "admin",
+    ...fillerUsers.map((user) => user.id),
+    insideManager.id,
+  ];
+  Object.assign(fake.client, {
+    organizations: {
+      getOrganizationMembershipList: async ({ limit = 100, offset = 0 }: { limit?: number; offset?: number }) => ({
+        data: memberIds.slice(offset, offset + limit).map((userId) => ({
+          publicUserData: { userId },
+        })),
+        totalCount: memberIds.length,
+      }),
+    },
+  });
+
+  const profiles = await listProjectManagers(
+    fake.client as unknown as Parameters<typeof listProjectManagers>[0],
+    "org-one",
+  );
+  assert.deepEqual(profiles.map((profile) => profile.id), ["manager-inside"]);
+  assert.deepEqual(
+    await resolveProjectManager(
+      "manager-outside",
+      fake.client as unknown as Parameters<typeof resolveProjectManager>[1],
+      "org-one",
+    ),
+    { kind: "not-found" },
+  );
+  assert.equal((await resolveProjectManager(
+    "manager-inside",
+    fake.client as unknown as Parameters<typeof resolveProjectManager>[1],
+    "org-one",
+  )).kind, "valid");
+
+  const base = await startApi("admin", fake.client, undefined, "org-one");
+  const response = await fetch(`${base}/users/project-managers`);
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json() as Array<{ id: string }>).map((profile) => profile.id), ["manager-inside"]);
 });
 
 test("lists, resends, and revokes pending invitations", async () => {

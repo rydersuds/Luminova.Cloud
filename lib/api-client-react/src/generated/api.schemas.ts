@@ -34,6 +34,11 @@ export interface WorkspaceUser {
   clientAccessCleanupPending: boolean;
 }
 
+export interface ProjectManager {
+  id: string;
+  name: string;
+  email: string;
+}
 export type BulkClientAccessReconciliationResponseFailedItem = {
   userId: string;
   error: string;
@@ -230,6 +235,8 @@ export interface Project {
   status: string;
   progress: number;
   pmName: string;
+  /** @nullable */
+  projectManagerId: string | null;
   clientName: string;
   /** @nullable */
   clientLogoUrl?: string | null;
@@ -245,7 +252,8 @@ export interface ProjectInput {
   address: string;
   region: string;
   status: string;
-  pmName: string;
+  /** @minLength 1 */
+  projectManagerId: string;
   clientName: string;
   targetDate: string;
   budgeted: number;
@@ -259,6 +267,8 @@ export interface ProjectUpdate {
   progress?: number;
   targetDate?: string;
   description?: string;
+  /** @minLength 1 */
+  projectManagerId?: string;
   /**
      * URL of an existing standard photo belonging to this project, or null to clear the exterior photo
      * @nullable

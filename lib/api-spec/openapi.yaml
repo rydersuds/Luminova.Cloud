@@ -983,6 +983,24 @@ paths:
           description: Authentication required
         "403":
           description: Administrator access required
+  /users/project-managers:
+    get:
+      operationId: getProjectManagers
+      tags: [users]
+      summary: List eligible project managers
+      responses:
+        "200":
+          description: Project managers available for project assignment
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProjectManager"
+        "401":
+          description: Authentication required
+        "403":
+          description: Administrator access required
   /users/client-access-reconciliation:
     post:
       operationId: reconcileAllClientAccess
@@ -1404,6 +1422,13 @@ components:
         lastSignInAt: { type: [integer, "null"] }
         imageUrl: { type: string }
         clientAccessCleanupPending: { type: boolean }
+    ProjectManager:
+      type: object
+      required: [id, name, email]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
     BulkClientAccessReconciliationResponse:
       type: object
       required: [reconciled, failed]
@@ -1600,7 +1625,7 @@ components:
             $ref: "#/components/schemas/Activity"
     Project:
       type: object
-      required: [id, name, address, region, status, progress, pmName, clientName, targetDate, budgeted, invoiced, exteriorImage, description]
+      required: [id, name, address, region, status, progress, pmName, projectManagerId, clientName, targetDate, budgeted, invoiced, exteriorImage, description]
       properties:
         id: { type: string }
         name: { type: string }
@@ -1609,6 +1634,7 @@ components:
         status: { type: string }
         progress: { type: number }
         pmName: { type: string }
+        projectManagerId: { type: [string, "null"] }
         clientName: { type: string }
         clientLogoUrl: { type: [string, "null"] }
         targetDate: { type: string }
@@ -1618,13 +1644,14 @@ components:
         description: { type: string }
     ProjectInput:
       type: object
-      required: [name, address, region, status, pmName, clientName, targetDate, budgeted, description]
+      additionalProperties: false
+      required: [name, address, region, status, projectManagerId, clientName, targetDate, budgeted, description]
       properties:
         name: { type: string }
         address: { type: string }
         region: { type: string }
         status: { type: string }
-        pmName: { type: string }
+        projectManagerId: { type: string, minLength: 1 }
         clientName: { type: string }
         targetDate: { type: string }
         budgeted: { type: number }
@@ -1632,12 +1659,14 @@ components:
         exteriorImage: { type: string }
     ProjectUpdate:
       type: object
+      additionalProperties: false
       properties:
         name: { type: string }
         status: { type: string }
         progress: { type: integer }
         targetDate: { type: string }
         description: { type: string }
+        projectManagerId: { type: string, minLength: 1 }
         exteriorImage:
           type: [string, "null"]
           description: URL of an existing standard photo belonging to this project, or null to clear the exterior photo

@@ -195,7 +195,7 @@ export default function Projects() {
                       <div className="grid grid-cols-1 gap-4 border-y border-border/50 py-4 text-sm min-[420px]:grid-cols-2">
                         <div className="min-w-0">
                         <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Project manager</p>
-                          <p className="mt-1 break-words font-medium">{project.pmName}</p>
+                          <p className="mt-1 break-words font-medium">{project.pmName || "Unassigned"}</p>
                       </div>
                         <div className="min-w-0">
                         <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Target</p>

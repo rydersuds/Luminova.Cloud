@@ -135,6 +135,11 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const [savingExteriorPhotoId, setSavingExteriorPhotoId] = React.useState<string | null>(null)
   const organizeFiles = useOrganizeProjectFiles()
   const panoramaName = (label: string | null) => label || "Untitled panorama"
+  const { data: currentUser } = useGetCurrentWorkspaceUser()
+  const isAdmin = currentUser?.role === "Admin"
+  const { data: projectManagers, isLoading: loadingProjectManagers, isError: projectManagersError } = useGetProjectManagers({
+    query: { enabled: isAdmin, queryKey: getGetProjectManagersQueryKey() },
+  })
 
   const { data: project, isLoading } = useGetProject(projectId, {
     query: {
@@ -487,7 +492,9 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
 
   const handleUpdate = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    if (!project) return
     const formData = new FormData(e.currentTarget)
+    const projectManagerId = formData.get("projectManagerId")
     updateProject.mutate({
       projectId,
       data: {
@@ -496,12 +503,21 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
         progress: Number(formData.get("progress")),
         targetDate: formData.get("targetDate") as string,
         description: formData.get("description") as string,
+        ...(isAdmin &&
+          typeof projectManagerId === "string" &&
+          projectManagerId !== "__legacy__" &&
+          projectManagerId !== project.projectManagerId &&
+          projectManagerId
+          ? { projectManagerId }
+          : {}),
       }
     }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) })
+        queryClient.invalidateQueries({ queryKey: getGetProjectsQueryKey() })
         setIsEditOpen(false)
-      }
+      },
+      onError: () => toast({ title: "Project could not be saved", description: "Check the project manager selection and try again.", variant: "destructive" }),
     })
   }
 
@@ -736,11 +752,43 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                              <option value="Rejected for bid">Rejected for bid</option>
                           </select>
                         </div>
-                        <div className="space-y-2">
+                         <div className="space-y-2">
                           <Label htmlFor="progress">Progress (%)</Label>
                           <Input id="progress" name="progress" type="number" min="0" max="100" defaultValue={project.progress} required />
                         </div>
                       </div>
+                       {isAdmin && (
+                         <div className="space-y-2">
+                           <Label htmlFor="projectManagerId">Project Manager</Label>
+                           <select
+                             id="projectManagerId"
+                             name="projectManagerId"
+                             defaultValue={project.projectManagerId ?? (project.pmName ? "__legacy__" : "")}
+                             disabled={loadingProjectManagers || !projectManagers?.length}
+                             className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                           >
+                             <option value="">
+                               {loadingProjectManagers ? "Loading Project Managers..." : projectManagersError ? "Unable to load managers" : !projectManagers?.length ? "No eligible managers" : "Select a Project Manager"}
+                             </option>
+                             {project.projectManagerId && !projectManagers?.some((manager) => manager.id === project.projectManagerId) && (
+                               <option value={project.projectManagerId}>
+                                 {project.pmName || "Current manager"} · Current assignment is no longer eligible
+                               </option>
+                             )}
+                             {!project.projectManagerId && project.pmName && (
+                               <option value="__legacy__">
+                                 {project.pmName} · Legacy assignment
+                               </option>
+                             )}
+                             {projectManagers?.map((manager) => (
+                               <option key={manager.id} value={manager.id}>
+                                 {manager.name} · {manager.email}
+                               </option>
+                             ))}
+                           </select>
+                           {projectManagersError && <p role="alert" className="text-xs text-destructive">Project Managers could not be loaded. Refresh and try again.</p>}
+                         </div>
+                       )}
                       <div className="space-y-2">
                         <Label htmlFor="targetDate">Target Date</Label>
                         <Input id="targetDate" name="targetDate" type="date" defaultValue={project.targetDate} required />
@@ -1058,9 +1106,9 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Project Manager</p>
                         <div className="flex items-center gap-2">
                           <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-heading font-bold text-xs">
-                            {project.pmName.charAt(0)}
+                            {(project.pmName || "U").charAt(0)}
                           </div>
-                          <span className="font-medium">{project.pmName}</span>
+                           <span className="font-medium">{project.pmName || "Unassigned"}</span>
                         </div>
                       </div>
                       <div>

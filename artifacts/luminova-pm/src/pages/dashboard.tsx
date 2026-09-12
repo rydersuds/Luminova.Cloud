@@ -3,6 +3,9 @@ import {
   useGetDashboardSummary,
   useGetProjects,
   useCreateProject,
+  useGetCurrentWorkspaceUser,
+  useGetProjectManagers,
+  getGetProjectManagersQueryKey,
   getGetProjectsQueryKey,
   getGetDashboardSummaryQueryKey
 } from "@workspace/api-client-react"
@@ -32,7 +35,8 @@ const projectSchema = z.object({
   address: z.string().min(1, "Required"),
   region: z.string().min(1, "Required"),
   status: z.string().min(1, "Required"),
-  pmName: z.string().min(1, "Required"),
+  projectManagerId: z.string().min(1, "Select a Project Manager"),
+  pmName: z.string().optional(),
   clientName: z.string().min(1, "Required"),
   targetDate: z.string().min(1, "Required"),
   budgeted: z.coerce.number().min(0.01, "Invalid budget"),
@@ -61,6 +65,11 @@ export default function Dashboard() {
   const [, setLocation] = useLocation()
   const [isCreateOpen, setIsCreateOpen] = React.useState(false)
   const queryClient = useQueryClient()
+  const { data: currentUser } = useGetCurrentWorkspaceUser()
+  const isAdmin = currentUser?.role === "Admin"
+  const { data: projectManagers, isLoading: loadingProjectManagers, isError: projectManagersError } = useGetProjectManagers({
+    query: { enabled: isAdmin, queryKey: getGetProjectManagersQueryKey() },
+  })
   
   const { data: summary, isLoading: loadingSummary } = useGetDashboardSummary({
     query: { queryKey: getGetDashboardSummaryQueryKey() }
@@ -81,7 +90,7 @@ export default function Dashboard() {
   const { register, handleSubmit, formState: { errors }, reset: resetManualForm } = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
-      name: "", address: "", region: "", status: "", pmName: "",
+       name: "", address: "", region: "", status: "", projectManagerId: "",
       clientName: "", targetDate: "", description: "", exteriorImage: ""
     } // strictly empty to enforce manual selection
   })
@@ -154,7 +163,18 @@ export default function Dashboard() {
       }
 
       const results = data.map((row, i) => {
-        const res = projectSchema.safeParse(row)
+        const managerHint = typeof row.projectManagerId === "string" && row.projectManagerId
+          ? row.projectManagerId
+          : typeof row.pmName === "string" ? row.pmName.trim().toLowerCase() : ""
+        const matchedManager = projectManagers?.find((manager) =>
+          manager.id === managerHint ||
+          manager.name.toLowerCase() === managerHint ||
+          manager.email.toLowerCase() === managerHint,
+        )
+        const res = projectSchema.safeParse({
+          ...row,
+          projectManagerId: matchedManager?.id ?? "",
+        })
         return { 
           row: i + 1, 
           original: row, 
@@ -190,10 +210,11 @@ export default function Dashboard() {
     const validRows = parsedRows.filter(r => r.valid)
     
     for (const row of validRows) {
+      const { pmName: _legacyPmName, ...projectData } = row.data
       await createProject.mutateAsync({
         data: {
-          ...row.data,
-          budgeted: Math.round(row.data.budgeted * 100) // Convert dollars to cents
+           ...projectData,
+           budgeted: Math.round(row.data.budgeted * 100) // Convert dollars to cents
         }
       })
     }
@@ -299,9 +320,24 @@ export default function Dashboard() {
                               {errors.status && <span className="text-[10px] font-mono text-destructive uppercase">{errors.status.message as string}</span>}
                             </div>
                             <div className="space-y-2">
-                              <Label className="font-mono text-xs uppercase tracking-wider text-muted-foreground">PM Assignment *</Label>
-                              <Input {...register("pmName")} placeholder="Assigned Manager ID" className="bg-black/20 focus:border-primary recessed-3d" />
-                              {errors.pmName && <span className="text-[10px] font-mono text-destructive uppercase">{errors.pmName.message as string}</span>}
+                               <Label htmlFor="project-manager" className="font-mono text-xs uppercase tracking-wider text-muted-foreground">PM Assignment *</Label>
+                               <select
+                                 id="project-manager"
+                                 {...register("projectManagerId")}
+                                 disabled={!isAdmin || loadingProjectManagers || !projectManagers?.length}
+                                 className="flex h-10 w-full bg-black/20 border-none px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary recessed-3d disabled:cursor-not-allowed disabled:opacity-60"
+                               >
+                                 <option value="" className="bg-background text-muted-foreground">
+                                   {loadingProjectManagers ? "Loading Project Managers..." : projectManagersError ? "Unable to load managers" : !isAdmin ? "Administrator access required" : !projectManagers?.length ? "No eligible managers" : "Select a Project Manager..."}
+                                 </option>
+                                 {projectManagers?.map((manager) => (
+                                   <option key={manager.id} value={manager.id} className="bg-background">
+                                     {manager.name} · {manager.email}
+                                   </option>
+                                 ))}
+                               </select>
+                               {errors.projectManagerId && <span className="text-[10px] font-mono text-destructive uppercase">{errors.projectManagerId.message as string}</span>}
+                               {projectManagersError && <span role="alert" className="text-[10px] font-mono text-destructive">Project Managers could not be loaded. Refresh and try again.</span>}
                             </div>
                             <div className="space-y-2 md:col-span-2">
                               <Label className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Physical Address *</Label>

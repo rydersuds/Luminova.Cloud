@@ -11,7 +11,8 @@ export interface ProjectInput {
   address: string;
   region: string;
   status: string;
-  pmName: string;
+  /** @minLength 1 */
+  projectManagerId: string;
   clientName: string;
   targetDate: string;
   budgeted: number;

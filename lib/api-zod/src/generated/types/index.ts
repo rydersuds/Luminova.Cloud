@@ -46,6 +46,7 @@ export * from './projectImportSession';
 export * from './projectImportSessionInput';
 export * from './projectImportSessionStatus';
 export * from './projectInput';
+export * from './projectManager';
 export * from './projectMessage';
 export * from './projectMessageInput';
 export * from './projectUpdate';

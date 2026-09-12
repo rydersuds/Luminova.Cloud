@@ -103,6 +103,18 @@ test.describe('Users & Roles background treatment', () => {
     await page.goto('/__visual/users');
     await expect(page.getByRole('heading', { name: 'Users & Roles' })).toBeVisible();
     await assertWorkspaceSurface(page);
+
+    const projectManagers = page.getByTestId('project-managers-section');
+    await expect(projectManagers.getByRole('heading', { name: 'Project Managers' })).toBeVisible();
+    await expect(projectManagers.getByTestId('project-managers-count')).toHaveText('1');
+    await expect(projectManagers.getByText('Sam Carter', { exact: true })).toBeVisible();
+    await expect(projectManagers.getByText('Morgan Reyes', { exact: true })).toHaveCount(0);
+
+    const otherWorkspaceUsers = page.getByTestId('other-workspace-users-section');
+    await expect(otherWorkspaceUsers.getByRole('heading', { name: 'Other workspace users' })).toBeVisible();
+    await expect(otherWorkspaceUsers.getByTestId('other-workspace-users-count')).toHaveText('3');
+    await expect(otherWorkspaceUsers.getByText('Morgan Reyes', { exact: true })).toBeVisible();
+    await expect(otherWorkspaceUsers.getByText('Sam Carter', { exact: true })).toHaveCount(0);
     await expect(page).toHaveScreenshot('desktop-users.png', { animations: 'disabled' });
 
     await page.getByRole('button', { name: 'Invite user' }).click();
@@ -115,6 +127,15 @@ test.describe('Users & Roles background treatment', () => {
     await expect(page.getByRole('alert')).toHaveText('Enter a valid email address.');
     await assertWorkspaceSurface(page);
     await expect(page).toHaveScreenshot('desktop-users-feedback.png', { animations: 'disabled' });
+  });
+
+  test('shows scoped empty states when user search has no matches', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 900 });
+    await page.goto('/__visual/users');
+    await page.getByLabel('Search users').fill('does-not-exist');
+    await expect(page.getByText('No Project Managers match your search.')).toBeVisible();
+    await expect(page.getByText('No other workspace users match your search.')).toBeVisible();
+    await expect(page).toHaveScreenshot('desktop-users-search-empty.png', { animations: 'disabled' });
   });
 
   test('keeps the shell background continuous on mobile across both tabs', async ({ page }) => {

@@ -3,6 +3,7 @@ import test from "node:test";
 import type { AddressInfo } from "node:net";
 import { randomUUID } from "node:crypto";
 import express from "express";
+import type { ClerkClient } from "@clerk/backend";
 import { and, eq } from "drizzle-orm";
 import {
   db,
@@ -18,6 +19,7 @@ test("schedule images require project authorization and imported schedule images
   const suffix = randomUUID();
   const ownerId = `schedule-owner-${suffix}`;
   const otherOwnerId = `schedule-other-${suffix}`;
+  const managerId = `schedule-manager-${suffix}`;
   const projectId = `schedule-project-${suffix}`;
   const importBatchId = `schedule-batch-${suffix}`;
   const objectPath = `/objects/uploads/${suffix}`;
@@ -96,6 +98,19 @@ test("schedule images require project authorization and imported schedule images
   });
 
   const app = express();
+  app.locals.projectAssignmentClerkClient = {
+    users: {
+      getUser: async (userId: string) => ({
+        id: userId,
+        firstName: userId === ownerId ? "Admin" : "Project",
+        lastName: userId === ownerId ? "Owner" : "Manager",
+        fullName: userId === ownerId ? "Admin Owner" : "Project Manager",
+        username: null,
+        primaryEmailAddress: { emailAddress: `${userId}@example.com` },
+        publicMetadata: { role: userId === ownerId ? "Admin" : "Project Manager" },
+      }),
+    },
+  } as unknown as ClerkClient;
   app.use(express.json());
   app.use((req, _res, next) => {
     const actor = req.header("x-test-user");
@@ -114,6 +129,7 @@ test("schedule images require project authorization and imported schedule images
     contentType: "image/png",
   };
   let directProjectId: string | undefined;
+  let directImportBatchId: string | undefined;
 
   t.after(async () => {
     server.close();
@@ -121,6 +137,10 @@ test("schedule images require project authorization and imported schedule images
     await db.delete(projectScheduleImagesTable).where(eq(projectScheduleImagesTable.projectId, projectId));
     if (directProjectId) {
       await db.delete(projectScheduleImagesTable).where(eq(projectScheduleImagesTable.projectId, directProjectId));
+      await db.delete(importedProjectsTable).where(eq(importedProjectsTable.id, directProjectId));
+    }
+    if (directImportBatchId) {
+      await db.delete(projectImportBatchesTable).where(eq(projectImportBatchesTable.id, directImportBatchId));
     }
     await db.delete(projectDocumentsTable).where(eq(projectDocumentsTable.projectId, projectId));
     await db.delete(importedProjectsTable).where(eq(importedProjectsTable.id, projectId));
@@ -250,7 +270,7 @@ test("schedule images require project authorization and imported schedule images
       address: "",
       region: "Calgary",
       status: "Planning",
-      pmName: "",
+      projectManagerId: managerId,
       clientName: "",
       targetDate: "",
       budgeted: 0,
@@ -259,6 +279,11 @@ test("schedule images require project authorization and imported schedule images
   });
   assert.equal(createDirectProject.status, 201);
   directProjectId = (await createDirectProject.json() as { id: string }).id;
+  const [directProjectRow] = await db.select({ importBatchId: importedProjectsTable.importBatchId })
+    .from(importedProjectsTable)
+    .where(eq(importedProjectsTable.id, directProjectId));
+  assert(directProjectRow);
+  directImportBatchId = directProjectRow.importBatchId;
   const directImageId = `direct-schedule-${suffix}`;
   await db.insert(projectScheduleImagesTable).values({
     id: directImageId,

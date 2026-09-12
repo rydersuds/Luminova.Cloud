@@ -3,7 +3,8 @@ import test from "node:test";
 import type { AddressInfo } from "node:net";
 import { randomUUID } from "node:crypto";
 import express from "express";
-import { inArray } from "drizzle-orm";
+import type { ClerkClient } from "@clerk/backend";
+import { eq, inArray } from "drizzle-orm";
 import {
   clientsTable,
   db,
@@ -19,6 +20,7 @@ test("portfolio financial summary only includes the authenticated owner's record
   const suffix = randomUUID();
   const ownerId = `financial-owner-${suffix}`;
   const otherOwnerId = `financial-other-${suffix}`;
+  const managerId = `financial-manager-${suffix}`;
   const batchIds = [`financial-batch-a-${suffix}`, `financial-batch-b-${suffix}`];
   const clientIds = [`financial-client-a-${suffix}`, `financial-client-b-${suffix}`];
 
@@ -204,6 +206,19 @@ test("portfolio financial summary only includes the authenticated owner's record
   ]);
 
   const app = express();
+  app.locals.projectAssignmentClerkClient = {
+    users: {
+      getUser: async (userId: string) => ({
+        id: userId,
+        firstName: userId === ownerId ? "Admin" : "Project",
+        lastName: userId === ownerId ? "Owner" : "Manager",
+        fullName: userId === ownerId ? "Admin Owner" : "Project Manager",
+        username: null,
+        primaryEmailAddress: { emailAddress: `${userId}@example.com` },
+        publicMetadata: { role: userId === ownerId ? "Admin" : "Project Manager" },
+      }),
+    },
+  } as unknown as ClerkClient;
   app.use(express.json());
   app.use((req, _res, next) => {
     const actor = req.header("x-test-user");
@@ -329,7 +344,7 @@ test("portfolio financial summary only includes the authenticated owner's record
       address: "3 Test Street",
       region: "Calgary",
       status: "Planning",
-      pmName: "Test PM",
+      projectManagerId: managerId,
       clientName: "Test Client",
       targetDate: "2027-03-31",
       budgeted: 500,
@@ -338,6 +353,11 @@ test("portfolio financial summary only includes the authenticated owner's record
   });
   assert.equal(createdProjectResponse.status, 201);
   const createdProject = await createdProjectResponse.json() as { id: string };
+  const [createdProjectRow] = await db.select({ importBatchId: importedProjectsTable.importBatchId })
+    .from(importedProjectsTable)
+    .where(eq(importedProjectsTable.id, createdProject.id));
+  assert(createdProjectRow);
+  batchIds.push(createdProjectRow.importBatchId);
   const ownerProjects = await (await fetch(`http://127.0.0.1:${port}/projects`, {
     headers: { "x-test-user": ownerId },
   })).json() as Array<{ id: string; clientLogoUrl?: string | null }>;

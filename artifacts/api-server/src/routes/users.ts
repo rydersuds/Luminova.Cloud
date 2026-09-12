@@ -17,6 +17,7 @@ import {
   DeleteWorkspaceUserParams,
   GetWorkspaceInvitationsResponse,
   GetCurrentWorkspaceUserResponse,
+  GetProjectManagersResponse,
   GetWorkspaceUsersResponse,
   GrantClientAccessBody,
   GrantClientAccessParams,
@@ -68,12 +69,22 @@ export function requireAuth(req: AuthenticatedRequest, res: Response, next: Next
   next();
 }
 
-function workspaceRole(user: User): (typeof ROLES)[number] {
+function explicitWorkspaceRole(user: User): (typeof ROLES)[number] | null {
   const role = user.publicMetadata.role;
   return ROLES.includes(role as (typeof ROLES)[number])
     ? role as (typeof ROLES)[number]
-    : "Project Manager";
+    : null;
 }
+
+function workspaceRole(user: User): (typeof ROLES)[number] {
+  return explicitWorkspaceRole(user) ?? "Project Manager";
+}
+
+export type ProjectManagerProfile = {
+  id: string;
+  name: string;
+  email: string;
+};
 
 function serializeUser(user: User) {
   const firstName = user.firstName ?? "";
@@ -263,12 +274,13 @@ export async function requireWorkspaceRole(
   res: Response,
   allowedRoles: readonly string[],
   errorMessage: string,
+  client: ClerkClient = clerk,
 ): Promise<boolean> {
   if (!req.userId) {
     res.status(401).json({ error: "Authentication required" });
     return false;
   }
-  const role = await ensureRole(clerk, req.userId);
+  const role = await ensureRole(client, req.userId);
   if (allowedRoles.includes(role)) return true;
   res.status(403).json({ error: errorMessage });
   return false;
@@ -311,6 +323,72 @@ async function listAllWorkspaceUsers(client: ClerkClient): Promise<User[]> {
   }
 
   return users;
+}
+
+async function workspaceMemberIds(client: ClerkClient, scope: string): Promise<Set<string> | null> {
+  if (scope === "default" || !client.organizations?.getOrganizationMembershipList) return null;
+  const members: Array<{ publicUserData?: { userId?: string } | null }> = [];
+  let offset = 0;
+  const limit = 100;
+  while (true) {
+    const result = await client.organizations.getOrganizationMembershipList({
+      organizationId: scope,
+      limit,
+      offset,
+    });
+    members.push(...result.data);
+    if (result.data.length < limit || members.length >= result.totalCount) break;
+    offset += result.data.length;
+  }
+  return new Set(
+    members
+      .map((membership) => membership.publicUserData?.userId)
+      .filter((userId): userId is string => Boolean(userId)),
+  );
+}
+
+function serializeProjectManager(user: User): ProjectManagerProfile | null {
+  const email = user.primaryEmailAddress?.emailAddress;
+  if (!email) return null;
+  return {
+    id: user.id,
+    name: user.fullName || user.username || [user.firstName, user.lastName].filter(Boolean).join(" ") || "Unnamed user",
+    email,
+  };
+}
+
+export async function listProjectManagers(
+  client: ClerkClient = clerk,
+  scope = "default",
+): Promise<ProjectManagerProfile[]> {
+  const [users, memberIds] = await Promise.all([
+    listAllWorkspaceUsers(client),
+    workspaceMemberIds(client, scope),
+  ]);
+  return users
+    .filter((user) => explicitWorkspaceRole(user) === "Project Manager" && (!memberIds || memberIds.has(user.id)))
+    .map(serializeProjectManager)
+    .filter((profile): profile is ProjectManagerProfile => profile !== null)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function resolveProjectManager(
+  userId: string,
+  client: ClerkClient = clerk,
+  scope = "default",
+): Promise<{ kind: "valid"; profile: ProjectManagerProfile } | { kind: "not-found" } | { kind: "wrong-role" } | { kind: "missing-email" }> {
+  let user: User;
+  try {
+    user = await client.users.getUser(userId);
+  } catch (error) {
+    if ((error as ClerkError).status === 404) return { kind: "not-found" };
+    throw error;
+  }
+  const memberIds = await workspaceMemberIds(client, scope);
+  if (memberIds && !memberIds.has(user.id)) return { kind: "not-found" };
+  if (explicitWorkspaceRole(user) !== "Project Manager") return { kind: "wrong-role" };
+  const profile = serializeProjectManager(user);
+  return profile ? { kind: "valid", profile } : { kind: "missing-email" };
 }
 
 async function deleteObjectQuietly(storage: ObjectStorageService, objectPath: string | null | undefined, log: Request["log"]) {
@@ -357,6 +435,16 @@ router.get("/users", async (req: AuthenticatedRequest, res): Promise<void> => {
     ...serializeUser(user),
     clientAccessCleanupPending: pendingUserIds.has(user.id),
   }))));
+});
+
+router.get("/users/project-managers", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!await requireAdmin(client, req, res)) return;
+  try {
+    res.json(GetProjectManagersResponse.parse(await listProjectManagers(client, workspaceId(req))));
+  } catch (error) {
+    req.log.error({ error }, "Project manager directory listing failed");
+    res.status(500).json({ error: "Unable to load project managers" });
+  }
 });
 
 router.post("/users/client-access-reconciliation", async (req: AuthenticatedRequest, res): Promise<void> => {
