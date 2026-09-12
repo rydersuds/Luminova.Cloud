@@ -428,7 +428,10 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
         projectId,
         documentId: document.id,
       })
-      await queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) }),
+        queryClient.invalidateQueries({ queryKey: getGetProjectActivityQueryKey(projectId) }),
+      ])
       toast({
         title: "Schedule image restored",
         description: `${document.name} is now available in the project schedule.`,

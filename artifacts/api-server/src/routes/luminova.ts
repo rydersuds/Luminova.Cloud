@@ -138,6 +138,7 @@ import
   projectImportBatchesTable,
   projectConversationsTable,
   projectMessagesTable,
+  projectActivitiesTable,
   vendorJobHistoryTable,
   vendorReviewTable,
   clientsTable,
@@ -5768,13 +5769,29 @@ router.post("/projects/:projectId/schedule-images/:documentId/restore", async (r
       return;
     }
 
-    await db.update(projectDocumentsTable)
-      .set({ classification: "schedule" })
-      .where(and(
-        eq(projectDocumentsTable.id, document.id),
-        eq(projectDocumentsTable.projectId, project.id),
-        eq(projectDocumentsTable.ownerId, req.userId),
-      ));
+    await db.transaction(async (tx) => {
+      const [restoredDocument] = await tx.update(projectDocumentsTable)
+        .set({ classification: "schedule" })
+        .where(and(
+          eq(projectDocumentsTable.id, document.id),
+          eq(projectDocumentsTable.projectId, project.id),
+          eq(projectDocumentsTable.ownerId, req.userId),
+        ))
+        .returning({ id: projectDocumentsTable.id });
+      if (!restoredDocument) {
+        throw new Error("Schedule image document was not updated");
+      }
+
+      await tx.insert(projectActivitiesTable).values({
+        id: randomUUID(),
+        projectId: project.id,
+        ownerId: req.userId,
+        type: "schedule",
+        title: "Schedule image restored",
+        description: `${document.name} was restored to the project schedule.`,
+        author: req.userId,
+      });
+    });
     res.json(RestoreProjectScheduleImageResponse.parse({
       id: document.id,
       url: `/api/storage${document.objectPath}`,
@@ -6110,7 +6127,7 @@ router.patch("/projects/:projectId", async (req: AuthenticatedRequest, res): Pro
 ;
 
 
-router.get("/projects/:projectId/activity", async (req, res) => 
+router.get("/projects/:projectId/activity", async (req: AuthenticatedRequest, res): Promise<void> =>
 {
 
   const parsed = GetProjectActivityParams.safeParse(req.params)
@@ -6132,15 +6149,45 @@ router.get("/projects/:projectId/activity", async (req, res) =>
   
 }
 
-  const [importedProject] = await db.select(
-{
- id: importedProjectsTable.id 
-}
-).from(importedProjectsTable)
-    .where(eq(importedProjectsTable.id, parsed.data.projectId)).limit(1)
-;
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
 
-  res.json(GetProjectActivityResponse.parse(importedProject ? [] : activities))
+  const project = await findAuthorizedProject(parsed.data.projectId, req.userId);
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  const [importedProject] = await db.select({ id: importedProjectsTable.id })
+    .from(importedProjectsTable)
+    .where(and(
+      eq(importedProjectsTable.id, project.id),
+      eq(importedProjectsTable.ownerId, req.userId),
+    ))
+    .limit(1);
+
+  if (!importedProject) {
+    res.json(GetProjectActivityResponse.parse(activities));
+    return;
+  }
+
+  const projectActivity = await db.select().from(projectActivitiesTable)
+    .where(and(
+      eq(projectActivitiesTable.projectId, project.id),
+      eq(projectActivitiesTable.ownerId, req.userId),
+    ))
+    .orderBy(desc(projectActivitiesTable.createdAt));
+
+  res.json(GetProjectActivityResponse.parse(projectActivity.map((activity) => ({
+    id: activity.id,
+    type: activity.type,
+    title: activity.title,
+    description: activity.description,
+    author: activity.author,
+    date: activity.createdAt.toISOString(),
+  }))))
 ;
 
 }

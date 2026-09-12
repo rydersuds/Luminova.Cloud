@@ -8,6 +8,7 @@ import {
   db,
   importedProjectsTable,
   projectDocumentsTable,
+  projectActivitiesTable,
   projectImportBatchesTable,
   projectScheduleImagesTable,
 } from "@workspace/db";
@@ -116,6 +117,7 @@ test("schedule images require project authorization and imported schedule images
 
   t.after(async () => {
     server.close();
+    await db.delete(projectActivitiesTable).where(eq(projectActivitiesTable.projectId, projectId));
     await db.delete(projectScheduleImagesTable).where(eq(projectScheduleImagesTable.projectId, projectId));
     if (directProjectId) {
       await db.delete(projectScheduleImagesTable).where(eq(projectScheduleImagesTable.projectId, directProjectId));
@@ -195,6 +197,16 @@ test("schedule images require project authorization and imported schedule images
     headers: { "x-test-user": ownerId },
   })).status, 404);
 
+  assert.equal((await fetch(`${base}/projects/${projectId}/activity`)).status, 401);
+  assert.equal((await fetch(`${base}/projects/${projectId}/activity`, {
+    headers: { "x-test-user": otherOwnerId },
+  })).status, 404);
+  const activityBeforeRestore = await fetch(`${base}/projects/${projectId}/activity`, {
+    headers: { "x-test-user": ownerId },
+  });
+  assert.equal(activityBeforeRestore.status, 200);
+  assert.deepEqual(await activityBeforeRestore.json(), []);
+
   const restored = await fetch(restoreUrl, {
     method: "POST",
     headers: { "x-test-user": ownerId },
@@ -211,6 +223,24 @@ test("schedule images require project authorization and imported schedule images
   const [restoredDocument] = await db.select().from(projectDocumentsTable)
     .where(eq(projectDocumentsTable.id, `restorable-document-${suffix}`));
   assert.equal(restoredDocument.classification, "schedule");
+
+  const activityAfterRestore = await fetch(`${base}/projects/${projectId}/activity`, {
+    headers: { "x-test-user": ownerId },
+  });
+  assert.equal(activityAfterRestore.status, 200);
+  const restoredActivity = await activityAfterRestore.json() as Array<{
+    type: string;
+    title: string;
+    description: string;
+    author: string;
+    date: string;
+  }>;
+  assert.equal(restoredActivity.length, 1);
+  assert.equal(restoredActivity[0]?.type, "schedule");
+  assert.equal(restoredActivity[0]?.title, "Schedule image restored");
+  assert.match(restoredActivity[0]?.description ?? "", /removed-schedule\.webp/);
+  assert.equal(restoredActivity[0]?.author, ownerId);
+  assert.equal(Number.isNaN(Date.parse(restoredActivity[0]?.date ?? "")), false);
 
   const createDirectProject = await fetch(`${base}/projects`, {
     method: "POST",
