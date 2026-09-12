@@ -183,7 +183,11 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   }, [photoFolderTree, photoSearch, project, projectId])
   const invoiceFiles = project?.files.filter((file) => file.classification === "invoice") || []
   const quoteFiles = project?.files.filter((file) => file.classification === "quote") || []
-  const agreementFiles = project?.files.filter((file) => file.classification === "contract") || []
+  const entryAgreement = project?.files.find((file) => {
+    if (file.classification !== "contract") return false
+    const title = file.name.replace(/\.[^./]+$/, "").trim()
+    return title.toLocaleUpperCase() === "NOTICE OF AUTHORIZED CONTRACTOR & INSURANCE ACCESS"
+  })
 
   const handleOrganizeFiles = async () => {
     try {
@@ -798,52 +802,44 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                   <Card>
                     <CardHeader>
                       <div className="flex items-center justify-between gap-3">
-                        <CardTitle>On-site agreement</CardTitle>
-                        {agreementFiles.length > 0 && (
+                        <CardTitle>Entry agreement</CardTitle>
+                        {entryAgreement && (
                           <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                            {agreementFiles.length} {agreementFiles.length === 1 ? "file" : "files"}
+                            1 file
                           </span>
                         )}
                       </div>
                       <CardDescription>
-                        {agreementFiles.length > 0
-                          ? "Open the imported agreement documents for this project."
-                          : "No on-site agreement has been imported yet."}
+                        {entryAgreement
+                          ? "Open the imported contractor and insurance access notice."
+                          : "No entry agreement is available."}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      {agreementFiles.length > 0 ? (
-                        <div
-                          className="max-h-64 space-y-3 overflow-y-auto overscroll-contain p-1"
-                          role="region"
-                          aria-label="On-site agreement files"
-                        >
-                          {agreementFiles.map((file) => (
-                            <div key={file.id} className="flex min-w-0 items-center gap-3 rounded-lg border border-border bg-muted/20 p-3">
-                              <FileText className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-medium" title={file.name}>{file.name}</p>
-                                {file.relativePath !== file.name && (
-                                  <p className="truncate text-xs text-muted-foreground" title={file.relativePath}>{file.relativePath}</p>
-                                )}
-                              </div>
-                              <a
-                                href={file.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex shrink-0 scroll-my-1 items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                                aria-label={`Open on-site agreement ${file.name}`}
-                                title={file.name}
-                                data-testid={`link-open-agreement-${file.id}`}
-                              >
-                                Open
-                                <ExternalLink className="h-4 w-4" aria-hidden="true" />
-                              </a>
-                            </div>
-                          ))}
+                      {entryAgreement ? (
+                        <div className="flex min-w-0 items-center gap-3 rounded-lg border border-border bg-muted/20 p-3">
+                          <FileText className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium" title={entryAgreement.name}>{entryAgreement.name}</p>
+                            {entryAgreement.relativePath !== entryAgreement.name && (
+                              <p className="truncate text-xs text-muted-foreground" title={entryAgreement.relativePath}>{entryAgreement.relativePath}</p>
+                            )}
+                          </div>
+                          <a
+                            href={entryAgreement.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex shrink-0 scroll-my-1 items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                            aria-label={`Open entry agreement ${entryAgreement.name}`}
+                            title={entryAgreement.name}
+                            data-testid={`link-open-agreement-${entryAgreement.id}`}
+                          >
+                            Open
+                            <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                          </a>
                         </div>
                       ) : (
-                        <p className="text-sm text-muted-foreground">Import a contract file to make it available here.</p>
+                        <p className="text-sm text-muted-foreground">Import the authorized contractor and insurance access notice to make it available here.</p>
                       )}
                     </CardContent>
                   </Card>
