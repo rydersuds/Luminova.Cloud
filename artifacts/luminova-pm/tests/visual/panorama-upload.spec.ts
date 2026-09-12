@@ -155,11 +155,39 @@ for (const viewport of [
     expect(listSize.clientHeight).toBeLessThanOrEqual(256);
     expect(listSize.scrollHeight).toBeGreaterThan(listSize.clientHeight);
 
-    for (const agreement of agreements) {
+    await page.keyboard.press('Tab');
+    for (let attempts = 0; attempts < 30; attempts += 1) {
+      const focusedLabel = await page.locator(':focus').getAttribute('aria-label');
+      if (focusedLabel === `Open on-site agreement ${agreements[0].name}`) break;
+      await page.keyboard.press('Tab');
+    }
+
+    for (const [index, agreement] of agreements.entries()) {
       const link = page.getByRole('link', { name: `Open on-site agreement ${agreement.name}` });
-      await link.scrollIntoViewIfNeeded();
-      await expect(link).toBeVisible();
+      await expect(link).toBeFocused();
       await expect(link).toHaveAttribute('href', agreement.url);
+
+      const focusedBounds = await link.evaluate((element) => {
+        const list = element.closest('[aria-label="On-site agreement files"]');
+        if (!list) throw new Error('Agreement list not found');
+        const linkRect = element.getBoundingClientRect();
+        const listRect = list.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return {
+          withinVisibleList:
+            linkRect.top >= listRect.top &&
+            linkRect.bottom <= listRect.bottom,
+          outlineVisible:
+            style.outlineStyle !== 'none' ||
+            style.boxShadow !== 'none',
+        };
+      });
+      expect(focusedBounds.withinVisibleList).toBe(true);
+      expect(focusedBounds.outlineVisible).toBe(true);
+
+      if (index < agreements.length - 1) {
+        await page.keyboard.press('Tab');
+      }
     }
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);

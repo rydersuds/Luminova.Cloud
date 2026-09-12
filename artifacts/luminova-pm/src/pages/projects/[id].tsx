@@ -814,7 +814,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                     <CardContent>
                       {agreementFiles.length > 0 ? (
                         <div
-                          className="max-h-64 space-y-3 overflow-y-auto overscroll-contain pr-1"
+                          className="max-h-64 space-y-3 overflow-y-auto overscroll-contain p-1"
                           role="region"
                           aria-label="On-site agreement files"
                         >
@@ -831,9 +831,10 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                                 href={file.url}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                className="inline-flex shrink-0 scroll-my-1 items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                                 aria-label={`Open on-site agreement ${file.name}`}
                                 title={file.name}
+                                data-testid={`link-open-agreement-${file.id}`}
                               >
                                 Open
                                 <ExternalLink className="h-4 w-4" aria-hidden="true" />
