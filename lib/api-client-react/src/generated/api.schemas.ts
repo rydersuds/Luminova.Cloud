@@ -360,6 +360,7 @@ export interface ProjectFile {
   url: string;
   contentType: string;
   classification: string;
+  isEntryAgreement: boolean;
   collection: string;
   /** @nullable */
   linkedEntityType?: string | null;

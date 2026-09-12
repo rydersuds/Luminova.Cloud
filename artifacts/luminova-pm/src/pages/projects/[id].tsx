@@ -188,11 +188,9 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   }, [photoFolderTree, photoSearch, project, projectId])
   const invoiceFiles = project?.files.filter((file) => file.classification === "invoice") || []
   const quoteFiles = project?.files.filter((file) => file.classification === "quote") || []
-  const entryAgreement = project?.files.find((file) => {
-    if (file.classification !== "contract") return false
-    const title = file.name.replace(/\.[^./]+$/, "").trim()
-    return title.toLocaleUpperCase() === "NOTICE OF AUTHORIZED CONTRACTOR & INSURANCE ACCESS"
-  })
+  const entryAgreement = project?.files.find(
+    (file) => file.classification === "contract" && file.isEntryAgreement,
+  )
 
   const handleOrganizeFiles = async () => {
     try {

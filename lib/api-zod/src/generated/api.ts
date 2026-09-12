@@ -210,6 +210,7 @@ export const GetProjectResponse = zod.object({
   "url": zod.string(),
   "contentType": zod.string(),
   "classification": zod.string(),
+  "isEntryAgreement": zod.boolean(),
   "collection": zod.string(),
   "linkedEntityType": zod.string().nullish(),
   "linkedEntityId": zod.string().nullish(),

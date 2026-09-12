@@ -1,4 +1,4 @@
-import { integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const projectImportBatchesTable = pgTable("project_import_batches", {
   id: text("id").primaryKey(),
@@ -23,6 +23,7 @@ export const projectDocumentsTable = pgTable("project_documents", {
   contentType: text("content_type").notNull(),
   size: integer("size").notNull(),
   classification: text("classification").notNull(),
+  isEntryAgreement: boolean("is_entry_agreement").notNull().default(false),
   collection: text("collection").notNull().default(""),
   linkedEntityType: text("linked_entity_type"),
   linkedEntityId: text("linked_entity_id"),

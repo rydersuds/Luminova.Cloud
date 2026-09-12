@@ -90,7 +90,52 @@ const assertWorkspaceSurface = async (page: import('@playwright/test').Page) => 
   });
 };
 
-    const projectManagers = page.getByTestId('project-managers-section');
+test.describe('Users & Roles background treatment', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem('luminova-cookie-consent-v1', 'accepted');
+    });
+    await installUsersFixtures(page);
+  });
+
+  test('keeps the shell background continuous across the users tab and invite form', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/__visual/users');
+    await expect(page.getByRole('heading', { name: 'Users & Roles' })).toBeVisible();
+    await assertWorkspaceSurface(page);
+    await expect(page).toHaveScreenshot('desktop-users.png', { animations: 'disabled' });
+
+    await page.getByRole('button', { name: 'Invite user' }).click();
+    await expect(page.getByRole('button', { name: 'Cancel invite' })).toBeVisible();
+    await assertWorkspaceSurface(page);
+    await expect(page).toHaveScreenshot('desktop-users-invite.png', { animations: 'disabled' });
+
+    await page.getByLabel('Email address').fill('invalid-email');
+    await page.getByRole('button', { name: 'Send invitation' }).click();
+    await expect(page.getByRole('alert')).toHaveText('Enter a valid email address.');
+    await assertWorkspaceSurface(page);
+    await expect(page).toHaveScreenshot('desktop-users-feedback.png', { animations: 'disabled' });
+  });
+
+  test('keeps the shell background continuous on mobile across both tabs', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/__visual/users');
+    await expect(page.getByRole('heading', { name: 'Users & Roles' })).toBeVisible();
+    await assertWorkspaceSurface(page);
+    await expect(page).toHaveScreenshot('mobile-users.png', { animations: 'disabled' });
+
+    await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    await assertWorkspaceSurface(page);
+
+    await page.getByRole('tab', { name: 'Clients' }).click();
+    await expect(page.getByRole('heading', { name: 'Users & Roles' })).toBeVisible();
+    await expect(page.getByText('North Ridge Development')).toBeVisible();
+    await assertWorkspaceSurface(page);
+    await expect(page).toHaveScreenshot('mobile-clients.png', { animations: 'disabled' });
+  });
+
+  test('retries pending client access cleanup and hides the warning after reconciliation', async ({ page }) => {
     let usersResponse = workspaceUsers.map((user) => (
       user.id === 'user-sam' || user.id === 'user-jordan'
         ? { ...user, clientAccessCleanupPending: true }
@@ -171,5 +216,3 @@ const assertWorkspaceSurface = async (page: import('@playwright/test').Page) => 
     await expect(page.getByRole('heading', { name: 'Client access needs reconciliation' })).toBeHidden();
   });
 });
-
-    const otherWorkspaceUsers = page.getByTestId('other-workspace-users-section');

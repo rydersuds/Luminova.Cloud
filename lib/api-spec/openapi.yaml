@@ -2010,7 +2010,7 @@ components:
           items: { type: string }
     ProjectFile:
       type: object
-      required: [id, name, relativePath, url, contentType, classification, collection]
+      required: [id, name, relativePath, url, contentType, classification, isEntryAgreement, collection]
       properties:
         id: { type: string }
         name: { type: string }
@@ -2018,6 +2018,7 @@ components:
         url: { type: string }
         contentType: { type: string }
         classification: { type: string }
+        isEntryAgreement: { type: boolean }
         collection: { type: string }
         linkedEntityType: { type: [string, "null"] }
         linkedEntityId: { type: [string, "null"] }

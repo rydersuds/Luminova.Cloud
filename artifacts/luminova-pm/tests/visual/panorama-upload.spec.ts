@@ -99,13 +99,15 @@ test('shows only the designated entry agreement in the Overview and opens it', a
   const files = [
     {
       id: 'agreement-1',
-      name: 'NOTICE OF AUTHORIZED CONTRACTOR & INSURANCE ACCESS.pdf',
+      name: 'Signed site entry agreement.pdf',
       url: '/api/storage/objects/uploads/entry-agreement',
+      isEntryAgreement: true,
     },
     {
       id: 'agreement-2',
       name: 'Riverstone-Residence-construction-management-agreement.pdf',
       url: '/api/storage/objects/uploads/riverstone-management-agreement',
+      isEntryAgreement: false,
     },
   ];
   const current = {
@@ -115,6 +117,7 @@ test('shows only the designated entry agreement in the Overview and opens it', a
       relativePath: `Contracts/${file.name}`,
       contentType: 'application/pdf',
       classification: 'contract',
+      isEntryAgreement: true,
       collection: 'Contracts',
     })),
   };
@@ -155,6 +158,7 @@ for (const viewport of [
       url: '/api/storage/objects/uploads/entry-agreement',
       contentType: 'application/pdf',
       classification: 'contract',
+      isEntryAgreement: true,
       collection: 'Contracts',
     };
     const current = { ...structuredClone(project), files: [entryAgreement] };
@@ -192,6 +196,7 @@ test('shows a clear Overview empty state when the designated entry agreement is 
     url: '/api/storage/objects/uploads/riverstone-management-agreement',
     contentType: 'application/pdf',
     classification: 'contract',
+    isEntryAgreement: false,
     collection: 'Contracts',
   };
   await page.unroute('**/api/projects/riverstone');

@@ -1,4 +1,5 @@
 import app from "./app";
+import { backfillLegacyEntryAgreementDesignations } from "./lib/entryAgreement";
 import { logger } from "./lib/logger";
 
 const rawPort = process.env["PORT"];
@@ -13,6 +14,11 @@ const port = Number(rawPort);
 
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
+}
+
+const backfilledEntryAgreements = await backfillLegacyEntryAgreementDesignations();
+if (backfilledEntryAgreements > 0) {
+  logger.info({ count: backfilledEntryAgreements }, "Backfilled legacy entry agreement designations");
 }
 
 app.listen(port, (err) => {

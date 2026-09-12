@@ -198,6 +198,8 @@ import
  from "../lib/financialDocumentExtraction"
 ;
 
+import { isStandardEntryAgreementName } from "../lib/entryAgreement";
+
 import 
 {
 
@@ -3259,6 +3261,7 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
         url: `/api/storage${document.objectPath}`,
         contentType: document.contentType,
         classification: document.classification,
+        isEntryAgreement: document.isEntryAgreement,
         collection: document.collection || document.relativePath.split("/").slice(0, -1).join("/") || "Project files",
         linkedEntityType: document.linkedEntityType,
         linkedEntityId: document.linkedEntityId,
@@ -5076,6 +5079,7 @@ const createProjectImportHandler = async (req: Request, res: Response): Promise<
             linkedEntityType: matchedQuote ? "quote" : null,
             linkedEntityId: matchedQuote?.id ?? null,
             aiConfidence: matchedQuote?.importConfidence ?? null,
+            isEntryAgreement: isStandardEntryAgreementName(document.name),
             visualCaption: visual?.caption ?? null,
             visualTags: visual ? photoMetadataTags(visual) : [],
           
@@ -5097,6 +5101,7 @@ const createProjectImportHandler = async (req: Request, res: Response): Promise<
           id: `doc-${randomUUID()}`, importBatchId: importId, projectId: project.id, ownerId, objectPath: document.objectPath,
           relativePath: document.relativePath, name: document.name, contentType: document.contentType, size: document.size,
           classification: classifications.get(document.relativePath) ?? documentClassification(document.relativePath),
+          isEntryAgreement: isStandardEntryAgreementName(document.name),
           linkedEntityType: (() => 
 {
 
