@@ -48,7 +48,8 @@ export const getProjectsQuerySearchMax = 100;
 export const GetProjectsQueryParams = zod.object({
   "status": zod.coerce.string().optional(),
   "search": zod.coerce.string().max(getProjectsQuerySearchMax).optional(),
-  "region": zod.coerce.string().optional()
+  "region": zod.coerce.string().optional(),
+  "client": zod.coerce.string().optional()
 })
 
 export const GetProjectsResponseItem = zod.object({

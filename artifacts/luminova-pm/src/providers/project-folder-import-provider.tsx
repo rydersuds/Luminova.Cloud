@@ -131,6 +131,7 @@ export function ProjectFolderImportProvider({
   }, [isActive])
 
   const dismissFolderError = React.useCallback(() => {
+    importGenerationRef.current += 1
     const importId = sessionRef.current?.importId
     if (importId) {
       dismissedImportIdsRef.current.add(importId)
@@ -384,7 +385,7 @@ export function ProjectFolderImportProvider({
           let transientFailures = 0
           let attempts = 0
           const checkBuild = async () => {
-            if (cancelled) return
+             if (cancelled || importGenerationRef.current !== importGeneration) return
             attempts++
             try {
               const statusResponse = await authenticatedFetch(`/api/project-import-sessions/${session.importId}`)
@@ -420,7 +421,7 @@ export function ProjectFolderImportProvider({
               transientFailures++
               if (attempts < 45 && transientFailures < 6) {
                 poll = window.setTimeout(checkBuild, 2000)
-              } else if (!cancelled) {
+             } else if (!cancelled && importGenerationRef.current === importGeneration) {
                 sessionRef.current = session
                 setFolderStatus("error")
                 setFolderError(`${error instanceof Error ? error.message : "Checking project build status failed."} Retry to continue from the uploaded files.`)

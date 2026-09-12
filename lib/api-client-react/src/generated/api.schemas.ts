@@ -1042,6 +1042,7 @@ status?: string;
  */
 search?: string;
 region?: string;
+client?: string;
 };
 
 export type GetTradesParams = {

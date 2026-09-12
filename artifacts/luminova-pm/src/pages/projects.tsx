@@ -24,17 +24,27 @@ export function getProjectRegionOptions(projects: Array<{ region?: string }> | u
   )).sort()
 }
 
+export function getProjectClientOptions(projects: Array<{ clientName?: string }> | undefined) {
+  return Array.from(new Set(
+    projects
+      ?.map((project) => project.clientName)
+      .filter((item): item is string => typeof item === "string" && item.trim().length > 0) ?? [],
+  )).sort()
+}
+
 export default function Projects() {
   const [, setLocation] = useLocation()
   const [search, setSearch] = React.useState("")
   const [status, setStatus] = React.useState("")
   const [region, setRegion] = React.useState("")
+  const [client, setClient] = React.useState("")
   const [view, setView] = React.useState<"grid" | "list">("grid")
 
   const params = {
     search: search || undefined,
     status: status || undefined,
     region: region || undefined,
+    client: client || undefined,
   }
   const { data: projects, isLoading } = useGetProjects(params, {
     query: { queryKey: getGetProjectsQueryKey(params) },
@@ -43,6 +53,7 @@ export default function Projects() {
     query: { queryKey: REGION_OPTIONS_QUERY_KEY },
   })
   const regionOptions = React.useMemo(() => getProjectRegionOptions(allProjects), [allProjects])
+  const clientOptions = React.useMemo(() => getProjectClientOptions(allProjects), [allProjects])
 
   React.useEffect(() => {
     if (region && allProjects && !regionOptions.includes(region)) {
@@ -50,12 +61,19 @@ export default function Projects() {
     }
   }, [allProjects, region, regionOptions])
 
+  React.useEffect(() => {
+    if (client && allProjects && !clientOptions.includes(client)) {
+      setClient("")
+    }
+  }, [allProjects, client, clientOptions])
+
   const clearFilters = () => {
     setSearch("")
     setStatus("")
     setRegion("")
+    setClient("")
   }
-  const hasFilters = Boolean(search || status || region)
+  const hasFilters = Boolean(search || status || region || client)
 
   return (
     <AppLayout>
@@ -99,7 +117,7 @@ export default function Projects() {
               <SlidersHorizontal className="h-4 w-4 text-primary" />
               Filter projects
             </div>
-            <div className="grid gap-3 xl:grid-cols-[minmax(220px,1fr)_220px_220px_auto]">
+            <div className="grid gap-3 xl:grid-cols-[minmax(220px,1fr)_200px_200px_220px_auto]">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -127,6 +145,16 @@ export default function Projects() {
               >
                 <option value="">All regions</option>
                 {regionOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+              <select
+                value={client}
+                onChange={(event) => setClient(event.target.value)}
+                aria-label="Project client"
+                disabled={areRegionsLoading && clientOptions.length === 0}
+                className="h-10 border border-border bg-background/70 px-3 text-sm outline-none focus:border-primary"
+              >
+                <option value="">All clients</option>
+                {clientOptions.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
               <Button type="button" variant="outline" onClick={clearFilters} disabled={!hasFilters} className="gap-2">
                 <X className="h-4 w-4" />

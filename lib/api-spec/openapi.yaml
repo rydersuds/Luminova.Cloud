@@ -71,6 +71,10 @@ paths:
           in: query
           schema:
             type: string
+        - name: client
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Project list

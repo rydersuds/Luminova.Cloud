@@ -5448,7 +5448,7 @@ router.get("/projects", async (req: AuthenticatedRequest, res) =>
   const 
 {
 
- status, search, region 
+ status, search, region, client
 }
 
  = parsed.data
@@ -5462,6 +5462,7 @@ router.get("/projects", async (req: AuthenticatedRequest, res) =>
     const result = (await projectsForOwner(req.userId, requestWorkspaceId(req))).filter((project) =>
       (!status || project.status === status) &&
       (!region || project.region === region) &&
+      (!client || project.clientName === client) &&
       (!search || `${project.name} ${project.address} ${project.clientName}`.toLowerCase().includes(search.toLowerCase())),
     )
 ;
