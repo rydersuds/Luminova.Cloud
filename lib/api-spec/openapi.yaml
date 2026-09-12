@@ -1820,6 +1820,8 @@ components:
         projectName: { type: string }
         vendor: { type: string }
         direction: { $ref: "#/components/schemas/QuoteDirection" }
+        clientName: { type: [string, "null"] }
+        clientLogoUrl: { type: [string, "null"] }
         amount: { type: number }
         date: { type: string }
         status: { type: string }

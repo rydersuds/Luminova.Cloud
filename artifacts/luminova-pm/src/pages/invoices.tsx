@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label"
 import { Filter, FileText, Check, X, AlertTriangle, Search, Plus, ArrowUpRight, ArrowDownRight, Clock3, RefreshCw } from "lucide-react"
 import { formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
+import { ClientIdentity } from "@/components/client-identity"
 
 export default function Invoices() {
   const [statusFilter, setStatusFilter] = React.useState("")
@@ -179,7 +180,20 @@ export default function Invoices() {
                     <div className="min-w-0">
                       <p className="break-words font-mono text-sm font-medium">{invoice.invoiceNumber}</p>
                       <p className="mt-1 break-words font-medium text-foreground">{invoice.projectName}</p>
-                      <p className="break-words text-xs text-muted-foreground">{invoice.vendor}</p>
+                      {invoice.direction === "luminova_to_client" ? (
+                        <div className="mt-2 flex min-w-0 items-center gap-2">
+                          <ClientIdentity name={invoice.clientName ?? invoice.vendor} logoUrl={invoice.clientLogoUrl} size="sm" />
+                          <div className="min-w-0">
+                            <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Client invoice</p>
+                            <p className="truncate text-xs text-foreground">{invoice.clientName ?? invoice.vendor}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-2">
+                          <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Vendor invoice</p>
+                          <p className="break-words text-xs text-muted-foreground">{invoice.vendor}</p>
+                        </div>
+                      )}
                     </div>
                     <Badge variant={getStatusColor(invoice.status) as any}>{invoice.status}</Badge>
                   </div>
@@ -238,7 +252,18 @@ export default function Invoices() {
                       <TableCell className="max-w-[12rem] break-words font-mono text-sm font-medium">{invoice.invoiceNumber}</TableCell>
                       <TableCell className="min-w-[12rem]">
                         <p className="break-words font-medium text-foreground">{invoice.projectName}</p>
-                        <p className="break-words text-xs text-muted-foreground">{invoice.vendor} • Line: {invoice.lineItem}</p>
+                        {invoice.direction === "luminova_to_client" ? (
+                          <div className="mt-2 flex min-w-0 items-center gap-2">
+                            <ClientIdentity name={invoice.clientName ?? invoice.vendor} logoUrl={invoice.clientLogoUrl} size="sm" />
+                            <div className="min-w-0">
+                              <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Client invoice</p>
+                              <p className="truncate text-xs text-foreground">{invoice.clientName ?? invoice.vendor}</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="break-words text-xs text-muted-foreground"><span className="font-mono uppercase tracking-wider">Vendor invoice:</span> {invoice.vendor}</p>
+                        )}
+                        <p className="mt-1 break-words text-xs text-muted-foreground">Line: {invoice.lineItem}</p>
                       </TableCell>
                       <TableCell className="text-sm">{formatDate(invoice.date)}</TableCell>
                       <TableCell className="text-right">

@@ -570,6 +570,7 @@ let projects = [
     description: "Compact urban new build focused on flexible family spaces, daylight, and a private landscaped courtyard.",
   },
 ];
+const createdProjectOwners = new Map<string, string>();
 
 let invoices = [
   { id: "inv-1", invoiceNumber: "INV-2048", projectId: "riverstone", projectName: "Riverstone Residence", vendor: "Northline Electric", amount: 1845000, date: "2026-09-04", status: "Auto-approved", lineItem: "26 00 00 · Electrical", overage: 0 },
@@ -762,6 +763,30 @@ const enrichProjectsWithClientBranding = async (projects: Project[], scope: stri
   const clients = await clientBrandingForWorkspace(scope);
   return projects.map((project) => enrichProjectClient(project, clients));
 };
+const enrichInvoicesWithClientBranding = async (
+  invoices: Invoice[],
+  projects: Project[],
+  scope: string,
+) => {
+  const clients = await clientBrandingForWorkspace(scope);
+  const projectsById = new Map(projects.map((project) => [project.id, project]));
+  return invoices.map((invoice) => {
+    if (invoice.direction !== "luminova_to_client") {
+      return { ...invoice, clientName: null, clientLogoUrl: null };
+    }
+
+    const project = projectsById.get(invoice.projectId);
+    const clientName = canonicalClientName(project?.clientName || invoice.vendor);
+    const client = clients.find((candidate) =>
+      normalizePartyName(candidate.name) === normalizePartyName(clientName),
+    );
+    return {
+      ...invoice,
+      clientName,
+      clientLogoUrl: client?.logoObjectPath ? `/api/storage${client.logoObjectPath}` : null,
+    };
+  });
+};
 const requestWorkspaceId = (req: Request) => {
   try {
     return getAuth(req).orgId || "default";
@@ -887,7 +912,7 @@ const allVendorQuotes = async (): Promise<VendorQuote[]> => {
     ...vendorQuotes,
   ];
 };
-const financialRecordsForOwner = async (ownerId: string) => {
+const financialRecordsForOwner = async (ownerId: string, scope = ownerId) => {
   const [invoiceRows, quoteRows, projectRows] = await Promise.all([
     db.select({ data: importedInvoicesTable.data })
       .from(importedInvoicesTable)
@@ -931,6 +956,7 @@ const financialRecordsForOwner = async (ownerId: string) => {
       ? normalized
       : { ...normalized, direction: "luminova_to_client" as const };
   });
+  const brandedInvoices = await enrichInvoicesWithClientBranding(normalizedInvoices, ownedProjects, scope);
   const financialProjects: FinancialProject[] = ownedProjects.map((project) => ({
     projectId: project.id,
     clientQuoteTotal: project.clientQuote?.total,
@@ -940,7 +966,7 @@ const financialRecordsForOwner = async (ownerId: string) => {
     ),
   }));
   return {
-    invoices: normalizedInvoices,
+    invoices: brandedInvoices,
     quotes: [
       ...quoteRows.map((row) => {
         const quote = row.data as VendorQuote;
@@ -960,11 +986,15 @@ const financialRecordsForOwner = async (ownerId: string) => {
     projects: financialProjects,
   };
 };
-const projectsForOwner = async (ownerId: string) =>
-  (await db.select({ data: importedProjectsTable.data })
+const projectsForOwner = async (ownerId: string) => [
+  ...(await db.select({ data: importedProjectsTable.data })
     .from(importedProjectsTable)
     .where(eq(importedProjectsTable.ownerId, ownerId)))
-    .map((row) => withCalculatedProjectProgress(row.data as Project));
+    .map((row) => withCalculatedProjectProgress(row.data as Project)),
+  ...projects
+    .filter((project) => !createdProjectOwners.has(project.id) || createdProjectOwners.get(project.id) === ownerId)
+    .map(withCalculatedProjectProgress),
+];
 const tradesForOwner = async (ownerId: string) => {
   const [tradeRows, projectRows, { invoices: ownedInvoices }, historyRecords, reviewRecords] = await Promise.all([
     db.select({ data: importedVendorsTable.data })
@@ -1262,7 +1292,9 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
 
   if (importedProject) {
     const [projectInvoices, vendorRows, documents, panoramas, scheduleImages, clientQuote] = await Promise.all([
-      allInvoices().then((records) => records.filter((invoice) => invoice.projectId === project.id)),
+      (ownerId
+        ? financialRecordsForOwner(ownerId, workspaceId ?? ownerId).then(({ invoices }) => invoices.filter((invoice) => invoice.projectId === project.id))
+        : allInvoices().then((records) => records.filter((invoice) => invoice.projectId === project.id))),
       db.select({ data: importedVendorsTable.data }).from(importedVendorsTable)
         .where(eq(importedVendorsTable.importBatchId, importedProject.importBatchId)),
       db.select().from(projectDocumentsTable).where(eq(projectDocumentsTable.projectId, project.id)),
@@ -1331,7 +1363,13 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
     startDate: "",
     clientQuote,
     lineItems: project.budgetLineItems ?? [],
-    invoices: (await allInvoices()).filter((invoice) => invoice.projectId === project.id),
+    invoices: await (ownerId
+      ? financialRecordsForOwner(ownerId, workspaceId ?? ownerId).then(({ invoices }) => invoices.filter((invoice) => invoice.projectId === project.id))
+      : enrichInvoicesWithClientBranding(
+        (await allInvoices()).filter((invoice) => invoice.projectId === project.id),
+        [project],
+        workspaceId || "default",
+      )),
     trades: [],
     photos: [],
     files: [],
@@ -1384,7 +1422,7 @@ router.get("/search", async (req: AuthenticatedRequest, res) => {
     const [projectRecords, tradeRecords, financialRecords, conversationRecords] = await Promise.all([
       projectsForOwner(req.userId),
       tradesForOwner(req.userId),
-      financialRecordsForOwner(req.userId),
+      financialRecordsForOwner(req.userId, requestWorkspaceId(req)),
       conversationsForOwner(req.userId),
     ]);
     const results = [
@@ -1588,7 +1626,11 @@ router.post("/conversations/:conversationId/messages", async (req: Authenticated
   }));
 });
 
-router.get("/projects", async (req, res) => {
+router.get("/projects", async (req: AuthenticatedRequest, res) => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
   const parsed = GetProjectsQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -1596,7 +1638,7 @@ router.get("/projects", async (req, res) => {
   }
   const { status, search, region } = parsed.data;
   try {
-    const result = (await allProjects()).filter((project) =>
+    const result = (await projectsForOwner(req.userId)).filter((project) =>
       (!status || project.status === status) &&
       (!region || project.region === region) &&
       (!search || `${project.name} ${project.address} ${project.clientName}`.toLowerCase().includes(search.toLowerCase())),
@@ -1608,7 +1650,11 @@ router.get("/projects", async (req, res) => {
   }
 });
 
-router.post("/projects", (req, res) => {
+router.post("/projects", (req: AuthenticatedRequest, res) => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
   const parsed = CreateProjectBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -1622,6 +1668,7 @@ router.post("/projects", (req, res) => {
     exteriorImage: parsed.data.exteriorImage ?? "",
   };
   projects = [project, ...projects];
+  createdProjectOwners.set(project.id, req.userId);
   res.status(201).json(CreateProjectResponse.parse(project));
 });
 
@@ -2026,12 +2073,19 @@ router.post("/project-import-sessions/:importId/build", async (req, res): Promis
 });
 
 router.get("/projects/:projectId", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
   const parsed = GetProjectParams.safeParse(req.params);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const seededProject = projects.find((project) => project.id === parsed.data.projectId);
+  const seededProject = projects.find((project) =>
+    project.id === parsed.data.projectId &&
+    (!createdProjectOwners.has(project.id) || createdProjectOwners.get(project.id) === req.userId),
+  );
   const [ownedImportedProject] = !seededProject && req.userId
     ? await db.select({ data: importedProjectsTable.data }).from(importedProjectsTable).where(and(
         eq(importedProjectsTable.id, parsed.data.projectId),
@@ -2786,7 +2840,7 @@ router.get("/invoices", async (req: AuthenticatedRequest, res) => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { invoices: records } = await financialRecordsForOwner(req.userId);
+  const { invoices: records } = await financialRecordsForOwner(req.userId, requestWorkspaceId(req));
   const normalizedSearch = parsed.data.search?.trim().toLowerCase();
   const result = records.filter((invoice) =>
     (!parsed.data.status || invoice.status === parsed.data.status) &&
@@ -2800,7 +2854,7 @@ router.get("/invoices/summary", async (req: AuthenticatedRequest, res) => {
     res.status(401).json({ error: "Authentication required" });
     return;
   }
-  const { invoices: invoiceRecords, quotes: quoteRecords, projects: projectRecords } = await financialRecordsForOwner(req.userId);
+  const { invoices: invoiceRecords, quotes: quoteRecords, projects: projectRecords } = await financialRecordsForOwner(req.userId, requestWorkspaceId(req));
   res.json(GetFinancialSummaryResponse.parse(
     calculatePortfolioFinancialSummary(invoiceRecords, quoteRecords, projectRecords),
   ));

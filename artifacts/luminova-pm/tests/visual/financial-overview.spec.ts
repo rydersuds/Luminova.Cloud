@@ -6,12 +6,29 @@ const invoices = [
     invoiceNumber: 'CLIENT-100',
     projectId: 'project-1',
     projectName: 'Riverstone Residence',
-    vendor: 'Avery Reid',
+    vendor: 'Avery & Morgan Reid',
     direction: 'luminova_to_client',
+    clientName: 'Avery & Morgan Reid',
+    clientLogoUrl: '/broken-client-logo.svg',
     amount: 250000,
     date: '2026-09-01',
     status: 'Approved',
     lineItem: 'Progress billing',
+    overage: 0,
+  },
+  {
+    id: 'invoice-2',
+    invoiceNumber: 'VENDOR-200',
+    projectId: 'project-1',
+    projectName: 'Riverstone Residence',
+    vendor: 'Northline Electric',
+    direction: 'company_to_luminova',
+    clientName: null,
+    clientLogoUrl: null,
+    amount: 85000,
+    date: '2026-09-02',
+    status: 'Pending',
+    lineItem: 'Electrical',
     overage: 0,
   },
 ];
@@ -41,6 +58,27 @@ test('renders portfolio totals above the existing invoice intake workflow', asyn
   await expect(summary.getByText('$2,000,000.00 accepted client work')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Invoice intake queue' })).toBeVisible();
   await expect(page.getByText('CLIENT-100').last()).toBeVisible();
+});
+
+test('keeps client and vendor invoice identities distinct across responsive layouts', async ({ page }) => {
+  await page.route('**/broken-client-logo.svg', (route) => route.fulfill({ status: 404, body: '' }));
+  await loadFinancials(page, {
+    invoicedRevenue: 250000,
+    invoicedExpenses: 85000,
+    acceptedClientQuoteValue: 500000,
+    upcomingClientPayments: 250000,
+  });
+
+  await expect(page.getByText('Client invoice', { exact: true })).toHaveCount(2);
+  await expect(page.getByText(/Vendor invoice/)).toHaveCount(2);
+  await expect(page.getByLabel('Avery & Morgan Reid initials')).toHaveCount(2);
+  await expect(page.getByText('Northline Electric')).toHaveCount(2);
+  await expect(page.getByRole('img', { name: 'Northline Electric logo' })).toHaveCount(0);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByText('CLIENT-100').first()).toBeVisible();
+  await expect(page.getByLabel('Avery & Morgan Reid initials').first()).toBeVisible();
+  await expect(page.getByText('Vendor invoice', { exact: true }).first()).toBeVisible();
 });
 
 test('renders real zero totals without treating them as unavailable', async ({ page }) => {

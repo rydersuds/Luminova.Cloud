@@ -1235,17 +1235,25 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
               )}
               <Card>
                 <CardHeader>
-                  <CardTitle>Quoted vs Invoiced</CardTitle>
-                  <CardDescription>Client billing issued to Weidner against the current project quote</CardDescription>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <CardTitle>Quoted vs Invoiced</CardTitle>
+                      <CardDescription>Client billing issued to {project.clientName} against the current project quote</CardDescription>
+                    </div>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <ClientIdentity name={project.clientName} logoUrl={project.clientLogoUrl} size="sm" />
+                      <span className="max-w-[16rem] truncate text-sm font-medium">{project.clientName}</span>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid gap-4 sm:grid-cols-3">
                     <div className="rounded-lg border bg-muted/30 p-4">
-                      <p className="text-sm text-muted-foreground">Quoted to Weidner</p>
+                      <p className="text-sm text-muted-foreground">Quoted to {project.clientName}</p>
                       <p className="mt-1 text-2xl font-bold tabular-nums">{formatCurrency(project.clientQuote.total)}</p>
                     </div>
                     <div className="rounded-lg border bg-muted/30 p-4">
-                      <p className="text-sm text-muted-foreground">Invoiced to Weidner</p>
+                      <p className="text-sm text-muted-foreground">Invoiced to {project.clientName}</p>
                       <p className="mt-1 text-2xl font-bold tabular-nums">{formatCurrency(project.invoiced)}</p>
                     </div>
                     <div className="rounded-lg border bg-muted/30 p-4">
@@ -1269,6 +1277,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                       <TableHeader>
                         <TableRow>
                           <TableHead>Invoice</TableHead>
+                          <TableHead>Party</TableHead>
                           <TableHead>Date</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="text-right">Amount</TableHead>
@@ -1280,6 +1289,22 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                           .map((invoice) => (
                             <TableRow key={invoice.id}>
                               <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
+                              <TableCell>
+                                {invoice.direction === "luminova_to_client" ? (
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    <ClientIdentity name={invoice.clientName ?? project.clientName} logoUrl={invoice.clientLogoUrl ?? project.clientLogoUrl} size="sm" />
+                                    <div className="min-w-0">
+                                      <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Client</p>
+                                      <p className="max-w-[12rem] truncate">{invoice.clientName ?? project.clientName}</p>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Vendor</p>
+                                    <p className="max-w-[12rem] truncate">{invoice.vendor}</p>
+                                  </div>
+                                )}
+                              </TableCell>
                               <TableCell>{formatDate(invoice.date)}</TableCell>
                               <TableCell><Badge variant="outline">{invoice.status}</Badge></TableCell>
                               <TableCell className="text-right tabular-nums">{formatCurrency(invoice.amount)}</TableCell>

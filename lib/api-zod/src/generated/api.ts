@@ -163,6 +163,8 @@ export const GetProjectResponse = zod.object({
   "projectName": zod.string(),
   "vendor": zod.string(),
   "direction": zod.enum(['luminova_to_client', 'company_to_luminova']).optional(),
+  "clientName": zod.string().nullish(),
+  "clientLogoUrl": zod.string().nullish(),
   "amount": zod.number(),
   "date": zod.string(),
   "status": zod.string(),
@@ -1104,6 +1106,8 @@ export const GetInvoicesResponseItem = zod.object({
   "projectName": zod.string(),
   "vendor": zod.string(),
   "direction": zod.enum(['luminova_to_client', 'company_to_luminova']).optional(),
+  "clientName": zod.string().nullish(),
+  "clientLogoUrl": zod.string().nullish(),
   "amount": zod.number(),
   "date": zod.string(),
   "status": zod.string(),
@@ -1132,6 +1136,8 @@ export const CreateInvoiceResponse = zod.object({
   "projectName": zod.string(),
   "vendor": zod.string(),
   "direction": zod.enum(['luminova_to_client', 'company_to_luminova']).optional(),
+  "clientName": zod.string().nullish(),
+  "clientLogoUrl": zod.string().nullish(),
   "amount": zod.number(),
   "date": zod.string(),
   "status": zod.string(),
@@ -1903,4 +1909,3 @@ export const DeleteWorkspaceUserParams = zod.object({
 })
 
 export const DeleteWorkspaceUserResponse = zod.void()
-

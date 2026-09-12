@@ -296,6 +296,10 @@ export interface Invoice {
   projectName: string;
   vendor: string;
   direction?: QuoteDirection;
+  /** @nullable */
+  clientName?: string | null;
+  /** @nullable */
+  clientLogoUrl?: string | null;
   amount: number;
   date: string;
   status: string;

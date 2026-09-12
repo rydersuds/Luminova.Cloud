@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Building2, Grid2X2, List, MapPin, Search, SlidersHorizontal, X } from "lucide-react"
 import { cn, formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
+import { ClientIdentity } from "@/components/client-identity"
 
 const STATUSES = ["Pre-construction", "Planning", "Active", "In progress", "On hold", "Completed", "Rejected for bid"]
 const REGION_OPTIONS_QUERY_KEY = [...getGetProjectsQueryKey(), "region-options"] as const
@@ -216,6 +217,13 @@ export default function Projects() {
                       </div>
                       <div className="h-1.5 overflow-hidden bg-muted">
                         <div className="h-full bg-primary transition-all duration-700" style={{ width: `${project.progress}%` }} />
+                      </div>
+                    </div>
+                    <div className="flex min-w-0 items-center gap-2 border-t border-border/50 pt-4">
+                      <ClientIdentity name={project.clientName} logoUrl={project.clientLogoUrl} size="sm" />
+                      <div className="min-w-0">
+                        <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Client</p>
+                        <p className="truncate font-medium">{project.clientName}</p>
                       </div>
                     </div>
                   </CardContent>

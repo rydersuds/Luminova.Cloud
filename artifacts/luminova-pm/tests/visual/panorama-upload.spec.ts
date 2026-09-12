@@ -9,6 +9,7 @@ const project = {
   progress: 64,
   pmName: 'Maya Chen',
   clientName: 'Avery & Morgan Reid',
+  clientLogoUrl: '/client-logo.svg',
   targetDate: '2027-02-12',
   budgeted: 186500000,
   invoiced: 112840000,
@@ -79,6 +80,10 @@ test.beforeEach(async ({ page }) => {
     },
   }));
   await page.route('**/__panorama-upload', route => route.fulfill({ status: 200 }));
+  await page.route('**/client-logo.svg', route => route.fulfill({
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#c8ae4b"/></svg>',
+  }));
   await page.route('**/api/projects/riverstone/activity', route => route.fulfill({ json: [] }));
   await page.route('**/api/projects/riverstone', async route => {
     if (route.request().method() === 'GET') {
@@ -200,6 +205,58 @@ test('shows a clear Overview empty state when the designated entry agreement is 
   await expect(page.getByText(unrelatedContract.name, { exact: true })).toHaveCount(0);
   await expect(page.getByText('1 file', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: /Open entry agreement/ })).toHaveCount(0);
+});
+
+test('shows the project client identity on project cards and client billing details', async ({ page }) => {
+  const current = {
+    ...structuredClone(project),
+    invoices: [
+      {
+        id: 'client-invoice',
+        invoiceNumber: 'CLIENT-100',
+        projectId: 'riverstone',
+        projectName: 'Riverstone Residence',
+        vendor: 'Avery & Morgan Reid',
+        direction: 'luminova_to_client',
+        clientName: 'Avery & Morgan Reid',
+        clientLogoUrl: '/client-logo.svg',
+        amount: 250000,
+        date: '2026-09-01',
+        status: 'Approved',
+        lineItem: 'Progress',
+        overage: 0,
+      },
+      {
+        id: 'vendor-invoice',
+        invoiceNumber: 'VENDOR-100',
+        projectId: 'riverstone',
+        projectName: 'Riverstone Residence',
+        vendor: 'Northline Electric',
+        direction: 'company_to_luminova',
+        clientName: null,
+        clientLogoUrl: null,
+        amount: 85000,
+        date: '2026-09-02',
+        status: 'Approved',
+        lineItem: 'Electrical',
+        overage: 0,
+      },
+    ],
+  };
+  await page.unroute('**/api/projects/riverstone');
+  await page.route('**/api/projects/riverstone', route => route.fulfill({ json: current }));
+  await page.route('**/api/projects', route => route.fulfill({ json: [current] }));
+
+  await page.goto('/__visual/project-cards');
+  await expect(page.getByRole('img', { name: 'Avery & Morgan Reid logo' })).toBeVisible();
+
+  await page.goto('/__visual/project-panorama');
+  await page.getByRole('tab', { name: 'Budget' }).click();
+  await expect(page.getByText('Client billing issued to Avery & Morgan Reid')).toBeVisible();
+  await expect(page.getByText('Quoted to Avery & Morgan Reid')).toBeVisible();
+  await expect(page.getByText('Invoiced to Avery & Morgan Reid')).toBeVisible();
+  await expect(page.getByText('Northline Electric')).toBeVisible();
+  await expect(page.getByRole('img', { name: 'Northline Electric logo' })).toHaveCount(0);
 });
 
 test('selects a standard photo as the exterior photo and keeps it selected after refresh', async ({ page }) => {

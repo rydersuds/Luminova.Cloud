@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import express from "express";
 import { inArray } from "drizzle-orm";
 import {
+  clientsTable,
   db,
   importedInvoicesTable,
   importedProjectsTable,
@@ -19,6 +20,24 @@ test("portfolio financial summary only includes the authenticated owner's record
   const ownerId = `financial-owner-${suffix}`;
   const otherOwnerId = `financial-other-${suffix}`;
   const batchIds = [`financial-batch-a-${suffix}`, `financial-batch-b-${suffix}`];
+  const clientIds = [`financial-client-a-${suffix}`, `financial-client-b-${suffix}`];
+
+  await db.insert(clientsTable).values([
+    {
+      id: clientIds[0],
+      workspaceId: "default",
+      name: "Test Client",
+      logoObjectPath: `/objects/test-client-logo-${suffix}`,
+      createdBy: ownerId,
+    },
+    {
+      id: clientIds[1],
+      workspaceId: `other-workspace-${suffix}`,
+      name: "Test Client",
+      logoObjectPath: `/objects/wrong-workspace-logo-${suffix}`,
+      createdBy: otherOwnerId,
+    },
+  ]);
 
   await db.insert(projectImportBatchesTable).values([
     { id: batchIds[0], projectId: `project-a-${suffix}`, ownerId, status: "completed", manifest: [] },
@@ -203,6 +222,7 @@ test("portfolio financial summary only includes the authenticated owner's record
     await db.delete(importedVendorsTable).where(inArray(importedVendorsTable.importBatchId, batchIds));
     await db.delete(importedProjectsTable).where(inArray(importedProjectsTable.importBatchId, batchIds));
     await db.delete(projectImportBatchesTable).where(inArray(projectImportBatchesTable.id, batchIds));
+    await db.delete(clientsTable).where(inArray(clientsTable.id, clientIds));
   });
 
   const unauthenticated = await fetch(`http://127.0.0.1:${port}/invoices/summary`);
@@ -223,16 +243,116 @@ test("portfolio financial summary only includes the authenticated owner's record
     headers: { "x-test-user": ownerId },
   });
   assert.equal(projectsResponse.status, 200);
-  const projects = await projectsResponse.json() as Array<{ id: string; progress: number }>;
+  const projects = await projectsResponse.json() as Array<{ id: string; progress: number; clientLogoUrl?: string | null }>;
   assert.equal(projects.find((project) => project.id === `project-a-${suffix}`)?.progress, 37.5);
+  assert.equal(projects.some((project) => project.id === `project-b-${suffix}`), false);
+  assert.equal(
+    projects.find((project) => project.id === `project-a-${suffix}`)?.clientLogoUrl,
+    `/api/storage/objects/test-client-logo-${suffix}`,
+  );
 
   const invoiceListResponse = await fetch(`http://127.0.0.1:${port}/invoices`, {
     headers: { "x-test-user": ownerId },
   });
-  const invoiceList = await invoiceListResponse.json() as Array<{ id: string }>;
+  const invoiceList = await invoiceListResponse.json() as Array<{
+    id: string;
+    direction?: string;
+    clientName?: string | null;
+    clientLogoUrl?: string | null;
+  }>;
   assert.equal(invoiceListResponse.status, 200);
   assert.equal(invoiceList.length, 3);
   assert.equal(invoiceList.some((invoice) => invoice.id === `invoice-b-${suffix}`), false);
+  assert.deepEqual(
+    invoiceList.find((invoice) => invoice.id === `invoice-a-${suffix}`),
+    {
+      id: `invoice-a-${suffix}`,
+      invoiceNumber: "CLIENT-A",
+      projectId: `project-a-${suffix}`,
+      projectName: "Owned project",
+      vendor: "Client",
+      direction: "luminova_to_client",
+      clientName: "Test Client",
+      clientLogoUrl: `/api/storage/objects/test-client-logo-${suffix}`,
+      amount: 300,
+      date: "2026-09-01",
+      status: "Approved",
+      lineItem: "Progress",
+      overage: 0,
+    },
+  );
+  assert.deepEqual(
+    invoiceList.find((invoice) => invoice.id === `invoice-expense-a-${suffix}`),
+    {
+      id: `invoice-expense-a-${suffix}`,
+      invoiceNumber: "EXPENSE-A",
+      projectId: `project-a-${suffix}`,
+      projectName: "Owned project",
+      vendor: "Owned Trade",
+      direction: "company_to_luminova",
+      clientName: null,
+      clientLogoUrl: null,
+      amount: 25,
+      date: "2026-09-03",
+      status: "Approved",
+      lineItem: "Electrical",
+      overage: 0,
+    },
+  );
+  assert.equal(
+    invoiceList.find((invoice) => invoice.id === `invoice-legacy-${suffix}`)?.clientLogoUrl,
+    `/api/storage/objects/test-client-logo-${suffix}`,
+  );
+
+  const projectDetailResponse = await fetch(`http://127.0.0.1:${port}/projects/project-a-${suffix}`, {
+    headers: { "x-test-user": ownerId },
+  });
+  assert.equal(projectDetailResponse.status, 200);
+  const projectDetail = await projectDetailResponse.json() as {
+    clientLogoUrl?: string | null;
+    invoices: typeof invoiceList;
+  };
+  assert.equal(projectDetail.clientLogoUrl, `/api/storage/objects/test-client-logo-${suffix}`);
+  assert.equal(
+    projectDetail.invoices.find((invoice) => invoice.id === `invoice-a-${suffix}`)?.clientLogoUrl,
+    `/api/storage/objects/test-client-logo-${suffix}`,
+  );
+  assert.equal((await fetch(`http://127.0.0.1:${port}/projects/project-b-${suffix}`, {
+    headers: { "x-test-user": ownerId },
+  })).status, 404);
+
+  const createdProjectResponse = await fetch(`http://127.0.0.1:${port}/projects`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-test-user": ownerId },
+    body: JSON.stringify({
+      name: `Created project ${suffix}`,
+      address: "3 Test Street",
+      region: "Calgary",
+      status: "Planning",
+      pmName: "Test PM",
+      clientName: "Test Client",
+      targetDate: "2027-03-31",
+      budgeted: 500,
+      description: "Created directly.",
+    }),
+  });
+  assert.equal(createdProjectResponse.status, 201);
+  const createdProject = await createdProjectResponse.json() as { id: string };
+  const ownerProjects = await (await fetch(`http://127.0.0.1:${port}/projects`, {
+    headers: { "x-test-user": ownerId },
+  })).json() as Array<{ id: string; clientLogoUrl?: string | null }>;
+  assert.equal(ownerProjects.some((project) => project.id === createdProject.id), true);
+  assert.equal(
+    ownerProjects.find((project) => project.id === createdProject.id)?.clientLogoUrl,
+    `/api/storage/objects/test-client-logo-${suffix}`,
+  );
+  const otherProjects = await (await fetch(`http://127.0.0.1:${port}/projects`, {
+    headers: { "x-test-user": otherOwnerId },
+  })).json() as Array<{ id: string }>;
+  assert.equal(otherProjects.some((project) => project.id === createdProject.id), false);
+  assert.equal((await fetch(`http://127.0.0.1:${port}/projects/${createdProject.id}`, {
+    headers: { "x-test-user": otherOwnerId },
+  })).status, 404);
 
   const quoteListResponse = await fetch(`http://127.0.0.1:${port}/vendor-quotes`, {
     headers: { "x-test-user": ownerId },

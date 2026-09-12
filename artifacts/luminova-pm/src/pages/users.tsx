@@ -4,6 +4,7 @@ import {
   getGetWorkspaceUsersQueryKey,
   getGetWorkspaceInvitationsQueryKey,
   getGetClientsQueryKey,
+  getGetInvoicesQueryKey,
   getGetProjectsQueryKey,
   useRequestClientLogoUpload,
   useAttachClientLogo,
@@ -128,6 +129,15 @@ export default function Users() {
   const refreshUsers = () => queryClient.invalidateQueries({ queryKey: getGetWorkspaceUsersQueryKey() })
   const refreshInvitations = () => queryClient.invalidateQueries({ queryKey: getGetWorkspaceInvitationsQueryKey() })
   const refreshClients = () => queryClient.invalidateQueries({ queryKey: getGetClientsQueryKey() })
+  const refreshClientBranding = () => Promise.all([
+    refreshClients(),
+    queryClient.invalidateQueries({ queryKey: getGetProjectsQueryKey() }),
+    queryClient.invalidateQueries({ queryKey: getGetInvoicesQueryKey() }),
+    queryClient.invalidateQueries({
+      predicate: ({ queryKey }) =>
+        typeof queryKey[0] === "string" && /^\/api\/projects\/[^/]+$/.test(queryKey[0]),
+    }),
+  ])
 
   const retryClientAccessCleanup = async (user: WorkspaceUser) => {
     setFeedback(null)
@@ -192,8 +202,7 @@ export default function Users() {
         request.send(file)
       })
       await attachClientLogo.mutateAsync({ clientId: client.id, data: { objectPath: upload.objectPath } })
-      await refreshClients()
-      await queryClient.invalidateQueries({ queryKey: getGetProjectsQueryKey() })
+      await refreshClientBranding()
       setFeedback({ kind: "success", message: `${client.name}'s logo was saved.` })
     } catch (error) {
       setFeedback({ kind: "error", message: errorMessage(error, "Unable to save this client logo.") })
@@ -208,8 +217,7 @@ export default function Users() {
     setLogoBusyClientId(client.id)
     try {
       await clearClientLogo.mutateAsync({ clientId: client.id })
-      await refreshClients()
-      await queryClient.invalidateQueries({ queryKey: getGetProjectsQueryKey() })
+      await refreshClientBranding()
       setFeedback({ kind: "success", message: `${client.name}'s logo was removed.` })
     } catch (error) {
       setFeedback({ kind: "error", message: errorMessage(error, "Unable to remove this client logo.") })
