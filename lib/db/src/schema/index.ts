@@ -22,6 +22,7 @@ export * from "./projectImports";
 export * from "./projectExteriorPhotos";
 export * from "./projectScheduleImages";
 export * from "./projectActivities";
+export * from "./scheduleUploadReservations";
 export * from "./vendorRecords";
 export * from "./projectConversations";
 export * from "./clients";

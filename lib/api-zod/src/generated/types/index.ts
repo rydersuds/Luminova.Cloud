@@ -62,6 +62,7 @@ export * from './tradeDetail';
 export * from './tradeDetailJobHistoryItem';
 export * from './updateTradeProfileInput';
 export * from './uploadUrlRequest';
+export * from './uploadUrlRequestPurpose';
 export * from './uploadUrlResponse';
 export * from './vendorJobHistory';
 export * from './vendorJobHistoryInput';

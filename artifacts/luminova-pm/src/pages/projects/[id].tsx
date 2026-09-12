@@ -362,6 +362,8 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          purpose: "schedule-image",
+          projectId,
           name: scheduleImage.file.name,
           size: scheduleImage.file.size,
           contentType: scheduleImage.file.type,

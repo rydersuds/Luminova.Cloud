@@ -3,7 +3,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { RequestUploadUrlBody, RequestUploadUrlResponse } from "@workspace/api-zod";
 import { ObjectNotFoundError, ObjectStorageService } from "../lib/objectStorage";
 import { and, eq } from "drizzle-orm";
-import { db, projectImportBatchesTable } from "@workspace/db";
+import { db, projectImportBatchesTable, scheduleUploadReservationsTable } from "@workspace/db";
 import { getAuth } from "@clerk/express";
 
 type AuthenticatedRequest = Request & { userId?: string };
@@ -49,9 +49,24 @@ router.post("/storage/uploads/request-url", async (req: AuthenticatedRequest, re
   }
   try {
     const uploadURL = await storage.getObjectEntityUploadURL();
+    const objectPath = storage.normalizeObjectEntityPath(uploadURL);
+    if (parsed.data.purpose === "schedule-image") {
+      if (!parsed.data.projectId) {
+        res.status(400).json({ error: "Choose a project for this schedule image." });
+        return;
+      }
+      await db.insert(scheduleUploadReservationsTable).values({
+        objectPath,
+        ownerId: req.userId,
+        projectId: parsed.data.projectId,
+        size: parsed.data.size,
+        contentType: parsed.data.contentType,
+        expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+      });
+    }
     res.json(RequestUploadUrlResponse.parse({
       uploadURL,
-      objectPath: storage.normalizeObjectEntityPath(uploadURL),
+      objectPath,
       metadata: parsed.data,
     }));
   } catch (error) {

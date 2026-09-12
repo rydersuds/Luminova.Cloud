@@ -723,6 +723,10 @@ export const VendorQuoteImportOutcomeStatus = {
   unreadable: 'unreadable',
 } as const;
 
+export const UploadUrlRequestPurpose = {
+  'schedule-image': 'schedule-image',
+} as const;
+
 export interface VendorQuoteImportOutcome {
   documentId: string;
   name: string;
@@ -812,9 +816,13 @@ export interface ScheduleImageInput {
   contentType: ScheduleImageInputContentType;
 }
 
+export type UploadUrlRequestPurpose = typeof UploadUrlRequestPurpose[keyof typeof UploadUrlRequestPurpose];
 export interface UploadUrlRequest {
   /** @minLength 1 */
   importId?: string;
+  purpose?: UploadUrlRequestPurpose;
+  /** @minLength 1 */
+  projectId?: string;
   /**
      * @minLength 1
      * @maxLength 255

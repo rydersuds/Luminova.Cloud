@@ -120,14 +120,13 @@ import
 
 import 
 {
- DatabaseScheduleImageStore 
+ DatabaseScheduleImageStore, ScheduleImageCreationError
 }
  from "../lib/scheduleImageStore"
 ;
 
 import 
 {
-
   db,
   importedInvoicesTable,
   importedProjectsTable,
@@ -5502,6 +5501,23 @@ router.post("/projects/:projectId/schedule-images", async (req: AuthenticatedReq
   if (!params.success || !body.success) 
 {
 
+    const objectPath = typeof req.body === "object" && req.body !== null && "objectPath" in req.body
+      && typeof req.body.objectPath === "string"
+      ? req.body.objectPath
+      : undefined;
+    const authorizedProject = req.userId && params.success
+      ? await findAuthorizedProject(params.data.projectId, req.userId)
+      : undefined;
+    if (authorizedProject && objectPath?.startsWith("/objects/")) {
+      try {
+        await scheduleImageStore.cleanupUnattached(objectPath, req.userId!, authorizedProject.id);
+      } catch (cleanupError) {
+        req.log.error(
+          { err: cleanupError, objectPath, projectId: authorizedProject.id },
+          "Failed to clean up invalid schedule image upload",
+        );
+      }
+    }
     res.status(400).json(
 {
  error: "Add a valid JPEG, PNG, or WebP schedule image." 
@@ -5576,6 +5592,12 @@ router.post("/projects/:projectId/schedule-images", async (req: AuthenticatedReq
  catch (error) 
 {
 
+    if (error instanceof ScheduleImageCreationError) {
+      req.log.error(
+        { err: error.cleanupError, objectPath: body.data.objectPath, projectId: project.id },
+        "Failed to clean up rejected schedule image upload",
+      );
+    }
     req.log.error(
 {
  err: error, projectId: project.id 
@@ -6954,13 +6976,9 @@ project.id
 )
 ;
 
-  
-}
-
 }
 )
 ;
-
 
 router.get("/trades", async (req: AuthenticatedRequest, res) => 
 {

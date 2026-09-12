@@ -12,3 +12,4 @@
 - [Route animation remounts](route-animation-remounts.md) — navigation motion must survive page-local shell remounts, and tests must recreate that lifecycle.
 - [Vendor logo rendering](vendor-logo-rendering.md) — preserve transparent vendor logos with the existing private upload path and contained rendering.
 - [Workspace-scoped private media](workspace-scoped-private-media.md) — private media shared within a workspace needs ACL scope checks in addition to owner checks.
+- [Destructive upload cleanup](destructive-upload-cleanup.md) — delete failed uploads only through owned, target-bound reservations claimed atomically before attachment.

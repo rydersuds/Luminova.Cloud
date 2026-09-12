@@ -5,10 +5,14 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { UploadUrlRequestPurpose } from './uploadUrlRequestPurpose';
 
 export interface UploadUrlRequest {
   /** @minLength 1 */
   importId?: string;
+  purpose?: UploadUrlRequestPurpose;
+  /** @minLength 1 */
+  projectId?: string;
   /**
      * @minLength 1
      * @maxLength 255

@@ -2138,6 +2138,10 @@ components:
       required: [name, size, contentType]
       properties:
         importId: { type: string, minLength: 1 }
+        purpose:
+          type: string
+          enum: [schedule-image]
+        projectId: { type: string, minLength: 1 }
         name: { type: string, minLength: 1, maxLength: 255 }
         size: { type: integer, minimum: 1 }
         contentType:
