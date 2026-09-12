@@ -135,4 +135,28 @@ test.describe('Users & Roles background treatment', () => {
     await assertWorkspaceSurface(page);
     await expect(page).toHaveScreenshot('mobile-clients.png', { animations: 'disabled' });
   });
+
+  test('retries pending client access cleanup and hides the warning after reconciliation', async ({ page }) => {
+    let usersResponse = workspaceUsers.map((user) => (
+      user.id === 'user-sam' ? { ...user, clientAccessCleanupPending: true } : user
+    ));
+    let reconciliationRequests = 0;
+
+    await page.route('**/api/users', (route) => route.fulfill({ json: usersResponse }));
+    await page.route('**/api/users/user-sam/client-access-reconciliation', async (route) => {
+      expect(route.request().method()).toBe('POST');
+      reconciliationRequests += 1;
+      usersResponse = usersResponse.map((user) => ({ ...user, clientAccessCleanupPending: false }));
+      await route.fulfill({ status: 204, body: '' });
+    });
+
+    await page.goto('/__visual/users');
+    await expect(page.getByRole('heading', { name: 'Client access needs reconciliation' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Retry cleanup' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Retry cleanup' }).click();
+    await expect.poll(() => reconciliationRequests).toBe(1);
+    await expect(page.getByRole('heading', { name: 'Client access needs reconciliation' })).toBeHidden();
+    await expect(page.getByText("Sam Carter's client access was reconciled.")).toBeVisible();
+  });
 });

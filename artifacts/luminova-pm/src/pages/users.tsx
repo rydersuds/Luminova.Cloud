@@ -43,7 +43,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Building2, Loader2, MailPlus, Pencil, Plus, RefreshCw, Search, ShieldCheck, Trash2, UserPlus, UserRoundMinus, Users as UsersIcon, X } from "lucide-react"
+import { AlertTriangle, Building2, Loader2, MailPlus, Pencil, Plus, RefreshCw, Search, ShieldCheck, Trash2, UserPlus, UserRoundMinus, Users as UsersIcon, X } from "lucide-react"
 import { ClientIdentity } from "@/components/client-identity"
 
 const ROLES: WorkspaceRole[] = ["Admin", "Project Manager", "Field Team", "Client"]
@@ -108,6 +108,7 @@ export default function Users() {
   const [clientName, setClientName] = React.useState("")
   const [selectedMemberByClient, setSelectedMemberByClient] = React.useState<Record<string, string>>({})
   const [deletingClient, setDeletingClient] = React.useState<ClientOrganization | null>(null)
+  const [reconcilingUserId, setReconcilingUserId] = React.useState<string | null>(null)
 
   const users = usersQuery.data ?? []
   const pending = inviteUser.isPending || updateUser.isPending || deleteUser.isPending || resendInvitation.isPending || revokeInvitation.isPending || reconcileClientAccess.isPending
@@ -117,20 +118,23 @@ export default function Users() {
   const visible = users.filter((user) =>
     `${user.name} ${user.email} ${user.role}`.toLowerCase().includes(search.trim().toLowerCase()),
   )
-  const pendingCleanupUsers = users.filter((user) => user.clientAccessCleanupPending)
+  const pendingReconciliations = users.filter((user) => user.clientAccessCleanupPending)
 
   const refreshUsers = () => queryClient.invalidateQueries({ queryKey: getGetWorkspaceUsersQueryKey() })
   const refreshInvitations = () => queryClient.invalidateQueries({ queryKey: getGetWorkspaceInvitationsQueryKey() })
   const refreshClients = () => queryClient.invalidateQueries({ queryKey: getGetClientsQueryKey() })
 
-  const reconcile = async (user: WorkspaceUser) => {
+  const retryClientAccessCleanup = async (user: WorkspaceUser) => {
     setFeedback(null)
+    setReconcilingUserId(user.id)
     try {
       await reconcileClientAccess.mutateAsync({ userId: user.id })
       await refreshUsers()
-      setFeedback({ kind: "success", message: `Client access cleanup finished for ${user.name}.` })
+      setFeedback({ kind: "success", message: `${user.name}'s client access was reconciled.` })
     } catch (error) {
-      setFeedback({ kind: "error", message: errorMessage(error, "Unable to finish client access cleanup.") })
+      setFeedback({ kind: "error", message: errorMessage(error, "Unable to reconcile client access.") })
+    } finally {
+      setReconcilingUserId(null)
     }
   }
 
@@ -469,36 +473,44 @@ export default function Users() {
             </Card>
           ) : (
             <>
-              {pendingCleanupUsers.length > 0 && (
-                <section aria-labelledby="client-access-cleanup-heading" className="space-y-3">
-                  <Card className="border-amber-500/50 bg-amber-500/5 p-4 sm:p-5">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <h2 id="client-access-cleanup-heading" className="font-semibold">Client access cleanup needed</h2>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          These users were changed from Client, but some access could not be removed. Retry the cleanup to finish.
-                        </p>
+              {pendingReconciliations.length > 0 && (
+                <Card className="border-amber-500/40 bg-amber-500/10 p-4 sm:p-5" role="alert">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="font-semibold">Client access needs reconciliation</h2>
+                        <Badge variant="outline" className="border-amber-500/50 text-amber-700 dark:text-amber-300">
+                          {pendingReconciliations.length} pending
+                        </Badge>
                       </div>
-                      <Badge variant="outline" className="w-fit border-amber-500/50 text-amber-700 dark:text-amber-300">
-                        {pendingCleanupUsers.length} pending
-                      </Badge>
-                    </div>
-                    <div className="mt-4 space-y-2">
-                      {pendingCleanupUsers.map((user) => (
-                        <div key={user.id} className="flex flex-col gap-3 rounded-md border border-amber-500/30 bg-background/60 p-3 sm:flex-row sm:items-center">
-                          <div className="min-w-0 flex-1">
-                            <p className="font-medium">{user.name}</p>
-                            <p className="truncate text-sm text-muted-foreground">{user.email}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Role changes succeeded, but client access could not be removed for these users.
+                      </p>
+                      <div className="mt-4 space-y-2">
+                        {pendingReconciliations.map((user) => (
+                          <div key={user.id} className="flex flex-col gap-3 rounded-md border border-amber-500/30 bg-background/50 p-3 sm:flex-row sm:items-center">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium">{user.name}</p>
+                              <p className="truncate text-sm text-muted-foreground">{user.email}</p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void retryClientAccessCleanup(user)}
+                              disabled={pending || reconcilingUserId !== null}
+                            >
+                              {reconcilingUserId === user.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                              {reconcilingUserId !== user.id && <RefreshCw className="mr-2 h-4 w-4" />}
+                              {reconcilingUserId === user.id ? "Retrying…" : "Retry cleanup"}
+                            </Button>
                           </div>
-                          <Button type="button" variant="outline" size="sm" onClick={() => void reconcile(user)} disabled={pending}>
-                            {reconcileClientAccess.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            <RefreshCw className="mr-2 h-4 w-4" />Retry cleanup
-                          </Button>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </Card>
-                </section>
+                  </div>
+                </Card>
               )}
               <div className="glass-panel p-4">
                 <Label htmlFor="user-search" className="sr-only">Search users</Label>
