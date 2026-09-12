@@ -209,8 +209,16 @@ test("returns the legacy display name with a null assignment identity", async ()
 });
 
 test("rejects an existing Project Manager outside the active organization", async () => {
+  const admin = makeUser("admin", "Admin");
+  Object.assign(admin, {
+    publicMetadata: {
+      role: "Admin",
+      workspaceIds: ["active-organization"],
+      workspaceRoles: { "active-organization": "Admin" },
+    },
+  });
   const client = fakeClerk([
-    makeUser("admin", "Admin"),
+    admin,
     makeUser("outside-manager", "Project Manager"),
   ]);
   Object.assign(client, {

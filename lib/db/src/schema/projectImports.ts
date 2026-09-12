@@ -4,6 +4,7 @@ export const projectImportBatchesTable = pgTable("project_import_batches", {
   id: text("id").primaryKey(),
   projectId: text("project_id"),
   ownerId: text("owner_id").notNull(),
+  workspaceId: text("workspace_id").notNull().default("default"),
   status: text("status").notNull(),
   manifest: jsonb("manifest").notNull().default([]),
   analysis: jsonb("analysis"),
@@ -46,7 +47,12 @@ const importedRecordColumns = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 };
 
-export const importedProjectsTable = pgTable("imported_projects", importedRecordColumns);
+export const importedProjectsTable = pgTable("imported_projects", {
+  ...importedRecordColumns,
+  workspaceId: text("workspace_id").notNull().default("default"),
+}, (table) => [
+  index("imported_projects_workspace_idx").on(table.workspaceId),
+]);
 
 export const importedVendorsTable = pgTable("imported_vendors", importedRecordColumns);
 

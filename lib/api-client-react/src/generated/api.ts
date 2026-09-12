@@ -25,6 +25,7 @@ import type {
   ChatOptions,
   Client,
   ClientInput,
+  ClientInvitationInput,
   ClientLogoInput,
   ClientLogoUploadInput,
   ClientMemberInput,
@@ -4414,6 +4415,78 @@ export const useGrantClientAccess = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getGrantClientAccessMutationOptions(options));
+    }
+
+export const getInviteClientUserUrl = (clientId: string,) => {
+
+
+
+
+  return `/api/clients/${clientId}/invitations`
+}
+
+/**
+ * @summary Invite a new Client user to a client organization
+ */
+export const inviteClientUser = async (clientId: string,
+    clientInvitationInput: ClientInvitationInput, options?: Parameters<typeof customFetch>[1]): Promise<WorkspaceInvitation> => {
+
+  return customFetch<WorkspaceInvitation>(getInviteClientUserUrl(clientId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(clientInvitationInput)
+  }
+);}
+
+
+
+
+
+export const getInviteClientUserMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inviteClientUser>>, TError,{clientId: string;data: BodyType<ClientInvitationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof inviteClientUser>>, TError,{clientId: string;data: BodyType<ClientInvitationInput>}, TContext> => {
+
+const mutationKey = ['inviteClientUser'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof inviteClientUser>>, {clientId: string;data: BodyType<ClientInvitationInput>}> = (props) => {
+          const {clientId,data} = props ?? {};
+
+          return  inviteClientUser(clientId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type InviteClientUserMutationResult = NonNullable<Awaited<ReturnType<typeof inviteClientUser>>>
+    export type InviteClientUserMutationBody = BodyType<ClientInvitationInput>
+    export type InviteClientUserMutationError = ErrorType<void>
+
+    /**
+ * @summary Invite a new Client user to a client organization
+ */
+export const useInviteClientUser = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inviteClientUser>>, TError,{clientId: string;data: BodyType<ClientInvitationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof inviteClientUser>>,
+        TError,
+        {clientId: string;data: BodyType<ClientInvitationInput>},
+        TContext
+      > => {
+      return useMutation(getInviteClientUserMutationOptions(options));
     }
 
 export const getRevokeClientAccessUrl = (clientId: string,

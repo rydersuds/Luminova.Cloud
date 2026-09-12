@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ClientMember } from './clientMember';
+import type { ClientPendingInvitation } from './clientPendingInvitation';
 
 export interface Client {
   id: string;
@@ -14,4 +15,5 @@ export interface Client {
   logoUrl: string | null;
   createdAt: number;
   members: ClientMember[];
+  pendingInvitations: ClientPendingInvitation[];
 }

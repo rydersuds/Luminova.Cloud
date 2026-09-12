@@ -19,6 +19,7 @@ import {
   useDeleteWorkspaceUser,
   useGetWorkspaceInvitations,
   useGetWorkspaceUsers,
+  useInviteClientUser,
   useInviteWorkspaceUser,
   useResendWorkspaceInvitation,
   useRevokeWorkspaceInvitation,
@@ -91,6 +92,7 @@ export default function Users() {
   const attachClientLogo = useAttachClientLogo()
   const clearClientLogo = useClearClientLogo()
   const grantClientAccess = useGrantClientAccess()
+  const inviteClientUser = useInviteClientUser()
   const revokeClientAccess = useRevokeClientAccess()
   const reconcileAllClientAccess = useReconcileAllClientAccess()
   const reconcileClientAccess = useReconcileClientAccess()
@@ -110,12 +112,14 @@ export default function Users() {
   const [activeTab, setActiveTab] = React.useState<"users" | "clients">("users")
   const [clientName, setClientName] = React.useState("")
   const [selectedMemberByClient, setSelectedMemberByClient] = React.useState<Record<string, string>>({})
+  const [clientAddMode, setClientAddMode] = React.useState<Record<string, "existing" | "invite">>({})
+  const [clientInviteEmailByClient, setClientInviteEmailByClient] = React.useState<Record<string, string>>({})
   const [deletingClient, setDeletingClient] = React.useState<ClientOrganization | null>(null)
   const [reconcilingUserId, setReconcilingUserId] = React.useState<string | null>(null)
 
   const users = usersQuery.data ?? []
   const pending = inviteUser.isPending || updateUser.isPending || deleteUser.isPending || resendInvitation.isPending || revokeInvitation.isPending || reconcileClientAccess.isPending || reconcileAllClientAccess.isPending
-  const clientsPending = createClient.isPending || deleteClient.isPending || grantClientAccess.isPending || revokeClientAccess.isPending
+  const clientsPending = createClient.isPending || deleteClient.isPending || grantClientAccess.isPending || inviteClientUser.isPending || revokeClientAccess.isPending
   const [logoBusyClientId, setLogoBusyClientId] = React.useState<string | null>(null)
   const [logoProgress, setLogoProgress] = React.useState(0)
   const visible = users.filter((user) =>
@@ -261,6 +265,23 @@ export default function Users() {
     }
   }
 
+  const inviteClient = async (client: ClientOrganization) => {
+    const email = (clientInviteEmailByClient[client.id] ?? "").trim().toLowerCase()
+    if (!EMAIL_PATTERN.test(email)) {
+      setFeedback({ kind: "error", message: "Enter a valid email address for the client user." })
+      return
+    }
+    setFeedback(null)
+    try {
+      await inviteClientUser.mutateAsync({ clientId: client.id, data: { email } })
+      setClientInviteEmailByClient((current) => ({ ...current, [client.id]: "" }))
+      await Promise.all([refreshClients(), refreshInvitations(), refreshUsers()])
+      setFeedback({ kind: "success", message: `Client invitation sent to ${email}.` })
+    } catch (error) {
+      setFeedback({ kind: "error", message: errorMessage(error, "Unable to invite this client user.") })
+    }
+  }
+
   const revokeAccess = async (client: ClientOrganization, userId: string, name: string) => {
     setFeedback(null)
     try {
@@ -328,7 +349,7 @@ export default function Users() {
     try {
       await revokeInvitation.mutateAsync({ invitationId: revoking.id })
       setRevoking(null)
-      await refreshInvitations()
+      await Promise.all([refreshInvitations(), refreshClients()])
       setFeedback({ kind: "success", message: `The invitation for ${email} was canceled.` })
     } catch (error) {
       setRevoking(null)
@@ -722,25 +743,97 @@ export default function Users() {
                           </div>
                         </div>
 
-                        <div className="grid gap-3 rounded-lg border border-border/70 bg-card/30 p-3 sm:grid-cols-[1fr_auto] sm:items-end">
-                          <div className="space-y-2">
-                            <Label htmlFor={`client-member-${client.id}`}>Grant access to a Client user</Label>
-                            <select
-                              id={`client-member-${client.id}`}
-                              value={selectedMemberByClient[client.id] ?? ""}
-                              onChange={(event) => setSelectedMemberByClient((current) => ({ ...current, [client.id]: event.target.value }))}
-                              disabled={clientsPending || availableUsers.length === 0}
-                              className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              <option value="">{availableUsers.length ? "Select a person…" : "No unassigned Client users"}</option>
-                              {availableUsers.map((user) => <option key={user.id} value={user.id}>{user.name} — {user.email}</option>)}
-                            </select>
+                        <div className="space-y-3 rounded-lg border border-border/70 bg-card/30 p-3">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                              <p className="font-medium">Add a person</p>
+                              <p className="text-xs text-muted-foreground">Choose an existing Client user or invite someone new.</p>
+                            </div>
+                            <div role="group" aria-label={`Add a person to ${client.name}`} className="flex rounded-md border border-border bg-background p-1">
+                              <button
+                                type="button"
+                                aria-pressed={(clientAddMode[client.id] ?? "existing") === "existing"}
+                                onClick={() => setClientAddMode((current) => ({ ...current, [client.id]: "existing" }))}
+                                disabled={clientsPending}
+                                className={`rounded px-3 py-1.5 text-xs font-medium ${(clientAddMode[client.id] ?? "existing") === "existing" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                              >
+                                Existing user
+                              </button>
+                              <button
+                                type="button"
+                                aria-pressed={clientAddMode[client.id] === "invite"}
+                                onClick={() => setClientAddMode((current) => ({ ...current, [client.id]: "invite" }))}
+                                disabled={clientsPending}
+                                className={`rounded px-3 py-1.5 text-xs font-medium ${clientAddMode[client.id] === "invite" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                              >
+                                Invite by email
+                              </button>
+                            </div>
                           </div>
-                          <Button type="button" onClick={() => void grantAccess(client)} disabled={clientsPending || !selectedMemberByClient[client.id]}>
-                            {grantClientAccess.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            <UserPlus className="mr-2 h-4 w-4" />Grant access
-                          </Button>
+                          {(clientAddMode[client.id] ?? "existing") === "existing" ? (
+                            <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                              <div className="space-y-2">
+                                <Label htmlFor={`client-member-${client.id}`}>Workspace Client user</Label>
+                                <select
+                                  id={`client-member-${client.id}`}
+                                  value={selectedMemberByClient[client.id] ?? ""}
+                                  onChange={(event) => setSelectedMemberByClient((current) => ({ ...current, [client.id]: event.target.value }))}
+                                  disabled={clientsPending || availableUsers.length === 0}
+                                  className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  <option value="">{availableUsers.length ? "Select a person…" : "No unassigned Client users"}</option>
+                                  {availableUsers.map((user) => <option key={user.id} value={user.id}>{user.name} — {user.email}</option>)}
+                                </select>
+                              </div>
+                              <Button type="button" onClick={() => void grantAccess(client)} disabled={clientsPending || !selectedMemberByClient[client.id]}>
+                                {grantClientAccess.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                <UserPlus className="mr-2 h-4 w-4" />Add existing user
+                              </Button>
+                            </div>
+                          ) : (
+                            <form
+                              className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end"
+                              onSubmit={(event) => { event.preventDefault(); void inviteClient(client) }}
+                              noValidate
+                            >
+                              <div className="space-y-2">
+                                <Label htmlFor={`client-invite-${client.id}`}>Email address</Label>
+                                <Input
+                                  id={`client-invite-${client.id}`}
+                                  type="email"
+                                  autoComplete="email"
+                                  placeholder="name@company.com"
+                                  value={clientInviteEmailByClient[client.id] ?? ""}
+                                  onChange={(event) => setClientInviteEmailByClient((current) => ({ ...current, [client.id]: event.target.value }))}
+                                  disabled={clientsPending}
+                                  required
+                                />
+                              </div>
+                              <Button type="submit" disabled={clientsPending}>
+                                {inviteClientUser.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                <MailPlus className="mr-2 h-4 w-4" />Send client invitation
+                              </Button>
+                            </form>
+                          )}
                         </div>
+
+                        {(client.pendingInvitations ?? []).length > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Pending client invitations</p>
+                              <Badge variant="outline">{client.pendingInvitations.length}</Badge>
+                            </div>
+                            <div className="space-y-2">
+                              {client.pendingInvitations.map((invitation) => (
+                                <div key={invitation.id} className="flex flex-col gap-2 rounded-md border border-dashed border-primary/40 bg-primary/5 p-3 sm:flex-row sm:items-center">
+                                  <MailPlus className="h-4 w-4 shrink-0 text-primary" />
+                                  <p className="min-w-0 flex-1 truncate text-sm">{invitation.email}</p>
+                                  <Badge variant="secondary">Invitation pending</Badge>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
                         {client.members.length ? (
                           <div className="space-y-2">

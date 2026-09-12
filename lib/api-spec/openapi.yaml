@@ -1260,6 +1260,38 @@ paths:
           description: Client or user not found
         "409":
           description: User already has access
+  /clients/{clientId}/invitations:
+    post:
+      operationId: inviteClientUser
+      tags: [users]
+      summary: Invite a new Client user to a client organization
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientInvitationInput"
+      responses:
+        "201":
+          description: Client invitation sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceInvitation"
+        "400":
+          description: Invalid email address
+        "401":
+          description: Authentication required
+        "403":
+          description: Administrator access required
+        "404":
+          description: Client not found
+        "409":
+          description: Duplicate invitation or existing workspace user
+        "502":
+          description: Identity provider rejected the invitation
   /clients/{clientId}/members/{userId}:
     delete:
       operationId: revokeClientAccess
@@ -1519,7 +1551,7 @@ components:
         addedAt: { type: integer }
     Client:
       type: object
-      required: [id, name, logoUrl, createdAt, members]
+      required: [id, name, logoUrl, createdAt, members, pendingInvitations]
       properties:
         id: { type: string }
         name: { type: string }
@@ -1529,6 +1561,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ClientMember"
+        pendingInvitations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ClientPendingInvitation"
     ClientInput:
       type: object
       additionalProperties: false
@@ -1562,6 +1598,25 @@ components:
         userId:
           type: string
           minLength: 1
+    ClientInvitationInput:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+    ClientPendingInvitation:
+      type: object
+      required: [id, email, role, status, createdAt]
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+        role:
+          $ref: "#/components/schemas/WorkspaceRole"
+        status: { type: string }
+        createdAt: { type: integer }
     WorkspaceInvitationInput:
       type: object
       additionalProperties: false

@@ -2000,6 +2000,13 @@ export const GetClientsResponseItem = zod.object({
   "imageUrl": zod.string(),
   "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client']),
   "addedAt": zod.number().int()
+})),
+  "pendingInvitations": zod.array(zod.object({
+  "id": zod.string(),
+  "email": zod.string().email(),
+  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client']),
+  "status": zod.string(),
+  "createdAt": zod.number().int()
 }))
 })
 export const GetClientsResponse = zod.array(GetClientsResponseItem)
@@ -2029,6 +2036,13 @@ export const CreateClientResponse = zod.object({
   "imageUrl": zod.string(),
   "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client']),
   "addedAt": zod.number().int()
+})),
+  "pendingInvitations": zod.array(zod.object({
+  "id": zod.string(),
+  "email": zod.string().email(),
+  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client']),
+  "status": zod.string(),
+  "createdAt": zod.number().int()
 }))
 })
 
@@ -2111,6 +2125,13 @@ export const AttachClientLogoResponse = zod.object({
   "imageUrl": zod.string(),
   "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client']),
   "addedAt": zod.number().int()
+})),
+  "pendingInvitations": zod.array(zod.object({
+  "id": zod.string(),
+  "email": zod.string().email(),
+  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client']),
+  "status": zod.string(),
+  "createdAt": zod.number().int()
 }))
 })
 
@@ -2138,6 +2159,13 @@ export const ClearClientLogoResponse = zod.object({
   "imageUrl": zod.string(),
   "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client']),
   "addedAt": zod.number().int()
+})),
+  "pendingInvitations": zod.array(zod.object({
+  "id": zod.string(),
+  "email": zod.string().email(),
+  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client']),
+  "status": zod.string(),
+  "createdAt": zod.number().int()
 }))
 })
 
@@ -2185,7 +2213,41 @@ export const GrantClientAccessResponse = zod.object({
   "imageUrl": zod.string(),
   "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client']),
   "addedAt": zod.number().int()
+})),
+  "pendingInvitations": zod.array(zod.object({
+  "id": zod.string(),
+  "email": zod.string().email(),
+  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client']),
+  "status": zod.string(),
+  "createdAt": zod.number().int()
 }))
+})
+
+
+/**
+ * @summary Invite a new Client user to a client organization
+ */
+
+
+
+export const InviteClientUserParams = zod.object({
+  "clientId": zod.coerce.string().min(1)
+})
+
+export const inviteClientUserBodyEmailMax = 254;
+
+
+
+export const InviteClientUserBody = zod.object({
+  "email": zod.string().email().max(inviteClientUserBodyEmailMax)
+})
+
+export const InviteClientUserResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string().email(),
+  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client']),
+  "status": zod.string(),
+  "createdAt": zod.number().int()
 })
 
 

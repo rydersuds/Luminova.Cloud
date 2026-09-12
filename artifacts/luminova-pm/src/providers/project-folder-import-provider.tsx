@@ -102,6 +102,7 @@ export function ProjectFolderImportProvider({
   const [folderError, setFolderError] = React.useState("")
   const isActive = folderStatus === "uploading" || folderStatus === "building"
   const activeImportRef = React.useRef(false)
+  const importGenerationRef = React.useRef(0)
   const folderFilesRef = React.useRef<FolderCandidate[]>([])
   const sessionRef = React.useRef<ImportSession | null>(null)
   const dismissedImportIdsRef = React.useRef(new Set<string>())
@@ -162,6 +163,7 @@ export function ProjectFolderImportProvider({
     dismissedPendingErrorRef.current = false
     forgetDismissedImportError("__pending__")
     activeImportRef.current = true
+    importGenerationRef.current += 1
     setFolderStatus("uploading")
     setFolderError("")
     let session = sessionRef.current
@@ -326,6 +328,7 @@ export function ProjectFolderImportProvider({
     let cancelled = false
     let poll: number | undefined
     const restore = async () => {
+      const importGeneration = importGenerationRef.current
       try {
         let session: ImportSession | null = null
         for (let attempt = 0; attempt < 6; attempt++) {
@@ -338,7 +341,11 @@ export function ProjectFolderImportProvider({
             await new Promise((resolve) => window.setTimeout(resolve, 500))
           }
         }
-        if (cancelled) return
+        if (
+          cancelled ||
+          activeImportRef.current ||
+          importGenerationRef.current !== importGeneration
+        ) return
         cleanupDismissedImportErrors(session?.status === "completed" ? null : session?.importId ?? null)
         const pendingDismissed = dismissedPendingErrorRef.current || wasImportErrorDismissed("__pending__")
         if (!session) {

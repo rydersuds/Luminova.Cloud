@@ -3,11 +3,9 @@
 - [Resumable browser imports](resumable-browser-imports.md) — persist selected blobs locally, but treat server-attached paths as the authoritative upload progress.
 - [Drizzle integration isolation](drizzle-integration-isolation.md) — use temporary databases, not search_path-only schemas, for drizzle-kit integration tests.
 - [Merged route reloads](merged-route-reloads.md) — force a watcher event after post-merge API builds so managed previews cannot keep an old route table.
-- [Post-merge contract generation](post-merge-contract-generation.md) — regenerate shared API contracts before compiling merged services that consume them.
 - [Photo analysis isolation](photo-analysis-isolation.md) — keep private visual analysis bounded and per-photo so one AI or decoder failure never rolls back a valid import.
 - [Workspace-scoped package installs](workspace-scoped-package-installs.md) — when package tooling cannot target a pnpm child package, edit its manifest and install from the workspace root.
 - [Internal budget semantics](internal-budget-semantics.md) — compare internal costs and commitments to internal budgets; never treat client billings as project costs.
-- [Canonical invoiced revenue](canonical-invoiced-revenue.md) — derive every invoiced display from persisted outgoing invoices, never project or quote totals.
 - [Visual auth harnesses](visual-auth-harnesses.md) — provider-owned UI should use injected auth state in isolated visual mounts instead of relying on Clerk session hydration.
 - [Clerk API test harnesses](clerk-api-test-harnesses.md) — direct Express route tests need a branded Clerk auth handler with a session token to preserve organization scope.
 - [Route animation remounts](route-animation-remounts.md) — navigation motion must survive page-local shell remounts, and tests must recreate that lifecycle.
@@ -16,3 +14,4 @@
 - [Destructive upload cleanup](destructive-upload-cleanup.md) — delete failed uploads only through owned, target-bound reservations claimed atomically before attachment.
 - [Folder import build recovery](folder-import-build-recovery.md) — reconcile unknown build outcomes before retrying, and rebuild only sessions the server marks retryable.
 - [Codegen dependency remediation](codegen-dependency-remediation.md) — keep the resolved generator stable when safe transitive pins remove advisories without output changes.
+- [Workspace invitation lifecycle](workspace-invitation-lifecycle.md) — scope provider invitations before exposure or mutation, and serialize provider cleanup with local access changes.

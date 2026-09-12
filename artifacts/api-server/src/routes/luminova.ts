@@ -2322,7 +2322,7 @@ const isDirectoryTrade = (trade: Pick<Trade, "companyName">) =>
 ;
 
 
-const jobHistoryForTrade = async (trade: Trade, ownerId: string) => 
+const jobHistoryForTrade = async (trade: Trade, ownerId: string, workspaceId = "default") =>
 {
 
 
@@ -2336,7 +2336,10 @@ const jobHistoryForTrade = async (trade: Trade, ownerId: string) =>
 
 )
       .from(importedProjectsTable)
-      .where(eq(importedProjectsTable.ownerId, ownerId)),
+      .where(and(
+        eq(importedProjectsTable.ownerId, ownerId),
+        eq(importedProjectsTable.workspaceId, workspaceId),
+      )),
     db.select().from(vendorJobHistoryTable).where(eq(vendorJobHistoryTable.vendorId, trade.id)),
   ])
 ;
@@ -2374,7 +2377,7 @@ const jobHistoryForTrade = async (trade: Trade, ownerId: string) =>
 ;
 
 
-const reviewsForTrade = async (trade: Trade, ownerId: string) => 
+const reviewsForTrade = async (trade: Trade, ownerId: string, workspaceId = "default") =>
 {
 
 
@@ -2388,7 +2391,10 @@ const reviewsForTrade = async (trade: Trade, ownerId: string) =>
 
 )
       .from(importedProjectsTable)
-      .where(eq(importedProjectsTable.ownerId, ownerId)),
+      .where(and(
+        eq(importedProjectsTable.ownerId, ownerId),
+        eq(importedProjectsTable.workspaceId, workspaceId),
+      )),
     db.select().from(vendorReviewTable).where(eq(vendorReviewTable.vendorId, trade.id)),
   ])
 ;
@@ -2665,10 +2671,12 @@ const allVendorQuotes = async (): Promise<VendorQuote[]> =>
 ;
 
 
-const financialRecordsForOwner = async (ownerId: string, scope = ownerId) => 
+const financialRecordsForOwner = async (ownerId: string, scope = "default") =>
 {
 
-  await applyMadisonParkRevenueCorrection(ownerId);
+  if (scope === "default") {
+    await applyMadisonParkRevenueCorrection(ownerId, undefined, undefined, scope);
+  }
   const [invoiceRows, quoteRows, projectRows, quoteDocuments] = await Promise.all([
     db.select(
 {
@@ -2697,7 +2705,10 @@ const financialRecordsForOwner = async (ownerId: string, scope = ownerId) =>
 
 )
       .from(importedProjectsTable)
-      .where(eq(importedProjectsTable.ownerId, ownerId)),
+      .where(and(
+        eq(importedProjectsTable.ownerId, ownerId),
+        eq(importedProjectsTable.workspaceId, scope),
+      )),
     db.select().from(projectDocumentsTable).where(and(
       eq(projectDocumentsTable.ownerId, ownerId),
       eq(projectDocumentsTable.linkedEntityType, "quote"),
@@ -2719,8 +2730,12 @@ const financialRecordsForOwner = async (ownerId: string, scope = ownerId) =>
 
 
   const ownedInvoices = [
-    ...invoiceRows.map((row) => row.data as Invoice),
-    ...(invoices as Invoice[]).filter((invoice) => invoice.ownerId === ownerId),
+    ...invoiceRows
+      .map((row) => row.data as Invoice)
+      .filter((invoice) => projectById.has(invoice.projectId)),
+    ...(scope === "default"
+      ? (invoices as Invoice[]).filter((invoice) => invoice.ownerId === ownerId)
+      : []),
   ]
 ;
 
@@ -2847,7 +2862,9 @@ const financialRecordsForOwner = async (ownerId: string, scope = ownerId) =>
 
     invoices: brandedInvoices,
     quotes: [
-      ...quoteRows.map((row) => 
+      ...quoteRows
+        .filter((row) => projectById.has((row.data as VendorQuote).projectId))
+        .map((row) =>
 {
 
 
@@ -2909,7 +2926,9 @@ const financialRecordsForOwner = async (ownerId: string, scope = ownerId) =>
 }
 
 ),
-      ...(vendorQuotes as VendorQuote[]).filter((quote) => quote.ownerId === ownerId).map((quote) => (
+      ...(scope === "default"
+        ? (vendorQuotes as VendorQuote[]).filter((quote) => quote.ownerId === ownerId)
+        : []).map((quote) => (
 {
 
 
@@ -2931,14 +2950,19 @@ const financialRecordsForOwner = async (ownerId: string, scope = ownerId) =>
 
 ;
 
-const projectsForOwner = async (ownerId: string) => {
-  await applyMadisonParkRevenueCorrection(ownerId);
+const projectsForOwner = async (ownerId: string, workspaceId: string) => {
+  if (workspaceId === "default") {
+    await applyMadisonParkRevenueCorrection(ownerId, undefined, undefined, workspaceId);
+  }
   const [projectRows, exteriorPhotos, financialRecords] = await Promise.all([
     db.select({ data: importedProjectsTable.data })
       .from(importedProjectsTable)
-      .where(eq(importedProjectsTable.ownerId, ownerId)),
+      .where(and(
+        eq(importedProjectsTable.ownerId, ownerId),
+        eq(importedProjectsTable.workspaceId, workspaceId),
+      )),
     db.select().from(projectExteriorPhotosTable),
-    financialRecordsForOwner(ownerId),
+    financialRecordsForOwner(ownerId, workspaceId),
   ]);
   const exteriorPhotoByProject = new Map(exteriorPhotos.map((item) => [item.projectId, item]));
   const ownedProjects = projectRows.map((row) => {
@@ -2960,18 +2984,18 @@ const projectsForOwner = async (ownerId: string) => {
     const exteriorPhoto = exteriorPhotoByProject.get(project.id);
     return exteriorPhoto?.ownerId === ownerId ? { ...project, exteriorImage: exteriorPhoto.exteriorImage } : project;
   });
-  const seededProjects = projects.map((project) => {
+  const seededProjects = workspaceId === "default" ? projects.map((project) => {
     const normalizedProject = withCalculatedProjectProgress(project);
     const exteriorPhoto = exteriorPhotoByProject.get(normalizedProject.id);
     return exteriorPhoto?.ownerId === "seeded-project"
       ? { ...normalizedProject, exteriorImage: exteriorPhoto.exteriorImage }
       : normalizedProject;
-  });
+  }) : [];
   return [...ownedProjects, ...seededProjects];
 };
 
 
-const tradesForOwner = async (ownerId: string) => 
+const tradesForOwner = async (ownerId: string, workspaceId = "default") =>
 {
 
 
@@ -2985,7 +3009,7 @@ const tradesForOwner = async (ownerId: string) =>
     db.select(
 {
 
- data: importedVendorsTable.data 
+ data: importedVendorsTable.data, importBatchId: importedVendorsTable.importBatchId
 }
 
 )
@@ -2994,13 +3018,16 @@ const tradesForOwner = async (ownerId: string) =>
     db.select(
 {
 
- data: importedProjectsTable.data 
+ data: importedProjectsTable.data, importBatchId: importedProjectsTable.importBatchId
 }
 
 )
       .from(importedProjectsTable)
-      .where(eq(importedProjectsTable.ownerId, ownerId)),
-    financialRecordsForOwner(ownerId),
+      .where(and(
+        eq(importedProjectsTable.ownerId, ownerId),
+        eq(importedProjectsTable.workspaceId, workspaceId),
+      )),
+    financialRecordsForOwner(ownerId, workspaceId),
     db.select().from(vendorJobHistoryTable),
     db.select().from(vendorReviewTable),
   ])
@@ -3008,6 +3035,8 @@ const tradesForOwner = async (ownerId: string) =>
 
 
   const ownedProjectIds = new Set(projectRows.map((row) => (row.data as Project).id))
+;
+  const ownedImportBatchIds = new Set(projectRows.map((row) => row.importBatchId))
 ;
 
 
@@ -3093,6 +3122,7 @@ const tradesForOwner = async (ownerId: string) =>
 
 
   return tradeRows
+    .filter((row) => ownedImportBatchIds.has(row.importBatchId))
     .map((row) => row.data as Trade)
     .filter(isDirectoryTrade)
     .map((trade) => (
@@ -3136,20 +3166,53 @@ const tradesForOwner = async (ownerId: string) =>
 ;
 
 
-const findOwnedProject = async (projectId: string, ownerId: string) =>
-  (await projectsForOwner(ownerId)).find((project) => project.id === projectId)
+const findOwnedProject = async (projectId: string, ownerId: string, workspaceId: string) =>
+  (await projectsForOwner(ownerId, workspaceId)).find((project) => project.id === projectId)
 ;
+
+const findWorkspaceProject = async (projectId: string, workspaceId: string): Promise<Project | undefined> => {
+  if (workspaceId === "default") {
+    const seeded = projects.find((project) => project.id === projectId);
+    if (seeded) return withCalculatedProjectProgress(seeded);
+  }
+  const [record] = await db.select({ data: importedProjectsTable.data })
+    .from(importedProjectsTable)
+    .where(and(
+      eq(importedProjectsTable.id, projectId),
+      eq(importedProjectsTable.workspaceId, workspaceId),
+    ))
+    .limit(1);
+  return record ? withCalculatedProjectProgress(record.data as Project) : undefined;
+};
+
+const findWorkspaceTrade = async (tradeId: string, workspaceId: string): Promise<Trade | undefined> => {
+  const [record] = await db.select({ data: importedVendorsTable.data })
+    .from(importedVendorsTable)
+    .innerJoin(
+      importedProjectsTable,
+      eq(importedProjectsTable.importBatchId, importedVendorsTable.importBatchId),
+    )
+    .where(and(
+      eq(importedVendorsTable.id, tradeId),
+      eq(importedProjectsTable.workspaceId, workspaceId),
+    ))
+    .limit(1);
+  const trade = record?.data as Trade | undefined;
+  return trade && isDirectoryTrade(trade) ? trade : undefined;
+};
 
 
 const findProject = async (projectId: string) => (await allProjects()).find((project) => project.id === projectId)
 ;
 
 
-const findAuthorizedProject = async (projectId: string, ownerId: string): Promise<Project | undefined> => 
+const findAuthorizedProject = async (projectId: string, ownerId: string, workspaceId: string): Promise<Project | undefined> =>
 {
 
 
-  const directProject = projects.find((project) => project.id === projectId)
+  const directProject = workspaceId === "default"
+    ? projects.find((project) => project.id === projectId)
+    : undefined
 ;
 
 
@@ -3157,7 +3220,7 @@ const findAuthorizedProject = async (projectId: string, ownerId: string): Promis
 ;
 
 
-  return findOwnedProject(projectId, ownerId)
+  return findOwnedProject(projectId, ownerId, workspaceId)
 ;
 
 
@@ -3334,9 +3397,13 @@ const chatUsers = async (req: AuthenticatedRequest): Promise<ChatUserSummary[]> 
   if (process.env.NODE_ENV === "test") {
     const testUsers = req.header("x-test-workspace-users");
     if (testUsers) {
+      const testClientIds = new Set(
+        req.header("x-test-workspace-client-users")?.split(",").filter(Boolean) ?? [],
+      );
       return testUsers.split(",").filter(Boolean).map((id) => ({
         ...fallbackChatUser(id),
         name: id,
+        role: testClientIds.has(id) ? "Client" : "Project Manager",
       }));
     }
   }
@@ -3344,17 +3411,17 @@ const chatUsers = async (req: AuthenticatedRequest): Promise<ChatUserSummary[]> 
     return await workspaceChatUsers(req) as ChatUserSummary[];
   } catch (error) {
     req.log?.warn?.({ err: error }, "Workspace chat profiles could not be loaded");
-    return req.userId ? [fallbackChatUser(req.userId)] : [];
+    return requestWorkspaceId(req) === "default" && req.userId
+      ? [fallbackChatUser(req.userId)]
+      : [];
   }
 };
 
 const accessibleProjectsForChat = async (req: AuthenticatedRequest, users: ChatUserSummary[]) => {
   const user = users.find((candidate) => candidate.id === req.userId);
-  const workspaceUserIds = users.map((candidate) => candidate.id);
-  const projectRows = workspaceUserIds.length
-    ? await db.select({ data: importedProjectsTable.data }).from(importedProjectsTable)
-        .where(inArray(importedProjectsTable.ownerId, workspaceUserIds))
-    : [];
+  if (!user) return [];
+  const projectRows = await db.select({ data: importedProjectsTable.data }).from(importedProjectsTable)
+    .where(eq(importedProjectsTable.workspaceId, requestWorkspaceId(req)));
   const workspaceProjects = projectRows.map((row) => withCalculatedProjectProgress(row.data as Project));
   if (user?.role !== "Client") return workspaceProjects;
   const memberships = await db.select({ clientId: clientMembersTable.clientId })
@@ -3374,7 +3441,11 @@ const conversationsForUser = async (req: AuthenticatedRequest) => {
   const participantRows = await db.select().from(conversationParticipantsTable)
     .where(eq(conversationParticipantsTable.userId, req.userId!));
   if (!participantRows.length) return [];
-  const conversationRows = await db.select().from(projectConversationsTable).where(and(
+  const users = await chatUsers(req);
+  if (!users.some((user) => user.id === req.userId)) return [];
+  const accessibleProjects = await accessibleProjectsForChat(req, users);
+  const accessibleProjectIds = new Set(accessibleProjects.map((project) => project.id));
+  const conversationRows = (await db.select().from(projectConversationsTable).where(and(
     inArray(projectConversationsTable.id, participantRows.map((participant) => participant.conversationId)),
     or(
       eq(projectConversationsTable.workspaceId, workspaceId),
@@ -3383,23 +3454,22 @@ const conversationsForUser = async (req: AuthenticatedRequest) => {
         eq(projectConversationsTable.ownerId, req.userId!),
       ),
     ),
-  )).orderBy(desc(projectConversationsTable.updatedAt));
+  )).orderBy(desc(projectConversationsTable.updatedAt)))
+    .filter((conversation) =>
+      conversation.type !== "project"
+      || Boolean(conversation.projectId && accessibleProjectIds.has(conversation.projectId)),
+    );
   if (!conversationRows.length) return [];
   const conversationIds = conversationRows.map((conversation) => conversation.id);
-  const [messageRows, allParticipantRows, projectRows, users] = await Promise.all([
+  const [messageRows, allParticipantRows] = await Promise.all([
     db.select().from(projectMessagesTable)
       .where(inArray(projectMessagesTable.conversationId, conversationIds))
       .orderBy(projectMessagesTable.createdAt),
     db.select().from(conversationParticipantsTable)
       .where(inArray(conversationParticipantsTable.conversationId, conversationIds)),
-    db.select({ data: importedProjectsTable.data }).from(importedProjectsTable),
-    chatUsers(req),
   ]);
   const usersById = new Map(users.map((user) => [user.id, user]));
-  const projectNames = new Map(projectRows.map((row) => {
-    const project = row.data as Project;
-    return [project.id, project.name] as const;
-  }));
+  const projectNames = new Map(accessibleProjects.map((project) => [project.id, project.name] as const));
   return conversationRows.flatMap((conversation) => {
     const projectName = conversation.projectId ? projectNames.get(conversation.projectId) ?? null : null;
     if (conversation.type === "project" && !projectName) return [];
@@ -3514,7 +3584,7 @@ const latestClientQuoteDetail = async (project: Project) =>
 ;
 
 
-export const analyzeImportedQuoteDirections = async (projectId: string, ownerId: string) => 
+export const analyzeImportedQuoteDirections = async (projectId: string, ownerId: string, workspaceId = "default") =>
 {
 
 
@@ -3526,7 +3596,11 @@ export const analyzeImportedQuoteDirections = async (projectId: string, ownerId:
 
 )
     .from(importedProjectsTable)
-    .where(and(eq(importedProjectsTable.id, projectId), eq(importedProjectsTable.ownerId, ownerId)))
+    .where(and(
+      eq(importedProjectsTable.id, projectId),
+      eq(importedProjectsTable.ownerId, ownerId),
+      eq(importedProjectsTable.workspaceId, workspaceId),
+    ))
     .limit(1)
 ;
 
@@ -3731,12 +3805,21 @@ export const analyzeImportedQuoteDirections = async (projectId: string, ownerId:
 ;
 
 
-export const organizeImportedProjectFiles = async (projectId: string, ownerId: string, log?: Pick<Request["log"], "warn">) => 
+export const organizeImportedProjectFiles = async (
+  projectId: string,
+  ownerId: string,
+  workspaceId = "default",
+  log?: Pick<Request["log"], "warn">,
+) =>
 {
 
 
   const [importedProject] = await db.select().from(importedProjectsTable)
-    .where(and(eq(importedProjectsTable.id, projectId), eq(importedProjectsTable.ownerId, ownerId))).limit(1)
+    .where(and(
+      eq(importedProjectsTable.id, projectId),
+      eq(importedProjectsTable.ownerId, ownerId),
+      eq(importedProjectsTable.workspaceId, workspaceId),
+    )).limit(1)
 ;
 
 
@@ -4014,7 +4097,10 @@ export const organizeImportedProjectFiles = async (projectId: string, ownerId: s
 
 const detailsFor = async (project: Project, ownerId?: string, workspaceId?: string) => 
 {
-  if (ownerId) await applyMadisonParkRevenueCorrection(ownerId);
+  const scope = workspaceId ?? "default";
+  if (ownerId && scope === "default") {
+    await applyMadisonParkRevenueCorrection(ownerId, undefined, undefined, scope);
+  }
   const [importedProject] = await db.select(
 {
 
@@ -4024,7 +4110,11 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
 )
     .from(importedProjectsTable)
     .where(ownerId
-      ? and(eq(importedProjectsTable.id, project.id), eq(importedProjectsTable.ownerId, ownerId))
+      ? and(
+          eq(importedProjectsTable.id, project.id),
+          eq(importedProjectsTable.ownerId, ownerId),
+          eq(importedProjectsTable.workspaceId, workspaceId ?? "default"),
+        )
       : eq(importedProjectsTable.id, project.id))
     .limit(1)
 ;
@@ -4237,7 +4327,7 @@ router.get("/dashboard/summary", async (req: AuthenticatedRequest, res) =>
 
 
     const [projectRecords, financialRecords] = await Promise.all([
-      projectsForOwner(req.userId),
+      projectsForOwner(req.userId, requestWorkspaceId(req)),
       financialRecordsForOwner(req.userId, requestWorkspaceId(req)),
     ])
 ;
@@ -4392,8 +4482,8 @@ router.get("/search", async (req: AuthenticatedRequest, res) =>
 
 
     const [projectRecords, tradeRecords, financialRecords, conversationRecords] = await Promise.all([
-      projectsForOwner(req.userId),
-      tradesForOwner(req.userId),
+      projectsForOwner(req.userId, requestWorkspaceId(req)),
+      tradesForOwner(req.userId, requestWorkspaceId(req)),
       financialRecordsForOwner(req.userId, requestWorkspaceId(req)),
       conversationsForUser(req),
     ])
@@ -4781,13 +4871,14 @@ router.post("/conversations/:conversationId/messages", async (req: Authenticated
     res.status(400).json({ error: "Message text is required" });
     return;
   }
+  const authorizedConversation = (await conversationsForUser(req))
+    .find((conversation) => conversation.id === params.data.conversationId);
+  if (!authorizedConversation) {
+    res.status(404).json({ error: "Conversation not found" });
+    return;
+  }
   const workspaceId = requestWorkspaceId(req);
-  const [membership] = await db.select().from(conversationParticipantsTable).where(and(
-    eq(conversationParticipantsTable.conversationId, params.data.conversationId),
-    eq(conversationParticipantsTable.userId, req.userId),
-  )).limit(1);
-  const [conversation] = membership
-    ? await db.select().from(projectConversationsTable).where(and(
+  const [conversation] = await db.select().from(projectConversationsTable).where(and(
         eq(projectConversationsTable.id, params.data.conversationId),
         or(
           eq(projectConversationsTable.workspaceId, workspaceId),
@@ -4796,8 +4887,7 @@ router.post("/conversations/:conversationId/messages", async (req: Authenticated
             eq(projectConversationsTable.ownerId, req.userId),
           ),
         ),
-      )).limit(1)
-    : [];
+      )).limit(1);
   if (!conversation) {
     res.status(404).json({ error: "Conversation not found" });
     return;
@@ -4946,7 +5036,7 @@ router.post("/conversations", async (req: AuthenticatedRequest, res): Promise<vo
 }
 
 
-  const project = await findOwnedProject(parsed.data.projectId, req.userId)
+  const project = await findOwnedProject(parsed.data.projectId, req.userId, requestWorkspaceId(req))
 ;
 
 
@@ -5208,7 +5298,7 @@ router.post("/conversations/:conversationId/messages", async (req: Authenticated
 ;
 
 
-  if (!conversation || !(await findOwnedProject(conversation.projectId, req.userId))) 
+  if (!conversation || !(await findOwnedProject(conversation.projectId, req.userId, requestWorkspaceId(req))))
 {
 
 
@@ -5369,7 +5459,7 @@ router.get("/projects", async (req: AuthenticatedRequest, res) =>
 {
 
 
-    const result = (await projectsForOwner(req.userId)).filter((project) =>
+    const result = (await projectsForOwner(req.userId, requestWorkspaceId(req))).filter((project) =>
       (!status || project.status === status) &&
       (!region || project.region === region) &&
       (!search || `${project.name} ${project.address} ${project.clientName}`.toLowerCase().includes(search.toLowerCase())),
@@ -5562,6 +5652,7 @@ router.post("/projects", async (req, res): Promise<void> =>
         id: importBatchId,
         projectId,
         ownerId: authenticatedRequest.userId!,
+        workspaceId: requestWorkspaceId(authenticatedRequest),
         status: "completed",
         manifest: [],
       
@@ -5575,6 +5666,7 @@ router.post("/projects", async (req, res): Promise<void> =>
         id: projectId,
         importBatchId,
         ownerId: authenticatedRequest.userId!,
+        workspaceId: requestWorkspaceId(authenticatedRequest),
         data: project,
       
 }
@@ -5785,6 +5877,7 @@ router.post("/project-import-sessions", async (req, res): Promise<void> =>
 
     id: `import-${randomUUID()}`,
     ownerId,
+    workspaceId: requestWorkspaceId(req as AuthenticatedRequest),
     status: "uploading",
     manifest: parsed.data.documents,
   
@@ -5841,6 +5934,7 @@ router.get("/project-import-sessions", async (req, res): Promise<void> =>
 
   const staleBefore = new Date(Date.now() - projectImportBuildLeaseMs)
 ;
+  const workspaceId = requestWorkspaceId(req as AuthenticatedRequest);
 
 
   await db.update(projectImportBatchesTable).set(
@@ -5856,6 +5950,7 @@ router.get("/project-import-sessions", async (req, res): Promise<void> =>
 
 ).where(and(
     eq(projectImportBatchesTable.ownerId, ownerId),
+    eq(projectImportBatchesTable.workspaceId, workspaceId),
     eq(projectImportBatchesTable.status, "building"),
     lt(projectImportBatchesTable.updatedAt, staleBefore),
   ))
@@ -5863,7 +5958,11 @@ router.get("/project-import-sessions", async (req, res): Promise<void> =>
 
 
   const [batch] = await db.select().from(projectImportBatchesTable)
-    .where(and(eq(projectImportBatchesTable.ownerId, ownerId), inArray(projectImportBatchesTable.status, ["uploading", "building"])))
+    .where(and(
+      eq(projectImportBatchesTable.ownerId, ownerId),
+      eq(projectImportBatchesTable.workspaceId, workspaceId),
+      inArray(projectImportBatchesTable.status, ["uploading", "building"]),
+    ))
     .orderBy(desc(projectImportBatchesTable.updatedAt)).limit(1)
 ;
 
@@ -5873,7 +5972,11 @@ router.get("/project-import-sessions", async (req, res): Promise<void> =>
 
 
     const [recoverable] = await db.select().from(projectImportBatchesTable)
-      .where(and(eq(projectImportBatchesTable.ownerId, ownerId), eq(projectImportBatchesTable.status, "failed")))
+      .where(and(
+        eq(projectImportBatchesTable.ownerId, ownerId),
+        eq(projectImportBatchesTable.workspaceId, workspaceId),
+        eq(projectImportBatchesTable.status, "failed"),
+      ))
       .orderBy(desc(projectImportBatchesTable.updatedAt)).limit(1)
 ;
 
@@ -5902,6 +6005,7 @@ router.get("/project-import-sessions", async (req, res): Promise<void> =>
 router.get("/project-import-sessions/:importId", async (req, res): Promise<void> => {
   const params = GetProjectImportSessionParams.safeParse(req.params);
   const ownerId = String((req as typeof req & { userId?: string }).userId ?? "");
+  const workspaceId = requestWorkspaceId(req as AuthenticatedRequest);
   if (!params.success || !ownerId) {
     res.status(400).json({ error: "Invalid import session." });
     return;
@@ -5915,6 +6019,7 @@ router.get("/project-import-sessions/:importId", async (req, res): Promise<void>
   }).where(and(
     eq(projectImportBatchesTable.id, params.data.importId),
     eq(projectImportBatchesTable.ownerId, ownerId),
+    eq(projectImportBatchesTable.workspaceId, workspaceId),
     eq(projectImportBatchesTable.status, "building"),
     lt(projectImportBatchesTable.updatedAt, staleBefore),
   ));
@@ -5922,6 +6027,7 @@ router.get("/project-import-sessions/:importId", async (req, res): Promise<void>
     .where(and(
       eq(projectImportBatchesTable.id, params.data.importId),
       eq(projectImportBatchesTable.ownerId, ownerId),
+      eq(projectImportBatchesTable.workspaceId, workspaceId),
     ))
     .limit(1);
   if (!batch) {
@@ -5935,12 +6041,17 @@ router.post("/project-import-sessions/:importId/documents", async (req, res): Pr
   const params = AttachProjectImportDocumentParams.safeParse(req.params);
   const parsed = AttachProjectImportDocumentBody.safeParse(req.body);
   const ownerId = String((req as typeof req & { userId?: string }).userId ?? "");
+  const workspaceId = requestWorkspaceId(req as AuthenticatedRequest);
   if (!params.success || !parsed.success || !ownerId) {
     res.status(400).json({ error: "Provide valid uploaded document metadata." });
     return;
   }
   const [batch] = await db.select().from(projectImportBatchesTable)
-    .where(and(eq(projectImportBatchesTable.id, params.data.importId), eq(projectImportBatchesTable.ownerId, ownerId))).limit(1)
+    .where(and(
+      eq(projectImportBatchesTable.id, params.data.importId),
+      eq(projectImportBatchesTable.ownerId, ownerId),
+      eq(projectImportBatchesTable.workspaceId, workspaceId),
+    )).limit(1)
 ;
 
 
@@ -6695,6 +6806,7 @@ const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: R
         }).where(and(
           eq(projectImportBatchesTable.id, importId),
           eq(projectImportBatchesTable.ownerId, ownerId),
+          eq(projectImportBatchesTable.workspaceId, requestWorkspaceId(req)),
           eq(projectImportBatchesTable.status, "building"),
           eq(projectImportBatchesTable.buildLeaseId, req.projectImportBuildLeaseId ?? ""),
         )).returning({ id: projectImportBatchesTable.id });
@@ -6710,7 +6822,7 @@ const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: R
         await tx.insert(projectImportBatchesTable).values(
 {
 
- id: importId, projectId: project.id, ownerId, status: "completed", analysis, manifest: analyzedDocuments 
+ id: importId, projectId: project.id, ownerId, workspaceId: requestWorkspaceId(req), status: "completed", analysis, manifest: analyzedDocuments
 }
 
 )
@@ -6723,7 +6835,7 @@ const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: R
       await tx.insert(importedProjectsTable).values(
 {
 
- id: project.id, importBatchId: importId, ownerId, data: project 
+ id: project.id, importBatchId: importId, ownerId, workspaceId: requestWorkspaceId(req), data: project
 }
 
 )
@@ -6966,6 +7078,7 @@ router.post("/project-import-sessions/:importId/build", async (req, res): Promis
 
 ).userId ?? "")
 ;
+  const workspaceId = requestWorkspaceId(req as AuthenticatedRequest);
 
 
   if (!params.success || !ownerId) 
@@ -6990,7 +7103,11 @@ router.post("/project-import-sessions/:importId/build", async (req, res): Promis
 
 
   const [batch] = await db.select().from(projectImportBatchesTable)
-    .where(and(eq(projectImportBatchesTable.id, params.data.importId), eq(projectImportBatchesTable.ownerId, ownerId))).limit(1);
+    .where(and(
+      eq(projectImportBatchesTable.id, params.data.importId),
+      eq(projectImportBatchesTable.ownerId, ownerId),
+      eq(projectImportBatchesTable.workspaceId, workspaceId),
+    )).limit(1);
   if (!batch) {
     res.status(404).json({ error: "Import session not found." });
     return;
@@ -7174,8 +7291,11 @@ router.get("/projects/:projectId", async (req: AuthenticatedRequest, res): Promi
 
 }
 
-  await applyMadisonParkRevenueCorrection(req.userId);
-  const project = await findAuthorizedProject(parsed.data.projectId, req.userId)
+  const workspaceId = requestWorkspaceId(req);
+  if (workspaceId === "default") {
+    await applyMadisonParkRevenueCorrection(req.userId, undefined, undefined, workspaceId);
+  }
+  const project = await findAuthorizedProject(parsed.data.projectId, req.userId, workspaceId)
 ;
 
 
@@ -7250,7 +7370,7 @@ router.get("/projects/:projectId", async (req: AuthenticatedRequest, res): Promi
 ;
 
 
-router.post("/projects/:projectId/panoramas", async (req, res): Promise<void> => 
+router.post("/projects/:projectId/panoramas", async (req: AuthenticatedRequest, res): Promise<void> =>
 {
 
 
@@ -7279,7 +7399,16 @@ router.post("/projects/:projectId/panoramas", async (req, res): Promise<void> =>
 }
 
 
-  const project = await findProject(params.data.projectId)
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  const project = await findAuthorizedProject(
+    params.data.projectId,
+    req.userId,
+    requestWorkspaceId(req),
+  )
 ;
 
 
@@ -7373,13 +7502,7 @@ router.post("/projects/:projectId/panoramas", async (req, res): Promise<void> =>
       label: label?.trim() || null,
       location: location?.trim() || null,
       date: date ?? null,
-      ownerId: String((req as typeof req & 
-{
-
- userId?: string 
-}
-
-).userId),
+      ownerId: req.userId,
     
 }
 
@@ -7449,7 +7572,7 @@ router.post("/projects/:projectId/schedule-images", async (req: AuthenticatedReq
 ;
 
     const authorizedProject = req.userId && params.success
-      ? await findAuthorizedProject(params.data.projectId, req.userId)
+      ? await findAuthorizedProject(params.data.projectId, req.userId, requestWorkspaceId(req))
       : undefined
 ;
 
@@ -7521,7 +7644,7 @@ router.post("/projects/:projectId/schedule-images", async (req: AuthenticatedReq
 }
 
 
-  const project = await findAuthorizedProject(params.data.projectId, req.userId)
+  const project = await findAuthorizedProject(params.data.projectId, req.userId, requestWorkspaceId(req))
 ;
 
 
@@ -7673,7 +7796,7 @@ router.delete("/projects/:projectId/schedule-images/:scheduleImageId", async (re
 }
 
 
-  const project = await findAuthorizedProject(params.data.projectId, req.userId)
+  const project = await findAuthorizedProject(params.data.projectId, req.userId, requestWorkspaceId(req))
 ;
 
 
@@ -7831,7 +7954,7 @@ router.patch("/projects/:projectId/schedule-images/:scheduleImageId", async (req
   if (!await requireWorkspaceRole(req, res, ["Admin", "Project Manager"], "Project management access required")) return;
 
   const workspaceId = requestWorkspaceId(req);
-  const project = await findAuthorizedProject(params.data.projectId, req.userId!);
+  const project = await findAuthorizedProject(params.data.projectId, req.userId!, workspaceId);
   if (!project) {
     res.status(404).json({ error: "Project not found" });
     return;
@@ -7924,7 +8047,7 @@ router.post("/projects/:projectId/schedule-images/:documentId/restore", async (r
 ;
 
 
-  const project = await findAuthorizedProject(params.data.projectId, userId)
+  const project = await findAuthorizedProject(params.data.projectId, userId, requestWorkspaceId(req))
 ;
 
   if (!project) 
@@ -8066,7 +8189,7 @@ router.post("/projects/:projectId/schedule-images/:documentId/restore", async (r
 ;
 
 
-router.patch("/projects/:projectId/panoramas/:panoramaId", async (req, res): Promise<void> => 
+router.patch("/projects/:projectId/panoramas/:panoramaId", async (req: AuthenticatedRequest, res): Promise<void> =>
 {
 
 
@@ -8099,7 +8222,16 @@ router.patch("/projects/:projectId/panoramas/:panoramaId", async (req, res): Pro
 }
 
 
-  const project = await findProject(params.data.projectId)
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  const project = await findAuthorizedProject(
+    params.data.projectId,
+    req.userId,
+    requestWorkspaceId(req),
+  )
 ;
 
 
@@ -8378,7 +8510,12 @@ router.patch("/projects/:projectId", async (req: AuthenticatedRequest, res): Pro
 }
 
 
-  const index = projects.findIndex((project) => project.id === params.data.projectId)
+  const workspaceId = requestWorkspaceId(req)
+;
+
+  const index = workspaceId === "default"
+    ? projects.findIndex((project) => project.id === params.data.projectId)
+    : -1
 ;
 
 
@@ -8386,6 +8523,7 @@ router.patch("/projects/:projectId", async (req: AuthenticatedRequest, res): Pro
     ? await db.select().from(importedProjectsTable).where(and(
         eq(importedProjectsTable.id, params.data.projectId),
         eq(importedProjectsTable.ownerId, req.userId),
+        eq(importedProjectsTable.workspaceId, workspaceId),
       )).limit(1)
     : []
 ;
@@ -8551,6 +8689,7 @@ router.patch("/projects/:projectId", async (req: AuthenticatedRequest, res): Pro
 ).where(and(
       eq(importedProjectsTable.id, params.data.projectId),
       eq(importedProjectsTable.ownerId, req.userId),
+      eq(importedProjectsTable.workspaceId, workspaceId),
     ))
 ;
 
@@ -8632,7 +8771,7 @@ router.get("/projects/:projectId/activity", async (req: AuthenticatedRequest, re
 }
 
 
-  const project = await findAuthorizedProject(parsed.data.projectId, req.userId)
+  const project = await findAuthorizedProject(parsed.data.projectId, req.userId, requestWorkspaceId(req))
 ;
 
   if (!project) 
@@ -8661,6 +8800,7 @@ router.get("/projects/:projectId/activity", async (req: AuthenticatedRequest, re
     .where(and(
       eq(importedProjectsTable.id, project.id),
       eq(importedProjectsTable.ownerId, req.userId),
+      eq(importedProjectsTable.workspaceId, requestWorkspaceId(req)),
     ))
     .limit(1)
 ;
@@ -8763,7 +8903,12 @@ router.post("/projects/:projectId/organize-files", async (req: AuthenticatedRequ
 }
 
 
-    const result = await organizeImportedProjectFiles(parsed.data.projectId, req.userId, req.log)
+    const result = await organizeImportedProjectFiles(
+      parsed.data.projectId,
+      req.userId,
+      requestWorkspaceId(req),
+      req.log,
+    )
 ;
 
 
@@ -8880,6 +9025,7 @@ router.post("/projects/:projectId/vendor-quotes/rescan", async (req: Authenticat
   const [projectRow] = await db.select().from(importedProjectsTable).where(and(
     eq(importedProjectsTable.id, parsed.data.projectId),
     eq(importedProjectsTable.ownerId, req.userId),
+    eq(importedProjectsTable.workspaceId, requestWorkspaceId(req)),
   )).limit(1)
 ;
 
@@ -9730,7 +9876,7 @@ router.get("/trades", async (req: AuthenticatedRequest, res) =>
 ;
 
 
-  const result = (await tradesForOwner(req.userId)).filter((trade) =>
+  const result = (await tradesForOwner(req.userId, requestWorkspaceId(req))).filter((trade) =>
     (!tradeType || trade.tradeType === tradeType) &&
     (!region || trade.region === region) &&
     (!search || `${trade.companyName} ${trade.contactName} ${trade.tradeType}`.toLowerCase().includes(search.toLowerCase())),
@@ -9785,7 +9931,7 @@ router.post("/trades/:tradeId/job-history", async (req: AuthenticatedRequest, re
 }
 
 
-  const trade = (await allTrades()).find((item) => item.id === params.data.tradeId)
+  const trade = await findWorkspaceTrade(params.data.tradeId, requestWorkspaceId(req))
 ;
 
 
@@ -9810,7 +9956,7 @@ router.post("/trades/:tradeId/job-history", async (req: AuthenticatedRequest, re
 }
 
 
-  const project = await findProject(body.data.projectId)
+  const project = await findWorkspaceProject(body.data.projectId, requestWorkspaceId(req))
 ;
 
 
@@ -9947,7 +10093,7 @@ router.patch("/trades/:tradeId/job-history/:historyId", async (req: Authenticate
 }
 
 
-  const trade = (await allTrades()).find((item) => item.id === params.data.tradeId)
+  const trade = await findWorkspaceTrade(params.data.tradeId, requestWorkspaceId(req))
 ;
 
 
@@ -9972,7 +10118,7 @@ router.patch("/trades/:tradeId/job-history/:historyId", async (req: Authenticate
 }
 
 
-  const project = await findProject(body.data.projectId)
+  const project = await findWorkspaceProject(body.data.projectId, requestWorkspaceId(req))
 ;
 
 
@@ -10190,7 +10336,7 @@ router.delete("/trades/:tradeId/job-history/:historyId", async (req: Authenticat
 }
 
 
-  const trade = (await allTrades()).find((item) => item.id === params.data.tradeId)
+  const trade = await findWorkspaceTrade(params.data.tradeId, requestWorkspaceId(req))
 ;
 
 
@@ -10334,7 +10480,7 @@ router.post("/trades/:tradeId/reviews", async (req: AuthenticatedRequest, res): 
 }
 
 
-  const trade = (await allTrades()).find((item) => item.id === params.data.tradeId)
+  const trade = await findWorkspaceTrade(params.data.tradeId, requestWorkspaceId(req))
 ;
 
 
@@ -10359,7 +10505,7 @@ router.post("/trades/:tradeId/reviews", async (req: AuthenticatedRequest, res): 
 }
 
 
-  const project = await findProject(body.data.projectId)
+  const project = await findWorkspaceProject(body.data.projectId, requestWorkspaceId(req))
 ;
 
 
@@ -10544,7 +10690,7 @@ router.patch("/trades/:tradeId/reviews/:reviewId", async (req: AuthenticatedRequ
 }
 
 
-  const trade = (await allTrades()).find((item) => item.id === params.data.tradeId)
+  const trade = await findWorkspaceTrade(params.data.tradeId, requestWorkspaceId(req))
 ;
 
 
@@ -10629,7 +10775,7 @@ router.patch("/trades/:tradeId/reviews/:reviewId", async (req: AuthenticatedRequ
 ;
 
 
-  const project = await findProject(existing.projectId)
+  const project = await findWorkspaceProject(existing.projectId, requestWorkspaceId(req))
 ;
 
 
@@ -10687,7 +10833,7 @@ router.delete("/trades/:tradeId/reviews/:reviewId", async (req: AuthenticatedReq
 }
 
 
-  const trade = (await allTrades()).find((item) => item.id === params.data.tradeId)
+  const trade = await findWorkspaceTrade(params.data.tradeId, requestWorkspaceId(req))
 ;
 
 
@@ -10813,23 +10959,8 @@ router.get("/trades/:tradeId", async (req: AuthenticatedRequest, res) =>
 }
 
 
-  const [tradeRow] = await db.select(
-{
-
- data: importedVendorsTable.data 
-}
-
-)
-    .from(importedVendorsTable)
-    .where(and(
-      eq(importedVendorsTable.id, parsed.data.tradeId),
-      eq(importedVendorsTable.ownerId, req.userId),
-    ))
-    .limit(1)
-;
-
-
-  const trade = tradeRow?.data as Trade | undefined
+  const trade = (await tradesForOwner(req.userId, requestWorkspaceId(req)))
+    .find((item) => item.id === parsed.data.tradeId)
 ;
 
 
@@ -10860,7 +10991,7 @@ router.get("/trades/:tradeId", async (req: AuthenticatedRequest, res) =>
  quotes: ownedQuotes 
 }
 
- = await financialRecordsForOwner(req.userId)
+= await financialRecordsForOwner(req.userId, requestWorkspaceId(req))
 ;
 
 
@@ -10886,11 +11017,11 @@ router.get("/trades/:tradeId", async (req: AuthenticatedRequest, res) =>
 ;
 
 
-  const jobHistory = await jobHistoryForTrade(trade, req.userId)
+  const jobHistory = await jobHistoryForTrade(trade, req.userId, requestWorkspaceId(req))
 ;
 
 
-  const reviews = await reviewsForTrade(trade, req.userId)
+  const reviews = await reviewsForTrade(trade, req.userId, requestWorkspaceId(req))
 ;
 
 
@@ -11673,7 +11804,7 @@ router.post("/invoices", async (req: AuthenticatedRequest, res) =>
 }
 
 
-  const project = await findOwnedProject(parsed.data.projectId, req.userId)
+  const project = await findOwnedProject(parsed.data.projectId, req.userId, requestWorkspaceId(req))
 ;
 
 
@@ -11806,7 +11937,7 @@ router.get("/vendor-quotes", async (req: AuthenticatedRequest, res) =>
  quotes: ownedQuotes 
 }
 
- = await financialRecordsForOwner(req.userId)
+= await financialRecordsForOwner(req.userId, requestWorkspaceId(req))
 ;
 
 
@@ -11887,10 +12018,10 @@ router.post("/vendor-quotes", async (req: AuthenticatedRequest, res) =>
 
 
   const [project, vendor] = await Promise.all([
-    findOwnedProject(parsed.data.projectId, req.userId),
+    findOwnedProject(parsed.data.projectId, req.userId, requestWorkspaceId(req)),
     isClientQuote
       ? Promise.resolve(null)
-      : tradesForOwner(req.userId).then((records) => records.find((item) => item.id === parsed.data.vendorId)),
+      : tradesForOwner(req.userId, requestWorkspaceId(req)).then((records) => records.find((item) => item.id === parsed.data.vendorId)),
   ])
 ;
 
@@ -12047,7 +12178,7 @@ router.get("/vendor-quotes/:quoteId", async (req: AuthenticatedRequest, res) =>
  quotes: ownedQuotes 
 }
 
- = await financialRecordsForOwner(req.userId)
+= await financialRecordsForOwner(req.userId, requestWorkspaceId(req))
 ;
 
 
@@ -12140,8 +12271,13 @@ router.patch("/vendor-quotes/:quoteId", async (req: AuthenticatedRequest, res) =
 }
 
 
-  const index = (vendorQuotes as VendorQuote[]).findIndex((item) =>
-    item.id === params.data.quoteId && item.ownerId === req.userId)
+  const workspaceId = requestWorkspaceId(req)
+;
+
+  const index = workspaceId === "default"
+    ? (vendorQuotes as VendorQuote[]).findIndex((item) =>
+        item.id === params.data.quoteId && item.ownerId === req.userId)
+    : -1
 ;
 
 
@@ -12152,14 +12288,21 @@ router.patch("/vendor-quotes/:quoteId", async (req: AuthenticatedRequest, res) =
     const imported = await db.select(
 {
 
- data: importedVendorQuotesTable.data 
+  data: importedVendorQuotesTable.data,
+  importBatchId: importedVendorQuotesTable.importBatchId,
 }
 
 )
       .from(importedVendorQuotesTable)
+      .innerJoin(
+        projectImportBatchesTable,
+        eq(projectImportBatchesTable.id, importedVendorQuotesTable.importBatchId),
+      )
       .where(and(
         eq(importedVendorQuotesTable.id, params.data.quoteId),
         eq(importedVendorQuotesTable.ownerId, req.userId),
+        eq(projectImportBatchesTable.ownerId, req.userId),
+        eq(projectImportBatchesTable.workspaceId, workspaceId),
       ))
       .limit(1)
 ;
@@ -12207,8 +12350,8 @@ router.patch("/vendor-quotes/:quoteId", async (req: AuthenticatedRequest, res) =
 
 
     const [project, vendor] = await Promise.all([
-      findOwnedProject(projectId, req.userId),
-      isClientQuote ? Promise.resolve(null) : tradesForOwner(req.userId).then((records) => records.find((item) => item.id === vendorId)),
+      findOwnedProject(projectId, req.userId, requestWorkspaceId(req)),
+      isClientQuote ? Promise.resolve(null) : tradesForOwner(req.userId, requestWorkspaceId(req)).then((records) => records.find((item) => item.id === vendorId)),
     ])
 ;
 
@@ -12300,6 +12443,7 @@ router.patch("/vendor-quotes/:quoteId", async (req: AuthenticatedRequest, res) =
 ).where(and(
       eq(importedVendorQuotesTable.id, params.data.quoteId),
       eq(importedVendorQuotesTable.ownerId, req.userId),
+      eq(importedVendorQuotesTable.importBatchId, imported[0].importBatchId),
     ))
 ;
 
@@ -12336,8 +12480,8 @@ router.patch("/vendor-quotes/:quoteId", async (req: AuthenticatedRequest, res) =
 
 
   const [project, vendor] = await Promise.all([
-    findOwnedProject(projectId, req.userId),
-    isClientQuote ? Promise.resolve(null) : tradesForOwner(req.userId).then((records) => records.find((item) => item.id === vendorId)),
+    findOwnedProject(projectId, req.userId, requestWorkspaceId(req)),
+    isClientQuote ? Promise.resolve(null) : tradesForOwner(req.userId, requestWorkspaceId(req)).then((records) => records.find((item) => item.id === vendorId)),
   ])
 ;
 

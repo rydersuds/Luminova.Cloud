@@ -263,8 +263,14 @@ test("corrects the first project response once, scopes it to the owner, and pres
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
+    const organizationId = req.header("x-test-workspace") || null;
+    const auth = Object.assign(
+      () => ({ userId: ownerId, orgId: organizationId, tokenType: "session_token" }),
+      { [Symbol.for("@clerk/express.auth")]: true },
+    );
     Object.assign(req, {
       userId: ownerId,
+      auth,
       log: { error: () => undefined, warn: () => undefined },
     });
     next();
@@ -274,6 +280,20 @@ test("corrects the first project response once, scopes it to the owner, and pres
   await new Promise<void>((resolve) => server.once("listening", resolve));
   t.after(() => server.close());
   const { port } = server.address() as AddressInfo;
+
+  const crossWorkspaceResponse = await fetch(`http://127.0.0.1:${port}/projects/${projectId}`, {
+    headers: { "x-test-workspace": `other-workspace-${suffix}` },
+  });
+  assert.equal(crossWorkspaceResponse.status, 404);
+  const [projectAfterCrossWorkspaceRequest] = await db.select({ data: importedProjectsTable.data })
+    .from(importedProjectsTable)
+    .where(and(eq(importedProjectsTable.id, projectId), eq(importedProjectsTable.ownerId, ownerId)));
+  assert.equal((projectAfterCrossWorkspaceRequest!.data as typeof project).invoiced, 1388786.55);
+  assert.deepEqual(
+    (projectAfterCrossWorkspaceRequest!.data as typeof project).revenueAdjustments,
+    project.revenueAdjustments,
+  );
+
   const firstResponse = await fetch(`http://127.0.0.1:${port}/projects/${projectId}`);
   assert.equal(firstResponse.status, 200);
   const firstProject = await firstResponse.json() as {

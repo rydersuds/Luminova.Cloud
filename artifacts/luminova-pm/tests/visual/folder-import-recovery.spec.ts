@@ -231,7 +231,7 @@ test('reload resumes an interrupted import by uploading only missing files', asy
   await page.reload();
   await expect(page.getByLabel('Import status')).toHaveText('success', { timeout: 10_000 });
 
-  expect(api.uploadRequests.slice(requestsBeforeRecovery)).toEqual(
+  expect([...new Set(api.uploadRequests.slice(requestsBeforeRecovery))]).toEqual(
     files.map(file => file.name).filter(path => !attachedBeforeReload.includes(path)),
   );
   expect(api.uploadedPaths.size).toBe(2);

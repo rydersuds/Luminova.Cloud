@@ -38,6 +38,20 @@ export const clientAccessCleanupTable = pgTable("client_access_cleanup", {
   index("client_access_cleanup_workspace_idx").on(table.workspaceId),
 ]);
 
+export const clientInvitationsTable = pgTable("client_invitations", {
+  id: text("id").primaryKey(),
+  invitationId: text("invitation_id").notNull(),
+  workspaceId: text("workspace_id").notNull(),
+  clientId: text("client_id").notNull(),
+  email: text("email").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("client_invitations_workspace_invitation_unique").on(table.workspaceId, table.invitationId),
+  uniqueIndex("client_invitations_workspace_client_email_unique").on(table.workspaceId, table.clientId, table.email),
+  index("client_invitations_workspace_idx").on(table.workspaceId),
+  index("client_invitations_client_idx").on(table.clientId),
+]);
+
 export const insertClientSchema = createInsertSchema(clientsTable).omit({
   createdAt: true,
   updatedAt: true,
@@ -51,3 +65,8 @@ export type Client = typeof clientsTable.$inferSelect;
 export type InsertClientMember = z.infer<typeof insertClientMemberSchema>;
 export type ClientMember = typeof clientMembersTable.$inferSelect;
 export type ClientAccessCleanup = typeof clientAccessCleanupTable.$inferSelect;
+export const insertClientInvitationSchema = createInsertSchema(clientInvitationsTable).omit({
+  createdAt: true,
+});
+export type InsertClientInvitation = z.infer<typeof insertClientInvitationSchema>;
+export type ClientInvitation = typeof clientInvitationsTable.$inferSelect;

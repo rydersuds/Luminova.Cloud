@@ -60,6 +60,14 @@ export interface ClientMember {
   addedAt: number;
 }
 
+export interface ClientPendingInvitation {
+  id: string;
+  email: string;
+  role: WorkspaceRole;
+  status: string;
+  createdAt: number;
+}
+
 export interface Client {
   id: string;
   name: string;
@@ -67,6 +75,7 @@ export interface Client {
   logoUrl: string | null;
   createdAt: number;
   members: ClientMember[];
+  pendingInvitations: ClientPendingInvitation[];
 }
 
 export interface ClientInput {
@@ -108,6 +117,11 @@ export interface ClientLogoInput {
 export interface ClientMemberInput {
   /** @minLength 1 */
   userId: string;
+}
+
+export interface ClientInvitationInput {
+  /** @maxLength 254 */
+  email: string;
 }
 
 export interface WorkspaceInvitationInput {

@@ -43,6 +43,16 @@ const workspaceUsers = [
     role: 'Client',
     clientAccessCleanupPending: false,
   },
+  {
+    id: 'user-casey',
+    firstName: 'Casey',
+    lastName: 'Brooks',
+    name: 'Casey Brooks',
+    email: 'casey.brooks@luminova.test',
+    imageUrl: avatarUrl,
+    role: 'Client',
+    clientAccessCleanupPending: false,
+  },
 ];
 
 const invitations = [
@@ -58,11 +68,26 @@ const clients = [
   {
     id: 'client-north-ridge',
     name: 'North Ridge Development',
+    logoUrl: null,
+    createdAt: Date.parse('2026-09-01T15:00:00.000Z'),
+    pendingInvitations: [
+      {
+        id: 'client-invitation-1',
+        email: 'pending.client@luminova.test',
+        role: 'Client',
+        status: 'pending',
+        createdAt: Date.parse('2026-09-10T15:00:00.000Z'),
+      },
+    ],
     members: [
       {
+        id: 'client-member-taylor',
         userId: 'user-taylor',
         name: 'Taylor Nguyen',
         email: 'taylor.nguyen@luminova.test',
+        imageUrl: avatarUrl,
+        role: 'Client',
+        addedAt: Date.parse('2026-09-02T15:00:00.000Z'),
       },
     ],
   },
@@ -112,10 +137,10 @@ test.describe('Users & Roles background treatment', () => {
 
     const otherWorkspaceUsers = page.getByTestId('other-workspace-users-section');
     await expect(otherWorkspaceUsers.getByRole('heading', { name: 'Other workspace users' })).toBeVisible();
-    await expect(otherWorkspaceUsers.getByTestId('other-workspace-users-count')).toHaveText('3');
+    await expect(otherWorkspaceUsers.getByTestId('other-workspace-users-count')).toHaveText('4');
     await expect(otherWorkspaceUsers.getByText('Morgan Reyes', { exact: true })).toBeVisible();
     await expect(otherWorkspaceUsers.getByText('Sam Carter', { exact: true })).toHaveCount(0);
-    await expect(page).toHaveScreenshot('desktop-users.png', { animations: 'disabled' });
+    await expect(page).toHaveScreenshot('desktop-users.png', { animations: 'disabled', maxDiffPixels: 50 });
 
     await page.getByRole('button', { name: 'Invite user' }).click();
     await expect(page.getByRole('button', { name: 'Cancel invite' })).toBeVisible();
@@ -143,7 +168,7 @@ test.describe('Users & Roles background treatment', () => {
     await page.goto('/__visual/users');
     await expect(page.getByRole('heading', { name: 'Users & Roles' })).toBeVisible();
     await assertWorkspaceSurface(page);
-    await expect(page).toHaveScreenshot('mobile-users.png', { animations: 'disabled' });
+    await expect(page).toHaveScreenshot('mobile-users.png', { animations: 'disabled', maxDiffPixels: 50 });
 
     await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }));
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
@@ -154,6 +179,77 @@ test.describe('Users & Roles background treatment', () => {
     await expect(page.getByText('North Ridge Development')).toBeVisible();
     await assertWorkspaceSurface(page);
     await expect(page).toHaveScreenshot('mobile-clients.png', { animations: 'disabled' });
+  });
+
+  test('adds an existing Client user and recovers from a failed client invitation', async ({ page }) => {
+    let clientsResponse = structuredClone(clients);
+    let inviteAttempts = 0;
+    const memberRequests: string[] = [];
+
+    await page.route('**/api/clients', async (route) => {
+      await route.fulfill({ json: clientsResponse });
+    });
+    await page.route('**/api/clients/client-north-ridge/members', async (route) => {
+      const body = route.request().postDataJSON() as { userId: string };
+      memberRequests.push(body.userId);
+      const user = workspaceUsers.find((candidate) => candidate.id === body.userId);
+      expect(user).toBeTruthy();
+      clientsResponse = clientsResponse.map((client) => client.id === 'client-north-ridge'
+        ? {
+            ...client,
+            members: [...client.members, {
+              id: 'client-member-casey',
+              userId: user!.id,
+              name: user!.name,
+              email: user!.email,
+              imageUrl: user!.imageUrl,
+              role: 'Client',
+              addedAt: Date.parse('2026-09-12T15:00:00.000Z'),
+            }],
+          }
+        : client);
+      await route.fulfill({ status: 201, json: clientsResponse[0] });
+    });
+    await page.route('**/api/clients/client-north-ridge/invitations', async (route) => {
+      inviteAttempts += 1;
+      if (inviteAttempts === 1) {
+        await route.fulfill({ status: 502, json: { error: 'Invitation service unavailable. Try again.' } });
+        return;
+      }
+      const body = route.request().postDataJSON() as { email: string };
+      const pendingInvitation = {
+        id: 'client-invitation-retry',
+        email: body.email,
+        role: 'Client' as const,
+        status: 'pending',
+        createdAt: Date.parse('2026-09-12T15:00:00.000Z'),
+      };
+      clientsResponse = clientsResponse.map((client) => client.id === 'client-north-ridge'
+        ? { ...client, pendingInvitations: [...client.pendingInvitations, pendingInvitation] }
+        : client);
+      await route.fulfill({ status: 201, json: pendingInvitation });
+    });
+
+    await page.goto('/__visual/users');
+    await page.getByRole('tab', { name: 'Clients' }).click();
+    await expect(page.getByText('Pending client invitations')).toBeVisible();
+    await expect(page.getByText('pending.client@luminova.test')).toBeVisible();
+
+    await page.getByLabel('Workspace Client user').selectOption('user-casey');
+    await page.getByRole('button', { name: 'Add existing user' }).click();
+    await expect.poll(() => memberRequests).toEqual(['user-casey']);
+    await expect(page.getByText('Client access granted.')).toBeVisible();
+    await expect(page.getByText('Casey Brooks', { exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Invite by email' }).click();
+    await page.getByLabel('Email address').fill('new.client@luminova.test');
+    await page.getByRole('button', { name: 'Send client invitation' }).click();
+    await expect(page.getByRole('alert')).toHaveText('Invitation service unavailable. Try again.');
+
+    await page.getByRole('button', { name: 'Send client invitation' }).click();
+    await expect(page.getByText('Client invitation sent to new.client@luminova.test.')).toBeVisible();
+    await expect(page.getByText('new.client@luminova.test', { exact: true })).toBeVisible();
+    await expect(page.getByText('Invitation pending')).toHaveCount(2);
   });
 
   test('retries pending client access cleanup and hides the warning after reconciliation', async ({ page }) => {

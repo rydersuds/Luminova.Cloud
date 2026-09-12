@@ -3,7 +3,7 @@ import { afterEach, test } from "node:test";
 import express from "express";
 import type { Server } from "node:http";
 import type { User } from "@clerk/backend";
-import { clientAccessCleanupTable, clientMembersTable, clientsTable, db } from "@workspace/db";
+import { clientAccessCleanupTable, clientInvitationsTable, clientMembersTable, clientsTable, db } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import {
   CLIENT_MEMBER_PROFILE_LOOKUP_CONCURRENCY,
@@ -12,12 +12,13 @@ import {
   listProjectManagers,
   resolveProjectManager,
   revokeClientMemberships,
+  workspaceChatUsers,
 } from "./users";
 import { ObjectStorageService } from "../lib/objectStorage";
 
 type Role = "Admin" | "Project Manager" | "Field Team" | "Client";
 
-function makeUser(id: string, role: Role, email = `${id}@example.com`): User {
+function makeUser(id: string, role: Role, email = `${id}@example.com`, workspaceIds: string[] = []): User {
   return {
     id,
     firstName: id === "admin" ? "Ada" : "Morgan",
@@ -25,7 +26,15 @@ function makeUser(id: string, role: Role, email = `${id}@example.com`): User {
     fullName: id === "admin" ? "Ada Builder" : "Morgan Builder",
     username: null,
     primaryEmailAddress: { emailAddress: email },
-    publicMetadata: { role },
+    publicMetadata: {
+      role,
+      ...(workspaceIds.length
+        ? {
+            workspaceIds,
+            workspaceRoles: Object.fromEntries(workspaceIds.map((workspaceId) => [workspaceId, role])),
+          }
+        : {}),
+    },
     createdAt: 1,
     lastSignInAt: null,
     imageUrl: "https://example.com/avatar.png",
@@ -40,7 +49,8 @@ function fakeClerk(
   let activeUserLookups = 0;
   let maxConcurrentUserLookups = 0;
   let beforeUserLookup: ((id: string, user: User | undefined) => Promise<void>) | undefined;
-  const invitations: Array<{ emailAddress: string; publicMetadata?: object }> = [];
+  const invitations: Array<Record<string, unknown>> = [];
+  const organizationMemberships = new Map<string, Set<string>>();
   let invitationRecords: Array<{
     id: string;
     emailAddress: string;
@@ -79,6 +89,25 @@ function fakeClerk(
         return {
           data: users.slice(offset, offset + limit),
           totalCount: users.length,
+        };
+      },
+      getOrganizationMembershipList: async ({
+        userId,
+        limit = 100,
+        offset = 0,
+      }: {
+        userId: string;
+        limit?: number;
+        offset?: number;
+      }) => {
+        const organizationIds = [...organizationMemberships.entries()]
+          .filter(([, memberIds]) => memberIds.has(userId))
+          .map(([organizationId]) => organizationId);
+        return {
+          data: organizationIds.slice(offset, offset + limit).map((organizationId) => ({
+            organization: { id: organizationId },
+          })),
+          totalCount: organizationIds.length,
         };
       },
       updateUserMetadata: async (id: string, input: { publicMetadata?: Record<string, unknown> }) => {
@@ -130,12 +159,129 @@ function fakeClerk(
         return invitation;
       },
     },
+    organizations: {
+      getOrganizationMembershipList: async ({
+        organizationId,
+        limit = 100,
+        offset = 0,
+      }: {
+        organizationId: string;
+        limit?: number;
+        offset?: number;
+      }) => {
+        const memberIds = [...(organizationMemberships.get(organizationId) ?? new Set<string>())];
+        return {
+          data: memberIds.slice(offset, offset + limit).map((userId) => ({
+            publicUserData: { userId },
+          })),
+          totalCount: memberIds.length,
+        };
+      },
+      createOrganizationMembership: async ({
+        organizationId,
+        userId,
+      }: {
+        organizationId: string;
+        userId: string;
+        role: string;
+      }) => {
+        const members = organizationMemberships.get(organizationId) ?? new Set<string>();
+        members.add(userId);
+        organizationMemberships.set(organizationId, members);
+        return { organization: { id: organizationId }, publicUserData: { userId } };
+      },
+      deleteOrganizationMembership: async ({
+        organizationId,
+        userId,
+      }: {
+        organizationId: string;
+        userId: string;
+      }) => {
+        const members = organizationMemberships.get(organizationId);
+        if (!members?.delete(userId)) throw { status: 404 };
+        return { organization: { id: organizationId }, publicUserData: { userId } };
+      },
+      getOrganizationInvitationList: async ({
+        organizationId,
+        status,
+      }: {
+        organizationId: string;
+        status?: string[];
+      }) => {
+        const data = invitationRecords.filter((invitation) =>
+          (invitation.publicMetadata as { workspaceId?: string }).workspaceId === organizationId
+          && (!status?.length || status.includes(invitation.status)),
+        );
+        return { data, totalCount: data.length };
+      },
+      getOrganizationInvitation: async ({
+        organizationId,
+        invitationId,
+      }: {
+        organizationId: string;
+        invitationId: string;
+      }) => {
+        const invitation = invitationRecords.find((candidate) =>
+          candidate.id === invitationId
+          && (candidate.publicMetadata as { workspaceId?: string }).workspaceId === organizationId,
+        );
+        if (!invitation) throw { status: 404 };
+        return invitation;
+      },
+      createOrganizationInvitation: async (input: {
+        organizationId: string;
+        emailAddress: string;
+        role: string;
+        inviterUserId?: string;
+        publicMetadata?: object;
+      }) => {
+        invitations.push(input);
+        const invitation = {
+          id: `inv_${invitationSequence++}`,
+          emailAddress: input.emailAddress,
+          publicMetadata: input.publicMetadata ?? {},
+          status: "pending",
+          createdAt: 200 + invitationSequence,
+        };
+        invitationRecords.unshift(invitation);
+        return invitation;
+      },
+      revokeOrganizationInvitation: async ({
+        organizationId,
+        invitationId,
+      }: {
+        organizationId: string;
+        invitationId: string;
+      }) => {
+        const invitation = invitationRecords.find((candidate) =>
+          candidate.id === invitationId
+          && (candidate.publicMetadata as { workspaceId?: string }).workspaceId === organizationId,
+        );
+        if (!invitation || invitation.status !== "pending") throw { status: 404 };
+        invitation.status = "revoked";
+        return invitation;
+      },
+    },
   };
   return {
     client,
     invitations,
     getUsers: () => users,
     getInvitations: () => invitationRecords,
+    getOrganizationMemberships: (organizationId: string) =>
+      [...(organizationMemberships.get(organizationId) ?? new Set<string>())],
+    acceptOrganizationInvitation: (invitationId: string, user: User) => {
+      const invitation = invitationRecords.find((candidate) => candidate.id === invitationId);
+      if (!invitation) throw new Error("Invitation not found");
+      invitation.status = "accepted";
+      if (!users.some((candidate) => candidate.id === user.id)) users.push(user);
+      const organizationId = (invitation.publicMetadata as { workspaceId?: string }).workspaceId;
+      if (organizationId) {
+        const members = organizationMemberships.get(organizationId) ?? new Set<string>();
+        members.add(user.id);
+        organizationMemberships.set(organizationId, members);
+      }
+    },
     getMaxConcurrentUserLookups: () => maxConcurrentUserLookups,
     setBeforeUserLookup: (hook: typeof beforeUserLookup) => {
       beforeUserLookup = hook;
@@ -178,6 +324,7 @@ afterEach(async () => {
   const clientIds = [...testClientIds];
   testClientIds.clear();
   if (clientIds.length) {
+    await db.delete(clientInvitationsTable).where(inArray(clientInvitationsTable.clientId, clientIds));
     await db.delete(clientMembersTable).where(inArray(clientMembersTable.clientId, clientIds));
     await db.delete(clientsTable).where(inArray(clientsTable.id, clientIds));
   }
@@ -190,7 +337,33 @@ async function startApi(
   organizationId = "default",
   revokeMemberships: Parameters<typeof createUsersRouter>[2] = revokeClientMemberships,
   logoStorage?: ObjectStorageService,
+  seedOrganizationMembers = true,
 ) {
+  if (organizationId !== "default" && seedOrganizationMembers) {
+    const existingUsers = await client.users.getUserList({ limit: 500 });
+    for (const user of existingUsers.data) {
+      const metadata = user.publicMetadata as Record<string, unknown>;
+      const workspaceIds = Array.isArray(metadata.workspaceIds)
+        ? metadata.workspaceIds.filter((value): value is string => typeof value === "string")
+        : [];
+      if (!workspaceIds.includes(organizationId)) workspaceIds.push(organizationId);
+      const workspaceRoles = metadata.workspaceRoles && typeof metadata.workspaceRoles === "object"
+        ? metadata.workspaceRoles as Record<string, unknown>
+        : {};
+      Object.assign(user, {
+        publicMetadata: {
+          ...metadata,
+          workspaceIds,
+          workspaceRoles: { ...workspaceRoles, [organizationId]: metadata.role },
+        },
+      });
+      await client.organizations.createOrganizationMembership({
+        organizationId,
+        userId: user.id,
+        role: "org:member",
+      });
+    }
+  }
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
@@ -240,6 +413,14 @@ async function grantClientAccess(base: string, clientId: string, userId: string)
   });
 }
 
+async function inviteClientUser(base: string, clientId: string, email: string) {
+  return fetch(`${base}/clients/${clientId}/invitations`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+}
+
 test("blocks non-administrators from listing and mutating users", async () => {
   const fake = fakeClerk([makeUser("admin", "Admin"), makeUser("member", "Field Team")]);
   const base = await startApi("member", fake.client);
@@ -258,6 +439,7 @@ test("blocks non-administrators from listing and mutating users", async () => {
     body: JSON.stringify({ role: "Client" }),
   })).status, 403);
   assert.equal((await fetch(`${base}/users/admin`, { method: "DELETE" })).status, 403);
+  assert.equal((await inviteClientUser(base, "client-not-owned", "new-client@example.com")).status, 403);
 });
 
 test("lists only eligible Project Managers for administrators", async () => {
@@ -286,7 +468,12 @@ test("lists only eligible Project Managers for administrators", async () => {
 
 test("keeps the Project Manager directory scoped across Clerk pagination", async () => {
   const outsideManager = makeUser("manager-outside", "Project Manager");
-  const insideManager = makeUser("manager-inside", "Project Manager");
+  const insideManager = makeUser(
+    "manager-inside",
+    "Project Manager",
+    "manager-inside@example.com",
+    ["org-one"],
+  );
   const fillerUsers = Array.from({ length: 100 }, (_, index) => makeUser(`field-${index}`, "Field Team"));
   const fake = fakeClerk([
     makeUser("admin", "Admin"),
@@ -301,6 +488,7 @@ test("keeps the Project Manager directory scoped across Clerk pagination", async
   ];
   Object.assign(fake.client, {
     organizations: {
+      ...fake.client.organizations,
       getOrganizationMembershipList: async ({ limit = 100, offset = 0 }: { limit?: number; offset?: number }) => ({
         data: memberIds.slice(offset, offset + limit).map((userId) => ({
           publicUserData: { userId },
@@ -335,6 +523,31 @@ test("keeps the Project Manager directory scoped across Clerk pagination", async
   assert.deepEqual((await response.json() as Array<{ id: string }>).map((profile) => profile.id), ["manager-inside"]);
 });
 
+test("serializes chat users with their organization-scoped role", async () => {
+  const user = makeUser("scoped-client", "Admin", "scoped-client@example.com", ["chat-workspace"]);
+  Object.assign(user, {
+    publicMetadata: {
+      ...user.publicMetadata,
+      workspaceRoles: { "chat-workspace": "Client" },
+    },
+  });
+  const fake = fakeClerk([user]);
+  await fake.client.organizations.createOrganizationMembership({
+    organizationId: "chat-workspace",
+    userId: user.id,
+    role: "org:member",
+  });
+  const auth = Object.assign(
+    () => ({ userId: user.id, orgId: "chat-workspace", tokenType: "session_token" }),
+    { [Symbol.for("@clerk/express.auth")]: true },
+  );
+  const users = await workspaceChatUsers(
+    { auth } as unknown as Parameters<typeof workspaceChatUsers>[0],
+    fake.client as unknown as Parameters<typeof workspaceChatUsers>[1],
+  );
+  assert.equal(users.find((candidate) => candidate.id === user.id)?.role, "Client");
+});
+
 test("lists, resends, and revokes pending invitations", async () => {
   const fake = fakeClerk([makeUser("admin", "Admin")]);
   const base = await startApi("admin", fake.client);
@@ -353,7 +566,7 @@ test("lists, resends, and revokes pending invitations", async () => {
   assert.equal(resent.status, 200);
   assert.deepEqual(fake.invitations.at(-1), {
     emailAddress: "pending@example.com",
-    publicMetadata: { role: "Client" },
+    publicMetadata: { role: "Client", workspaceId: "default" },
     notify: true,
     ignoreExisting: true,
   });
@@ -405,9 +618,110 @@ test("validates invitations and passes the initial role to Clerk", async () => {
   assert.equal(valid.status, 201);
   assert.deepEqual(fake.invitations[0], {
     emailAddress: "new.user@example.com",
-    publicMetadata: { role: "Project Manager" },
+    publicMetadata: { role: "Project Manager", workspaceId: "default" },
     notify: true,
     ignoreExisting: false,
+  });
+});
+
+test("preserves implicit default access through ordinary organization invitation removal", async () => {
+  const workspace = "ordinary-invitation-workspace";
+  const admin = makeUser("admin", "Admin", "admin@example.com", [workspace]);
+  const legacyDefaultUser = makeUser("legacy-default", "Field Team", "legacy@example.com");
+  const immediatelyRemovedUser = makeUser(
+    "legacy-immediate",
+    "Project Manager",
+    "legacy-immediate@example.com",
+  );
+  const fake = fakeClerk([admin, legacyDefaultUser, immediatelyRemovedUser]);
+  await fake.client.organizations.createOrganizationMembership({
+    organizationId: workspace,
+    userId: admin.id,
+    role: "org:member",
+  });
+  const adminBase = await startApi(
+    admin.id,
+    fake.client,
+    undefined,
+    workspace,
+    undefined,
+    undefined,
+    false,
+  );
+  const invited = await fetch(`${adminBase}/users/invitations`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "legacy@example.com", role: "Client" }),
+  });
+  assert.equal(invited.status, 201);
+  const invitation = await invited.json() as { id: string };
+  fake.acceptOrganizationInvitation(invitation.id, legacyDefaultUser);
+
+  const memberBase = await startApi(
+    legacyDefaultUser.id,
+    fake.client,
+    undefined,
+    workspace,
+    undefined,
+    undefined,
+    false,
+  );
+  const organizationMe = await fetch(`${memberBase}/users/me`);
+  assert.equal(organizationMe.status, 200);
+  assert.deepEqual(await organizationMe.json(), {
+    userId: legacyDefaultUser.id,
+    role: "Client",
+  });
+  assert.deepEqual(
+    (legacyDefaultUser.publicMetadata.workspaceIds as string[]).sort(),
+    ["default", workspace],
+  );
+  assert.deepEqual(legacyDefaultUser.publicMetadata.workspaceRoles, {
+    default: "Field Team",
+    [workspace]: "Client",
+  });
+
+  assert.equal(
+    (await fetch(`${adminBase}/users/${legacyDefaultUser.id}`, { method: "DELETE" })).status,
+    204,
+  );
+  assert.equal(fake.getUsers().some((user) => user.id === legacyDefaultUser.id), true);
+  assert.deepEqual(legacyDefaultUser.publicMetadata.workspaceIds, ["default"]);
+  const defaultBase = await startApi(legacyDefaultUser.id, fake.client);
+  const defaultMe = await fetch(`${defaultBase}/users/me`);
+  assert.equal(defaultMe.status, 200);
+  assert.deepEqual(await defaultMe.json(), {
+    userId: legacyDefaultUser.id,
+    role: "Field Team",
+  });
+
+  const immediateInvitationResponse = await fetch(`${adminBase}/users/invitations`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      email: "legacy-immediate@example.com",
+      role: "Client",
+    }),
+  });
+  assert.equal(immediateInvitationResponse.status, 201);
+  const immediateInvitation = await immediateInvitationResponse.json() as { id: string };
+  fake.acceptOrganizationInvitation(immediateInvitation.id, immediatelyRemovedUser);
+  assert.deepEqual(immediatelyRemovedUser.publicMetadata, { role: "Project Manager" });
+  assert.equal(
+    (await fetch(`${adminBase}/users/${immediatelyRemovedUser.id}`, { method: "DELETE" })).status,
+    204,
+  );
+  assert.equal(fake.getUsers().some((user) => user.id === immediatelyRemovedUser.id), true);
+  assert.deepEqual(
+    (immediatelyRemovedUser.publicMetadata as Record<string, unknown>).workspaceIds,
+    ["default"],
+  );
+  const immediateDefaultBase = await startApi(immediatelyRemovedUser.id, fake.client);
+  const immediateDefaultMe = await fetch(`${immediateDefaultBase}/users/me`);
+  assert.equal(immediateDefaultMe.status, 200);
+  assert.deepEqual(await immediateDefaultMe.json(), {
+    userId: immediatelyRemovedUser.id,
+    role: "Project Manager",
   });
 });
 
@@ -651,13 +965,14 @@ test("protects self-deletion and the final administrator role", async () => {
   assert.equal(fake.getUsers()[0].primaryEmailAddress?.emailAddress, "admin@example.com");
 });
 
-test("deletes a confirmed target and revokes all of their client memberships", async () => {
+test("removes a shared user only from the active workspace", async () => {
   const fake = fakeClerk([
     makeUser("admin", "Admin"),
     makeUser("member", "Client"),
     makeUser("other-client", "Client"),
   ]);
   const base = await startApi("admin", fake.client, undefined, "workspace-delete-user-check");
+  const removedUserBase = await startApi("member", fake.client, undefined, "workspace-delete-user-check");
   const firstClient = await createTestClient(base, "First Delete User Client");
   const secondClient = await createTestClient(base, "Second Delete User Client");
   const otherWorkspace = await startApi("admin", fake.client, undefined, "workspace-delete-user-other");
@@ -666,9 +981,19 @@ test("deletes a confirmed target and revokes all of their client memberships", a
   await grantClientAccess(base, secondClient.id, "member");
   await grantClientAccess(base, firstClient.id, "other-client");
   await grantClientAccess(otherWorkspace, thirdClient.id, "member");
+  const member = fake.getUsers().find((user) => user.id === "member");
+  assert(member);
+  Object.assign(member, { publicMetadata: { role: "Client" } });
 
   assert.equal((await fetch(`${base}/users/member`, { method: "DELETE" })).status, 204);
-  assert.deepEqual(fake.getUsers().map((user) => user.id), ["admin", "other-client"]);
+  assert.equal((await fetch(`${removedUserBase}/users`)).status, 403);
+  assert.equal(fake.getOrganizationMemberships("workspace-delete-user-check").includes("member"), false);
+  assert.deepEqual(fake.getUsers().map((user) => user.id), ["admin", "member", "other-client"]);
+  assert.deepEqual(
+    (fake.getUsers().find((user) => user.id === "member")?.publicMetadata.workspaceIds as string[]).sort(),
+    ["default", "workspace-delete-user-other"],
+  );
+  assert.equal(fake.getOrganizationMemberships("workspace-delete-user-other").includes("member"), true);
   assert.deepEqual(
     await db.select({
       clientId: clientMembersTable.clientId,
@@ -678,12 +1003,36 @@ test("deletes a confirmed target and revokes all of their client memberships", a
       clientMembersTable.clientId,
       [firstClient.id, secondClient.id, thirdClient.id],
     )),
-    [{ clientId: firstClient.id, userId: "other-client", addedBy: "admin" }],
+    [
+      { clientId: firstClient.id, userId: "other-client", addedBy: "admin" },
+      { clientId: thirdClient.id, userId: "member", addedBy: "admin" },
+    ],
   );
   assert.deepEqual(
     clerkErrorResponse({ status: 422, errors: [{ code: "form_identifier_exists", longMessage: "Email already exists." }] }, "failed"),
     { status: 409, error: "Email already exists." },
   );
+});
+
+test("keeps a shared user's other workspace role unchanged", async () => {
+  const fake = fakeClerk([makeUser("admin", "Admin"), makeUser("member", "Client")]);
+  const workspaceA = await startApi("admin", fake.client, undefined, "workspace-role-a");
+  const workspaceB = await startApi("admin", fake.client, undefined, "workspace-role-b");
+  const clientA = await createTestClient(workspaceA, "Workspace Role A Client");
+  const clientB = await createTestClient(workspaceB, "Workspace Role B Client");
+
+  const demoted = await fetch(`${workspaceA}/users/member`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ role: "Field Team" }),
+  });
+  assert.equal(demoted.status, 200);
+  assert.equal((await demoted.json() as { role: string }).role, "Field Team");
+
+  const usersInB = await (await fetch(`${workspaceB}/users`)).json() as Array<{ id: string; role: string }>;
+  assert.equal(usersInB.find((user) => user.id === "member")?.role, "Client");
+  assert.equal((await grantClientAccess(workspaceA, clientA.id, "member")).status, 403);
+  assert.equal((await grantClientAccess(workspaceB, clientB.id, "member")).status, 201);
 });
 
 test("serializes client access grants with workspace-user deletion", async () => {
@@ -935,6 +1284,317 @@ test("rejects granting client access to a non-Client workspace user", async () =
   assert.deepEqual(clients[0].members, []);
 });
 
+test("does not list or grant a Client user from another workspace", async () => {
+  const fake = fakeClerk([makeUser("admin", "Admin")]);
+  const workspaceA = await startApi("admin", fake.client, undefined, "workspace-user-scope-a");
+  const workspaceB = await startApi("admin", fake.client, undefined, "workspace-user-scope-b");
+  const workspaceBOnlyUser = makeUser(
+    "workspace-b-client",
+    "Client",
+    "workspace-b-client@example.com",
+    ["workspace-user-scope-b"],
+  );
+  fake.getUsers().push(workspaceBOnlyUser);
+  await fake.client.organizations.createOrganizationMembership({
+    organizationId: "workspace-user-scope-b",
+    userId: workspaceBOnlyUser.id,
+    role: "org:member",
+  });
+
+  const usersInA = await (await fetch(`${workspaceA}/users`)).json() as Array<{ id: string }>;
+  const usersInB = await (await fetch(`${workspaceB}/users`)).json() as Array<{ id: string }>;
+  assert.equal(usersInA.some((user) => user.id === workspaceBOnlyUser.id), false);
+  assert.equal(usersInB.some((user) => user.id === workspaceBOnlyUser.id), true);
+
+  const clientA = await createTestClient(workspaceA, "Workspace A Scoped Client");
+  const denied = await grantClientAccess(workspaceA, clientA.id, workspaceBOnlyUser.id);
+  assert.equal(denied.status, 403);
+  assert.deepEqual(
+    await db.select().from(clientMembersTable).where(eq(clientMembersTable.clientId, clientA.id)),
+    [],
+  );
+});
+
+test("invites a client user, shows pending state, and reconciles an accepted invitation once", async () => {
+  const fake = fakeClerk([makeUser("admin", "Admin")]);
+  const workspaceA = await startApi("admin", fake.client, undefined, "workspace-client-invite-a");
+  const workspaceB = await startApi("admin", fake.client, undefined, "workspace-client-invite-b");
+  const clientA = await createTestClient(workspaceA, "Direct Invite Client");
+  const clientB = await createTestClient(workspaceB, "Other Workspace Client");
+
+  assert.equal((await inviteClientUser(workspaceA, clientA.id, "not-an-email")).status, 400);
+  const invited = await inviteClientUser(workspaceA, clientA.id, " New.Client@example.com ");
+  assert.equal(invited.status, 201);
+  assert.deepEqual(fake.invitations.at(-1), {
+    organizationId: "workspace-client-invite-a",
+    emailAddress: "new.client@example.com",
+    role: "org:member",
+    inviterUserId: "admin",
+    publicMetadata: { role: "Client", workspaceId: "workspace-client-invite-a" },
+  });
+  const invitation = await invited.json() as { id: string; email: string; role: string; status: string; createdAt: number };
+  assert.deepEqual(invitation, {
+    id: fake.getInvitations().find((record) => record.emailAddress === "new.client@example.com")?.id,
+    email: "new.client@example.com",
+    role: "Client",
+    status: "pending",
+    createdAt: 202,
+  });
+  const listedInWorkspaceA = await (await fetch(`${workspaceA}/users/invitations`)).json() as Array<{ id: string }>;
+  const listedInWorkspaceB = await (await fetch(`${workspaceB}/users/invitations`)).json() as Array<{ id: string }>;
+  assert.equal(listedInWorkspaceA.some((record) => record.id === invitation.id), true);
+  assert.equal(listedInWorkspaceB.some((record) => record.id === invitation.id), false);
+  assert.equal((await fetch(`${workspaceB}/users/invitations/${invitation.id}`, { method: "DELETE" })).status, 404);
+  assert.equal((await fetch(`${workspaceB}/users/invitations/${invitation.id}/resend`, { method: "POST" })).status, 404);
+  assert.equal(fake.getInvitations().find((record) => record.id === invitation.id)?.status, "pending");
+
+  const duplicate = await inviteClientUser(workspaceA, clientA.id, "new.client@example.com");
+  assert.equal(duplicate.status, 409);
+  assert.equal((await inviteClientUser(workspaceB, clientA.id, "other@example.com")).status, 404);
+  const pendingClients = await (await fetch(`${workspaceA}/clients`)).json() as Array<{
+    id: string;
+    pendingInvitations: Array<{ email: string; role: string; status: string }>;
+    members: unknown[];
+  }>;
+  assert.deepEqual(pendingClients.find((candidate) => candidate.id === clientA.id)?.pendingInvitations.map((record) => ({
+    email: record.email,
+    role: record.role,
+    status: record.status,
+  })), [{
+    email: "new.client@example.com",
+    role: "Client",
+    status: "pending",
+  }]);
+
+  const clerkInvitation = fake.getInvitations().find((record) => record.emailAddress === "new.client@example.com");
+  assert(clerkInvitation);
+  clerkInvitation.status = "accepted";
+  const acceptedBeforeUserExists = await (await fetch(`${workspaceA}/clients`)).json() as Array<{
+    id: string;
+    pendingInvitations: Array<{ email: string }>;
+    members: unknown[];
+  }>;
+  const waitingClient = acceptedBeforeUserExists.find((candidate) => candidate.id === clientA.id);
+  assert(waitingClient);
+  assert.deepEqual(waitingClient.pendingInvitations.map((record) => record.email), ["new.client@example.com"]);
+  assert.deepEqual(waitingClient.members, []);
+
+  const acceptedClient = makeUser("accepted-client", "Admin", "new.client@example.com");
+  fake.acceptOrganizationInvitation(clerkInvitation.id, acceptedClient);
+  assert.equal(
+    fake.getOrganizationMemberships("workspace-client-invite-a").includes(acceptedClient.id),
+    true,
+  );
+  const acceptedUserBase = await startApi(
+    acceptedClient.id,
+    fake.client,
+    undefined,
+    "workspace-client-invite-a",
+    undefined,
+    undefined,
+    false,
+  );
+  const acceptedSession = await fetch(`${acceptedUserBase}/users/me`);
+  assert.equal(acceptedSession.status, 200);
+  assert.deepEqual(await acceptedSession.json(), { userId: acceptedClient.id, role: "Client" });
+  assert.equal(
+    (acceptedClient.publicMetadata.workspaceRoles as Record<string, unknown>)["workspace-client-invite-a"],
+    "Client",
+  );
+  assert.deepEqual(
+    await db.select({ userId: clientMembersTable.userId })
+      .from(clientMembersTable)
+      .where(eq(clientMembersTable.clientId, clientA.id)),
+    [{ userId: acceptedClient.id }],
+  );
+  assert.deepEqual(
+    await db.select().from(clientInvitationsTable).where(eq(clientInvitationsTable.clientId, clientA.id)),
+    [],
+  );
+
+  const reconciled = await (await fetch(`${workspaceA}/clients`)).json() as Array<{
+    id: string;
+    pendingInvitations: unknown[];
+    members: Array<{ userId: string }>;
+  }>;
+  const reconciledClient = reconciled.find((candidate) => candidate.id === clientA.id);
+  assert(reconciledClient);
+  assert.deepEqual(reconciledClient.pendingInvitations, []);
+  assert.deepEqual(reconciledClient.members.map((member) => member.userId), ["accepted-client"]);
+  const acceptedWorkspaceUsers = await (await fetch(`${workspaceA}/users`)).json() as Array<{
+    id: string;
+    role: string;
+  }>;
+  assert.equal(acceptedWorkspaceUsers.find((user) => user.id === acceptedClient.id)?.role, "Client");
+
+  const refreshed = await (await fetch(`${workspaceA}/clients`)).json() as Array<{
+    id: string;
+    pendingInvitations: unknown[];
+    members: Array<{ userId: string }>;
+  }>;
+  const refreshedClient = refreshed.find((candidate) => candidate.id === clientA.id);
+  assert(refreshedClient);
+  assert.deepEqual(refreshedClient.members.map((member) => member.userId), ["accepted-client"]);
+  assert.deepEqual(await db.select().from(clientInvitationsTable).where(eq(clientInvitationsTable.clientId, clientA.id)), []);
+
+  const cancelable = await inviteClientUser(workspaceA, clientA.id, "cancel-me@example.com");
+  assert.equal(cancelable.status, 201);
+  const cancelableInvitation = await cancelable.json() as { id: string };
+  assert.equal((await fetch(`${workspaceA}/users/invitations/${cancelableInvitation.id}`, { method: "DELETE" })).status, 204);
+  assert.deepEqual(await db.select().from(clientInvitationsTable).where(eq(clientInvitationsTable.clientId, clientA.id)), []);
+
+  const revoked = await inviteClientUser(workspaceA, clientA.id, "revoked@example.com");
+  assert.equal(revoked.status, 201);
+  const revokedInvitation = fake.getInvitations().find((record) => record.emailAddress === "revoked@example.com");
+  assert(revokedInvitation);
+  revokedInvitation.status = "revoked";
+  fake.getUsers().push(makeUser("unrelated-same-email", "Client", "revoked@example.com", ["workspace-client-invite-a"]));
+  const afterRevocation = await (await fetch(`${workspaceA}/clients`)).json() as Array<{
+    id: string;
+    pendingInvitations: unknown[];
+    members: Array<{ userId: string }>;
+  }>;
+  const clientAfterRevocation = afterRevocation.find((candidate) => candidate.id === clientA.id);
+  assert(clientAfterRevocation);
+  assert.deepEqual(clientAfterRevocation.pendingInvitations, []);
+  assert.equal(clientAfterRevocation.members.some((member) => member.userId === "unrelated-same-email"), false);
+
+  assert.deepEqual(
+    (acceptedClient.publicMetadata.workspaceIds as string[]).sort(),
+    ["default", "workspace-client-invite-a"],
+  );
+  assert.equal(
+    (acceptedClient.publicMetadata.workspaceRoles as Record<string, unknown>).default,
+    "Admin",
+  );
+  const forbiddenIdentityUpdate = await fetch(`${workspaceA}/users/${acceptedClient.id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      firstName: "Changed",
+      email: "changed-across-workspaces@example.com",
+    }),
+  });
+  assert.equal(forbiddenIdentityUpdate.status, 403);
+  assert.equal(acceptedClient.firstName, "Morgan");
+  assert.equal(acceptedClient.primaryEmailAddress?.emailAddress, "new.client@example.com");
+
+  assert.equal(
+    (await fetch(`${workspaceA}/users/${acceptedClient.id}`, { method: "DELETE" })).status,
+    204,
+  );
+  assert.equal(fake.getUsers().some((user) => user.id === acceptedClient.id), true);
+  assert.deepEqual(acceptedClient.publicMetadata.workspaceIds, ["default"]);
+  assert.equal(
+    (acceptedClient.publicMetadata.workspaceRoles as Record<string, unknown>).default,
+    "Admin",
+  );
+  const defaultWorkspaceSession = await startApi(acceptedClient.id, fake.client);
+  const defaultMe = await fetch(`${defaultWorkspaceSession}/users/me`);
+  assert.equal(defaultMe.status, 200);
+  assert.deepEqual(await defaultMe.json(), { userId: acceptedClient.id, role: "Admin" });
+});
+
+test("rejects client invitations for existing users and translates Clerk failures", async () => {
+  const fake = fakeClerk([
+    makeUser("admin", "Admin"),
+    makeUser("existing-client", "Client", "existing@example.com"),
+  ]);
+  const base = await startApi("admin", fake.client, undefined, "workspace-client-invite-errors");
+  const client = await createTestClient(base, "Invite Error Client");
+
+  const existing = await inviteClientUser(base, client.id, "existing@example.com");
+  assert.equal(existing.status, 409);
+  assert.match((await existing.json() as { error: string }).error, /already belongs/);
+
+  fake.client.organizations.createOrganizationInvitation = async () => {
+    throw { status: 503, errors: [{ longMessage: "Invitation service unavailable." }] };
+  };
+  const failed = await inviteClientUser(base, client.id, "new-failure@example.com");
+  assert.equal(failed.status, 502);
+  assert.deepEqual(await failed.json(), { error: "Invitation service unavailable." });
+  assert.deepEqual(await db.select().from(clientInvitationsTable).where(eq(clientInvitationsTable.clientId, client.id)), []);
+});
+
+test("does not recreate client access when the assignment is removed during reconciliation", async () => {
+  const fake = fakeClerk([makeUser("admin", "Admin")]);
+  const base = await startApi("admin", fake.client, undefined, "workspace-client-invite-race");
+  const client = await createTestClient(base, "Reconciliation Race Client");
+  const invited = await inviteClientUser(base, client.id, "race@example.com");
+  assert.equal(invited.status, 201);
+  const invitation = fake.getInvitations().find((record) => record.emailAddress === "race@example.com");
+  assert(invitation);
+  invitation.status = "accepted";
+  fake.getUsers().push(makeUser("race-user", "Client", "race@example.com", ["workspace-client-invite-race"]));
+
+  const getInvitationList = fake.client.invitations.getInvitationList;
+  let removedDuringLookup = false;
+  fake.client.invitations.getInvitationList = async (params) => {
+    if (!removedDuringLookup && params?.query === invitation.id) {
+      removedDuringLookup = true;
+      await db.delete(clientInvitationsTable).where(eq(clientInvitationsTable.clientId, client.id));
+      await db.delete(clientsTable).where(eq(clientsTable.id, client.id));
+    }
+    return getInvitationList(params);
+  };
+
+  const refreshed = await fetch(`${base}/clients`);
+  assert.equal(refreshed.status, 200);
+  assert.deepEqual(
+    await db.select().from(clientMembersTable).where(eq(clientMembersTable.clientId, client.id)),
+    [],
+  );
+});
+
+test("serializes a client invitation racing with client deletion without leaving orphaned access", async () => {
+  const fake = fakeClerk([makeUser("admin", "Admin")]);
+  let releaseFirst!: () => void;
+  let firstEntered!: () => void;
+  const firstEnteredPromise = new Promise<void>((resolve) => {
+    firstEntered = resolve;
+  });
+  const firstGate = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  let queue = Promise.resolve();
+  let invocationCount = 0;
+  const lock: Parameters<typeof createUsersRouter>[1] = async (operation) => {
+    const previous = queue;
+    let releaseCurrent!: () => void;
+    queue = new Promise<void>((resolve) => {
+      releaseCurrent = resolve;
+    });
+    await previous;
+    invocationCount += 1;
+    if (invocationCount === 1) {
+      firstEntered();
+      await firstGate;
+    }
+    try {
+      return await operation();
+    } finally {
+      releaseCurrent();
+    }
+  };
+  const base = await startApi("admin", fake.client, lock, "workspace-invite-delete-race");
+  const client = await createTestClient(base, "Invite Delete Race Client");
+
+  const invitedPromise = inviteClientUser(base, client.id, "delete-race@example.com");
+  await firstEnteredPromise;
+  const deletedPromise = fetch(`${base}/clients/${client.id}`, { method: "DELETE" });
+  releaseFirst();
+
+  const [invited, deleted] = await Promise.all([invitedPromise, deletedPromise]);
+  assert.equal(invited.status, 201);
+  assert.equal(deleted.status, 204);
+  const clerkInvitation = fake.getInvitations().find((record) => record.emailAddress === "delete-race@example.com");
+  assert(clerkInvitation);
+  assert.equal(clerkInvitation.status, "revoked");
+  assert.deepEqual(await db.select().from(clientsTable).where(eq(clientsTable.id, client.id)), []);
+  assert.deepEqual(await db.select().from(clientInvitationsTable).where(eq(clientInvitationsTable.clientId, client.id)), []);
+  assert.deepEqual(await db.select().from(clientMembersTable).where(eq(clientMembersTable.clientId, client.id)), []);
+});
+
 test("rejects duplicate grants and revokes only the targeted membership", async () => {
   const fake = fakeClerk([
     makeUser("admin", "Admin"),
@@ -968,6 +1628,9 @@ test("deleting a client revokes memberships without deleting workspace users", a
   const client = await createTestClient(base, "Delete Check Client");
   await grantClientAccess(base, client.id, "client-one");
   await grantClientAccess(base, client.id, "client-two");
+  assert.equal((await inviteClientUser(base, client.id, "pending-delete@example.com")).status, 201);
+  const pendingInvitation = fake.getInvitations().find((record) => record.emailAddress === "pending-delete@example.com");
+  assert(pendingInvitation);
 
   const deleted = await fetch(`${base}/clients/${client.id}`, { method: "DELETE" });
   assert.equal(deleted.status, 204);
@@ -978,7 +1641,34 @@ test("deleting a client revokes memberships without deleting workspace users", a
     await db.select().from(clientMembersTable).where(eq(clientMembersTable.clientId, client.id)),
     [],
   );
+  assert.deepEqual(
+    await db.select().from(clientInvitationsTable).where(eq(clientInvitationsTable.clientId, client.id)),
+    [],
+  );
+  assert.equal(pendingInvitation.status, "revoked");
   assert.deepEqual(fake.getUsers().map((user) => user.id), ["admin", "client-one", "client-two"]);
+});
+
+test("keeps a client and its assignment retryable when Clerk invitation cleanup fails", async () => {
+  const fake = fakeClerk([makeUser("admin", "Admin")]);
+  const base = await startApi("admin", fake.client, undefined, "workspace-delete-invite-failure");
+  const client = await createTestClient(base, "Delete Invite Failure Client");
+  assert.equal((await inviteClientUser(base, client.id, "cleanup-failure@example.com")).status, 201);
+  fake.client.organizations.revokeOrganizationInvitation = async () => {
+    throw { status: 503, errors: [{ longMessage: "Invitation cleanup unavailable." }] };
+  };
+
+  const deleted = await fetch(`${base}/clients/${client.id}`, { method: "DELETE" });
+  assert.equal(deleted.status, 502);
+  assert.deepEqual(await deleted.json(), { error: "Invitation cleanup unavailable." });
+  assert.equal(
+    (await db.select().from(clientsTable).where(eq(clientsTable.id, client.id))).length,
+    1,
+  );
+  assert.equal(
+    (await db.select().from(clientInvitationsTable).where(eq(clientInvitationsTable.clientId, client.id))).length,
+    1,
+  );
 });
 
 test("secures client logo uploads and cleans up replacement and clear", async () => {

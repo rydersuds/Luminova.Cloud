@@ -8,7 +8,7 @@
     "build": "node ./build.mjs",
     "prestart": "pnpm --filter @workspace/db run push",
     "start": "node --enable-source-maps ./dist/index.mjs",
-    "test": "tsx --test src/**/*.test.ts",
+    "test": "NODE_ENV=test tsx --test src/**/*.test.ts",
     "test:client-access-recovery": "tsx test/integration/clientAccessRecovery.ts",
     "test:folder-import-integration": "tsx test/integration/folderImportRecovery.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
