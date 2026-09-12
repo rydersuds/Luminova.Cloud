@@ -39,6 +39,7 @@ test("project import session routes are available at their public API paths", as
       body: JSON.stringify({}),
     }],
     ["/api/project-import-sessions/import-route-test/build", { method: "POST" }],
+    ["/api/projects/project-route-test/vendor-quotes/rescan", { method: "POST" }],
   ];
 
   for (const [path, init] of importRequests) {

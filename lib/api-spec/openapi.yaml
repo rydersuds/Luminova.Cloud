@@ -393,6 +393,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OrganizeProjectFilesResult"
+  /projects/{projectId}/vendor-quotes/rescan:
+    post:
+      operationId: rescanProjectVendorQuotes
+      tags: [vendor-quotes]
+      summary: Scan existing project documents for vendor quotes
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Document scan completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorQuoteRescanResult"
+        "401":
+          description: Authentication required
+        "404":
+          description: Imported project not found
   /trades:
     get:
       operationId: getTrades
@@ -1889,8 +1907,8 @@ components:
         id: { type: string }
         description: { type: string, minLength: 1 }
         quantity: { type: number, exclusiveMinimum: 0 }
-        unitPrice: { type: integer, minimum: 0 }
-        amount: { type: integer, minimum: 0 }
+        unitPrice: { type: number, minimum: 0 }
+        amount: { type: number, minimum: 0 }
     VendorQuoteLineItemInput:
       type: object
       required: [description, quantity, unitPrice]
@@ -1898,10 +1916,10 @@ components:
         id: { type: string }
         description: { type: string, minLength: 1 }
         quantity: { type: number, exclusiveMinimum: 0 }
-        unitPrice: { type: integer, minimum: 0 }
+        unitPrice: { type: number, minimum: 0 }
     VendorQuote:
       type: object
-      required: [id, quoteNumber, projectId, projectName, vendorId, vendorName, direction, trade, status, revision, issueDate, dueDate, notes, lineItems, total, createdAt, updatedAt]
+      required: [id, quoteNumber, projectId, projectName, vendorId, vendorName, direction, trade, status, revision, issueDate, dueDate, notes, lineItems, total, attachments, createdAt, updatedAt]
       properties:
         id: { type: string }
         quoteNumber: { type: string }
@@ -1922,9 +1940,24 @@ components:
           minItems: 1
           items:
             $ref: "#/components/schemas/VendorQuoteLineItem"
-        total: { type: integer, minimum: 0 }
+        total: { type: number, minimum: 0 }
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/VendorQuoteAttachment"
         createdAt: { type: string }
         updatedAt: { type: string }
+    VendorQuoteAttachment:
+      type: object
+      required: [id, name, relativePath, url, contentType, size]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        relativePath: { type: string }
+        url: { type: string }
+        contentType: { type: string }
+        size: { type: integer, minimum: 1 }
+        confidence: { type: [integer, "null"], minimum: 0, maximum: 100 }
     VendorQuoteInput:
       type: object
       required: [quoteNumber, projectId, vendorId, direction, trade, status, revision, issueDate, dueDate, notes, lineItems]
@@ -1996,6 +2029,28 @@ components:
         filesOrganized: { type: integer }
         collectionsCreated: { type: integer }
         attachmentsMatched: { type: integer }
+    VendorQuoteImportOutcome:
+      type: object
+      required: [documentId, name, relativePath, status, reason]
+      properties:
+        documentId: { type: string }
+        name: { type: string }
+        relativePath: { type: string }
+        status: { type: string, enum: [imported, skipped, unreadable] }
+        reason: { type: string }
+        quoteId: { type: [string, "null"] }
+    VendorQuoteRescanResult:
+      type: object
+      required: [documentsScanned, imported, skipped, unreadable, outcomes]
+      properties:
+        documentsScanned: { type: integer, minimum: 0 }
+        imported: { type: integer, minimum: 0 }
+        skipped: { type: integer, minimum: 0 }
+        unreadable: { type: integer, minimum: 0 }
+        outcomes:
+          type: array
+          items:
+            $ref: "#/components/schemas/VendorQuoteImportOutcome"
     Panorama:
       type: object
       required: [id, url, label, location, date]

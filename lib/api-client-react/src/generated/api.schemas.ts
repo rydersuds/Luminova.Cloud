@@ -613,6 +613,21 @@ export interface VendorQuoteLineItemInput {
   unitPrice: number;
 }
 
+export interface VendorQuoteAttachment {
+  id: string;
+  name: string;
+  relativePath: string;
+  url: string;
+  contentType: string;
+  /** @minimum 1 */
+  size: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     * @nullable
+     */
+  confidence?: number | null;
+}
 export interface VendorQuote {
   id: string;
   quoteNumber: string;
@@ -635,6 +650,7 @@ export interface VendorQuote {
   lineItems: VendorQuoteLineItem[];
   /** @minimum 0 */
   total: number;
+  attachments: VendorQuoteAttachment[];
   createdAt: string;
   updatedAt: string;
 }
@@ -689,6 +705,7 @@ export interface OrganizeProjectFilesResult {
   attachmentsMatched: number;
 }
 
+export type VendorQuoteImportOutcomeStatus = typeof VendorQuoteImportOutcomeStatus[keyof typeof VendorQuoteImportOutcomeStatus];
 export interface PanoramaInput {
   /**
      * App Storage object path returned after a direct upload
@@ -925,3 +942,31 @@ export interface BulkClientAccessReconciliationResponse {
   reconciled: string[];
   failed: BulkClientAccessReconciliationResponseFailedItem[];
 }
+
+export interface VendorQuoteRescanResult {
+  /** @minimum 0 */
+  documentsScanned: number;
+  /** @minimum 0 */
+  imported: number;
+  /** @minimum 0 */
+  skipped: number;
+  /** @minimum 0 */
+  unreadable: number;
+  outcomes: VendorQuoteImportOutcome[];
+}
+
+export interface VendorQuoteImportOutcome {
+  documentId: string;
+  name: string;
+  relativePath: string;
+  status: VendorQuoteImportOutcomeStatus;
+  reason: string;
+  /** @nullable */
+  quoteId?: string | null;
+}
+
+export const VendorQuoteImportOutcomeStatus = {
+  imported: 'imported',
+  skipped: 'skipped',
+  unreadable: 'unreadable',
+} as const;

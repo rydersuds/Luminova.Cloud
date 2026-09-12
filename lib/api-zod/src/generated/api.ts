@@ -670,7 +670,12 @@ export const OrganizeProjectFilesResponse = zod.object({
   "attachmentsMatched": zod.number().int()
 })
 
-
+/**
+ * @summary Scan existing project documents for vendor quotes
+ */
+export const RescanProjectVendorQuotesParams = zod.object({
+  "projectId": zod.coerce.string()
+})
 /**
  * @summary List trades
  */
@@ -1322,7 +1327,7 @@ export const getVendorQuotesResponseLineItemsItemAmountMin = 0;
 
 export const getVendorQuotesResponseTotalMin = 0;
 
-
+export const getVendorQuotesResponseAttachmentsItemConfidenceMin = 0;
 export const GetVendorQuotesResponseItem = zod.object({
   "id": zod.string(),
   "quoteNumber": zod.string(),
@@ -1342,10 +1347,19 @@ export const GetVendorQuotesResponseItem = zod.object({
   "id": zod.string(),
   "description": zod.string().min(1),
   "quantity": zod.number().gt(getVendorQuotesResponseLineItemsItemQuantityExclusiveMin),
-  "unitPrice": zod.number().int().min(getVendorQuotesResponseLineItemsItemUnitPriceMin),
-  "amount": zod.number().int().min(getVendorQuotesResponseLineItemsItemAmountMin)
+  "unitPrice": zod.number().min(getVendorQuotesResponseLineItemsItemUnitPriceMin),
+  "amount": zod.number().min(getVendorQuotesResponseLineItemsItemAmountMin)
 })).min(1),
-  "total": zod.number().int().min(getVendorQuotesResponseTotalMin),
+  "total": zod.number().min(getVendorQuotesResponseTotalMin),
+  "attachments": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "relativePath": zod.string(),
+  "url": zod.string(),
+  "contentType": zod.string(),
+  "size": zod.number().int().min(1),
+  "confidence": zod.number().int().min(getVendorQuotesResponseAttachmentsItemConfidenceMin).max(getVendorQuotesResponseAttachmentsItemConfidenceMax).nullish()
+})),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -1380,7 +1394,7 @@ export const CreateVendorQuoteBody = zod.object({
   "id": zod.string().optional(),
   "description": zod.string().min(1),
   "quantity": zod.number().gt(createVendorQuoteBodyLineItemsItemQuantityExclusiveMin),
-  "unitPrice": zod.number().int().min(createVendorQuoteBodyLineItemsItemUnitPriceMin)
+  "unitPrice": zod.number().min(createVendorQuoteBodyLineItemsItemUnitPriceMin)
 })).min(1)
 })
 
@@ -1397,7 +1411,7 @@ export const createVendorQuoteResponseLineItemsItemAmountMin = 0;
 
 export const createVendorQuoteResponseTotalMin = 0;
 
-
+export const createVendorQuoteResponseAttachmentsItemConfidenceMin = 0;
 export const CreateVendorQuoteResponse = zod.object({
   "id": zod.string(),
   "quoteNumber": zod.string(),
@@ -1417,10 +1431,19 @@ export const CreateVendorQuoteResponse = zod.object({
   "id": zod.string(),
   "description": zod.string().min(1),
   "quantity": zod.number().gt(createVendorQuoteResponseLineItemsItemQuantityExclusiveMin),
-  "unitPrice": zod.number().int().min(createVendorQuoteResponseLineItemsItemUnitPriceMin),
-  "amount": zod.number().int().min(createVendorQuoteResponseLineItemsItemAmountMin)
+  "unitPrice": zod.number().min(createVendorQuoteResponseLineItemsItemUnitPriceMin),
+  "amount": zod.number().min(createVendorQuoteResponseLineItemsItemAmountMin)
 })).min(1),
-  "total": zod.number().int().min(createVendorQuoteResponseTotalMin),
+  "total": zod.number().min(createVendorQuoteResponseTotalMin),
+  "attachments": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "relativePath": zod.string(),
+  "url": zod.string(),
+  "contentType": zod.string(),
+  "size": zod.number().int().min(1),
+  "confidence": zod.number().int().min(createVendorQuoteResponseAttachmentsItemConfidenceMin).max(createVendorQuoteResponseAttachmentsItemConfidenceMax).nullish()
+})),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -1446,7 +1469,7 @@ export const getVendorQuoteResponseLineItemsItemAmountMin = 0;
 
 export const getVendorQuoteResponseTotalMin = 0;
 
-
+export const getVendorQuoteResponseAttachmentsItemConfidenceMin = 0;
 export const GetVendorQuoteResponse = zod.object({
   "id": zod.string(),
   "quoteNumber": zod.string(),
@@ -1466,10 +1489,19 @@ export const GetVendorQuoteResponse = zod.object({
   "id": zod.string(),
   "description": zod.string().min(1),
   "quantity": zod.number().gt(getVendorQuoteResponseLineItemsItemQuantityExclusiveMin),
-  "unitPrice": zod.number().int().min(getVendorQuoteResponseLineItemsItemUnitPriceMin),
-  "amount": zod.number().int().min(getVendorQuoteResponseLineItemsItemAmountMin)
+  "unitPrice": zod.number().min(getVendorQuoteResponseLineItemsItemUnitPriceMin),
+  "amount": zod.number().min(getVendorQuoteResponseLineItemsItemAmountMin)
 })).min(1),
-  "total": zod.number().int().min(getVendorQuoteResponseTotalMin),
+  "total": zod.number().min(getVendorQuoteResponseTotalMin),
+  "attachments": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "relativePath": zod.string(),
+  "url": zod.string(),
+  "contentType": zod.string(),
+  "size": zod.number().int().min(1),
+  "confidence": zod.number().int().min(getVendorQuoteResponseAttachmentsItemConfidenceMin).max(getVendorQuoteResponseAttachmentsItemConfidenceMax).nullish()
+})),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -1506,7 +1538,7 @@ export const UpdateVendorQuoteBody = zod.object({
   "id": zod.string().optional(),
   "description": zod.string().min(1),
   "quantity": zod.number().gt(updateVendorQuoteBodyLineItemsItemQuantityExclusiveMin),
-  "unitPrice": zod.number().int().min(updateVendorQuoteBodyLineItemsItemUnitPriceMin)
+  "unitPrice": zod.number().min(updateVendorQuoteBodyLineItemsItemUnitPriceMin)
 })).min(1).optional()
 })
 
@@ -1523,7 +1555,7 @@ export const updateVendorQuoteResponseLineItemsItemAmountMin = 0;
 
 export const updateVendorQuoteResponseTotalMin = 0;
 
-
+export const updateVendorQuoteResponseAttachmentsItemConfidenceMin = 0;
 export const UpdateVendorQuoteResponse = zod.object({
   "id": zod.string(),
   "quoteNumber": zod.string(),
@@ -1543,10 +1575,19 @@ export const UpdateVendorQuoteResponse = zod.object({
   "id": zod.string(),
   "description": zod.string().min(1),
   "quantity": zod.number().gt(updateVendorQuoteResponseLineItemsItemQuantityExclusiveMin),
-  "unitPrice": zod.number().int().min(updateVendorQuoteResponseLineItemsItemUnitPriceMin),
-  "amount": zod.number().int().min(updateVendorQuoteResponseLineItemsItemAmountMin)
+  "unitPrice": zod.number().min(updateVendorQuoteResponseLineItemsItemUnitPriceMin),
+  "amount": zod.number().min(updateVendorQuoteResponseLineItemsItemAmountMin)
 })).min(1),
-  "total": zod.number().int().min(updateVendorQuoteResponseTotalMin),
+  "total": zod.number().min(updateVendorQuoteResponseTotalMin),
+  "attachments": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "relativePath": zod.string(),
+  "url": zod.string(),
+  "contentType": zod.string(),
+  "size": zod.number().int().min(1),
+  "confidence": zod.number().int().min(updateVendorQuoteResponseAttachmentsItemConfidenceMin).max(updateVendorQuoteResponseAttachmentsItemConfidenceMax).nullish()
+})),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -1915,3 +1956,34 @@ export const DeleteWorkspaceUserParams = zod.object({
 export const DeleteWorkspaceUserResponse = zod.void()
 
 export const DeleteProjectScheduleImageResponse = zod.void()
+
+export const getVendorQuotesResponseAttachmentsItemConfidenceMax = 100;
+
+export const rescanProjectVendorQuotesResponseSkippedMin = 0;
+
+export const createVendorQuoteResponseAttachmentsItemConfidenceMax = 100;
+
+export const getVendorQuoteResponseAttachmentsItemConfidenceMax = 100;
+
+export const updateVendorQuoteResponseAttachmentsItemConfidenceMax = 100;
+
+export const RescanProjectVendorQuotesResponse = zod.object({
+  "documentsScanned": zod.number().int().min(rescanProjectVendorQuotesResponseDocumentsScannedMin),
+  "imported": zod.number().int().min(rescanProjectVendorQuotesResponseImportedMin),
+  "skipped": zod.number().int().min(rescanProjectVendorQuotesResponseSkippedMin),
+  "unreadable": zod.number().int().min(rescanProjectVendorQuotesResponseUnreadableMin),
+  "outcomes": zod.array(zod.object({
+  "documentId": zod.string(),
+  "name": zod.string(),
+  "relativePath": zod.string(),
+  "status": zod.enum(['imported', 'skipped', 'unreadable']),
+  "reason": zod.string(),
+  "quoteId": zod.string().nullish()
+}))
+})
+
+export const rescanProjectVendorQuotesResponseUnreadableMin = 0;
+
+export const rescanProjectVendorQuotesResponseDocumentsScannedMin = 0;
+
+export const rescanProjectVendorQuotesResponseImportedMin = 0;

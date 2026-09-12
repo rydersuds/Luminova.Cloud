@@ -14,6 +14,7 @@ type ImportDocument = {
   size: number;
   contentType: string;
   textSnippet?: string;
+  extractionFailed?: boolean;
 };
 
 type ExtractionLog = {
@@ -241,6 +242,7 @@ export async function enrichFinancialDocumentSnippets(
       const maxBytes = isImage ? MAX_IMAGE_BYTES : MAX_DOCUMENT_BYTES;
       if (document.size > maxBytes) {
         log.warn({ relativePath: document.relativePath, size: document.size }, "Financial document is too large for bounded extraction");
+        enriched[index] = { ...document, extractionFailed: true };
         continue;
       }
       try {
@@ -249,9 +251,12 @@ export async function enrichFinancialDocumentSnippets(
         const textSnippet = isImage
           ? await extractImageText(client, document, buffer)
           : await extractOfficeText(document, buffer);
-        if (textSnippet) enriched[index] = { ...document, textSnippet };
+        enriched[index] = textSnippet
+          ? { ...document, textSnippet, extractionFailed: false }
+          : { ...document, extractionFailed: true };
       } catch (error) {
         log.warn({ err: error, relativePath: document.relativePath }, "Private financial document text extraction failed");
+        enriched[index] = { ...document, extractionFailed: true };
       }
     }
   });

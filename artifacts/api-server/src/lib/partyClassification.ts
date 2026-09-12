@@ -35,3 +35,17 @@ export function normalizeFinancialParty<T extends {
     ...(record.vendorName && isClientParty(record.vendorName) ? { vendorName: canonicalClientName(record.vendorName) } : {}),
   };
 }
+
+export const isConfidentCompanyQuote = (record: {
+  direction: FinancialDirection;
+  vendorName: string;
+  amountDollars: number;
+  confidence: number;
+  sourceRelativePaths: string[];
+}) =>
+  record.direction === "company_to_luminova" &&
+  record.amountDollars > 0 &&
+  record.confidence >= 80 &&
+  record.sourceRelativePaths.length > 0 &&
+  !isClientParty(record.vendorName) &&
+  !isLuminovaParty(record.vendorName);

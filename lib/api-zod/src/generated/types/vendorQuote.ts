@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { QuoteDirection } from './quoteDirection';
+import type { VendorQuoteAttachment } from './vendorQuoteAttachment';
 import type { VendorQuoteLineItem } from './vendorQuoteLineItem';
 import type { VendorQuoteStatus } from './vendorQuoteStatus';
 
@@ -31,6 +32,7 @@ export interface VendorQuote {
   lineItems: VendorQuoteLineItem[];
   /** @minimum 0 */
   total: number;
+  attachments: VendorQuoteAttachment[];
   createdAt: string;
   updatedAt: string;
 }

@@ -7,8 +7,10 @@ import {
   useGetProjects,
   useGetTrades,
   useGetVendorQuotes,
+  useRescanProjectVendorQuotes,
   useUpdateVendorQuote,
   type VendorQuote,
+  type VendorQuoteRescanResult,
   type VendorQuoteStatus,
 } from "@workspace/api-client-react"
 import { AppLayout } from "@/components/layout/app-layout"
@@ -21,7 +23,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
 import { cn, formatCurrency, formatDateOnly, getStatusColor } from "@/lib/utils"
-import { Building2, CalendarClock, FilePenLine, FolderKanban, Layers3, Plus, Search, Trash2, Users, X } from "lucide-react"
+import { Building2, CalendarClock, ExternalLink, FilePenLine, FileText, FolderKanban, Layers3, Plus, RefreshCw, Search, Trash2, Users, X } from "lucide-react"
 
 const STATUSES: VendorQuoteStatus[] = ["Draft", "Requested", "Received", "Under review", "Accepted", "Declined", "Expired"]
 type GroupMode = "all" | "project" | "vendor" | "trade"
@@ -42,6 +44,8 @@ export default function Quotes() {
   const [status, setStatus] = React.useState<VendorQuoteStatus | "">("")
   const [groupMode, setGroupMode] = React.useState<GroupMode>("all")
   const [editing, setEditing] = React.useState<VendorQuote | null | undefined>(undefined)
+  const [scanResult, setScanResult] = React.useState<VendorQuoteRescanResult | null>(null)
+  const rescanQuotes = useRescanProjectVendorQuotes()
 
   const params = {
     search: search || undefined,
@@ -79,6 +83,17 @@ export default function Quotes() {
     setTrade("")
     setStatus("")
   }
+  const rescan = async () => {
+    if (!projectId) return
+    try {
+      const result = await rescanQuotes.mutateAsync({ projectId })
+      setScanResult(result)
+      await queryClient.invalidateQueries({ queryKey: getGetVendorQuotesQueryKey() })
+      toast({ title: "Quote scan complete", description: `${result.imported} imported, ${result.skipped} skipped, ${result.unreadable} unreadable.` })
+    } catch {
+      toast({ title: "Quote scan failed", description: "The project files were left unchanged. Try again.", variant: "destructive" })
+    }
+  }
 
   return (
     <AppLayout>
@@ -93,7 +108,13 @@ export default function Quotes() {
               <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Quote Workspace</h1>
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Review quotes submitted to Luminova by subcontractors, suppliers, and other vendors.</p>
             </div>
-            <Button onClick={() => setEditing(null)} className="gap-2 self-start lg:self-auto"><Plus className="h-4 w-4" /> New vendor quote</Button>
+            <div className="flex flex-wrap gap-2 self-start lg:self-auto">
+              <Button variant="outline" onClick={rescan} disabled={!projectId || rescanQuotes.isPending} className="gap-2">
+                <RefreshCw className={cn("h-4 w-4", rescanQuotes.isPending && "animate-spin")} />
+                {rescanQuotes.isPending ? "Scanning…" : "Scan project files"}
+              </Button>
+              <Button onClick={() => setEditing(null)} className="gap-2"><Plus className="h-4 w-4" /> New vendor quote</Button>
+            </div>
           </header>
 
           <section className="grid gap-4 sm:grid-cols-3">
@@ -101,6 +122,23 @@ export default function Quotes() {
             <Summary icon={Layers3} label="Combined value" value={formatCurrency(totalValue)} />
             <Summary icon={CalendarClock} label="Due soon" value={String(dueSoon)} />
           </section>
+
+          {scanResult && (
+            <section className="glass-panel space-y-3 p-4 sm:p-5" aria-label="Latest vendor quote scan">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div><h2 className="font-bold">Latest file scan</h2><p className="text-sm text-muted-foreground">{scanResult.documentsScanned} project files checked · {scanResult.imported} imported · {scanResult.skipped} skipped · {scanResult.unreadable} unreadable</p></div>
+                <Button variant="ghost" size="sm" onClick={() => setScanResult(null)}>Dismiss</Button>
+              </div>
+              <div className="max-h-56 divide-y divide-border/50 overflow-y-auto border border-border/60">
+                {scanResult.outcomes.map((outcome) => (
+                  <div key={outcome.documentId} className="flex items-start justify-between gap-3 px-3 py-2 text-sm">
+                    <div className="min-w-0"><p className="truncate font-medium">{outcome.name}</p><p className="text-xs text-muted-foreground">{outcome.reason}</p></div>
+                    <Badge variant={outcome.status === "imported" ? "default" : outcome.status === "unreadable" ? "destructive" : "secondary"} className="shrink-0 capitalize">{outcome.status}</Badge>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section className="glass-panel tech-border space-y-4 p-4 sm:p-5">
             <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(220px,1fr)_repeat(4,170px)_auto]">
@@ -182,6 +220,20 @@ function QuoteCard({ quote, onEdit, onProject, onVendor }: { quote: VendorQuote;
           <div><span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Due date</span><p className="mt-1 font-medium">{formatDateOnly(quote.dueDate)}</p></div>
           <div><span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Quote total</span><p className="mt-1 text-lg font-bold tabular-nums">{formatCurrency(quote.total)}</p></div>
         </div>
+        {quote.attachments.length > 0 && (
+          <div className="border-t border-border/50 px-5 py-3">
+            <p className="mb-2 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground"><FileText className="h-3.5 w-3.5" />Source documents</p>
+            <div className="flex flex-wrap gap-2">
+              {quote.attachments.map((attachment) => (
+                <Button key={attachment.id} asChild variant="outline" size="sm" className="max-w-full gap-2">
+                  <a href={attachment.url} target="_blank" rel="noreferrer" title={attachment.relativePath}>
+                    <span className="truncate">{attachment.name}</span><ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                  </a>
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="flex items-center justify-between border-t border-border/50 bg-muted/20 px-5 py-3"><span className="text-xs text-muted-foreground">{quote.lineItems.length} line item{quote.lineItems.length === 1 ? "" : "s"}</span><Button variant="ghost" size="sm" onClick={onEdit} className="gap-2"><FilePenLine className="h-4 w-4" /> Edit</Button></div>
       </CardContent>
     </Card>
