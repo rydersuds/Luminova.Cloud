@@ -5,9 +5,11 @@ import {
   useCreateProject,
   useGetCurrentWorkspaceUser,
   useGetProjectManagers,
+  useGetFinancialSummary,
   getGetProjectManagersQueryKey,
   getGetProjectsQueryKey,
-  getGetDashboardSummaryQueryKey
+  getGetDashboardSummaryQueryKey,
+  getGetFinancialSummaryQueryKey,
 } from "@workspace/api-client-react"
 import { AppLayout } from "@/components/layout/app-layout"
 import { Card, CardContent } from "@/components/ui/card"
@@ -15,7 +17,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
-import { Plus, MapPin, Building, Activity, Camera, DollarSign, Clock, UploadCloud, FileJson, FileSpreadsheet, X, CheckCircle2, AlertTriangle, ShieldAlert, FolderUp, FileText } from "lucide-react"
+import { Plus, MapPin, Building, Activity, DollarSign, Clock, FileJson, FileSpreadsheet, X, CheckCircle2, AlertTriangle, ShieldAlert, FolderUp, FileText } from "lucide-react"
 import { Link, useLocation } from "wouter"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
@@ -73,6 +75,9 @@ export default function Dashboard() {
   
   const { data: summary, isLoading: loadingSummary } = useGetDashboardSummary({
     query: { queryKey: getGetDashboardSummaryQueryKey() }
+  })
+  const financialSummary = useGetFinancialSummary({
+    query: { queryKey: getGetFinancialSummaryQueryKey(), retry: false }
   })
   
   const { data: projects, isLoading: loadingProjects } = useGetProjects(
@@ -231,6 +236,54 @@ export default function Dashboard() {
 
   const validCount = parsedRows.filter(r => r.valid).length
   const invalidCount = parsedRows.filter(r => !r.valid).length
+  const financials = financialSummary.data
+  const totalProfit = financials
+    ? financials.invoicedRevenue - financials.invoicedExpenses
+    : undefined
+  const financialCards = [
+    {
+      label: "Portfolio Budget",
+      value: summary?.budgeted,
+      icon: DollarSign,
+      accent: "text-primary bg-primary/10",
+      loading: loadingSummary,
+    },
+    {
+      label: "Invoiced Revenue",
+      value: financials?.invoicedRevenue,
+      icon: FileText,
+      accent: "text-success bg-success/10",
+      loading: financialSummary.isLoading,
+    },
+    {
+      label: "Invoiced Expenses",
+      value: financials?.invoicedExpenses,
+      icon: Activity,
+      accent: "text-warning bg-warning/10",
+      loading: financialSummary.isLoading,
+    },
+    {
+      label: "Total Profit",
+      value: totalProfit,
+      icon: DollarSign,
+      accent: (totalProfit ?? 0) >= 0 ? "text-success bg-success/10" : "text-destructive bg-destructive/10",
+      loading: financialSummary.isLoading,
+    },
+    {
+      label: "Accepted Client Work",
+      value: financials?.acceptedClientQuoteValue,
+      icon: CheckCircle2,
+      accent: "text-info bg-info/10",
+      loading: financialSummary.isLoading,
+    },
+    {
+      label: "Upcoming Client Payments",
+      value: financials?.upcomingClientPayments,
+      icon: Clock,
+      accent: "text-primary bg-primary/10",
+      loading: financialSummary.isLoading,
+    },
+  ]
 
   return (
     <AppLayout>
@@ -528,73 +581,25 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Stats Grid - Holographic style */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-            <Card className="surface-3d bg-card hover:bg-card/80 transition-all group">
-              <CardContent className="p-6">
-                <div className="flex flex-col justify-between h-full">
-                  <div className="flex items-center justify-between mb-4">
-                    <p className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground drop-shadow-sm">Active Nodes</p>
-                    <div className="h-10 w-10 bg-primary/10 text-primary rounded-full surface-3d flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Building className="h-5 w-5 drop-shadow-sm" />
+          {/* Financial overview */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 md:gap-6">
+            {financialCards.map(({ label, value, icon: Icon, accent, loading }) => (
+              <Card key={label} className="surface-3d bg-card hover:bg-card/80 transition-all group">
+                <CardContent className="p-6">
+                  <div className="flex min-h-24 flex-col justify-between">
+                    <div className="mb-4 flex items-center justify-between gap-4">
+                      <p className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground drop-shadow-sm">{label}</p>
+                      <div className={cn("h-10 w-10 shrink-0 rounded-full surface-3d flex items-center justify-center group-hover:scale-110 transition-transform", accent)}>
+                        <Icon className="h-5 w-5 drop-shadow-sm" />
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <p className="text-3xl font-mono font-bold tracking-tighter text-primary transition-colors">{loadingSummary ? "-" : summary?.activeProjects}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="surface-3d bg-card hover:bg-card/80 transition-all group">
-              <CardContent className="p-6">
-                <div className="flex flex-col justify-between h-full">
-                  <div className="flex items-center justify-between mb-4">
-                    <p className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground drop-shadow-sm">Pending Auth</p>
-                    <div className="h-10 w-10 bg-warning/10 text-warning rounded-full surface-3d flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Clock className="h-5 w-5 drop-shadow-sm" />
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-3xl font-mono font-bold tracking-tighter text-warning">{loadingSummary ? "-" : summary?.awaitingApproval}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="surface-3d bg-card hover:bg-card/80 transition-all group">
-              <CardContent className="p-6">
-                <div className="flex flex-col justify-between h-full">
-                  <div className="flex items-center justify-between mb-4">
-                    <p className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground drop-shadow-sm">Visual Feeds</p>
-                    <div className="h-10 w-10 bg-info/10 text-info rounded-full surface-3d flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Camera className="h-5 w-5 drop-shadow-sm" />
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-3xl font-mono font-bold tracking-tighter text-info">{loadingSummary ? "-" : summary?.new360Photos}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="surface-3d bg-card hover:bg-card/80 transition-all group">
-              <CardContent className="p-6">
-                <div className="flex flex-col justify-between h-full">
-                  <div className="flex items-center justify-between mb-4">
-                    <p className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground drop-shadow-sm">Capital Outlay</p>
-                    <div className="h-10 w-10 bg-success/10 text-success rounded-full surface-3d flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <DollarSign className="h-5 w-5 drop-shadow-sm" />
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-3xl font-mono font-bold tracking-tighter text-success">
-                      {loadingSummary ? "-" : `$${((summary?.budgeted || 0) / 1000000).toFixed(1)}M`}
+                    <p className="break-words text-2xl font-mono font-bold tracking-tighter text-foreground sm:text-3xl">
+                      {loading ? "—" : value === undefined ? "Unavailable" : formatCurrency(value)}
                     </p>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            ))}
           </div>
 
           {/* Main Panels */}
