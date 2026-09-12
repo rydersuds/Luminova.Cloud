@@ -176,6 +176,20 @@ export interface ChatParticipant {
   imageUrl: string;
   role: WorkspaceRole;
 }
+
+export interface ChatProjectOption {
+  id: string;
+  name: string;
+  clientName: string;
+  eligibleParticipantIds: string[];
+}
+
+export interface ChatOptions {
+  currentUserId: string;
+  participants: ChatParticipant[];
+  projects: ChatProjectOption[];
+}
+
 export interface ProjectMessage {
   id: string;
   conversationId: string;
@@ -196,6 +210,13 @@ export interface ProjectMessageInput {
 }
 
 export type ProjectConversationType = typeof ProjectConversationType[keyof typeof ProjectConversationType];
+
+
+export const ProjectConversationType = {
+  direct: 'direct',
+  project: 'project',
+} as const;
+
 export interface ProjectConversation {
   id: string;
   type: ProjectConversationType;
@@ -212,6 +233,13 @@ export interface ProjectConversation {
 }
 
 export type ProjectConversationInputType = typeof ProjectConversationInputType[keyof typeof ProjectConversationInputType];
+
+
+export const ProjectConversationInputType = {
+  direct: 'direct',
+  project: 'project',
+} as const;
+
 export interface ProjectConversationInput {
   type: ProjectConversationInputType;
   /** @minLength 1 */
@@ -1035,26 +1063,3 @@ trade?: string;
 status?: VendorQuoteStatus;
 direction?: QuoteDirection;
 };
-
-export interface ChatOptions {
-  currentUserId: string;
-  participants: ChatParticipant[];
-  projects: ChatProjectOption[];
-}
-
-export const ProjectConversationInputType = {
-  direct: 'direct',
-  project: 'project',
-} as const;
-
-export interface ChatProjectOption {
-  id: string;
-  name: string;
-  clientName: string;
-  eligibleParticipantIds: string[];
-}
-
-export const ProjectConversationType = {
-  direct: 'direct',
-  project: 'project',
-} as const;
