@@ -122,6 +122,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const [scheduleImageToRemove, setScheduleImageToRemove] = React.useState<ProjectScheduleImage | null>(null)
   const [scheduleRemoveError, setScheduleRemoveError] = React.useState("")
   const [restoringScheduleDocumentId, setRestoringScheduleDocumentId] = React.useState<string | null>(null)
+  const [scheduleRestoreSearch, setScheduleRestoreSearch] = React.useState("")
   const [photoIndex, setPhotoIndex] = React.useState<number | null>(null)
   const [activePanorama, setActivePanorama] = React.useState<ProjectPanorama | null>(null)
   const [editingPanorama, setEditingPanorama] = React.useState<ProjectPanorama | null>(null)
@@ -195,6 +196,14 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
     file.contentType.toLowerCase().startsWith("image/") &&
     !project.scheduleImages.some((image) => image.id === file.id)
   ) || []
+  const filteredRestorableScheduleDocuments = React.useMemo(() => {
+    const query = scheduleRestoreSearch.trim().toLowerCase()
+    if (!query) return restorableScheduleDocuments
+    return restorableScheduleDocuments.filter((document) =>
+      document.name.toLowerCase().includes(query) ||
+      document.relativePath.toLowerCase().includes(query)
+    )
+  }, [restorableScheduleDocuments, scheduleRestoreSearch])
   const entryAgreement = project?.files.find(
     (file) => file.classification === "contract" && file.isEntryAgreement,
   )
@@ -884,28 +893,57 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                     <div className="mt-6 border-t pt-5">
                       <h3 className="font-medium">Restore from project files</h3>
                       <p className="mt-1 text-sm text-muted-foreground">Add a preserved project image back to the schedule gallery.</p>
-                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                        {restorableScheduleDocuments.map((document) => (
-                          <div key={document.id} className="flex min-w-0 items-center gap-3 rounded-lg border p-3">
-                            <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-sm font-medium">{document.name}</span>
-                              <span className="block truncate text-xs text-muted-foreground">{document.relativePath}</span>
-                            </span>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="shrink-0 gap-1.5"
-                              disabled={restoringScheduleDocumentId !== null}
-                              onClick={() => void handleScheduleRestore(document)}
-                              aria-label={`Restore schedule image ${document.name}`}
-                            >
-                              <RotateCcw className="h-3.5 w-3.5" />
-                              {restoringScheduleDocumentId === document.id ? "Restoring…" : "Restore"}
-                            </Button>
+                      <div className="relative mt-3">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          type="search"
+                          value={scheduleRestoreSearch}
+                          onChange={(event) => setScheduleRestoreSearch(event.target.value)}
+                          placeholder="Search by file name or project path"
+                          aria-label="Search restorable schedule images"
+                          className="pl-9"
+                        />
+                      </div>
+                      <p className="mt-2 text-xs text-muted-foreground" aria-live="polite">
+                        {filteredRestorableScheduleDocuments.length === restorableScheduleDocuments.length
+                          ? `${restorableScheduleDocuments.length} images available`
+                          : `${filteredRestorableScheduleDocuments.length} of ${restorableScheduleDocuments.length} images shown`}
+                      </p>
+                      <div className="mt-3 max-h-72 overflow-y-auto overscroll-contain rounded-lg border p-2">
+                        {filteredRestorableScheduleDocuments.length === 0 ? (
+                          <p className="px-3 py-8 text-center text-sm text-muted-foreground">No project images match your search.</p>
+                        ) : (
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            {filteredRestorableScheduleDocuments.map((document) => {
+                              const isRestoring = restoringScheduleDocumentId === document.id
+                              return (
+                                <div
+                                  key={document.id}
+                                  className={cn("flex min-w-0 items-center gap-3 rounded-lg border p-3", isRestoring && "border-primary bg-primary/5")}
+                                  aria-current={isRestoring ? "true" : undefined}
+                                >
+                                  <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
+                                  <span className="min-w-0 flex-1">
+                                    <span className="block truncate text-sm font-medium" title={document.name}>{document.name}</span>
+                                    <span className="block truncate text-xs text-muted-foreground" title={document.relativePath}>{document.relativePath}</span>
+                                  </span>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="shrink-0 gap-1.5"
+                                    disabled={restoringScheduleDocumentId !== null}
+                                    onClick={() => void handleScheduleRestore(document)}
+                                    aria-label={`Restore schedule image ${document.name}`}
+                                  >
+                                    <RotateCcw className={cn("h-3.5 w-3.5", isRestoring && "animate-spin")} />
+                                    {isRestoring ? "Restoring…" : "Restore"}
+                                  </Button>
+                                </div>
+                              )
+                            })}
                           </div>
-                        ))}
+                        )}
                       </div>
                     </div>
                   )}

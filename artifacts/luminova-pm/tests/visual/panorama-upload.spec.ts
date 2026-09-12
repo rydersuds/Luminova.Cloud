@@ -491,6 +491,57 @@ test('restores a project image, reports failures, and refreshes the schedule gal
   await expect(restore).not.toBeVisible();
 });
 
+test('filters a large project image set by path and restores the selected schedule image', async ({ page }) => {
+  const projectImages = Array.from({ length: 48 }, (_, index) => ({
+    id: `project-image-${index}`,
+    url: `/api/storage/objects/uploads/project-image-${index}`,
+    name: `site-photo-${String(index).padStart(2, '0')}.png`,
+    relativePath: `Photos/Progress/Week-${String(index).padStart(2, '0')}/site-photo-${String(index).padStart(2, '0')}.png`,
+    contentType: 'image/png',
+    size: 2048,
+    classification: 'other',
+    collection: 'Photos',
+    linkedEntityType: null,
+    linkedEntityId: null,
+    aiConfidence: null,
+  }));
+  const target = {
+    ...projectImages[37],
+    name: 'approved-master-schedule.png',
+    relativePath: 'Closeout/Schedules/Approved/approved-master-schedule.png',
+  };
+  projectImages[37] = target;
+  let current = { ...structuredClone(project), files: projectImages, scheduleImages: [] };
+
+  await page.unroute('**/api/projects/riverstone');
+  await page.route('**/api/projects/riverstone', route => route.fulfill({ json: current }));
+  await page.route(`**/api/projects/riverstone/schedule-images/${target.id}/restore`, async route => {
+    expect(route.request().method()).toBe('POST');
+    await new Promise(resolve => setTimeout(resolve, 150));
+    current = { ...current, scheduleImages: [target] };
+    await route.fulfill({ status: 200, json: target });
+  });
+
+  await openOverview(page);
+  await expect(page.getByText('48 images available', { exact: true })).toBeVisible();
+  const restoreRegion = page.getByText('48 images available', { exact: true }).locator('..').locator('div').last();
+  const regionSize = await restoreRegion.boundingBox();
+  expect(regionSize?.height).toBeLessThanOrEqual(288);
+
+  await page.getByLabel('Search restorable schedule images').fill('Closeout/Schedules');
+  await expect(page.getByText('1 of 48 images shown', { exact: true })).toBeVisible();
+  await expect(page.getByText(target.name, { exact: true })).toBeVisible();
+  await expect(page.getByText(target.relativePath, { exact: true })).toBeVisible();
+  await expect(page.getByText('site-photo-00.png', { exact: true })).toHaveCount(0);
+
+  const restore = page.getByRole('button', { name: `Restore schedule image ${target.name}` });
+  await restore.click();
+  await expect(restore).toHaveText('Restoring…');
+  await expect(restore.locator('..')).toHaveAttribute('aria-current', 'true');
+  await expect(page.getByText('Schedule image restored', { exact: true })).toBeVisible();
+  await expect(page.getByRole('img', { name: target.name })).toBeVisible();
+});
+
 test('uploads a schedule image, refreshes the project, and supports retry after failure', async ({ page }) => {
   const uploaded = {
     id: 'schedule-new',
