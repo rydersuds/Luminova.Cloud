@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import test from "node:test";
 import express from "express";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   db,
   importedProjectsTable,
@@ -14,16 +14,117 @@ import {
 import {
   backfillLegacyEntryAgreementDesignations,
   isStandardEntryAgreementName,
+  selectEntryAgreementRelativePath,
 } from "../lib/entryAgreement";
 import luminovaRouter from "./luminova";
 
 test("recognizes the legacy imported filename regardless of extension casing", () => {
-  assert.equal(isStandardEntryAgreementName("NOTICE OF AUTHORIZED CONTRACTOR & INSURANCE ACCESS.pdf"), true);
-  assert.equal(isStandardEntryAgreementName(" notice of authorized contractor & insurance access.PDF "), true);
+  assert.equal(
+    isStandardEntryAgreementName(
+      "NOTICE OF AUTHORIZED CONTRACTOR & INSURANCE ACCESS.pdf",
+    ),
+    true,
+  );
+  assert.equal(
+    isStandardEntryAgreementName(
+      " notice of authorized contractor & insurance access.PDF ",
+    ),
+    true,
+  );
 });
 
 test("does not designate other contract documents", () => {
-  assert.equal(isStandardEntryAgreementName("Construction Management Agreement.pdf"), false);
+  assert.equal(
+    isStandardEntryAgreementName("Construction Management Agreement.pdf"),
+    false,
+  );
+});
+
+test("selects the standard agreement from the current import paths", () => {
+  assert.equal(
+    selectEntryAgreementRelativePath([
+      {
+        relativePath: "Contracts/Construction Management Agreement.pdf",
+        name: "Construction Management Agreement.pdf",
+        textSnippet: "Agreement for construction management services.",
+      },
+      {
+        relativePath:
+          "Site/NOTICE OF AUTHORIZED CONTRACTOR & INSURANCE ACCESS.PDF",
+        name: "NOTICE OF AUTHORIZED CONTRACTOR & INSURANCE ACCESS.PDF",
+      },
+    ]),
+    "Site/NOTICE OF AUTHORIZED CONTRACTOR & INSURANCE ACCESS.PDF",
+  );
+});
+
+test("selects equivalent site-access wording supported by extracted text", () => {
+  assert.equal(
+    selectEntryAgreementRelativePath([
+      {
+        relativePath: "Administration/owner-form.pdf",
+        name: "owner-form.pdf",
+        textSnippet:
+          "Site access authorization and agreement. Contractor must provide proof of insurance before entry to the property.",
+      },
+    ]),
+    "Administration/owner-form.pdf",
+  );
+});
+
+test("keeps the entry agreement empty when no confident match exists", () => {
+  assert.equal(
+    selectEntryAgreementRelativePath([
+      {
+        relativePath: "Contracts/Prime Contract.pdf",
+        name: "Prime Contract.pdf",
+        textSnippet: "Construction services agreement and payment terms.",
+      },
+      {
+        relativePath: "Schedules/Master Schedule.pdf",
+        name: "Master Schedule.pdf",
+        textSnippet: "Foundation and framing milestones.",
+      },
+    ]),
+    null,
+  );
+});
+
+test("rejects equally confident candidates instead of designating an arbitrary agreement", () => {
+  assert.equal(
+    selectEntryAgreementRelativePath([
+      {
+        relativePath: "Copy A/Site access agreement.pdf",
+        name: "Site access agreement.pdf",
+      },
+      {
+        relativePath: "Copy B/Site access agreement.pdf",
+        name: "Site access agreement.pdf",
+      },
+    ]),
+    null,
+  );
+});
+
+test("only considers candidates explicitly supplied from the current import", () => {
+  const otherProjectDocument = {
+    relativePath:
+      "Other project/NOTICE OF AUTHORIZED CONTRACTOR & INSURANCE ACCESS.pdf",
+    name: "NOTICE OF AUTHORIZED CONTRACTOR & INSURANCE ACCESS.pdf",
+  };
+  const currentImport = [
+    {
+      relativePath: "Current project/Construction Management Agreement.pdf",
+      name: "Construction Management Agreement.pdf",
+      textSnippet: "Construction management services.",
+    },
+  ];
+
+  assert.equal(selectEntryAgreementRelativePath(currentImport), null);
+  assert.equal(
+    selectEntryAgreementRelativePath([...currentImport, otherProjectDocument]),
+    otherProjectDocument.relativePath,
+  );
 });
 
 test("backfills a legacy agreement and preserves its designation after it is renamed", async (t) => {
@@ -33,6 +134,9 @@ test("backfills a legacy agreement and preserves its designation after it is ren
   const importBatchId = `entry-batch-${suffix}`;
   const entryDocumentId = `entry-document-${suffix}`;
   const otherDocumentId = `other-contract-${suffix}`;
+  const otherProjectId = `other-entry-project-${suffix}`;
+  const otherImportBatchId = `other-entry-batch-${suffix}`;
+  const otherProjectDocumentId = `other-entry-document-${suffix}`;
   const project = {
     id: projectId,
     name: "Entry agreement persistence project",
@@ -56,7 +160,26 @@ test("backfills a legacy agreement and preserves its designation after it is ren
     status: "completed",
     manifest: [],
   });
-  await db.insert(importedProjectsTable).values({ id: projectId, importBatchId, ownerId, data: project });
+  await db.insert(projectImportBatchesTable).values({
+    id: otherImportBatchId,
+    projectId: otherProjectId,
+    ownerId,
+    status: "completed",
+    manifest: [],
+  });
+  await db.insert(importedProjectsTable).values([
+    { id: projectId, importBatchId, ownerId, data: project },
+    {
+      id: otherProjectId,
+      importBatchId: otherImportBatchId,
+      ownerId,
+      data: {
+        ...project,
+        id: otherProjectId,
+        name: "Other entry agreement project",
+      },
+    },
+  ]);
   await db.insert(projectDocumentsTable).values([
     {
       id: entryDocumentId,
@@ -64,7 +187,8 @@ test("backfills a legacy agreement and preserves its designation after it is ren
       projectId,
       ownerId,
       objectPath: `/objects/uploads/${entryDocumentId}`,
-      relativePath: "Contracts/NOTICE OF AUTHORIZED CONTRACTOR & INSURANCE ACCESS.pdf",
+      relativePath:
+        "Contracts/NOTICE OF AUTHORIZED CONTRACTOR & INSURANCE ACCESS.pdf",
       name: "NOTICE OF AUTHORIZED CONTRACTOR & INSURANCE ACCESS.pdf",
       contentType: "application/pdf",
       size: 2048,
@@ -78,6 +202,19 @@ test("backfills a legacy agreement and preserves its designation after it is ren
       objectPath: `/objects/uploads/${otherDocumentId}`,
       relativePath: "Contracts/Construction Management Agreement.pdf",
       name: "Construction Management Agreement.pdf",
+      contentType: "application/pdf",
+      size: 2048,
+      classification: "contract",
+    },
+    {
+      id: otherProjectDocumentId,
+      importBatchId: otherImportBatchId,
+      projectId: otherProjectId,
+      ownerId,
+      objectPath: `/objects/uploads/${otherProjectDocumentId}`,
+      relativePath:
+        "Contracts/NOTICE OF AUTHORIZED CONTRACTOR & INSURANCE ACCESS.pdf",
+      name: "NOTICE OF AUTHORIZED CONTRACTOR & INSURANCE ACCESS.pdf",
       contentType: "application/pdf",
       size: 2048,
       classification: "contract",
@@ -99,26 +236,45 @@ test("backfills a legacy agreement and preserves its designation after it is ren
 
   t.after(async () => {
     server.close();
-    await db.delete(projectDocumentsTable).where(eq(projectDocumentsTable.projectId, projectId));
-    await db.delete(importedProjectsTable).where(eq(importedProjectsTable.id, projectId));
-    await db.delete(projectImportBatchesTable).where(and(
-      eq(projectImportBatchesTable.id, importBatchId),
-      eq(projectImportBatchesTable.ownerId, ownerId),
-    ));
+    await db
+      .delete(projectDocumentsTable)
+      .where(
+        inArray(projectDocumentsTable.projectId, [projectId, otherProjectId]),
+      );
+    await db
+      .delete(importedProjectsTable)
+      .where(inArray(importedProjectsTable.id, [projectId, otherProjectId]));
+    await db
+      .delete(projectImportBatchesTable)
+      .where(
+        and(
+          inArray(projectImportBatchesTable.id, [
+            importBatchId,
+            otherImportBatchId,
+          ]),
+          eq(projectImportBatchesTable.ownerId, ownerId),
+        ),
+      );
   });
 
-  assert.ok(await backfillLegacyEntryAgreementDesignations() >= 1);
-  await db.update(projectDocumentsTable).set({
-    name: "Signed site entry agreement.pdf",
-    relativePath: "Contracts/Signed site entry agreement.pdf",
-  }).where(eq(projectDocumentsTable.id, entryDocumentId));
+  assert.ok((await backfillLegacyEntryAgreementDesignations()) >= 1);
+  await db
+    .update(projectDocumentsTable)
+    .set({
+      name: "Signed site entry agreement.pdf",
+      relativePath: "Contracts/Signed site entry agreement.pdf",
+    })
+    .where(eq(projectDocumentsTable.id, entryDocumentId));
 
-  const response = await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/projects/${projectId}`, {
-    headers: { "x-test-user": ownerId },
-  });
+  const response = await fetch(
+    `http://127.0.0.1:${(server.address() as AddressInfo).port}/projects/${projectId}`,
+    {
+      headers: { "x-test-user": ownerId },
+    },
+  );
   assert.equal(response.status, 200);
 
-  const detail = await response.json() as {
+  const detail = (await response.json()) as {
     files: Array<{ id: string; name: string; isEntryAgreement: boolean }>;
   };
   assert.deepEqual(
@@ -127,5 +283,12 @@ test("backfills a legacy agreement and preserves its designation after it is ren
       .map((file) => ({ id: file.id, name: file.name })),
     [{ id: entryDocumentId, name: "Signed site entry agreement.pdf" }],
   );
-  assert.equal(detail.files.find((file) => file.id === otherDocumentId)?.isEntryAgreement, false);
+  assert.equal(
+    detail.files.find((file) => file.id === otherDocumentId)?.isEntryAgreement,
+    false,
+  );
+  assert.equal(
+    detail.files.some((file) => file.id === otherProjectDocumentId),
+    false,
+  );
 });

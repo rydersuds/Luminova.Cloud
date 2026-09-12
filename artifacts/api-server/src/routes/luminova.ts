@@ -148,7 +148,7 @@ import
 
 import 
 {
- and, desc, eq, inArray, lt, sql 
+ and, desc, eq, inArray, isNull, lt, sql
 }
  from "drizzle-orm"
 ;
@@ -201,7 +201,7 @@ import
  from "../lib/financialDocumentExtraction"
 ;
 
-import { isStandardEntryAgreementName } from "../lib/entryAgreement";
+import { selectEntryAgreementRelativePath } from "../lib/entryAgreement";
 
 import 
 {
@@ -4862,6 +4862,8 @@ const createProjectImportHandler = async (req: Request, res: Response): Promise<
 
   const classifications = new Map(analysis.documents.map((item) => [item.relativePath, item.classification]))
 ;
+  const entryAgreementRelativePath = selectEntryAgreementRelativePath(analyzedDocuments)
+;
 
   const photoMetadata = await analyzeImportedPhotos(analyzedDocuments, req.log)
 ;
@@ -4964,16 +4966,23 @@ const createProjectImportHandler = async (req: Request, res: Response): Promise<
 {
 
             projectId: project.id,
-            classification: classifications.get(document.relativePath) ?? documentClassification(document.relativePath),
+            classification: document.relativePath === entryAgreementRelativePath
+              ? "contract"
+              : classifications.get(document.relativePath) ?? documentClassification(document.relativePath),
             linkedEntityType: matchedQuote ? "quote" : null,
             linkedEntityId: matchedQuote?.id ?? null,
             aiConfidence: matchedQuote?.importConfidence ?? null,
-            isEntryAgreement: isStandardEntryAgreementName(document.name),
+            isEntryAgreement: document.relativePath === entryAgreementRelativePath,
             visualCaption: visual?.caption ?? null,
             visualTags: visual ? photoMetadataTags(visual) : [],
           
 }
-).where(and(eq(projectDocumentsTable.importBatchId, importId), eq(projectDocumentsTable.relativePath, document.relativePath)))
+).where(and(
+              eq(projectDocumentsTable.importBatchId, importId),
+              eq(projectDocumentsTable.ownerId, ownerId),
+              isNull(projectDocumentsTable.projectId),
+              eq(projectDocumentsTable.relativePath, document.relativePath),
+            ))
 ;
 
         
@@ -4989,8 +4998,10 @@ const createProjectImportHandler = async (req: Request, res: Response): Promise<
 
           id: `doc-${randomUUID()}`, importBatchId: importId, projectId: project.id, ownerId, objectPath: document.objectPath,
           relativePath: document.relativePath, name: document.name, contentType: document.contentType, size: document.size,
-          classification: classifications.get(document.relativePath) ?? documentClassification(document.relativePath),
-          isEntryAgreement: isStandardEntryAgreementName(document.name),
+          classification: document.relativePath === entryAgreementRelativePath
+            ? "contract"
+            : classifications.get(document.relativePath) ?? documentClassification(document.relativePath),
+          isEntryAgreement: document.relativePath === entryAgreementRelativePath,
           linkedEntityType: (() => 
 {
 
@@ -5126,7 +5137,11 @@ router.post("/project-import-sessions/:importId/build", async (req, res): Promis
   
 }
 
-  const documents = await db.select().from(projectDocumentsTable).where(eq(projectDocumentsTable.importBatchId, batch.id))
+  const documents = await db.select().from(projectDocumentsTable).where(and(
+    eq(projectDocumentsTable.importBatchId, batch.id),
+    eq(projectDocumentsTable.ownerId, ownerId),
+    isNull(projectDocumentsTable.projectId),
+  ))
 ;
 
   const manifest = batch.manifest as ImportManifestDocument[]
