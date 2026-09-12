@@ -5,15 +5,23 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ProjectConversationInputType } from './projectConversationInputType';
 
 export interface ProjectConversationInput {
+  type: ProjectConversationInputType;
   /** @minLength 1 */
-  projectId: string;
+  projectId?: string;
   /**
      * @minLength 1
      * @maxLength 160
      */
-  title: string;
+  title?: string;
   /** @maxLength 200 */
   context?: string;
+  /**
+     * @minItems 1
+     * @maxItems 50
+     * @items.minLength 1
+     */
+  participantIds: string[];
 }

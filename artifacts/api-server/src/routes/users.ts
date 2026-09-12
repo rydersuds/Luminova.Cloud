@@ -103,6 +103,23 @@ function serializeUser(user: User) {
   };
 }
 
+export async function workspaceChatUsers(req: AuthenticatedRequest) {
+  const auth = getAuth(req);
+  let users: User[];
+  if (auth.orgId) {
+    const memberships = await clerk.organizations.getOrganizationMembershipList({
+      organizationId: auth.orgId,
+      limit: 100,
+    });
+    const userIds = memberships.data
+      .map((membership) => membership.publicUserData?.userId)
+      .filter((userId): userId is string => Boolean(userId));
+    users = await Promise.all(userIds.map((userId) => clerk.users.getUser(userId)));
+  } else {
+    users = await listAllWorkspaceUsers(clerk);
+  }
+  return users.map(serializeUser);
+}
 function invitationRole(invitation: Invitation): (typeof ROLES)[number] {
   const role = invitation.publicMetadata?.role;
   return ROLES.includes(role as (typeof ROLES)[number])

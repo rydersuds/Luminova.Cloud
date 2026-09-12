@@ -800,10 +800,10 @@ paths:
     get:
       operationId: getProjectConversations
       tags: [communications]
-      summary: List the authenticated workspace's project conversations
+      summary: List chats the authenticated user participates in
       responses:
         "200":
-          description: Project conversations with persisted messages
+          description: Direct and project chats with persisted messages
           content:
             application/json:
               schema:
@@ -815,7 +815,7 @@ paths:
     post:
       operationId: createProjectConversation
       tags: [communications]
-      summary: Create a conversation for an owned project
+      summary: Create a direct or project chat
       requestBody:
         required: true
         content:
@@ -834,12 +834,28 @@ paths:
         "401":
           description: Authentication required
         "404":
-          description: Project not found
+          description: Project or participant not found
+        "403":
+          description: Participant is not eligible for the selected project
+  /conversations/options:
+    get:
+      operationId: getChatOptions
+      tags: [communications]
+      summary: List eligible chat participants and projects
+      responses:
+        "200":
+          description: Chat creation options for the authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatOptions"
+        "401":
+          description: Authentication required
   /conversations/{conversationId}:
     get:
       operationId: getProjectConversation
       tags: [communications]
-      summary: Get an owned project conversation
+      summary: Get a chat the authenticated user participates in
       parameters:
         - name: conversationId
           in: path
@@ -860,7 +876,7 @@ paths:
     post:
       operationId: createProjectMessage
       tags: [communications]
-      summary: Add a message to an owned project conversation
+      summary: Add a message to a chat the authenticated user participates in
       parameters:
         - name: conversationId
           in: path
@@ -1590,14 +1606,49 @@ components:
         title: { type: string }
         subtitle: { type: string }
         href: { type: string }
+    ChatParticipant:
+      type: object
+      required: [id, name, email, imageUrl, role]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string }
+        imageUrl: { type: string }
+        role:
+          $ref: "#/components/schemas/WorkspaceRole"
+    ChatProjectOption:
+      type: object
+      required: [id, name, clientName, eligibleParticipantIds]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        clientName: { type: string }
+        eligibleParticipantIds:
+          type: array
+          items: { type: string }
+    ChatOptions:
+      type: object
+      required: [currentUserId, participants, projects]
+      properties:
+        currentUserId: { type: string }
+        participants:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatParticipant"
+        projects:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatProjectOption"
     ProjectMessage:
       type: object
-      required: [id, conversationId, projectId, senderId, text, createdAt]
+      required: [id, conversationId, projectId, senderId, sender, text, createdAt]
       properties:
         id: { type: string }
         conversationId: { type: string }
-        projectId: { type: string }
+        projectId: { type: [string, "null"] }
         senderId: { type: string }
+        sender:
+          $ref: "#/components/schemas/ChatParticipant"
         text: { type: string }
         createdAt: { type: string, format: date-time }
     ProjectMessageInput:
@@ -1611,13 +1662,18 @@ components:
           maxLength: 5000
     ProjectConversation:
       type: object
-      required: [id, projectId, projectName, title, context, createdAt, updatedAt, messages]
+      required: [id, type, projectId, projectName, title, context, participants, createdAt, updatedAt, messages]
       properties:
         id: { type: string }
-        projectId: { type: string }
-        projectName: { type: string }
+        type: { type: string, enum: [direct, project] }
+        projectId: { type: [string, "null"] }
+        projectName: { type: [string, "null"] }
         title: { type: string }
         context: { type: string }
+        participants:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatParticipant"
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         messages:
@@ -1627,11 +1683,18 @@ components:
     ProjectConversationInput:
       type: object
       additionalProperties: false
-      required: [projectId, title]
+      required: [type, participantIds]
       properties:
+        type: { type: string, enum: [direct, project] }
         projectId: { type: string, minLength: 1 }
         title: { type: string, minLength: 1, maxLength: 160 }
         context: { type: string, maxLength: 200, default: Project channel }
+        participantIds:
+          type: array
+          minItems: 1
+          maxItems: 50
+          uniqueItems: true
+          items: { type: string, minLength: 1 }
     DashboardSummary:
       type: object
       required: [activeProjects, awaitingApproval, unreadMessages, new360Photos, budgeted, invoiced, recentActivity]

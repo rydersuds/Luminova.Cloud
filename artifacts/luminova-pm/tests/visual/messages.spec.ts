@@ -6,12 +6,17 @@ const conversations = [
     projectId: 'downtown',
     projectName: 'Downtown Office Reno',
     title: 'City Electric',
+    type: 'direct',
     context: 'Trade',
+    participants: [
+      { id: 'me', name: 'Alex Morgan', email: 'alex@example.com', imageUrl: '', role: 'Project Manager' },
+      { id: 'trade', name: 'City Electric', email: 'city@example.com', imageUrl: '', role: 'Field Team' },
+    ],
     createdAt: '2026-09-09T15:00:00.000Z',
     updatedAt: '2026-09-09T16:42:00.000Z',
     messages: [
-      { id: 'message-1', conversationId: 'city-electric', projectId: 'downtown', senderId: 'me', text: 'Hey, are the framing guys done on floor 2?', createdAt: '2026-09-09T15:15:00.000Z' },
-      { id: 'message-2', conversationId: 'city-electric', projectId: 'downtown', senderId: 'trade', text: "We'll be on site at 7am tomorrow.", createdAt: '2026-09-09T16:42:00.000Z' },
+      { id: 'message-1', conversationId: 'city-electric', projectId: 'downtown', senderId: 'me', sender: { id: 'me', name: 'Alex Morgan', email: 'alex@example.com', imageUrl: '', role: 'Project Manager' }, text: 'Hey, are the framing guys done on floor 2?', createdAt: '2026-09-09T15:15:00.000Z' },
+      { id: 'message-2', conversationId: 'city-electric', projectId: 'downtown', senderId: 'trade', sender: { id: 'trade', name: 'City Electric', email: 'city@example.com', imageUrl: '', role: 'Field Team' }, text: "We'll be on site at 7am tomorrow.", createdAt: '2026-09-09T16:42:00.000Z' },
     ],
   },
   {
@@ -19,11 +24,16 @@ const conversations = [
     projectId: 'downtown',
     projectName: 'Downtown Office Reno',
     title: 'Downtown Office Reno',
+    type: 'project',
     context: 'Project Channel',
+    participants: [
+      { id: 'me', name: 'Alex Morgan', email: 'alex@example.com', imageUrl: '', role: 'Project Manager' },
+      { id: 'trade', name: 'City Electric', email: 'city@example.com', imageUrl: '', role: 'Field Team' },
+    ],
     createdAt: '2026-09-08T15:00:00.000Z',
     updatedAt: '2026-09-08T16:00:00.000Z',
     messages: [
-      { id: 'message-3', conversationId: 'downtown-office', projectId: 'downtown', senderId: 'trade', text: 'Client approved the lighting change.', createdAt: '2026-09-08T16:00:00.000Z' },
+      { id: 'message-3', conversationId: 'downtown-office', projectId: 'downtown', senderId: 'trade', sender: { id: 'trade', name: 'City Electric', email: 'city@example.com', imageUrl: '', role: 'Field Team' }, text: 'Client approved the lighting change.', createdAt: '2026-09-08T16:00:00.000Z' },
     ],
   },
   {
@@ -31,17 +41,34 @@ const conversations = [
     projectId: 'riverstone',
     projectName: 'Riverstone Clinic',
     title: 'Sarah Jenkins',
+    type: 'direct',
     context: 'Client',
+    participants: [
+      { id: 'me', name: 'Alex Morgan', email: 'alex@example.com', imageUrl: '', role: 'Project Manager' },
+      { id: 'sarah', name: 'Sarah Jenkins', email: 'sarah@example.com', imageUrl: '', role: 'Client' },
+    ],
     createdAt: '2026-09-07T15:00:00.000Z',
     updatedAt: '2026-09-07T16:00:00.000Z',
     messages: [
-      { id: 'message-4', conversationId: 'sarah-jenkins', projectId: 'riverstone', senderId: 'trade', text: 'Thanks for the update!', createdAt: '2026-09-07T16:00:00.000Z' },
+      { id: 'message-4', conversationId: 'sarah-jenkins', projectId: 'riverstone', senderId: 'sarah', sender: { id: 'sarah', name: 'Sarah Jenkins', email: 'sarah@example.com', imageUrl: '', role: 'Client' }, text: 'Thanks for the update!', createdAt: '2026-09-07T16:00:00.000Z' },
     ],
   },
 ];
 
 test.describe('Messages Interface', () => {
   test.beforeEach(async ({ page }) => {
+    await page.route('**/api/conversations/options', async (route) => {
+      await route.fulfill({ json: {
+        currentUserId: 'me',
+        participants: [
+          { id: 'trade', name: 'City Electric', email: 'city@example.com', imageUrl: '', role: 'Field Team' },
+          { id: 'sarah', name: 'Sarah Jenkins', email: 'sarah@example.com', imageUrl: '', role: 'Client' },
+        ],
+        projects: [
+          { id: 'downtown', name: 'Downtown Office Reno', clientName: 'Acme', eligibleParticipantIds: ['trade'] },
+        ],
+      } });
+    });
     await page.route('**/api/conversations', async (route) => {
       if (route.request().method() === 'GET') {
         await route.fulfill({ json: conversations });
@@ -58,6 +85,7 @@ test.describe('Messages Interface', () => {
         conversationId,
         projectId: conversation.projectId,
         senderId: 'me',
+        sender: { id: 'me', name: 'Alex Morgan', email: 'alex@example.com', imageUrl: '', role: 'Project Manager' },
         text: body.text,
         createdAt: new Date().toISOString(),
       };
@@ -65,6 +93,52 @@ test.describe('Messages Interface', () => {
       conversation.updatedAt = created.createdAt;
       await route.fulfill({ status: 201, json: created });
     });
+  });
+
+  test('creates direct and project conversations with accessible controls', async ({ page }) => {
+    await page.route('**/api/conversations', async (route) => {
+      if (route.request().method() === 'POST') {
+        const body = route.request().postDataJSON();
+        await route.fulfill({ status: 201, json: {
+          id: body.type === 'direct' ? 'new-direct' : 'new-project',
+          type: body.type,
+          projectId: body.projectId ?? null,
+          projectName: body.projectId ? 'Downtown Office Reno' : null,
+          title: body.title ?? 'City Electric',
+          context: body.type === 'direct' ? 'Direct chat' : 'Project chat',
+          participants: [
+            { id: 'me', name: 'Alex Morgan', email: 'alex@example.com', imageUrl: '', role: 'Project Manager' },
+            { id: 'trade', name: 'City Electric', email: 'city@example.com', imageUrl: '', role: 'Field Team' },
+          ],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          messages: [],
+        } });
+        return;
+      }
+      await route.fallback();
+    });
+    await page.goto('/__visual/messages');
+    await page.getByTestId('button-new-conversation').click();
+    await page.getByTestId('button-select-participants').click();
+    await page.getByTestId('item-participant-trade').click();
+    await page.keyboard.press('Escape');
+    await page.getByTestId('button-submit-create').click();
+    await expect(page).toHaveURL(/conversation=new-direct/);
+
+    await page.goto('/__visual/messages');
+    await page.getByTestId('button-new-conversation').click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await page.getByTestId('tab-type-project').click();
+    await page.getByLabel('Search projects').fill('Downtown');
+    await page.getByTestId('select-project').click();
+    await page.getByTestId('item-project-downtown').click();
+    await page.getByTestId('input-channel-title').fill('Site coordination');
+    await page.getByTestId('button-select-participants').click();
+    await page.getByTestId('item-participant-trade').click();
+    await page.keyboard.press('Escape');
+    await page.getByTestId('button-submit-create').click();
+    await expect(page).toHaveURL(/conversation=new-project/);
   });
 
   test('desktop layout side-by-side and search filtering', async ({ page }) => {

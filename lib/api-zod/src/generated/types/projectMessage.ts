@@ -5,12 +5,15 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ChatParticipant } from './chatParticipant';
 
 export interface ProjectMessage {
   id: string;
   conversationId: string;
-  projectId: string;
+  /** @nullable */
+  projectId: string | null;
   senderId: string;
+  sender: ChatParticipant;
   text: string;
   createdAt: Date;
 }

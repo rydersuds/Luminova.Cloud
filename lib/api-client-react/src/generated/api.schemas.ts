@@ -169,11 +169,20 @@ export interface WorkspaceSearchResult {
   href: string;
 }
 
+export interface ChatParticipant {
+  id: string;
+  name: string;
+  email: string;
+  imageUrl: string;
+  role: WorkspaceRole;
+}
 export interface ProjectMessage {
   id: string;
   conversationId: string;
-  projectId: string;
+  /** @nullable */
+  projectId: string | null;
   senderId: string;
+  sender: ChatParticipant;
   text: string;
   createdAt: string;
 }
@@ -186,27 +195,40 @@ export interface ProjectMessageInput {
   text: string;
 }
 
+export type ProjectConversationType = typeof ProjectConversationType[keyof typeof ProjectConversationType];
 export interface ProjectConversation {
   id: string;
-  projectId: string;
-  projectName: string;
+  type: ProjectConversationType;
+  /** @nullable */
+  projectId: string | null;
+  /** @nullable */
+  projectName: string | null;
   title: string;
   context: string;
+  participants: ChatParticipant[];
   createdAt: string;
   updatedAt: string;
   messages: ProjectMessage[];
 }
 
+export type ProjectConversationInputType = typeof ProjectConversationInputType[keyof typeof ProjectConversationInputType];
 export interface ProjectConversationInput {
+  type: ProjectConversationInputType;
   /** @minLength 1 */
-  projectId: string;
+  projectId?: string;
   /**
      * @minLength 1
      * @maxLength 160
      */
-  title: string;
+  title?: string;
   /** @maxLength 200 */
   context?: string;
+  /**
+     * @minItems 1
+     * @maxItems 50
+     * @items.minLength 1
+     */
+  participantIds: string[];
 }
 
 export interface Activity {
@@ -1013,3 +1035,26 @@ trade?: string;
 status?: VendorQuoteStatus;
 direction?: QuoteDirection;
 };
+
+export interface ChatOptions {
+  currentUserId: string;
+  participants: ChatParticipant[];
+  projects: ChatProjectOption[];
+}
+
+export const ProjectConversationInputType = {
+  direct: 'direct',
+  project: 'project',
+} as const;
+
+export interface ChatProjectOption {
+  id: string;
+  name: string;
+  clientName: string;
+  eligibleParticipantIds: string[];
+}
+
+export const ProjectConversationType = {
+  direct: 'direct',
+  project: 'project',
+} as const;
