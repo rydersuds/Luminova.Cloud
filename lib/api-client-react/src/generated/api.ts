@@ -1372,6 +1372,83 @@ export function useGetActiveProjectImportSession<TData = Awaited<ReturnType<type
 
 
 
+export const getGetProjectImportSessionUrl = (importId: string,) => {
+
+
+
+
+  return `/api/project-import-sessions/${importId}`
+}
+
+/**
+ * @summary Get an exact folder import session for build reconciliation
+ */
+export const getProjectImportSession = async (importId: string, options?: Parameters<typeof customFetch>[1]): Promise<ProjectImportSession> => {
+
+  return customFetch<ProjectImportSession>(getGetProjectImportSessionUrl(importId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProjectImportSessionQueryKey = (importId: string,) => {
+    return [
+    `/api/project-import-sessions/${importId}`
+    ] as const;
+    }
+
+
+export const getGetProjectImportSessionQueryOptions = <TData = Awaited<ReturnType<typeof getProjectImportSession>>, TError = ErrorType<void>>(importId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectImportSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProjectImportSessionQueryKey(importId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProjectImportSession>>> = ({ signal }) => getProjectImportSession(importId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: importId !== null && importId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProjectImportSession>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProjectImportSessionQueryResult = NonNullable<Awaited<ReturnType<typeof getProjectImportSession>>>
+export type GetProjectImportSessionQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get an exact folder import session for build reconciliation
+ */
+
+export function useGetProjectImportSession<TData = Awaited<ReturnType<typeof getProjectImportSession>>, TError = ErrorType<void>>(
+ importId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectImportSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProjectImportSessionQueryOptions(importId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getAttachProjectImportDocumentUrl = (importId: string,) => {
 
 

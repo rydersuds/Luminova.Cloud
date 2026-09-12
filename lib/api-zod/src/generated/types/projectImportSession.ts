@@ -15,6 +15,8 @@ export interface ProjectImportSession {
   uploadedPaths: string[];
   uploaded: number;
   failed: number;
+  /** Whether the preserved session can safely be submitted to the build endpoint again. */
+  retryable: boolean;
   /** @nullable */
   error?: string | null;
   /** @nullable */

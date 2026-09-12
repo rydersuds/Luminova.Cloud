@@ -5,6 +5,7 @@ import { createServer, type Server } from "node:http";
 import { spawn } from "node:child_process";
 import express from "express";
 import pg from "pg";
+import { eq } from "drizzle-orm";
 
 const { Pool } = pg;
 const sourceDatabaseUrl = process.env.PROJECT_IMPORT_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
@@ -93,7 +94,16 @@ try {
         message: {
           role: "assistant",
           content: JSON.stringify({
-            project: { name: "Recovery Integration Project", address: "", region: "", clientName: "", pmName: "", description: "" },
+            project: {
+              name: "Recovery Integration Project",
+              address: "",
+              region: "",
+              clientName: "",
+              pmName: "",
+              description: "",
+              targetDate: "2026-01-01",
+              budgetDollars: 0,
+            },
             documents: [
               { relativePath: "scope.txt", classification: "contract" },
               { relativePath: "budget.txt", classification: "other" },
@@ -122,7 +132,13 @@ try {
   app.use(express.json());
   app.use((req, _res, next) => {
     (req as typeof req & { userId: string }).userId = ownerId;
-    (req as typeof req & { log: Console }).log = console;
+    (req as typeof req & { log: Console }).log = {
+      ...console,
+      error(value: unknown) {
+        const error = value && typeof value === "object" && "err" in value ? value.err : value;
+        process.stderr.write(`Folder import integration route error: ${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
+      },
+    } as Console;
     next();
   });
   app.use("/api", storageRouter, luminovaRouter);
@@ -195,9 +211,39 @@ try {
   const attachmentCount = await database.db.select().from(database.projectDocumentsTable);
   assert.equal(attachmentCount.length, 2, "Duplicate attachment request created an extra database row.");
 
+  await database.db.update(database.projectImportBatchesTable)
+    .set({
+      status: "building",
+      error: null,
+      buildLeaseId: "expired-build-lease",
+      updatedAt: new Date(Date.now() - 60_000),
+    })
+    .where(eq(database.projectImportBatchesTable.id, created.importId));
+  const interrupted = await json(await fetch(`${baseUrl}/project-import-sessions`)) as {
+    importId: string;
+    status: string;
+    retryable: boolean;
+    uploadedPaths: string[];
+  };
+  assert.equal(interrupted.importId, created.importId);
+  assert.equal(interrupted.status, "failed");
+  assert.equal(interrupted.retryable, true);
+  assert.deepEqual(interrupted.uploadedPaths.sort(), ["budget.txt", "scope.txt"]);
+
   const buildRequests = [0, 1].map(() => fetch(`${baseUrl}/project-import-sessions/${created.importId}/build`, { method: "POST" }));
   const buildResponses = await Promise.all(buildRequests);
   assert.deepEqual(buildResponses.map((response) => response.status).sort(), [201, 409]);
+
+  const completedSession = await json(await fetch(`${baseUrl}/project-import-sessions/${created.importId}`)) as {
+    importId: string;
+    status: string;
+    retryable: boolean;
+    projectId: string | null;
+  };
+  assert.equal(completedSession.importId, created.importId);
+  assert.equal(completedSession.status, "completed");
+  assert.equal(completedSession.retryable, false);
+  assert.ok(completedSession.projectId);
 
   const duplicateBuild = await fetch(`${baseUrl}/project-import-sessions/${created.importId}/build`, { method: "POST" });
   assert.equal(duplicateBuild.status, 409);

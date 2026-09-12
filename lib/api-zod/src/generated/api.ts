@@ -635,6 +635,7 @@ export const CreateProjectImportSessionResponse = zod.object({
   "uploadedPaths": zod.array(zod.string()),
   "uploaded": zod.number().int(),
   "failed": zod.number().int(),
+  "retryable": zod.boolean().describe('Whether the preserved session can safely be submitted to the build endpoint again.'),
   "error": zod.string().nullish(),
   "projectId": zod.string().nullish(),
   "createdAt": zod.coerce.date(),
@@ -666,11 +667,51 @@ export const GetActiveProjectImportSessionResponse = zod.union([zod.object({
   "uploadedPaths": zod.array(zod.string()),
   "uploaded": zod.number().int(),
   "failed": zod.number().int(),
+  "retryable": zod.boolean().describe('Whether the preserved session can safely be submitted to the build endpoint again.'),
   "error": zod.string().nullish(),
   "projectId": zod.string().nullish(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 }),zod.null()])
+
+
+/**
+ * @summary Get an exact folder import session for build reconciliation
+ */
+
+
+
+export const GetProjectImportSessionParams = zod.object({
+  "importId": zod.coerce.string().min(1)
+})
+
+export const getProjectImportSessionResponseDocumentsItemRelativePathMax = 1024;
+
+export const getProjectImportSessionResponseDocumentsItemNameMax = 255;
+
+
+export const getProjectImportSessionResponseDocumentsItemContentTypeMax = 255;
+
+
+
+export const GetProjectImportSessionResponse = zod.object({
+  "importId": zod.string(),
+  "status": zod.enum(['uploading', 'ready', 'building', 'completed', 'failed']),
+  "documents": zod.array(zod.object({
+  "relativePath": zod.string().min(1).max(getProjectImportSessionResponseDocumentsItemRelativePathMax),
+  "name": zod.string().min(1).max(getProjectImportSessionResponseDocumentsItemNameMax),
+  "size": zod.number().int().min(1),
+  "contentType": zod.string().min(1).max(getProjectImportSessionResponseDocumentsItemContentTypeMax)
+})),
+  "uploadedPaths": zod.array(zod.string()),
+  "uploaded": zod.number().int(),
+  "failed": zod.number().int(),
+  "retryable": zod.boolean().describe('Whether the preserved session can safely be submitted to the build endpoint again.'),
+  "error": zod.string().nullish(),
+  "projectId": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
 
 
 
@@ -722,6 +763,7 @@ export const AttachProjectImportDocumentResponse = zod.object({
   "uploadedPaths": zod.array(zod.string()),
   "uploaded": zod.number().int(),
   "failed": zod.number().int(),
+  "retryable": zod.boolean().describe('Whether the preserved session can safely be submitted to the build endpoint again.'),
   "error": zod.string().nullish(),
   "projectId": zod.string().nullish(),
   "createdAt": zod.coerce.date(),

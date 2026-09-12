@@ -386,6 +386,22 @@ paths:
                 oneOf:
                   - $ref: "#/components/schemas/ProjectImportSession"
                   - type: "null"
+  /project-import-sessions/{importId}:
+    get:
+      operationId: getProjectImportSession
+      tags: [project-imports]
+      summary: Get an exact folder import session for build reconciliation
+      parameters:
+        - $ref: "#/components/parameters/ImportId"
+      responses:
+        "200":
+          description: Import session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectImportSession"
+        "404":
+          description: Import session not found
   /project-import-sessions/{importId}/documents:
     post:
       operationId: attachProjectImportDocument
@@ -2325,7 +2341,7 @@ components:
             $ref: "#/components/schemas/ProjectImportManifestDocument"
     ProjectImportSession:
       type: object
-      required: [importId, status, documents, uploadedPaths, uploaded, failed, createdAt, updatedAt]
+      required: [importId, status, documents, uploadedPaths, uploaded, failed, retryable, createdAt, updatedAt]
       properties:
         importId: { type: string }
         status: { type: string, enum: [uploading, ready, building, completed, failed] }
@@ -2338,6 +2354,9 @@ components:
           items: { type: string }
         uploaded: { type: integer }
         failed: { type: integer }
+        retryable:
+          type: boolean
+          description: Whether the preserved session can safely be submitted to the build endpoint again.
         error: { type: ["string", "null"] }
         projectId: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }

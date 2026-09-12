@@ -14,3 +14,4 @@
 - [Vendor logo rendering](vendor-logo-rendering.md) — preserve transparent vendor logos with the existing private upload path and contained rendering.
 - [Workspace-scoped private media](workspace-scoped-private-media.md) — private media shared within a workspace needs ACL scope checks in addition to owner checks.
 - [Destructive upload cleanup](destructive-upload-cleanup.md) — delete failed uploads only through owned, target-bound reservations claimed atomically before attachment.
+- [Folder import build recovery](folder-import-build-recovery.md) — reconcile unknown build outcomes before retrying, and rebuild only sessions the server marks retryable.

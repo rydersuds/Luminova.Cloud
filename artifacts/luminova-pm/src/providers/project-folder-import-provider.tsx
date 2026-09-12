@@ -15,6 +15,7 @@ type ImportSession = {
   uploadedPaths: string[]
   uploaded: number
   failed: number
+  retryable: boolean
   error?: string | null
 }
 type FolderImportContextValue = {
@@ -262,37 +263,61 @@ export function ProjectFolderImportProvider({
       activeImportRef.current = false
       toast({ title: "Project initialized", description: "The folder was uploaded and the project build completed." })
     }
-    try {
-      const response = await authenticatedFetch(`/api/project-import-sessions/${session.importId}/build`, { method: "POST" })
-      const body = await readBatchImportResponse<{ project?: { id: string } }>(response, { operation: "Building the imported project" })
-      if (!body.project) throw new Error("Building the imported project returned incomplete data. Please retry the import.")
-      await finishImport()
-    } catch (error) {
-      // The preview proxy can time out while the server continues a large AI build.
-      // Follow the durable session until it completes instead of showing a false failure.
-      for (let attempt = 0; attempt < 90; attempt++) {
+    const reconcileBuild = async (): Promise<
+      { state: "completed" } | { state: "retryable" | "terminal"; session: ImportSession } | { state: "unavailable" }
+    > => {
+      for (let attempt = 0; attempt < 45; attempt++) {
         try {
-          const statusResponse = await authenticatedFetch("/api/project-import-sessions")
+          const statusResponse = await authenticatedFetch(`/api/project-import-sessions/${session.importId}`)
           const active = await readBatchImportResponse<ImportSession | null>(statusResponse, { operation: "Checking project build status" })
-          if (!active) {
-            await finishImport()
-            return
-          }
-          if (active.importId !== session.importId || active.status === "failed") break
-          if (active.status === "completed") {
-            await finishImport()
-            return
+          if (!active) return { state: "completed" }
+          if (active.importId !== session.importId) return { state: "unavailable" }
+          if (active.status === "completed") return { state: "completed" }
+          if (active.status === "failed" || active.status === "uploading" || active.status === "ready") {
+            return { state: active.retryable ? "retryable" : "terminal", session: active }
           }
           setFolderStatus("building")
-          await new Promise((resolve) => window.setTimeout(resolve, 2000))
         } catch {
-          break
+          // Brief proxy and API outages are expected while a long build is running.
         }
+        await new Promise((resolve) => window.setTimeout(resolve, 2000))
       }
-      const message = error instanceof Error ? error.message : "The uploaded documents could not be analyzed."
-      setFolderStatus("error"); setFolderError(message)
-      activeImportRef.current = false
-      toast({ variant: "destructive", title: "Project folder import failed", description: message })
+      return { state: "unavailable" }
+    }
+
+    let buildAttempt = 0
+    let buildError: unknown
+    while (buildAttempt < 2) {
+      try {
+        const response = await authenticatedFetch(`/api/project-import-sessions/${session.importId}/build`, { method: "POST" })
+        const body = await readBatchImportResponse<{ project?: { id: string } }>(response, { operation: "Building the imported project" })
+        if (!body.project) throw new Error("Building the imported project returned incomplete data. Please retry the import.")
+        await finishImport()
+        return
+      } catch (error) {
+        buildError = error
+        const recovery = await reconcileBuild()
+        if (recovery.state === "completed") {
+          await finishImport()
+          return
+        }
+        if (recovery.state === "retryable" && buildAttempt === 0) {
+          sessionRef.current = recovery.session
+          buildAttempt++
+          continue
+        }
+        const message = recovery.state === "terminal"
+          ? recovery.session.error || "The project could not be built. Retry when ready."
+          : recovery.state === "retryable"
+            ? recovery.session.error || "The project build was interrupted again. Retry when ready."
+            : buildError instanceof Error
+              ? `${buildError.message} Build recovery is temporarily unavailable. Retry to continue from the uploaded files.`
+              : "Build recovery is temporarily unavailable. Retry to continue from the uploaded files."
+        setFolderStatus("error"); setFolderError(message)
+        activeImportRef.current = false
+        toast({ variant: "destructive", title: "Project folder import failed", description: message })
+        return
+      }
     }
   }, [authenticatedFetch, queryClient])
 
@@ -302,8 +327,17 @@ export function ProjectFolderImportProvider({
     let poll: number | undefined
     const restore = async () => {
       try {
-        const response = await authenticatedFetch("/api/project-import-sessions")
-        const session = await readBatchImportResponse<ImportSession | null>(response, { operation: "Restoring the import session" })
+        let session: ImportSession | null = null
+        for (let attempt = 0; attempt < 6; attempt++) {
+          try {
+            const response = await authenticatedFetch("/api/project-import-sessions")
+            session = await readBatchImportResponse<ImportSession | null>(response, { operation: "Restoring the import session" })
+            break
+          } catch (error) {
+            if (attempt === 5) throw error
+            await new Promise((resolve) => window.setTimeout(resolve, 500))
+          }
+        }
         if (cancelled) return
         cleanupDismissedImportErrors(session?.status === "completed" ? null : session?.importId ?? null)
         const pendingDismissed = dismissedPendingErrorRef.current || wasImportErrorDismissed("__pending__")
@@ -336,42 +370,58 @@ export function ProjectFolderImportProvider({
         setFolderProgress({ uploaded: session.uploaded, failed: Math.max(session.documents.length - session.uploaded - restored.filter((item) => !session.uploadedPaths.includes(item.relativePath)).length, 0) })
         if (session.status === "building") {
           setFolderStatus("building")
-          poll = window.setInterval(async () => {
-            const statusResponse = await authenticatedFetch("/api/project-import-sessions")
-            let active: ImportSession | null
+          let transientFailures = 0
+          let attempts = 0
+          const checkBuild = async () => {
+            if (cancelled) return
+            attempts++
             try {
-              active = await readBatchImportResponse<ImportSession | null>(statusResponse, { operation: "Checking project build status" })
+              const statusResponse = await authenticatedFetch(`/api/project-import-sessions/${session.importId}`)
+              const active = await readBatchImportResponse<ImportSession | null>(statusResponse, { operation: "Checking project build status" })
+              transientFailures = 0
+              if (active?.importId === session.importId && active.status === "building") {
+                if (attempts < 45) poll = window.setTimeout(checkBuild, 2000)
+                else {
+                  setFolderStatus("error")
+                  setFolderError("The project build is still unavailable. Retry to continue from the uploaded files.")
+                }
+                return
+              }
+              if (active?.importId === session.importId && active.status === "failed") {
+                sessionRef.current = active
+                if (active.retryable && restored.length) {
+                  setFolderStatus("idle")
+                  if (!cancelled) await startFolderImport()
+                } else {
+                  setFolderStatus("error")
+                  setFolderError(active.error || "The project could not be built. Retry when ready.")
+                }
+                return
+              }
+              await Promise.all([
+                queryClient.invalidateQueries({ queryKey: getGetProjectsQueryKey() }),
+                queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() }),
+              ])
+              scheduleImportFileCleanup(session.importId, session.documents.map((item) => item.relativePath))
+              sessionRef.current = null
+              setFolderStatus("success")
             } catch (error) {
-              window.clearInterval(poll)
-              if (!cancelled) {
+              transientFailures++
+              if (attempts < 45 && transientFailures < 6) {
+                poll = window.setTimeout(checkBuild, 2000)
+              } else if (!cancelled) {
                 sessionRef.current = session
                 setFolderStatus("error")
-                setFolderError(error instanceof Error ? error.message : "Checking project build status failed. Please retry the import.")
+                setFolderError(`${error instanceof Error ? error.message : "Checking project build status failed."} Retry to continue from the uploaded files.`)
               }
-              return
             }
-            if (active?.importId === session.importId && active.status === "building") return
-            window.clearInterval(poll)
-            if (cancelled) return
-            if (active?.importId === session.importId && active.status === "failed") {
-              sessionRef.current = active
-              setFolderStatus("error")
-              setFolderError(active.error || "The project could not be built. Retry when ready.")
-              return
-            }
-            await Promise.all([
-              queryClient.invalidateQueries({ queryKey: getGetProjectsQueryKey() }),
-              queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() }),
-            ])
-            scheduleImportFileCleanup(session.importId, session.documents.map((item) => item.relativePath))
-            sessionRef.current = null
-            setFolderStatus("success")
-          }, 2000)
+          }
+          poll = window.setTimeout(checkBuild, 2000)
           return
         }
         if (restored.length) {
           setFolderStatus("idle")
-          queueMicrotask(() => { if (!cancelled) void startFolderImport() })
+          if (!cancelled) await startFolderImport()
         } else {
           setFolderStatus("error")
           setFolderError(session.error || "Select only the missing files to continue this import.")
