@@ -73,38 +73,50 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('opens imported on-site agreements from the Overview in a new tab', async ({ page, context }) => {
+test('keeps every imported on-site agreement individually accessible from the Overview', async ({ page, context }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const fileName = 'Riverstone-Residence-fully-executed-on-site-agreement-and-scope-of-work.pdf';
+  const agreements = [
+    {
+      id: 'agreement-1',
+      name: 'Riverstone-Residence-fully-executed-on-site-agreement-and-scope-of-work.pdf',
+      url: '/api/storage/objects/uploads/riverstone-agreement',
+    },
+    {
+      id: 'agreement-2',
+      name: 'Riverstone-Residence-construction-management-agreement.pdf',
+      url: '/api/storage/objects/uploads/riverstone-management-agreement',
+    },
+  ];
   const current = {
     ...structuredClone(project),
-    files: [{
-      id: 'agreement-1',
-      name: fileName,
-      relativePath: `Contracts/${fileName}`,
-      url: '/api/storage/objects/uploads/riverstone-agreement',
+    files: agreements.map((agreement) => ({
+      ...agreement,
+      relativePath: `Contracts/${agreement.name}`,
       contentType: 'application/pdf',
       classification: 'contract',
       collection: 'Contracts',
-    }],
+    })),
   };
   await page.unroute('**/api/projects/riverstone');
   await page.route('**/api/projects/riverstone', route => route.fulfill({ json: current }));
 
   await openOverview(page);
-  await expect(page.getByText(fileName, { exact: true })).toBeVisible();
-  const agreementLink = page.getByRole('link', { name: `Open on-site agreement ${fileName}` });
-  await expect(agreementLink).toHaveAttribute('href', '/api/storage/objects/uploads/riverstone-agreement');
-  await expect(agreementLink).toHaveAttribute('target', '_blank');
-  await expect(agreementLink).toHaveAttribute('title', fileName);
+  for (const agreement of agreements) {
+    await expect(page.getByText(agreement.name, { exact: true })).toBeVisible();
+    const agreementLink = page.getByRole('link', { name: `Open on-site agreement ${agreement.name}` });
+    await expect(agreementLink).toHaveAttribute('href', agreement.url);
+    await expect(agreementLink).toHaveAttribute('target', '_blank');
+    await expect(agreementLink).toHaveAttribute('title', agreement.name);
+  }
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(overflow).toBe(false);
 
+  const firstAgreementLink = page.getByRole('link', { name: `Open on-site agreement ${agreements[0].name}` });
   const newPagePromise = context.waitForEvent('page');
-  await agreementLink.click();
+  await firstAgreementLink.click();
   const newPage = await newPagePromise;
-  await expect(newPage).toHaveURL(/\/api\/storage\/objects\/uploads\/riverstone-agreement$/);
+  await expect(newPage).toHaveURL(new RegExp(`${agreements[0].url}$`));
   await newPage.close();
 });
 
