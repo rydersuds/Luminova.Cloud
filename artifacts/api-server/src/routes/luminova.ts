@@ -116,7 +116,7 @@ import
 import 
 {
 
- calculatePortfolioFinancialSummary, type FinancialProject 
+ calculatePortfolioFinancialSummary, invoicedRevenueForProject, type FinancialProject
 }
 
  from "../lib/financialSummary"
@@ -3975,6 +3975,7 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
 
 
       ...project,
+      invoiced: invoicedRevenueForProject(projectInvoices, project.id),
       startDate: "",
       clientQuote,
       lineItems: project.budgetLineItems ?? [],
@@ -4012,40 +4013,30 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
 }
 
 
-  const clientQuote = await latestClientQuoteDetail(project)
-;
-
+  const clientQuote = await latestClientQuoteDetail(project);
+  const projectInvoices = ownerId
+    ? (await financialRecordsForOwner(ownerId, workspaceId ?? ownerId)).invoices
+      .filter((invoice) => invoice.projectId === project.id)
+    : await enrichInvoicesWithClientBranding(
+      (await allInvoices()).filter((invoice) => invoice.projectId === project.id),
+      [project],
+      workspaceId || "default",
+    );
 
   return {
-
-
     ...project,
+    invoiced: invoicedRevenueForProject(projectInvoices, project.id),
     startDate: "",
     clientQuote,
     lineItems: project.budgetLineItems ?? [],
-    invoices: await (ownerId
-      ? financialRecordsForOwner(ownerId, workspaceId ?? ownerId).then((
-{
-
- invoices 
-}
-
-) => invoices.filter((invoice) => invoice.projectId === project.id))
-      : enrichInvoicesWithClientBranding(
-        (await allInvoices()).filter((invoice) => invoice.projectId === project.id),
-        [project],
-        workspaceId || "default",
-      )),
+    invoices: projectInvoices,
     trades: [],
     photos: [],
     files: [],
     panoramas: await panoramaStore.list(project.id),
     scheduleImages: await scheduleImageStore.list(project.id, workspaceId),
     activity: [],
-  
-}
-
-;
+  };
 
 
 }
@@ -4053,15 +4044,29 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
 ;
 
 
-router.get("/dashboard/summary", async (req, res) => 
+router.get("/dashboard/summary", async (req: AuthenticatedRequest, res) =>
 {
 
+
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
 
   try 
 {
 
 
-    const [projectRecords, invoiceRecords] = await Promise.all([allProjects(), allInvoices()])
+    const { invoices: invoiceRecords } = await financialRecordsForOwner(
+      req.userId,
+      requestWorkspaceId(req),
+    );
+    const projectRecords = (await projectsForOwner(req.userId)).map((project) =>
+      withCalculatedProjectProgress({
+        ...project,
+        invoiced: invoicedRevenueForProject(invoiceRecords, project.id),
+      }),
+    )
 ;
 
 
@@ -4074,7 +4079,11 @@ router.get("/dashboard/summary", async (req, res) =>
       unreadMessages: 7,
       new360Photos: 3,
       budgeted: projectRecords.reduce((sum, project) => sum + project.budgeted, 0),
-      invoiced: projectRecords.reduce((sum, project) => sum + project.invoiced, 0),
+      invoiced: invoiceRecords.reduce(
+        (sum, invoice) =>
+          sum + (invoice.direction === "luminova_to_client" ? invoice.amount : 0),
+        0,
+      ),
       recentActivity: activities,
     
 }
@@ -4953,7 +4962,17 @@ router.get("/projects", async (req: AuthenticatedRequest, res) =>
 {
 
 
-    const result = (await projectsForOwner(req.userId)).filter((project) =>
+    const { invoices: invoiceRecords } = await financialRecordsForOwner(
+      req.userId,
+      requestWorkspaceId(req),
+    );
+    const projectsWithCanonicalInvoices = (await projectsForOwner(req.userId)).map((project) =>
+      withCalculatedProjectProgress({
+        ...project,
+        invoiced: invoicedRevenueForProject(invoiceRecords, project.id),
+      }),
+    );
+    const result = projectsWithCanonicalInvoices.filter((project) =>
       (!status || project.status === status) &&
       (!region || project.region === region) &&
       (!search || `${project.name} ${project.address} ${project.clientName}`.toLowerCase().includes(search.toLowerCase())),

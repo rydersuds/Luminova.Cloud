@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { GetFinancialSummaryResponse } from "@workspace/api-zod";
-import { calculatePortfolioFinancialSummary, type FinancialInvoice, type FinancialQuote, type FinancialProject } from "./financialSummary";
+import {
+  calculatePortfolioFinancialSummary,
+  invoicedRevenueForProject,
+  type FinancialInvoice,
+  type FinancialQuote,
+  type FinancialProject,
+} from "./financialSummary";
 
 const quote = (overrides: Partial<FinancialQuote> = {}): FinancialQuote => ({
   id: "quote-1",
@@ -61,6 +67,16 @@ test("only counts accepted outgoing quotes and keeps the latest accepted revisio
 
   assert.equal(summary.acceptedClientQuoteValue, 950);
   assert.equal(summary.upcomingClientPayments, 950);
+});
+
+test("keeps quoted value out of a project's invoiced revenue", () => {
+  const invoices = [
+    invoice({ amount: 275 }),
+    invoice({ amount: 80, direction: "company_to_luminova" }),
+    invoice({ projectId: "project-2", amount: 900 }),
+  ];
+
+  assert.equal(invoicedRevenueForProject(invoices, "project-1"), 275);
 });
 
 test("a latest project-total quote prevents overlapping scope quotes from being added", () => {

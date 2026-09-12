@@ -47,6 +47,21 @@ const normalizedQuoteNumber = (quote: FinancialQuote) =>
 
 const roundCurrency = (value: number) => Math.round(value * 100) / 100;
 
+export function invoicedRevenueForProject(
+  invoices: FinancialInvoice[],
+  projectId: string,
+): number {
+  return roundCurrency(invoices.reduce(
+    (total, invoice) =>
+      total + (
+        invoice.projectId === projectId && invoice.direction === "luminova_to_client"
+          ? invoice.amount
+          : 0
+      ),
+    0,
+  ));
+}
+
 export function acceptedClientQuoteTotal(quotes: FinancialQuote[]): number {
   const accepted = quotes
     .filter((quote) => quote.direction === "luminova_to_client" && quote.status === "Accepted")
@@ -101,9 +116,7 @@ export function calculatePortfolioFinancialSummary(
     const acceptedValue = hasAcceptedClientQuote
       ? acceptedClientQuoteTotal(projectQuotes)
       : projectsById.get(projectId)?.clientQuoteTotal ?? 0;
-    const projectRevenue = invoices
-      .filter((invoice) => invoice.projectId === projectId && invoice.direction === "luminova_to_client")
-      .reduce((total, invoice) => total + invoice.amount, 0);
+    const projectRevenue = invoicedRevenueForProject(invoices, projectId);
     const invoiceExpenses = expenseInvoicesByProject.get(projectId) ?? 0;
     const internalExpenses = projectsById.get(projectId)?.internalExpenseTotal ?? 0;
     invoicedExpenses += Math.max(invoiceExpenses, internalExpenses);
