@@ -58,6 +58,7 @@ import type {
   Review,
   ScheduleImage,
   ScheduleImageInput,
+  ScheduleImageUpdate,
   SearchWorkspaceParams,
   Trade,
   TradeDetail,
@@ -781,6 +782,80 @@ export const useCreateProjectScheduleImage = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getCreateProjectScheduleImageMutationOptions(options));
+    }
+
+export const getUpdateProjectScheduleImageUrl = (projectId: string,
+    scheduleImageId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/schedule-images/${scheduleImageId}`
+}
+
+/**
+ * @summary Update schedule image revision details or designate it as current
+ */
+export const updateProjectScheduleImage = async (projectId: string,
+    scheduleImageId: string,
+    scheduleImageUpdate: ScheduleImageUpdate, options?: Parameters<typeof customFetch>[1]): Promise<ScheduleImage> => {
+
+  return customFetch<ScheduleImage>(getUpdateProjectScheduleImageUrl(projectId,scheduleImageId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(scheduleImageUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateProjectScheduleImageMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProjectScheduleImage>>, TError,{projectId: string;scheduleImageId: string;data: BodyType<ScheduleImageUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateProjectScheduleImage>>, TError,{projectId: string;scheduleImageId: string;data: BodyType<ScheduleImageUpdate>}, TContext> => {
+
+const mutationKey = ['updateProjectScheduleImage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateProjectScheduleImage>>, {projectId: string;scheduleImageId: string;data: BodyType<ScheduleImageUpdate>}> = (props) => {
+          const {projectId,scheduleImageId,data} = props ?? {};
+
+          return  updateProjectScheduleImage(projectId,scheduleImageId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateProjectScheduleImageMutationResult = NonNullable<Awaited<ReturnType<typeof updateProjectScheduleImage>>>
+    export type UpdateProjectScheduleImageMutationBody = BodyType<ScheduleImageUpdate>
+    export type UpdateProjectScheduleImageMutationError = ErrorType<void>
+
+    /**
+ * @summary Update schedule image revision details or designate it as current
+ */
+export const useUpdateProjectScheduleImage = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProjectScheduleImage>>, TError,{projectId: string;scheduleImageId: string;data: BodyType<ScheduleImageUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateProjectScheduleImage>>,
+        TError,
+        {projectId: string;scheduleImageId: string;data: BodyType<ScheduleImageUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateProjectScheduleImageMutationOptions(options));
     }
 
 export const getDeleteProjectScheduleImageUrl = (projectId: string,

@@ -269,6 +269,8 @@ async function ensureRole(client: ClerkClient, userId: string) {
   return role;
 }
 
+let resolveWorkspaceRole = (userId: string) => ensureRole(clerk, userId);
+
 export async function requireWorkspaceRole(
   req: AuthenticatedRequest,
   res: Response,
@@ -280,7 +282,9 @@ export async function requireWorkspaceRole(
     res.status(401).json({ error: "Authentication required" });
     return false;
   }
-  const role = await ensureRole(client, req.userId);
+  const role = client === clerk
+    ? await resolveWorkspaceRole(req.userId)
+    : await ensureRole(client, req.userId);
   if (allowedRoles.includes(role)) return true;
   res.status(403).json({ error: errorMessage });
   return false;
@@ -1047,4 +1051,10 @@ class ClientAccessCleanupError extends Error {
     this.userId = userId;
     this.workspaceId = workspaceId;
   }
+}
+
+export function setWorkspaceRoleResolverForTests(
+  resolver?: (userId: string) => Promise<(typeof ROLES)[number]>,
+): void {
+  resolveWorkspaceRole = resolver ?? ((userId) => ensureRole(clerk, userId));
 }

@@ -215,6 +215,35 @@ paths:
         "404":
           description: Project not found
   /projects/{projectId}/schedule-images/{scheduleImageId}:
+    patch:
+      operationId: updateProjectScheduleImage
+      tags: [projects]
+      summary: Update schedule image revision details or designate it as current
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - name: scheduleImageId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScheduleImageUpdate"
+      responses:
+        "200":
+          description: Updated schedule image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleImage"
+        "400":
+          description: Invalid schedule image details
+        "403":
+          description: Project management access required
+        "404":
+          description: Project or schedule image not found
     delete:
       operationId: deleteProjectScheduleImage
       tags: [projects]
@@ -2141,7 +2170,7 @@ components:
           pattern: '^\d{4}-\d{2}-\d{2}$'
     ScheduleImage:
       type: object
-      required: [id, url, name, relativePath, contentType, size]
+      required: [id, url, name, relativePath, contentType, size, revision, effectiveDate, isCurrent]
       properties:
         id: { type: string }
         url: { type: string }
@@ -2149,6 +2178,11 @@ components:
         relativePath: { type: string }
         contentType: { type: string }
         size: { type: integer, minimum: 1 }
+        revision: { type: [string, "null"] }
+        effectiveDate:
+          type: [string, "null"]
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+        isCurrent: { type: boolean }
     ScheduleImageInput:
       type: object
       required: [objectPath, name, size, contentType]
@@ -2162,6 +2196,13 @@ components:
         contentType:
           type: string
           enum: [image/jpeg, image/png, image/webp]
+    ScheduleImageUpdate:
+      type: object
+      required: [revision, effectiveDate, isCurrent]
+      properties:
+        revision: { type: [string, "null"] }
+        effectiveDate: { type: [string, "null"] }
+        isCurrent: { type: boolean }
     UploadUrlRequest:
       type: object
       required: [name, size, contentType]

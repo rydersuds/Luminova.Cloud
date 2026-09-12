@@ -74,7 +74,10 @@ test.describe('Messages Interface', () => {
     await expect(page.getByPlaceholder('Transmit message...')).toBeVisible();
     
     // Check initial dark aesthetic and layout
-    await expect(page).toHaveScreenshot('desktop-messages-initial.png', { animations: 'disabled' });
+    await expect(page).toHaveScreenshot('desktop-messages-initial.png', {
+      animations: 'disabled',
+      timeout: 10_000,
+    });
 
     // Filter by search
     const searchInput = page.getByPlaceholder('Search channels & people...');

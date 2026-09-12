@@ -128,6 +128,7 @@ export const getProjectResponseTwoFilesItemAiConfidenceMin = 0;
 export const getProjectResponseTwoFilesItemAiConfidenceMax = 100;
 
 
+export const getProjectResponseTwoScheduleImagesItemEffectiveDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 
 
 export const GetProjectResponse = zod.object({
@@ -238,7 +239,10 @@ export const GetProjectResponse = zod.object({
   "name": zod.string(),
   "relativePath": zod.string(),
   "contentType": zod.string(),
-  "size": zod.number().int().min(1)
+  "size": zod.number().int().min(1),
+  "revision": zod.string().nullable(),
+  "effectiveDate": zod.string().regex(getProjectResponseTwoScheduleImagesItemEffectiveDateRegExp).nullable(),
+  "isCurrent": zod.boolean()
 })),
   "activity": zod.array(zod.object({
   "id": zod.string(),
@@ -380,6 +384,7 @@ export const CreateProjectScheduleImageBody = zod.object({
 })
 
 
+export const createProjectScheduleImageResponseEffectiveDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 
 
 export const CreateProjectScheduleImageResponse = zod.object({
@@ -388,7 +393,44 @@ export const CreateProjectScheduleImageResponse = zod.object({
   "name": zod.string(),
   "relativePath": zod.string(),
   "contentType": zod.string(),
-  "size": zod.number().int().min(1)
+  "size": zod.number().int().min(1),
+  "revision": zod.string().nullable(),
+  "effectiveDate": zod.string().regex(createProjectScheduleImageResponseEffectiveDateRegExp).nullable(),
+  "isCurrent": zod.boolean()
+})
+
+
+/**
+ * @summary Update schedule image revision details or designate it as current
+ */
+
+
+
+export const UpdateProjectScheduleImageParams = zod.object({
+  "projectId": zod.coerce.string(),
+  "scheduleImageId": zod.coerce.string().min(1)
+})
+
+export const UpdateProjectScheduleImageBody = zod.object({
+  "revision": zod.string().nullable(),
+  "effectiveDate": zod.string().nullable(),
+  "isCurrent": zod.boolean()
+})
+
+
+export const updateProjectScheduleImageResponseEffectiveDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const UpdateProjectScheduleImageResponse = zod.object({
+  "id": zod.string(),
+  "url": zod.string(),
+  "name": zod.string(),
+  "relativePath": zod.string(),
+  "contentType": zod.string(),
+  "size": zod.number().int().min(1),
+  "revision": zod.string().nullable(),
+  "effectiveDate": zod.string().regex(updateProjectScheduleImageResponseEffectiveDateRegExp).nullable(),
+  "isCurrent": zod.boolean()
 })
 
 
@@ -418,6 +460,7 @@ export const RestoreProjectScheduleImageParams = zod.object({
 })
 
 
+export const restoreProjectScheduleImageResponseEffectiveDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 
 
 export const RestoreProjectScheduleImageResponse = zod.object({
@@ -426,7 +469,10 @@ export const RestoreProjectScheduleImageResponse = zod.object({
   "name": zod.string(),
   "relativePath": zod.string(),
   "contentType": zod.string(),
-  "size": zod.number().int().min(1)
+  "size": zod.number().int().min(1),
+  "revision": zod.string().nullable(),
+  "effectiveDate": zod.string().regex(restoreProjectScheduleImageResponseEffectiveDateRegExp).nullable(),
+  "isCurrent": zod.boolean()
 })
 
 
@@ -2156,3 +2202,4 @@ export const DeleteWorkspaceUserParams = zod.object({
 })
 
 export const DeleteWorkspaceUserResponse = zod.void()
+// End generated schemas.

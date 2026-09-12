@@ -19,6 +19,9 @@ export type ScheduleImageRecord = {
   relativePath: string;
   contentType: string;
   size: number;
+  revision: string | null;
+  effectiveDate: string | null;
+  isCurrent: boolean;
 };
 
 export type ScheduleImageInput = {
@@ -157,6 +160,9 @@ export class DatabaseScheduleImageStore {
       relativePath: row.relativePath,
       contentType: row.contentType,
       size: row.size,
+      revision: null,
+      effectiveDate: null,
+      isCurrent: false,
     }));
   }
 
@@ -194,6 +200,9 @@ export class DatabaseScheduleImageStore {
         relativePath: row.relativePath,
         contentType: row.contentType,
         size: row.size,
+        revision: null,
+        effectiveDate: null,
+        isCurrent: false,
       };
     } catch (error) {
       try {

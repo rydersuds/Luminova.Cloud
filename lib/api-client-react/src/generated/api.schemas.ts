@@ -410,6 +410,14 @@ export interface ScheduleImage {
   contentType: string;
   /** @minimum 1 */
   size: number;
+  /** @nullable */
+  revision: string | null;
+  /**
+     * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  effectiveDate: string | null;
+  isCurrent: boolean;
 }
 
 export type ProjectDetail = Project & {
@@ -820,6 +828,14 @@ export interface ScheduleImageInput {
      */
   size: number;
   contentType: ScheduleImageInputContentType;
+}
+
+export interface ScheduleImageUpdate {
+  /** @nullable */
+  revision: string | null;
+  /** @nullable */
+  effectiveDate: string | null;
+  isCurrent: boolean;
 }
 
 export type UploadUrlRequestPurpose = typeof UploadUrlRequestPurpose[keyof typeof UploadUrlRequestPurpose];

@@ -9,6 +9,7 @@ import {
   useCreateProjectScheduleImage,
   useDeleteProjectScheduleImage,
   useRestoreProjectScheduleImage,
+  useUpdateProjectScheduleImage,
   useUpdateProjectPanorama,
   useUpdateProject,
   useGetProjectActivity,
@@ -33,11 +34,11 @@ import {
   Camera, Briefcase, FileText, CheckCircle2, ChevronRight, Activity, Clock,
   Maximize2, ChevronLeft, ChevronDown, Pencil, Search, Trash2, ExternalLink, RotateCcw
 } from "lucide-react"
-import { cn, formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "@/hooks/use-toast"
 import { PanoramaViewer } from "@/components/panorama-viewer"
 import { ClientIdentity } from "@/components/client-identity"
+import { cn, formatCurrency, formatDate, formatDateOnly, getStatusColor } from "@/lib/utils"
 
 const PANORAMA_TYPES = ["image/jpeg", "image/png", "image/webp"]
 const MAX_PANORAMA_BYTES = 8 * 1024 * 1024
@@ -66,6 +67,9 @@ type ProjectScheduleImage = {
   relativePath: string
   contentType: string
   size: number
+  revision: string | null
+  effectiveDate: string | null
+  isCurrent: boolean
 }
 type PhotoFolderNode = {
   name: string
@@ -126,6 +130,11 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const [scheduleRemoveError, setScheduleRemoveError] = React.useState("")
   const [restoringScheduleDocumentId, setRestoringScheduleDocumentId] = React.useState<string | null>(null)
   const [scheduleRestoreSearch, setScheduleRestoreSearch] = React.useState("")
+  const [editingScheduleImage, setEditingScheduleImage] = React.useState<ProjectScheduleImage | null>(null)
+  const [scheduleRevision, setScheduleRevision] = React.useState("")
+  const [scheduleEffectiveDate, setScheduleEffectiveDate] = React.useState("")
+  const [scheduleIsCurrent, setScheduleIsCurrent] = React.useState(false)
+  const [scheduleMetadataError, setScheduleMetadataError] = React.useState("")
   const [photoIndex, setPhotoIndex] = React.useState<number | null>(null)
   const [activePanorama, setActivePanorama] = React.useState<ProjectPanorama | null>(null)
   const [editingPanorama, setEditingPanorama] = React.useState<ProjectPanorama | null>(null)
@@ -163,7 +172,9 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const createScheduleImage = useCreateProjectScheduleImage()
   const deleteScheduleImage = useDeleteProjectScheduleImage()
   const restoreScheduleImage = useRestoreProjectScheduleImage()
+  const updateScheduleImage = useUpdateProjectScheduleImage()
   const updatePanorama = useUpdateProjectPanorama()
+  const canManageSchedules = currentUser?.role === "Admin" || currentUser?.role === "Project Manager"
   const photoFolderTree = React.useMemo(() => {
     if (!project) return []
     const photoPaths = project.photos.map((photo) => photo.caption.split("/").filter(Boolean))
@@ -219,7 +230,10 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const handleOrganizeFiles = async () => {
     try {
       const result = await organizeFiles.mutateAsync({ projectId })
-      await queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) }),
+        queryClient.invalidateQueries({ queryKey: getGetProjectActivityQueryKey(projectId) }),
+      ])
       toast({ title: "Files organized", description: `${result.filesOrganized} files sorted into ${result.collectionsCreated} collections.` })
     } catch {
       toast({ title: "Organization failed", description: "The AI organizer could not complete this project.", variant: "destructive" })
@@ -454,6 +468,41 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
       })
     } finally {
       setRestoringScheduleDocumentId(null)
+    }
+  }
+
+  const openScheduleEditor = (image: ProjectScheduleImage) => {
+    setEditingScheduleImage(image)
+    setScheduleRevision(image.revision ?? "")
+    setScheduleEffectiveDate(image.effectiveDate ?? "")
+    setScheduleIsCurrent(image.isCurrent)
+    setScheduleMetadataError("")
+  }
+
+  const handleScheduleMetadataSave = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!editingScheduleImage) return
+    setScheduleMetadataError("")
+    try {
+      await updateScheduleImage.mutateAsync({
+        projectId,
+        scheduleImageId: editingScheduleImage.id,
+        data: {
+          revision: scheduleRevision.trim() || null,
+          effectiveDate: scheduleEffectiveDate || null,
+          isCurrent: scheduleIsCurrent,
+        },
+      })
+      await queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) })
+      setEditingScheduleImage(null)
+      toast({
+        title: scheduleIsCurrent ? "Current schedule updated" : "Schedule details updated",
+        description: scheduleIsCurrent
+          ? `${editingScheduleImage.name} is now the current project schedule.`
+          : `Revision details for ${editingScheduleImage.name} were saved.`,
+      })
+    } catch (error) {
+      setScheduleMetadataError(error instanceof Error ? error.message : "The schedule details could not be saved.")
     }
   }
 
@@ -909,7 +958,19 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                   ) : (
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                       {project.scheduleImages.map((image) => (
-                        <article key={image.id} className="min-w-0 overflow-hidden rounded-lg border bg-card">
+                        <article
+                          key={image.id}
+                          className={cn(
+                            "min-w-0 overflow-hidden rounded-lg border bg-card",
+                            image.isCurrent && "border-primary shadow-md ring-1 ring-primary/30 sm:col-span-2 xl:col-span-2",
+                          )}
+                        >
+                          {image.isCurrent && (
+                            <div className="flex items-center gap-2 bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground">
+                              <CheckCircle2 className="h-4 w-4" />
+                              Current schedule
+                            </div>
+                          )}
                           <button
                             type="button"
                             className="group block aspect-[4/3] w-full cursor-zoom-in bg-muted text-left"
@@ -918,13 +979,29 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                           >
                             <img src={image.url} alt={image.name} loading="lazy" decoding="async" className="h-full w-full object-contain transition-transform group-hover:scale-[1.02]" />
                           </button>
-                          <div className="min-w-0 space-y-2 border-t p-3">
-                            <p className="truncate font-medium" title={image.relativePath}>{image.name}</p>
+                          <div className="min-w-0 space-y-3 border-t p-3">
+                            <div>
+                              <p className="truncate font-medium" title={image.relativePath}>{image.name}</p>
+                              {(image.revision || image.effectiveDate) && (
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {image.revision && <Badge variant="secondary">{image.revision}</Badge>}
+                                  {image.effectiveDate && <Badge variant="outline">Effective {formatDateOnly(image.effectiveDate)}</Badge>}
+                                </div>
+                              )}
+                            </div>
                             <p className="truncate text-xs text-muted-foreground" title={image.relativePath}>{image.relativePath}</p>
-                            <div className="flex items-center justify-between gap-3">
-                              <a href={image.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-primary hover:underline">
-                                Open full image
-                              </a>
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div className="flex flex-wrap items-center gap-3">
+                                <a href={image.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-primary hover:underline">
+                                  Open full image
+                                </a>
+                                {canManageSchedules && (
+                                  <Button type="button" variant="ghost" size="sm" className="h-auto px-0 py-0 text-sm" onClick={() => openScheduleEditor(image)}>
+                                    <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                                    Edit details
+                                  </Button>
+                                )}
+                              </div>
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -1056,6 +1133,37 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+
+              <Dialog open={editingScheduleImage !== null} onOpenChange={(open) => !open && setEditingScheduleImage(null)}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Schedule details</DialogTitle>
+                    <DialogDescription>Add revision details and choose whether this is the schedule crews should use.</DialogDescription>
+                  </DialogHeader>
+                  <form className="space-y-4" onSubmit={handleScheduleMetadataSave}>
+                    <div className="space-y-2">
+                      <Label htmlFor="schedule-revision">Revision</Label>
+                      <Input id="schedule-revision" value={scheduleRevision} onChange={(event) => setScheduleRevision(event.target.value)} placeholder="Revision 4" maxLength={100} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="schedule-effective-date">Effective date</Label>
+                      <Input id="schedule-effective-date" type="date" value={scheduleEffectiveDate} onChange={(event) => setScheduleEffectiveDate(event.target.value)} />
+                    </div>
+                    <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3">
+                      <input type="checkbox" className="mt-1 h-4 w-4 accent-primary" checked={scheduleIsCurrent} onChange={(event) => setScheduleIsCurrent(event.target.checked)} />
+                      <span>
+                        <span className="block font-medium">Mark as current schedule</span>
+                        <span className="block text-sm text-muted-foreground">This will replace any existing current selection. Prior schedules remain visible.</span>
+                      </span>
+                    </label>
+                    {scheduleMetadataError && <p role="alert" className="text-sm text-destructive">{scheduleMetadataError}</p>}
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setEditingScheduleImage(null)} disabled={updateScheduleImage.isPending}>Cancel</Button>
+                      <Button type="submit" disabled={updateScheduleImage.isPending}>{updateScheduleImage.isPending ? "Saving…" : "Save details"}</Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="md:col-span-2 space-y-6">

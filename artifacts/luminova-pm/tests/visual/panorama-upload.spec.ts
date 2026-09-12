@@ -85,6 +85,19 @@ test.beforeEach(async ({ page }) => {
     body: '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#c8ae4b"/></svg>',
   }));
   await page.route('**/api/projects/riverstone/activity', route => route.fulfill({ json: [] }));
+  await page.route('**/api/users/me', route => route.fulfill({
+    json: {
+      id: 'user-1',
+      firstName: 'Maya',
+      lastName: 'Chen',
+      name: 'Maya Chen',
+      email: 'maya@example.com',
+      role: 'Project Manager',
+      createdAt: 0,
+      lastSignInAt: 0,
+      imageUrl: '',
+    },
+  }));
   await page.route('**/api/projects/riverstone', async route => {
     if (route.request().method() === 'GET') {
       await route.fulfill({ json: current });
@@ -397,6 +410,9 @@ test('renders imported schedule images with their paths and full-image link', as
       relativePath: 'Schedules/master-schedule.png',
       contentType: 'image/png',
       size: 2048,
+      revision: 'Revision 3',
+      effectiveDate: '2026-09-08',
+      isCurrent: true,
     }],
   };
   await page.unroute('**/api/projects/riverstone');
@@ -405,12 +421,78 @@ test('renders imported schedule images with their paths and full-image link', as
   await openOverview(page);
   await expect(page.getByRole('img', { name: 'master-schedule.png' })).toBeVisible();
   await expect(page.getByText('Schedules/master-schedule.png', { exact: true })).toBeVisible();
+  await expect(page.getByText('Current schedule', { exact: true })).toBeVisible();
+  await expect(page.getByText('Revision 3', { exact: true })).toBeVisible();
+  await expect(page.getByText('Effective Sep 8, 2026', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Open full image' }).first()).toHaveAttribute(
     'href',
     '/api/storage/objects/uploads/imported-schedule',
   );
   await page.getByRole('button', { name: 'Open schedule image master-schedule.png' }).click();
   await expect(page.getByRole('dialog')).toContainText('Schedules/master-schedule.png');
+});
+
+test('lets project managers designate a schedule as current without hiding prior revisions', async ({ page }) => {
+  let current = {
+    ...structuredClone(project),
+    scheduleImages: [
+      {
+        id: 'schedule-old',
+        url: '/schedule-old.png',
+        name: 'schedule-old.png',
+        relativePath: 'Schedules/schedule-old.png',
+        contentType: 'image/png',
+        size: 2048,
+        revision: 'Revision 2',
+        effectiveDate: '2026-08-20',
+        isCurrent: true,
+      },
+      {
+        id: 'schedule-new',
+        url: '/schedule-new.png',
+        name: 'schedule-new.png',
+        relativePath: 'Schedules/schedule-new.png',
+        contentType: 'image/png',
+        size: 2048,
+        revision: null,
+        effectiveDate: null,
+        isCurrent: false,
+      },
+    ],
+  };
+  await page.unroute('**/api/projects/riverstone');
+  await page.route('**/api/projects/riverstone', route => route.fulfill({ json: current }));
+  await page.route('**/api/projects/riverstone/schedule-images/schedule-new', async route => {
+    expect(route.request().method()).toBe('PATCH');
+    expect(route.request().postDataJSON()).toEqual({
+      revision: 'Revision 3',
+      effectiveDate: '2026-09-12',
+      isCurrent: true,
+    });
+    current = {
+      ...current,
+      scheduleImages: current.scheduleImages.map(image => ({
+        ...image,
+        revision: image.id === 'schedule-new' ? 'Revision 3' : image.revision,
+        effectiveDate: image.id === 'schedule-new' ? '2026-09-12' : image.effectiveDate,
+        isCurrent: image.id === 'schedule-new',
+      })),
+    };
+    await route.fulfill({ status: 200, json: current.scheduleImages[1] });
+  });
+
+  await openOverview(page);
+  const newSchedule = page.getByRole('article').filter({ hasText: 'schedule-new.png' });
+  await newSchedule.getByRole('button', { name: 'Edit details' }).click();
+  await page.getByLabel('Revision').fill('Revision 3');
+  await page.getByLabel('Effective date').fill('2026-09-12');
+  await page.getByText('Mark as current schedule', { exact: true }).click();
+  await page.getByRole('button', { name: 'Save details' }).click();
+
+  await expect(page.getByText('Current schedule updated', { exact: true })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'schedule-old.png' })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'schedule-new.png' })).toBeVisible();
+  await expect(newSchedule.getByText('Current schedule', { exact: true })).toBeVisible();
 });
 
 test('confirms schedule image removal, reports failures, and refreshes the gallery after retry', async ({ page }) => {

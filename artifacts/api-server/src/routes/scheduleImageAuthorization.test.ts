@@ -3,7 +3,6 @@ import test from "node:test";
 import type { AddressInfo } from "node:net";
 import { randomUUID } from "node:crypto";
 import express from "express";
-import type { ClerkClient } from "@clerk/backend";
 import { and, eq } from "drizzle-orm";
 import {
   db,
@@ -12,17 +11,21 @@ import {
   projectActivitiesTable,
   projectImportBatchesTable,
   projectScheduleImagesTable,
+  projectScheduleMetadataTable,
 } from "@workspace/db";
 import luminovaRouter from "./luminova";
+import { setWorkspaceRoleResolverForTests } from "./users";
 
 test("schedule images require project authorization and imported schedule images appear in project details", async (t) => {
   const suffix = randomUUID();
   const ownerId = `schedule-owner-${suffix}`;
   const otherOwnerId = `schedule-other-${suffix}`;
-  const managerId = `schedule-manager-${suffix}`;
   const projectId = `schedule-project-${suffix}`;
   const importBatchId = `schedule-batch-${suffix}`;
   const objectPath = `/objects/uploads/${suffix}`;
+
+  const currentDocumentId = `schedule-document-${suffix}`;
+  const manualScheduleId = `manual-schedule-${suffix}`;
   const project = {
     id: projectId,
     name: "Schedule authorization project",
@@ -48,7 +51,7 @@ test("schedule images require project authorization and imported schedule images
   });
   await db.insert(importedProjectsTable).values({ id: projectId, importBatchId, ownerId, data: project });
   await db.insert(projectDocumentsTable).values({
-    id: `schedule-document-${suffix}`,
+    id: currentDocumentId,
     importBatchId,
     projectId,
     ownerId,
@@ -86,7 +89,7 @@ test("schedule images require project authorization and imported schedule images
     },
   ]);
   await db.insert(projectScheduleImagesTable).values({
-    id: `manual-schedule-${suffix}`,
+    id: manualScheduleId,
     projectId,
     ownerId,
     workspaceId: "default",
@@ -96,21 +99,9 @@ test("schedule images require project authorization and imported schedule images
     contentType: "image/png",
     size: 2048,
   });
+  setWorkspaceRoleResolverForTests(async (userId) => userId === ownerId ? "Project Manager" : "Field Team");
 
   const app = express();
-  app.locals.projectAssignmentClerkClient = {
-    users: {
-      getUser: async (userId: string) => ({
-        id: userId,
-        firstName: userId === ownerId ? "Admin" : "Project",
-        lastName: userId === ownerId ? "Owner" : "Manager",
-        fullName: userId === ownerId ? "Admin Owner" : "Project Manager",
-        username: null,
-        primaryEmailAddress: { emailAddress: `${userId}@example.com` },
-        publicMetadata: { role: userId === ownerId ? "Admin" : "Project Manager" },
-      }),
-    },
-  } as unknown as ClerkClient;
   app.use(express.json());
   app.use((req, _res, next) => {
     const actor = req.header("x-test-user");
@@ -133,7 +124,9 @@ test("schedule images require project authorization and imported schedule images
 
   t.after(async () => {
     server.close();
+    setWorkspaceRoleResolverForTests();
     await db.delete(projectActivitiesTable).where(eq(projectActivitiesTable.projectId, projectId));
+    await db.delete(projectScheduleMetadataTable).where(eq(projectScheduleMetadataTable.projectId, projectId));
     await db.delete(projectScheduleImagesTable).where(eq(projectScheduleImagesTable.projectId, projectId));
     if (directProjectId) {
       await db.delete(projectScheduleImagesTable).where(eq(projectScheduleImagesTable.projectId, directProjectId));
@@ -166,31 +159,89 @@ test("schedule images require project authorization and imported schedule images
     headers: { "x-test-user": ownerId },
   });
   assert.equal(details.status, 200);
-  const detail = await details.json() as { scheduleImages: Array<{ name: string; relativePath: string; url: string }> };
-  assert.deepEqual(detail.scheduleImages, [
+  const detail = await details.json() as { scheduleImages: Array<{
+    id: string;
+    name: string;
+    relativePath: string;
+    url: string;
+    contentType: string;
+    size: number;
+    revision: string | null;
+    effectiveDate: string | null;
+    isCurrent: boolean;
+  }> };
+
+  const updateSchedule = (actor: string, imageId: string, update: {
+    revision: string | null;
+    effectiveDate: string | null;
+    isCurrent: boolean;
+  }) => fetch(`${base}/projects/${projectId}/schedule-images/${imageId}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", "x-test-user": actor },
+    body: JSON.stringify(update),
+  });
+  assert.deepEqual(detail.scheduleImages.map((image) => ({
+    id: image.id,
+    revision: image.revision,
+    effectiveDate: image.effectiveDate,
+    isCurrent: image.isCurrent,
+  })), [
     {
-      id: `schedule-document-${suffix}`,
-      name: "master-schedule.png",
-      relativePath: "Schedules/master-schedule.png",
-      url: `/api/storage${objectPath}`,
-      contentType: "image/png",
-      size: 2048,
+      id: currentDocumentId,
+      revision: null,
+      effectiveDate: null,
+      isCurrent: false,
     },
     {
-      id: `manual-schedule-${suffix}`,
-      name: "manual-schedule.png",
-      relativePath: "manual-schedule.png",
-      url: `/api/storage/objects/uploads/manual-${suffix}`,
-      contentType: "image/png",
-      size: 2048,
+      id: manualScheduleId,
+      revision: null,
+      effectiveDate: null,
+      isCurrent: false,
     },
   ]);
 
-  assert.equal((await fetch(`${base}/projects/${projectId}`, {
-    headers: { "x-test-user": otherOwnerId },
-  })).status, 404);
+  assert.equal((await updateSchedule(otherOwnerId, currentDocumentId, {
+    revision: "Revision 3",
+    effectiveDate: "2026-09-01",
+    isCurrent: true,
+  })).status, 403);
+  assert.equal((await updateSchedule(ownerId, currentDocumentId, {
+    revision: "Revision 3",
+    effectiveDate: "2026-09-01",
+    isCurrent: true,
+  })).status, 200);
+  assert.equal((await updateSchedule(ownerId, manualScheduleId, {
+    revision: "Revision 4",
+    effectiveDate: "2026-09-12",
+    isCurrent: true,
+  })).status, 200);
 
-  const importedDeleteUrl = `${base}/projects/${projectId}/schedule-images/schedule-document-${suffix}`;
+  const refreshed = await fetch(`${base}/projects/${projectId}`, {
+    headers: { "x-test-user": ownerId },
+  });
+  assert.equal(refreshed.status, 200);
+  const refreshedDetail = await refreshed.json() as typeof detail;
+  assert.deepEqual(refreshedDetail.scheduleImages.map((image) => ({
+    id: image.id,
+    revision: image.revision,
+    effectiveDate: image.effectiveDate,
+    isCurrent: image.isCurrent,
+  })), [
+    {
+      id: manualScheduleId,
+      revision: "Revision 4",
+      effectiveDate: "2026-09-12",
+      isCurrent: true,
+    },
+    {
+      id: currentDocumentId,
+      revision: "Revision 3",
+      effectiveDate: "2026-09-01",
+      isCurrent: false,
+    },
+  ]);
+
+  const importedDeleteUrl = `${base}/projects/${projectId}/schedule-images/${currentDocumentId}`;
   assert.equal((await fetch(importedDeleteUrl, { method: "DELETE" })).status, 401);
   assert.equal((await fetch(importedDeleteUrl, {
     method: "DELETE",
@@ -202,7 +253,7 @@ test("schedule images require project authorization and imported schedule images
   })).status, 204);
 
   const [sourceDocument] = await db.select().from(projectDocumentsTable)
-    .where(eq(projectDocumentsTable.id, `schedule-document-${suffix}`));
+    .where(eq(projectDocumentsTable.id, currentDocumentId));
   assert.equal(sourceDocument.classification, "other");
   assert.equal(sourceDocument.objectPath, objectPath);
 
@@ -239,6 +290,9 @@ test("schedule images require project authorization and imported schedule images
     url: `/api/storage/objects/uploads/restorable-${suffix}`,
     contentType: "image/webp",
     size: 1024,
+    revision: null,
+    effectiveDate: null,
+    isCurrent: false,
   });
   const [restoredDocument] = await db.select().from(projectDocumentsTable)
     .where(eq(projectDocumentsTable.id, `restorable-document-${suffix}`));
@@ -262,28 +316,36 @@ test("schedule images require project authorization and imported schedule images
   assert.equal(restoredActivity[0]?.author, ownerId);
   assert.equal(Number.isNaN(Date.parse(restoredActivity[0]?.date ?? "")), false);
 
-  const createDirectProject = await fetch(`${base}/projects`, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-test-user": ownerId },
-    body: JSON.stringify({
+  directProjectId = `private-schedule-project-${suffix}`;
+  directImportBatchId = `private-schedule-batch-${suffix}`;
+  await db.insert(projectImportBatchesTable).values({
+    id: directImportBatchId,
+    projectId: directProjectId,
+    ownerId,
+    status: "completed",
+    manifest: [],
+  });
+  await db.insert(importedProjectsTable).values({
+    id: directProjectId,
+    importBatchId: directImportBatchId,
+    ownerId,
+    data: {
+      id: directProjectId,
       name: `Private schedule project ${suffix}`,
       address: "",
       region: "Calgary",
       status: "Planning",
-      projectManagerId: managerId,
+      progress: 0,
+      projectManagerId: ownerId,
+      pmName: "",
       clientName: "",
       targetDate: "",
       budgeted: 0,
+      invoiced: 0,
+      exteriorImage: "",
       description: "",
-    }),
+    },
   });
-  assert.equal(createDirectProject.status, 201);
-  directProjectId = (await createDirectProject.json() as { id: string }).id;
-  const [directProjectRow] = await db.select({ importBatchId: importedProjectsTable.importBatchId })
-    .from(importedProjectsTable)
-    .where(eq(importedProjectsTable.id, directProjectId));
-  assert(directProjectRow);
-  directImportBatchId = directProjectRow.importBatchId;
   const directImageId = `direct-schedule-${suffix}`;
   await db.insert(projectScheduleImagesTable).values({
     id: directImageId,

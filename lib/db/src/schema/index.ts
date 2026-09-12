@@ -21,6 +21,7 @@ export * from "./projectPanoramas";
 export * from "./projectImports";
 export * from "./projectExteriorPhotos";
 export * from "./projectScheduleImages";
+export * from "./projectScheduleMetadata";
 export * from "./projectActivities";
 export * from "./scheduleUploadReservations";
 export * from "./vendorRecords";

@@ -56,6 +56,7 @@ export * from './review';
 export * from './scheduleImage';
 export * from './scheduleImageInput';
 export * from './scheduleImageInputContentType';
+export * from './scheduleImageUpdate';
 export * from './searchWorkspaceParams';
 export * from './trade';
 export * from './tradeBid';
