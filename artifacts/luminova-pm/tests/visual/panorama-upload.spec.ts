@@ -48,7 +48,7 @@ async function openGallery(page: Page) {
 async function openOverview(page: Page) {
   await page.goto('/__visual/project-panorama');
   await expect(page.getByRole('heading', { name: 'Riverstone Residence' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Entry agreement' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'On-site agreement' })).toBeVisible();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -73,13 +73,13 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('shows only the designated entry agreement in the Overview and opens it', async ({ page, context }) => {
+test('keeps every imported on-site agreement individually accessible from the Overview', async ({ page, context }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const files = [
+  const agreements = [
     {
       id: 'agreement-1',
-      name: 'NOTICE OF AUTHORIZED CONTRACTOR & INSURANCE ACCESS.pdf',
-      url: '/api/storage/objects/uploads/entry-agreement',
+      name: 'Riverstone-Residence-fully-executed-on-site-agreement-and-scope-of-work.pdf',
+      url: '/api/storage/objects/uploads/riverstone-agreement',
     },
     {
       id: 'agreement-2',
@@ -89,9 +89,9 @@ test('shows only the designated entry agreement in the Overview and opens it', a
   ];
   const current = {
     ...structuredClone(project),
-    files: files.map((file) => ({
-      ...file,
-      relativePath: `Contracts/${file.name}`,
+    files: agreements.map((agreement) => ({
+      ...agreement,
+      relativePath: `Contracts/${agreement.name}`,
       contentType: 'application/pdf',
       classification: 'contract',
       collection: 'Contracts',
@@ -101,22 +101,22 @@ test('shows only the designated entry agreement in the Overview and opens it', a
   await page.route('**/api/projects/riverstone', route => route.fulfill({ json: current }));
 
   await openOverview(page);
-  await expect(page.getByText('1 file', { exact: true })).toBeVisible();
-  await expect(page.getByText(files[0].name, { exact: true })).toBeVisible();
-  await expect(page.getByText(files[1].name, { exact: true })).toHaveCount(0);
-  await expect(page.getByText('2 files', { exact: true })).toHaveCount(0);
+  for (const agreement of agreements) {
+    await expect(page.getByText(agreement.name, { exact: true })).toBeVisible();
+    const agreementLink = page.getByRole('link', { name: `Open on-site agreement ${agreement.name}` });
+    await expect(agreementLink).toHaveAttribute('href', agreement.url);
+    await expect(agreementLink).toHaveAttribute('target', '_blank');
+    await expect(agreementLink).toHaveAttribute('title', agreement.name);
+  }
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(overflow).toBe(false);
 
-  const entryAgreementLink = page.getByRole('link', { name: `Open entry agreement ${files[0].name}` });
-  await expect(entryAgreementLink).toHaveAttribute('href', files[0].url);
-  await expect(entryAgreementLink).toHaveAttribute('target', '_blank');
-  await expect(entryAgreementLink).toHaveAttribute('title', files[0].name);
+  const firstAgreementLink = page.getByRole('link', { name: `Open on-site agreement ${agreements[0].name}` });
   const newPagePromise = context.waitForEvent('page');
-  await entryAgreementLink.click();
+  await firstAgreementLink.click();
   const newPage = await newPagePromise;
-  await expect(newPage).toHaveURL(new RegExp(`${files[0].url}$`));
+  await expect(newPage).toHaveURL(new RegExp(`${agreements[0].url}$`));
   await newPage.close();
 });
 
@@ -124,31 +124,85 @@ for (const viewport of [
   { name: 'narrow', width: 390, height: 844 },
   { name: 'desktop', width: 1440, height: 1000 },
 ]) {
-  test(`keeps the entry agreement usable at ${viewport.name} width`, async ({ page }) => {
+  test(`keeps every on-site agreement reachable in a compact list at ${viewport.name} width`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    const name = 'notice of authorized contractor & insurance access.PDF';
-    const entryAgreement = {
-      id: 'entry-agreement',
-      name,
-      relativePath: `Contracts/Executed agreements/${name}`,
-      url: '/api/storage/objects/uploads/entry-agreement',
-      contentType: 'application/pdf',
-      classification: 'contract',
-      collection: 'Contracts',
-    };
-    const current = { ...structuredClone(project), files: [entryAgreement] };
+    const agreements = Array.from({ length: 12 }, (_, index) => {
+      const number = index + 1;
+      const name = `Riverstone agreement ${number} with a long descriptive contract filename.pdf`;
+      return {
+        id: `agreement-${number}`,
+        name,
+        relativePath: `Contracts/Executed agreements/${name}`,
+        url: `/api/storage/objects/uploads/riverstone-agreement-${number}`,
+        contentType: 'application/pdf',
+        classification: 'contract',
+        collection: 'Contracts',
+      };
+    });
+    const current = { ...structuredClone(project), files: agreements };
     await page.unroute('**/api/projects/riverstone');
     await page.route('**/api/projects/riverstone', route => route.fulfill({ json: current }));
 
     await openOverview(page);
-    await expect(page.getByText('1 file', { exact: true })).toBeVisible();
-    const link = page.getByRole('link', { name: `Open entry agreement ${name}` });
-    await expect(link).toBeVisible();
-    await expect(link).toHaveAttribute('href', entryAgreement.url);
-    await link.focus();
-    await expect(link).toBeFocused();
-    const focusStyle = await link.evaluate((element) => getComputedStyle(element).boxShadow);
-    expect(focusStyle).not.toBe('none');
+    await expect(page.getByText('12 files', { exact: true })).toBeVisible();
+    const agreementList = page.getByRole('region', { name: 'On-site agreement files' });
+    await expect(agreementList).toBeVisible();
+    const agreementFilter = page.getByRole('searchbox', { name: 'Filter on-site agreements' });
+    await expect(agreementFilter).toBeVisible();
+
+    const listSize = await agreementList.evaluate(element => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+    }));
+    expect(listSize.clientHeight).toBeLessThanOrEqual(256);
+    expect(listSize.scrollHeight).toBeGreaterThan(listSize.clientHeight);
+
+    await page.keyboard.press('Tab');
+    for (let attempts = 0; attempts < 30; attempts += 1) {
+      const focusedLabel = await page.locator(':focus').getAttribute('aria-label');
+      if (focusedLabel === `Open on-site agreement ${agreements[0].name}`) break;
+      await page.keyboard.press('Tab');
+    }
+
+    for (const [index, agreement] of agreements.entries()) {
+      const link = page.getByRole('link', { name: `Open on-site agreement ${agreement.name}` });
+      await expect(link).toBeFocused();
+      await expect(link).toHaveAttribute('href', agreement.url);
+
+      const focusedBounds = await link.evaluate((element) => {
+        const list = element.closest('[aria-label="On-site agreement files"]');
+        if (!list) throw new Error('Agreement list not found');
+        const linkRect = element.getBoundingClientRect();
+        const listRect = list.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return {
+          withinVisibleList:
+            linkRect.top >= listRect.top &&
+            linkRect.bottom <= listRect.bottom,
+          outlineVisible:
+            style.outlineStyle !== 'none' ||
+            style.boxShadow !== 'none',
+        };
+      });
+      expect(focusedBounds.withinVisibleList).toBe(true);
+      expect(focusedBounds.outlineVisible).toBe(true);
+
+      if (index < agreements.length - 1) {
+        await page.keyboard.press('Tab');
+      }
+    }
+
+    await agreementFilter.fill('agreement 12');
+    await expect(page.getByRole('link', { name: `Open on-site agreement ${agreements[11].name}` })).toBeVisible();
+    await expect(page.getByRole('link', { name: `Open on-site agreement ${agreements[0].name}` })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: `Open on-site agreement ${agreements[11].name}` }))
+      .toHaveAttribute('href', agreements[11].url);
+
+    await agreementFilter.fill('Executed agreements');
+    await expect(page.getByRole('link', { name: /Open on-site agreement/ })).toHaveCount(agreements.length);
+
+    await agreementFilter.clear();
+    await expect(page.getByRole('link', { name: /Open on-site agreement/ })).toHaveCount(agreements.length);
 
     await page.keyboard.press('Tab');
     for (const agreement of agreements.toReversed()) {
@@ -175,27 +229,11 @@ for (const viewport of [
   });
 }
 
-test('shows a clear Overview empty state when the designated entry agreement is missing', async ({ page }) => {
-  const unrelatedContract = {
-    id: 'agreement-2',
-    name: 'Riverstone-Residence-construction-management-agreement.pdf',
-    relativePath: 'Contracts/Riverstone-Residence-construction-management-agreement.pdf',
-    url: '/api/storage/objects/uploads/riverstone-management-agreement',
-    contentType: 'application/pdf',
-    classification: 'contract',
-    collection: 'Contracts',
-  };
-  await page.unroute('**/api/projects/riverstone');
-  await page.route('**/api/projects/riverstone', route => route.fulfill({
-    json: { ...structuredClone(project), files: [unrelatedContract] },
-  }));
-
+test('shows a clear Overview empty state when no on-site agreement is imported', async ({ page }) => {
   await openOverview(page);
-  await expect(page.getByText('No entry agreement is available.', { exact: true })).toBeVisible();
-  await expect(page.getByText('Import the authorized contractor and insurance access notice to make it available here.', { exact: true })).toBeVisible();
-  await expect(page.getByText(unrelatedContract.name, { exact: true })).toHaveCount(0);
-  await expect(page.getByText('1 file', { exact: true })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: /Open entry agreement/ })).toHaveCount(0);
+  await expect(page.getByText('No on-site agreement has been imported yet.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Import a contract file to make it available here.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Open on-site agreement/ })).toHaveCount(0);
 });
 
 test('selects a standard photo as the exterior photo and keeps it selected after refresh', async ({ page }) => {
