@@ -186,12 +186,16 @@ export async function applyMadisonParkRevenueCorrection(
   log?: CorrectionLog,
   hooks?: RevenueCorrectionHooks,
 ) {
-  const projectRows = await db.select({ data: importedProjectsTable.data })
+  const projectRows = await db.select({
+    data: importedProjectsTable.data,
+    importBatchId: importedProjectsTable.importBatchId,
+  })
     .from(importedProjectsTable)
     .where(eq(importedProjectsTable.ownerId, ownerId));
   const projectRow = projectRows.find((row) => isMadisonParkProject(row.data as MadisonProject));
   if (!projectRow) return { applied: false, alreadyApplied: false, source: null };
   const project = projectRow.data as MadisonProject;
+  const importBatchId = projectRow.importBatchId;
   const [existingCorrection] = await db.select({ id: importedVendorQuotesTable.id })
     .from(importedVendorQuotesTable)
     .where(and(
@@ -209,6 +213,7 @@ export async function applyMadisonParkRevenueCorrection(
   const documents = await db.select().from(projectDocumentsTable).where(and(
     eq(projectDocumentsTable.ownerId, ownerId),
     eq(projectDocumentsTable.projectId, project.id),
+    eq(projectDocumentsTable.importBatchId, importBatchId),
   ));
   const financialCandidates = documents.filter((document) =>
     /(\.pdf|\.xlsx|\.docx|\.odt)$/i.test(document.name) &&
@@ -241,9 +246,16 @@ export async function applyMadisonParkRevenueCorrection(
   if (!sourceDocument) throw new Error("Madison Park revenue source document disappeared before correction");
 
   return db.transaction(async (tx) => {
-    const [lockedProjectRow] = await tx.select({ data: importedProjectsTable.data })
+    const [lockedProjectRow] = await tx.select({
+      data: importedProjectsTable.data,
+      importBatchId: importedProjectsTable.importBatchId,
+    })
       .from(importedProjectsTable)
-      .where(and(eq(importedProjectsTable.id, project.id), eq(importedProjectsTable.ownerId, ownerId)))
+      .where(and(
+        eq(importedProjectsTable.id, project.id),
+        eq(importedProjectsTable.ownerId, ownerId),
+        eq(importedProjectsTable.importBatchId, importBatchId),
+      ))
       .for("update");
     if (!lockedProjectRow) throw new Error("Owned Madison Park project disappeared before correction");
 
@@ -264,7 +276,7 @@ export async function applyMadisonParkRevenueCorrection(
       const quote = importedQuoteForCorrection(lockedProject, source, ownerId);
       await tx.insert(importedVendorQuotesTable).values({
         id: quote.id,
-        importBatchId: sourceDocument.importBatchId,
+        importBatchId: lockedProjectRow.importBatchId,
         ownerId,
         data: quote,
       });
@@ -320,6 +332,8 @@ export async function applyMadisonParkRevenueCorrection(
         .where(and(
           eq(projectDocumentsTable.id, source.documentId),
           eq(projectDocumentsTable.ownerId, ownerId),
+          eq(projectDocumentsTable.projectId, lockedProject.id),
+          eq(projectDocumentsTable.importBatchId, lockedProjectRow.importBatchId),
         ));
     }
 

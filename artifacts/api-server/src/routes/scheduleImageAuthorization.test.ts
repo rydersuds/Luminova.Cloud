@@ -3,7 +3,7 @@ import test from "node:test";
 import type { AddressInfo } from "node:net";
 import { randomUUID } from "node:crypto";
 import express from "express";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   db,
   importedProjectsTable,
@@ -22,6 +22,8 @@ test("schedule images require project authorization and imported schedule images
   const otherOwnerId = `schedule-other-${suffix}`;
   const projectId = `schedule-project-${suffix}`;
   const importBatchId = `schedule-batch-${suffix}`;
+  const otherImportBatchId = `schedule-other-batch-${suffix}`;
+  const mismatchedDocumentId = `mismatched-schedule-document-${suffix}`;
   const objectPath = `/objects/uploads/${suffix}`;
 
   const currentDocumentId = `schedule-document-${suffix}`;
@@ -45,6 +47,13 @@ test("schedule images require project authorization and imported schedule images
   await db.insert(projectImportBatchesTable).values({
     id: importBatchId,
     projectId,
+    ownerId,
+    status: "completed",
+    manifest: [],
+  });
+  await db.insert(projectImportBatchesTable).values({
+    id: otherImportBatchId,
+    projectId: `other-schedule-project-${suffix}`,
     ownerId,
     status: "completed",
     manifest: [],
@@ -86,6 +95,18 @@ test("schedule images require project authorization and imported schedule images
       contentType: "application/pdf",
       size: 1024,
       classification: "other",
+    },
+    {
+      id: mismatchedDocumentId,
+      importBatchId: otherImportBatchId,
+      projectId,
+      ownerId,
+      objectPath: `/objects/uploads/mismatched-${suffix}`,
+      relativePath: "Schedules/master-schedule.png",
+      name: "master-schedule.png",
+      contentType: "image/png",
+      size: 2048,
+      classification: "schedule",
     },
   ]);
   await db.insert(projectScheduleImagesTable).values({
@@ -138,7 +159,7 @@ test("schedule images require project authorization and imported schedule images
     await db.delete(projectDocumentsTable).where(eq(projectDocumentsTable.projectId, projectId));
     await db.delete(importedProjectsTable).where(eq(importedProjectsTable.id, projectId));
     await db.delete(projectImportBatchesTable).where(and(
-      eq(projectImportBatchesTable.id, importBatchId),
+      inArray(projectImportBatchesTable.id, [importBatchId, otherImportBatchId]),
       eq(projectImportBatchesTable.ownerId, ownerId),
     ));
   });
@@ -199,6 +220,19 @@ test("schedule images require project authorization and imported schedule images
       isCurrent: false,
     },
   ]);
+  assert.equal(detail.scheduleImages.some((image) => image.id === mismatchedDocumentId), false);
+
+  const rescan = await fetch(`${base}/projects/${projectId}/vendor-quotes/rescan`, {
+    method: "POST",
+    headers: { "x-test-user": ownerId },
+  });
+  assert.equal(rescan.status, 200);
+  const rescanResult = await rescan.json() as {
+    documentsScanned: number;
+    outcomes: Array<{ documentId: string }>;
+  };
+  assert.equal(rescanResult.documentsScanned, 3);
+  assert.equal(rescanResult.outcomes.some((outcome) => outcome.documentId === mismatchedDocumentId), false);
 
   assert.equal((await updateSchedule(otherOwnerId, currentDocumentId, {
     revision: "Revision 3",
@@ -267,6 +301,17 @@ test("schedule images require project authorization and imported schedule images
     method: "POST",
     headers: { "x-test-user": ownerId },
   })).status, 404);
+  assert.equal((await fetch(`${base}/projects/${projectId}/schedule-images/${mismatchedDocumentId}/restore`, {
+    method: "POST",
+    headers: { "x-test-user": ownerId },
+  })).status, 404);
+  assert.equal((await fetch(`${base}/projects/${projectId}/schedule-images/${mismatchedDocumentId}`, {
+    method: "DELETE",
+    headers: { "x-test-user": ownerId },
+  })).status, 404);
+  const [mismatchedDocument] = await db.select().from(projectDocumentsTable)
+    .where(eq(projectDocumentsTable.id, mismatchedDocumentId));
+  assert.equal(mismatchedDocument.classification, "schedule");
 
   assert.equal((await fetch(`${base}/projects/${projectId}/activity`)).status, 401);
   assert.equal((await fetch(`${base}/projects/${projectId}/activity`, {

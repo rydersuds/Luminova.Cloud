@@ -4921,3 +4921,4 @@ export const useDeleteWorkspaceUser = <TError = ErrorType<void>,
       > => {
       return useMutation(getDeleteWorkspaceUserMutationOptions(options));
     }
+

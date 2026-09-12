@@ -364,6 +364,10 @@ export function ProjectFolderImportProvider({
           const file = await loadImportFile(session.importId, document.relativePath)
           return file ? { file, relativePath: document.relativePath } : null
         }))).filter((item): item is FolderCandidate => item !== null)
+        if (dismissedImportIdsRef.current.has(session.importId) || wasImportErrorDismissed(session.importId)) {
+          if (sessionRef.current?.importId === session.importId) clearFolderImport()
+          return
+        }
         sessionRef.current = session
         folderFilesRef.current = restored
         setFolderFiles(restored)

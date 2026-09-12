@@ -94,8 +94,10 @@ test("corrects the first project response once, scopes it to the owner, and pres
   const otherProjectId = `madison-other-project-${suffix}`;
   const batchId = `madison-batch-${suffix}`;
   const otherBatchId = `madison-other-batch-${suffix}`;
+  const mismatchedBatchId = `madison-mismatched-batch-${suffix}`;
   const documentId = `madison-source-${suffix}`;
   const otherDocumentId = `madison-other-source-${suffix}`;
+  const mismatchedDocumentId = `madison-mismatched-source-${suffix}`;
   const project = {
     id: projectId,
     name: "Madison Park Building 79",
@@ -136,6 +138,7 @@ test("corrects the first project response once, scopes it to the owner, and pres
   await db.insert(projectImportBatchesTable).values([
     { id: batchId, projectId, ownerId, status: "completed", manifest: [] },
     { id: otherBatchId, projectId: otherProjectId, ownerId: otherOwnerId, status: "completed", manifest: [] },
+    { id: mismatchedBatchId, projectId, ownerId, status: "completed", manifest: [] },
   ]);
   await db.insert(importedProjectsTable).values([
     { id: projectId, importBatchId: batchId, ownerId, data: project },
@@ -186,6 +189,19 @@ test("corrects the first project response once, scopes it to the owner, and pres
       classification: "quote",
       textSnippet: sourceText,
     },
+    {
+      id: mismatchedDocumentId,
+      importBatchId: mismatchedBatchId,
+      projectId,
+      ownerId,
+      objectPath: `/objects/${mismatchedDocumentId}`,
+      relativePath: "Building 79/Rebuild Quote/Weidner - 79 Cambridge Ave Madison Park RebuildREV1- Incl Taxes.pdf",
+      name: "preferred-decoy.pdf",
+      contentType: "application/pdf",
+      size: sourceText.length,
+      classification: "quote",
+      textSnippet: sourceText,
+    },
   ]);
   await db.insert(importedVendorQuotesTable).values({
     id: `madison-draft-${suffix}`,
@@ -216,11 +232,11 @@ test("corrects the first project response once, scopes it to the owner, and pres
     },
   });
   t.after(async () => {
-    await db.delete(importedInvoicesTable).where(inArray(importedInvoicesTable.importBatchId, [batchId, otherBatchId]));
-    await db.delete(importedVendorQuotesTable).where(inArray(importedVendorQuotesTable.importBatchId, [batchId, otherBatchId]));
-    await db.delete(projectDocumentsTable).where(inArray(projectDocumentsTable.importBatchId, [batchId, otherBatchId]));
-    await db.delete(importedProjectsTable).where(inArray(importedProjectsTable.importBatchId, [batchId, otherBatchId]));
-    await db.delete(projectImportBatchesTable).where(inArray(projectImportBatchesTable.id, [batchId, otherBatchId]));
+    await db.delete(importedInvoicesTable).where(inArray(importedInvoicesTable.importBatchId, [batchId, otherBatchId, mismatchedBatchId]));
+    await db.delete(importedVendorQuotesTable).where(inArray(importedVendorQuotesTable.importBatchId, [batchId, otherBatchId, mismatchedBatchId]));
+    await db.delete(projectDocumentsTable).where(inArray(projectDocumentsTable.importBatchId, [batchId, otherBatchId, mismatchedBatchId]));
+    await db.delete(importedProjectsTable).where(inArray(importedProjectsTable.importBatchId, [batchId, otherBatchId, mismatchedBatchId]));
+    await db.delete(projectImportBatchesTable).where(inArray(projectImportBatchesTable.id, [batchId, otherBatchId, mismatchedBatchId]));
   });
 
   await assert.rejects(

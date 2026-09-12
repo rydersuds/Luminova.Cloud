@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const projectImportBatchesTable = pgTable("project_import_batches", {
   id: text("id").primaryKey(),
@@ -35,6 +35,7 @@ export const projectDocumentsTable = pgTable("project_documents", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("project_documents_import_path_unique").on(table.importBatchId, table.relativePath),
+  index("project_documents_boundary_idx").on(table.ownerId, table.projectId, table.importBatchId),
 ]);
 
 const importedRecordColumns = {

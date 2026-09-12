@@ -2330,7 +2330,8 @@ const jobHistoryForTrade = async (trade: Trade, ownerId: string) =>
     db.select(
 {
 
- data: importedProjectsTable.data 
+ data: importedProjectsTable.data,
+ importBatchId: importedProjectsTable.importBatchId,
 }
 
 )
@@ -2381,7 +2382,8 @@ const reviewsForTrade = async (trade: Trade, ownerId: string) =>
     db.select(
 {
 
- data: importedProjectsTable.data 
+ data: importedProjectsTable.data,
+ importBatchId: importedProjectsTable.importBatchId
 }
 
 )
@@ -2689,7 +2691,8 @@ const financialRecordsForOwner = async (ownerId: string, scope = ownerId) =>
     db.select(
 {
 
- data: importedProjectsTable.data 
+ data: importedProjectsTable.data,
+ importBatchId: importedProjectsTable.importBatchId
 }
 
 )
@@ -2709,6 +2712,10 @@ const financialRecordsForOwner = async (ownerId: string, scope = ownerId) =>
 
   const projectById = new Map(ownedProjects.map((project) => [project.id, project]))
 ;
+  const importBatchByProjectId = new Map(projectRows.map((row) => [
+    (row.data as Project).id,
+    row.importBatchId,
+  ]));
 
 
   const ownedInvoices = [
@@ -2863,7 +2870,11 @@ const financialRecordsForOwner = async (ownerId: string, scope = ownerId) =>
 
 
         const attachments = quoteDocuments
-          .filter((document) => document.linkedEntityId === quote.id)
+          .filter((document) =>
+            document.linkedEntityId === quote.id &&
+            document.projectId === quote.projectId &&
+            document.importBatchId === importBatchByProjectId.get(quote.projectId),
+          )
           .map((document) => (
 {
 
@@ -3153,6 +3164,38 @@ const findAuthorizedProject = async (projectId: string, ownerId: string): Promis
 }
 
 ;
+
+type ProjectDocumentBoundary = {
+  projectId: string;
+  importBatchId: string;
+  ownerId: string;
+};
+
+const resolveProjectDocumentBoundary = async (
+  projectId: string,
+  ownerId: string,
+): Promise<ProjectDocumentBoundary | null> => {
+  const [project] = await db.select({
+    projectId: importedProjectsTable.id,
+    importBatchId: importedProjectsTable.importBatchId,
+    ownerId: importedProjectsTable.ownerId,
+  }).from(importedProjectsTable).where(and(
+    eq(importedProjectsTable.id, projectId),
+    eq(importedProjectsTable.ownerId, ownerId),
+  )).limit(1);
+  return project ?? null;
+};
+
+const projectDocumentBoundaryWhere = (boundary: ProjectDocumentBoundary) => and(
+  eq(projectDocumentsTable.projectId, boundary.projectId),
+  eq(projectDocumentsTable.importBatchId, boundary.importBatchId),
+  eq(projectDocumentsTable.ownerId, boundary.ownerId),
+);
+
+const projectDocumentWhere = (boundary: ProjectDocumentBoundary, documentId: string) => and(
+  projectDocumentBoundaryWhere(boundary),
+  eq(projectDocumentsTable.id, documentId),
+);
 
 
 const conversationsForOwner = async (ownerId: string) => 
@@ -3490,6 +3533,7 @@ export const analyzeImportedQuoteDirections = async (projectId: string, ownerId:
 
   if (!projectRow) return null
 ;
+  const boundary = { projectId, importBatchId: projectRow.importBatchId, ownerId };
 
 
   const [quoteRows, documents] = await Promise.all([
@@ -3507,10 +3551,7 @@ export const analyzeImportedQuoteDirections = async (projectId: string, ownerId:
     
 }
 
-).from(projectDocumentsTable).where(and(
-      eq(projectDocumentsTable.importBatchId, projectRow.importBatchId),
-      eq(projectDocumentsTable.ownerId, ownerId),
-    )),
+).from(projectDocumentsTable).where(projectDocumentBoundaryWhere(boundary)),
   ])
 ;
 
@@ -3701,10 +3742,11 @@ export const organizeImportedProjectFiles = async (projectId: string, ownerId: s
 
   if (!importedProject) return null
 ;
+  const boundary = { projectId, importBatchId: importedProject.importBatchId, ownerId };
 
 
   const [documents, vendorRows, quoteRows, invoiceRows] = await Promise.all([
-    db.select().from(projectDocumentsTable).where(and(eq(projectDocumentsTable.projectId, projectId), eq(projectDocumentsTable.ownerId, ownerId))),
+    db.select().from(projectDocumentsTable).where(projectDocumentBoundaryWhere(boundary)),
     db.select().from(importedVendorsTable).where(eq(importedVendorsTable.importBatchId, importedProject.importBatchId)),
     db.select().from(importedVendorQuotesTable).where(eq(importedVendorQuotesTable.importBatchId, importedProject.importBatchId)),
     db.select().from(importedInvoicesTable).where(eq(importedInvoicesTable.importBatchId, importedProject.importBatchId)),
@@ -3913,7 +3955,7 @@ export const organizeImportedProjectFiles = async (projectId: string, ownerId: s
     
 }
 
-).where(eq(projectDocumentsTable.id, document.id))
+).where(projectDocumentWhere(boundary, document.id))
 ;
 
 
@@ -3972,7 +4014,6 @@ export const organizeImportedProjectFiles = async (projectId: string, ownerId: s
 
 const detailsFor = async (project: Project, ownerId?: string, workspaceId?: string) => 
 {
-
   if (ownerId) await applyMadisonParkRevenueCorrection(ownerId);
   const [importedProject] = await db.select(
 {
@@ -3991,6 +4032,11 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
 
   if (importedProject) 
 {
+    const boundary = {
+      projectId: project.id,
+      importBatchId: importedProject.importBatchId,
+      ownerId: ownerId!,
+    };
 
 
     const [financialRecords, vendorRows, documents, panoramas, scheduleImages] = await Promise.all([
@@ -4005,7 +4051,7 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
 
 ).from(importedVendorsTable)
         .where(eq(importedVendorsTable.importBatchId, importedProject.importBatchId)),
-      db.select().from(projectDocumentsTable).where(eq(projectDocumentsTable.projectId, project.id)),
+      db.select().from(projectDocumentsTable).where(projectDocumentBoundaryWhere(boundary)),
       panoramaStore.list(project.id),
       scheduleImageStore.list(project.id, workspaceId),
     ])
@@ -4221,9 +4267,7 @@ router.get("/dashboard/summary", async (req: AuthenticatedRequest, res) =>
 
  catch (error) 
 {
-
-
-    req.log.error(
+    req.log?.error?.(
 {
 
  err: error 
@@ -6112,7 +6156,6 @@ const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: R
 
 }
 
-
   try 
 {
 
@@ -7654,6 +7697,7 @@ router.delete("/projects/:projectId/schedule-images/:scheduleImageId", async (re
 
 }
 
+  const importedBoundary = await resolveProjectDocumentBoundary(project.id, req.userId);
 
   try 
 {
@@ -7682,7 +7726,7 @@ router.delete("/projects/:projectId/schedule-images/:scheduleImageId", async (re
 }
 
 
-    const [importedImage] = await db.select(
+    const [importedImage] = importedBoundary ? await db.select(
 {
 
  id: projectDocumentsTable.id 
@@ -7691,12 +7735,10 @@ router.delete("/projects/:projectId/schedule-images/:scheduleImageId", async (re
 )
       .from(projectDocumentsTable)
       .where(and(
-        eq(projectDocumentsTable.id, params.data.scheduleImageId),
-        eq(projectDocumentsTable.projectId, params.data.projectId),
-        eq(projectDocumentsTable.ownerId, req.userId),
+        projectDocumentWhere(importedBoundary, params.data.scheduleImageId),
         eq(projectDocumentsTable.classification, "schedule"),
       ))
-      .limit(1)
+      .limit(1) : []
 ;
 
 
@@ -7729,11 +7771,7 @@ router.delete("/projects/:projectId/schedule-images/:scheduleImageId", async (re
 }
 
 )
-      .where(and(
-        eq(projectDocumentsTable.id, importedImage.id),
-        eq(projectDocumentsTable.projectId, params.data.projectId),
-        eq(projectDocumentsTable.ownerId, req.userId),
-      ))
+      .where(projectDocumentWhere(importedBoundary!, importedImage.id))
 ;
 
 
@@ -7905,16 +7943,18 @@ router.post("/projects/:projectId/schedule-images/:documentId/restore", async (r
   
 }
 
+  const boundary = await resolveProjectDocumentBoundary(project.id, userId);
+  if (!boundary) {
+    res.status(404).json({ error: "Image document not found" });
+    return;
+  }
+
 
   try 
 {
 
     const [document] = await db.select().from(projectDocumentsTable)
-      .where(and(
-        eq(projectDocumentsTable.id, params.data.documentId),
-        eq(projectDocumentsTable.projectId, project.id),
-        eq(projectDocumentsTable.ownerId, userId),
-      ))
+      .where(projectDocumentWhere(boundary, params.data.documentId))
       .limit(1)
 ;
 
@@ -7944,11 +7984,7 @@ router.post("/projects/:projectId/schedule-images/:documentId/restore", async (r
  classification: "schedule" 
 }
 )
-        .where(and(
-          eq(projectDocumentsTable.id, document.id),
-          eq(projectDocumentsTable.projectId, project.id),
-          eq(projectDocumentsTable.ownerId, userId),
-        ))
+        .where(projectDocumentWhere(boundary, document.id))
         .returning(
 {
  id: projectDocumentsTable.id 
@@ -8433,7 +8469,11 @@ router.patch("/projects/:projectId", async (req: AuthenticatedRequest, res): Pro
 ;
 
 
-    const standardPhotos = (await detailsFor(currentProject)).photos
+    const standardPhotos = (await detailsFor(
+      currentProject,
+      req.userId,
+      requestWorkspaceId(req),
+    )).photos
 ;
 
 
@@ -8864,11 +8904,14 @@ router.post("/projects/:projectId/vendor-quotes/rescan", async (req: Authenticat
 
 }
 
+  const boundary: ProjectDocumentBoundary = {
+    projectId: parsed.data.projectId,
+    importBatchId: projectRow.importBatchId,
+    ownerId: req.userId,
+  };
 
-  const documents = await db.select().from(projectDocumentsTable).where(and(
-    eq(projectDocumentsTable.projectId, parsed.data.projectId),
-    eq(projectDocumentsTable.ownerId, req.userId),
-  ))
+  const documents = await db.select().from(projectDocumentsTable)
+    .where(projectDocumentBoundaryWhere(boundary))
 ;
 
 
@@ -9133,10 +9176,8 @@ project.id
 ;
 
 
-      const currentDocuments = await tx.select().from(projectDocumentsTable).where(and(
-        eq(projectDocumentsTable.projectId, project.id),
-        eq(projectDocumentsTable.ownerId, req.userId!),
-      ))
+      const currentDocuments = await tx.select().from(projectDocumentsTable)
+        .where(projectDocumentBoundaryWhere(boundary))
 ;
 
 
@@ -9229,7 +9270,7 @@ project.id
         
 }
 
-).where(and(eq(projectDocumentsTable.id, document.id), eq(projectDocumentsTable.ownerId, req.userId!)))
+).where(projectDocumentWhere(boundary, document.id))
 ;
 
 
@@ -9516,7 +9557,7 @@ project.id
         
 }
 
-).where(and(eq(projectDocumentsTable.id, document.id), eq(projectDocumentsTable.ownerId, req.userId!)))
+).where(projectDocumentWhere(boundary, document.id))
 ;
 
 

@@ -18,6 +18,7 @@ function session(status: SessionStatus, documents: Document[], uploadedPaths: st
     failed: 0,
     retryable: status === 'uploading' || status === 'failed',
     error,
+    buildLeaseId: null,
   };
 }
 
