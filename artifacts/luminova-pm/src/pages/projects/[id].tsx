@@ -797,7 +797,14 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
 
                   <Card>
                     <CardHeader>
-                      <CardTitle>On-site agreement</CardTitle>
+                      <div className="flex items-center justify-between gap-3">
+                        <CardTitle>On-site agreement</CardTitle>
+                        {agreementFiles.length > 0 && (
+                          <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                            {agreementFiles.length} {agreementFiles.length === 1 ? "file" : "files"}
+                          </span>
+                        )}
+                      </div>
                       <CardDescription>
                         {agreementFiles.length > 0
                           ? "Open the imported agreement documents for this project."
@@ -806,7 +813,11 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                     </CardHeader>
                     <CardContent>
                       {agreementFiles.length > 0 ? (
-                        <div className="space-y-3">
+                        <div
+                          className="max-h-64 space-y-3 overflow-y-auto overscroll-contain pr-1"
+                          role="region"
+                          aria-label="On-site agreement files"
+                        >
                           {agreementFiles.map((file) => (
                             <div key={file.id} className="flex min-w-0 items-center gap-3 rounded-lg border border-border bg-muted/20 p-3">
                               <FileText className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />

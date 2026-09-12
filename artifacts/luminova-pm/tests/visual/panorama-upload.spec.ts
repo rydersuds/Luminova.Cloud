@@ -120,6 +120,53 @@ test('keeps every imported on-site agreement individually accessible from the Ov
   await newPage.close();
 });
 
+for (const viewport of [
+  { name: 'narrow', width: 390, height: 844 },
+  { name: 'desktop', width: 1440, height: 1000 },
+]) {
+  test(`keeps every on-site agreement reachable in a compact list at ${viewport.name} width`, async ({ page }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    const agreements = Array.from({ length: 12 }, (_, index) => {
+      const number = index + 1;
+      const name = `Riverstone agreement ${number} with a long descriptive contract filename.pdf`;
+      return {
+        id: `agreement-${number}`,
+        name,
+        relativePath: `Contracts/Executed agreements/${name}`,
+        url: `/api/storage/objects/uploads/riverstone-agreement-${number}`,
+        contentType: 'application/pdf',
+        classification: 'contract',
+        collection: 'Contracts',
+      };
+    });
+    const current = { ...structuredClone(project), files: agreements };
+    await page.unroute('**/api/projects/riverstone');
+    await page.route('**/api/projects/riverstone', route => route.fulfill({ json: current }));
+
+    await openOverview(page);
+    await expect(page.getByText('12 files', { exact: true })).toBeVisible();
+    const agreementList = page.getByRole('region', { name: 'On-site agreement files' });
+    await expect(agreementList).toBeVisible();
+
+    const listSize = await agreementList.evaluate(element => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+    }));
+    expect(listSize.clientHeight).toBeLessThanOrEqual(256);
+    expect(listSize.scrollHeight).toBeGreaterThan(listSize.clientHeight);
+
+    for (const agreement of agreements) {
+      const link = page.getByRole('link', { name: `Open on-site agreement ${agreement.name}` });
+      await link.scrollIntoViewIfNeeded();
+      await expect(link).toBeVisible();
+      await expect(link).toHaveAttribute('href', agreement.url);
+    }
+
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+    expect(overflow).toBe(false);
+  });
+}
+
 test('shows a clear Overview empty state when no on-site agreement is imported', async ({ page }) => {
   await openOverview(page);
   await expect(page.getByText('No on-site agreement has been imported yet.', { exact: true })).toBeVisible();
