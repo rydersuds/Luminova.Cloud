@@ -120,6 +120,9 @@ export default function Users() {
   const visible = users.filter((user) =>
     `${user.name} ${user.email} ${user.role}`.toLowerCase().includes(search.trim().toLowerCase()),
   )
+  const projectManagers = visible.filter((user) => user.role === "Project Manager")
+  const otherWorkspaceUsers = visible.filter((user) => user.role !== "Project Manager")
+  const hasSearch = search.trim().length > 0
   const pendingReconciliations = users.filter((user) => user.clientAccessCleanupPending)
 
   const refreshUsers = () => queryClient.invalidateQueries({ queryKey: getGetWorkspaceUsersQueryKey() })
@@ -372,6 +375,28 @@ export default function Users() {
     }
   }
 
+  const renderUserCard = (user: WorkspaceUser) => (
+    <Card key={user.id} className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
+      <img src={user.imageUrl} alt="" className="h-12 w-12 rounded-full object-cover" />
+      <div className="min-w-0 flex-1">
+        <h3 className="font-semibold">{user.name}</h3>
+        <p className="truncate text-sm text-muted-foreground">{user.email}</p>
+      </div>
+      <Badge variant={user.role === "Admin" ? "default" : "secondary"} className="self-start sm:self-auto">{user.role}</Badge>
+      {user.clientAccessCleanupPending && (
+        <Badge variant="outline" className="w-fit border-amber-500/50 text-amber-700 dark:text-amber-300">Cleanup pending</Badge>
+      )}
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm" onClick={() => { setEditing({ ...user }); setFeedback(null) }} disabled={pending}>
+          <Pencil className="mr-2 h-4 w-4" />Edit
+        </Button>
+        <Button variant="destructive" size="sm" onClick={() => setDeleting(user)} disabled={pending || user.id === currentUser?.id} title={user.id === currentUser?.id ? "You cannot delete your own account" : undefined}>
+          <Trash2 className="mr-2 h-4 w-4" />Remove
+        </Button>
+      </div>
+    </Card>
+  )
+
   return (
     <AppLayout>
       <div data-testid="users-page-scroll" className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 md:p-8">
@@ -562,35 +587,51 @@ export default function Users() {
                 </div>
               </div>
               <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-muted-foreground">
-                <UsersIcon className="h-4 w-4" />{visible.length} {visible.length === 1 ? "user" : "users"}
+                <UsersIcon className="h-4 w-4" />{visible.length} matching {visible.length === 1 ? "user" : "users"}
               </div>
               {users.length === 0 ? (
                 <Card className="p-10 text-center"><UsersIcon className="mx-auto mb-3 h-10 w-10 text-primary" /><p>No workspace users found.</p></Card>
-              ) : visible.length === 0 ? (
-                <Card className="p-10 text-center"><Search className="mx-auto mb-3 h-8 w-8 text-muted-foreground" /><p>No users match your search.</p></Card>
               ) : (
-                <div className="space-y-3">
-                  {visible.map((user) => (
-                    <Card key={user.id} className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
-                      <img src={user.imageUrl} alt="" className="h-12 w-12 rounded-full object-cover" />
-                      <div className="min-w-0 flex-1">
-                        <h2 className="font-semibold">{user.name}</h2>
-                        <p className="truncate text-sm text-muted-foreground">{user.email}</p>
+                <div className="space-y-8">
+                  <section aria-labelledby="project-managers-heading" data-testid="project-managers-section" className="space-y-3">
+                    <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                      <UsersIcon className="h-4 w-4" />
+                      <h2 id="project-managers-heading">Project Managers</h2>
+                      <Badge variant="secondary" data-testid="project-managers-count" aria-label={`${projectManagers.length} Project Manager ${projectManagers.length === 1 ? "user" : "users"}`}>
+                        {projectManagers.length}
+                      </Badge>
+                    </div>
+                    {projectManagers.length ? (
+                      <div className="space-y-3">
+                        {projectManagers.map(renderUserCard)}
                       </div>
-                      <Badge variant={user.role === "Admin" ? "default" : "secondary"} className="self-start sm:self-auto">{user.role}</Badge>
-                      {user.clientAccessCleanupPending && (
-                        <Badge variant="outline" className="w-fit border-amber-500/50 text-amber-700 dark:text-amber-300">Cleanup pending</Badge>
-                      )}
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => { setEditing({ ...user }); setFeedback(null) }} disabled={pending}>
-                          <Pencil className="mr-2 h-4 w-4" />Edit
-                        </Button>
-                        <Button variant="destructive" size="sm" onClick={() => setDeleting(user)} disabled={pending || user.id === currentUser?.id} title={user.id === currentUser?.id ? "You cannot delete your own account" : undefined}>
-                          <Trash2 className="mr-2 h-4 w-4" />Remove
-                        </Button>
+                    ) : (
+                      <Card className="p-6 text-center text-sm text-muted-foreground">
+                        <Search className="mx-auto mb-3 h-8 w-8" />
+                        <p>{hasSearch ? "No Project Managers match your search." : "No Project Managers found."}</p>
+                      </Card>
+                    )}
+                  </section>
+
+                  <section aria-labelledby="other-workspace-users-heading" data-testid="other-workspace-users-section" className="space-y-3">
+                    <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                      <UsersIcon className="h-4 w-4" />
+                      <h2 id="other-workspace-users-heading">Other workspace users</h2>
+                      <Badge variant="secondary" data-testid="other-workspace-users-count" aria-label={`${otherWorkspaceUsers.length} other workspace ${otherWorkspaceUsers.length === 1 ? "user" : "users"}`}>
+                        {otherWorkspaceUsers.length}
+                      </Badge>
+                    </div>
+                    {otherWorkspaceUsers.length ? (
+                      <div className="space-y-3">
+                        {otherWorkspaceUsers.map(renderUserCard)}
                       </div>
-                    </Card>
-                  ))}
+                    ) : (
+                      <Card className="p-6 text-center text-sm text-muted-foreground">
+                        <Search className="mx-auto mb-3 h-8 w-8" />
+                        <p>{hasSearch ? "No other workspace users match your search." : "No other workspace users found."}</p>
+                      </Card>
+                    )}
+                  </section>
                 </div>
               )}
             </>
