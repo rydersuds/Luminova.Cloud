@@ -110,6 +110,7 @@ import
 }
  from "../lib/financialSummary"
 ;
+import { applyMadisonParkRevenueCorrection } from "../lib/madisonParkRevenueCorrection";
 
 import 
 {
@@ -2117,6 +2118,7 @@ const allVendorQuotes = async (): Promise<VendorQuote[]> =>
 const financialRecordsForOwner = async (ownerId: string, scope = ownerId) => 
 {
 
+  await applyMadisonParkRevenueCorrection(ownerId);
   const [invoiceRows, quoteRows, projectRows, quoteDocuments] = await Promise.all([
     db.select(
 {
@@ -2318,20 +2320,22 @@ const financialRecordsForOwner = async (ownerId: string, scope = ownerId) =>
 }
 ;
 
-const projectsForOwner = async (ownerId: string) => [
-  ...(await db.select(
+const projectsForOwner = async (ownerId: string) => {
+  await applyMadisonParkRevenueCorrection(ownerId);
+  return [
+    ...(await db.select(
 {
  data: importedProjectsTable.data 
 }
 )
-    .from(importedProjectsTable)
-    .where(eq(importedProjectsTable.ownerId, ownerId)))
-    .map((row) => withCalculatedProjectProgress(row.data as Project)),
-  ...projects
-    .filter((project) => !createdProjectOwners.has(project.id) || createdProjectOwners.get(project.id) === ownerId)
-    .map(withCalculatedProjectProgress),
-]
-;
+      .from(importedProjectsTable)
+      .where(eq(importedProjectsTable.ownerId, ownerId)))
+      .map((row) => withCalculatedProjectProgress(row.data as Project)),
+    ...projects
+      .filter((project) => !createdProjectOwners.has(project.id) || createdProjectOwners.get(project.id) === ownerId)
+      .map(withCalculatedProjectProgress),
+  ];
+};
 
 const tradesForOwner = async (ownerId: string) => 
 {
@@ -3048,6 +3052,7 @@ export const organizeImportedProjectFiles = async (projectId: string, ownerId: s
 const detailsFor = async (project: Project, ownerId?: string, workspaceId?: string) => 
 {
 
+  if (ownerId) await applyMadisonParkRevenueCorrection(ownerId);
   const [importedProject] = await db.select(
 {
  importBatchId: importedProjectsTable.importBatchId 
@@ -5294,6 +5299,7 @@ router.get("/projects/:projectId", async (req: AuthenticatedRequest, res): Promi
   
 }
 
+  await applyMadisonParkRevenueCorrection(req.userId);
   const project = await findAuthorizedProject(parsed.data.projectId, req.userId)
 ;
 
