@@ -188,6 +188,32 @@ paths:
           description: Project or panorama not found
         "500":
           description: Panorama details could not be persisted
+  /projects/{projectId}/schedule-images:
+    post:
+      operationId: createProjectScheduleImage
+      tags: [projects]
+      summary: Add a schedule image to a project
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScheduleImageInput"
+      responses:
+        "201":
+          description: Created schedule image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleImage"
+        "400":
+          description: Invalid schedule image upload
+        "401":
+          description: Authentication required
+        "404":
+          description: Project not found
   /storage/uploads/request-url:
     post:
       operationId: requestUploadUrl
@@ -1522,7 +1548,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/Project"
         - type: object
-          required: [startDate, clientQuote, lineItems, invoices, trades, photos, files, panoramas, activity]
+          required: [startDate, clientQuote, lineItems, invoices, trades, photos, files, panoramas, scheduleImages, activity]
           properties:
             startDate: { type: string }
             clientQuote: { $ref: "#/components/schemas/ClientQuote" }
@@ -1550,6 +1576,10 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/Panorama"
+            scheduleImages:
+              type: array
+              items:
+                $ref: "#/components/schemas/ScheduleImage"
             activity:
               type: array
               items:
@@ -1943,6 +1973,29 @@ components:
         date:
           type: [string, "null"]
           pattern: '^\d{4}-\d{2}-\d{2}$'
+    ScheduleImage:
+      type: object
+      required: [id, url, name, relativePath, contentType, size]
+      properties:
+        id: { type: string }
+        url: { type: string }
+        name: { type: string }
+        relativePath: { type: string }
+        contentType: { type: string }
+        size: { type: integer, minimum: 1 }
+    ScheduleImageInput:
+      type: object
+      required: [objectPath, name, size, contentType]
+      properties:
+        objectPath:
+          type: string
+          minLength: 1
+          pattern: '^/objects/uploads/[A-Za-z0-9-]+$'
+        name: { type: string, minLength: 1, maxLength: 255 }
+        size: { type: integer, minimum: 1, maximum: 8388608 }
+        contentType:
+          type: string
+          enum: [image/jpeg, image/png, image/webp]
     UploadUrlRequest:
       type: object
       required: [name, size, contentType]

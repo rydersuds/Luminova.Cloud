@@ -376,6 +376,16 @@ export interface Panorama {
   date: string | null;
 }
 
+export interface ScheduleImage {
+  id: string;
+  url: string;
+  name: string;
+  relativePath: string;
+  contentType: string;
+  /** @minimum 1 */
+  size: number;
+}
+
 export type ProjectDetail = Project & {
   startDate: string;
   clientQuote: ClientQuote;
@@ -385,6 +395,7 @@ export type ProjectDetail = Project & {
   photos: Photo[];
   files: ProjectFile[];
   panoramas: Panorama[];
+  scheduleImages: ScheduleImage[];
   activity: Activity[];
 };
 
@@ -707,6 +718,34 @@ export interface PanoramaUpdate {
      * @pattern ^\d{4}-\d{2}-\d{2}$
      */
   date: string | null;
+}
+
+export type ScheduleImageInputContentType = typeof ScheduleImageInputContentType[keyof typeof ScheduleImageInputContentType];
+
+
+export const ScheduleImageInputContentType = {
+  'image/jpeg': 'image/jpeg',
+  'image/png': 'image/png',
+  'image/webp': 'image/webp',
+} as const;
+
+export interface ScheduleImageInput {
+  /**
+     * @minLength 1
+     * @pattern ^/objects/uploads/[A-Za-z0-9-]+$
+     */
+  objectPath: string;
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  name: string;
+  /**
+     * @minimum 1
+     * @maximum 8388608
+     */
+  size: number;
+  contentType: ScheduleImageInputContentType;
 }
 
 export interface UploadUrlRequest {

@@ -69,3 +69,42 @@ test("project file verification still rejects mismatched object metadata", async
     contentType: "application/octet-stream",
   }));
 });
+
+test("schedule image verification accepts supported images with matching metadata", async () => {
+  const storage = new ConstructionDocumentStorage({
+    size: "2048",
+    contentType: "image/png",
+  });
+
+  await assert.doesNotReject(storage.verifyScheduleImage({
+    objectPath: "/objects/uploads/schedule-image",
+    size: 2048,
+    contentType: "image/png",
+  }));
+});
+
+test("schedule image verification rejects unsupported, oversized, and mismatched objects", async () => {
+  const unsupported = new ConstructionDocumentStorage({ size: "2048", contentType: "application/pdf" });
+  await assert.rejects(unsupported.verifyScheduleImage({
+    objectPath: "/objects/uploads/schedule-pdf",
+    size: 2048,
+    contentType: "application/pdf",
+  }));
+
+  const oversized = new ConstructionDocumentStorage({
+    size: String(8 * 1024 * 1024 + 1),
+    contentType: "image/jpeg",
+  });
+  await assert.rejects(oversized.verifyScheduleImage({
+    objectPath: "/objects/uploads/large-schedule",
+    size: 8 * 1024 * 1024 + 1,
+    contentType: "image/jpeg",
+  }));
+
+  const mismatched = new ConstructionDocumentStorage({ size: "2048", contentType: "image/png" });
+  await assert.rejects(mismatched.verifyScheduleImage({
+    objectPath: "/objects/uploads/wrong-schedule",
+    size: 1024,
+    contentType: "image/png",
+  }));
+});

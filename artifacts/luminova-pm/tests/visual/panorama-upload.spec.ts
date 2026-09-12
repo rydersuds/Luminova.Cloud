@@ -21,6 +21,7 @@ const project = {
   trades: [],
   photos: [],
   files: [],
+  scheduleImages: [],
   panoramas: [{
     id: 'pano-1',
     url: '/panorama-test-fixture.svg',
@@ -169,6 +170,117 @@ test('reports upload failures', async ({ page }) => {
 
   await expect(page.getByRole('alert')).toContainText('The panorama image could not be processed.');
   await expect(page.getByRole('dialog', { name: 'Upload 360° panorama' })).toBeVisible();
+});
+
+test('shows an empty schedule state and validates unsupported schedule files', async ({ page }) => {
+  await openGallery(page);
+  await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible();
+  await expect(page.getByText('No schedule images yet', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Upload schedule image' }).first().click();
+  await expect(page.getByRole('dialog', { name: 'Upload schedule image' })).toBeVisible();
+  await page.locator('#schedule-image').setInputFiles({
+    name: 'master-schedule.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('not an image'),
+  });
+  await expect(page.getByRole('alert')).toHaveText('Choose a JPEG, PNG, or WebP schedule image.');
+  await expect(page.getByRole('dialog', { name: 'Upload schedule image' })).toBeVisible();
+});
+
+test('renders imported schedule images with their paths and full-image link', async ({ page }) => {
+  const current = {
+    ...structuredClone(project),
+    scheduleImages: [{
+      id: 'schedule-imported',
+      url: '/api/storage/objects/uploads/imported-schedule',
+      name: 'master-schedule.png',
+      relativePath: 'Schedules/master-schedule.png',
+      contentType: 'image/png',
+      size: 2048,
+    }],
+  };
+  await page.unroute('**/api/projects/riverstone');
+  await page.route('**/api/projects/riverstone', route => route.fulfill({ json: current }));
+
+  await openGallery(page);
+  await expect(page.getByRole('img', { name: 'master-schedule.png' })).toBeVisible();
+  await expect(page.getByText('Schedules/master-schedule.png', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open full image' }).first()).toHaveAttribute(
+    'href',
+    '/api/storage/objects/uploads/imported-schedule',
+  );
+  await page.getByRole('button', { name: 'Open schedule image master-schedule.png' }).click();
+  await expect(page.getByRole('dialog')).toContainText('Schedules/master-schedule.png');
+});
+
+test('uploads a schedule image, refreshes the project, and supports retry after failure', async ({ page }) => {
+  const uploaded = {
+    id: 'schedule-new',
+    url: '/api/storage/objects/uploads/schedule-new',
+    name: 'lookahead.png',
+    relativePath: 'lookahead.png',
+    contentType: 'image/png',
+    size: png.length,
+  };
+  let current = structuredClone(project);
+  let attempts = 0;
+  await page.unroute('**/api/projects/riverstone');
+  await page.route('**/api/projects/riverstone', route => route.fulfill({ json: current }));
+  await page.route('**/api/projects/riverstone/schedule-images', async route => {
+    attempts += 1;
+    if (attempts === 1) {
+      await route.fulfill({ status: 500, json: { error: 'The schedule image could not be saved.' } });
+      return;
+    }
+    expect(route.request().postDataJSON()).toEqual({
+      objectPath: '/objects/uploads/123e4567-e89b-12d3-a456-426614174000',
+      name: uploaded.name,
+      size: png.length,
+      contentType: 'image/png',
+    });
+    current = { ...current, scheduleImages: [uploaded] };
+    await route.fulfill({ status: 201, json: uploaded });
+  });
+
+  await openGallery(page);
+  await page.getByRole('button', { name: 'Upload schedule image' }).first().click();
+  await page.locator('#schedule-image').setInputFiles({
+    name: uploaded.name,
+    mimeType: 'image/png',
+    buffer: png,
+  });
+  await page.getByRole('button', { name: 'Upload schedule image' }).last().click();
+  await expect(page.getByRole('alert')).toContainText('The schedule image could not be saved.');
+  await expect(page.getByRole('dialog', { name: 'Upload schedule image' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Upload schedule image' }).last().click();
+  await expect(page.getByRole('dialog', { name: 'Upload schedule image' })).not.toBeVisible();
+  await expect(page.getByText('Schedule image uploaded', { exact: true })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'lookahead.png' })).toBeVisible();
+});
+
+test.describe('responsive schedule images', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('keeps multiple schedule images within the narrow project view', async ({ page }) => {
+    const current = {
+      ...structuredClone(project),
+      scheduleImages: [1, 2, 3].map((index) => ({
+        id: `schedule-${index}`,
+        url: `/schedule-${index}.png`,
+        name: `schedule-${index}.png`,
+        relativePath: `Schedules/schedule-${index}.png`,
+        contentType: 'image/png',
+        size: 2048,
+      })),
+    };
+    await page.unroute('**/api/projects/riverstone');
+    await page.route('**/api/projects/riverstone', route => route.fulfill({ json: current }));
+    await openGallery(page);
+    await expect(page.getByRole('img', { name: 'schedule-1.png' })).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+    expect(overflow).toBe(false);
+  });
 });
 
 test('uploads, refreshes the gallery, and opens the new panorama', async ({ page }) => {

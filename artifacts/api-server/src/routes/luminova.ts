@@ -22,6 +22,9 @@ import {
   CreateProjectPanoramaBody,
   CreateProjectPanoramaParams,
   CreateProjectPanoramaResponse,
+  CreateProjectScheduleImageBody,
+  CreateProjectScheduleImageParams,
+  CreateProjectScheduleImageResponse,
   GetDashboardSummaryResponse,
   SearchWorkspaceQueryParams,
   SearchWorkspaceResponse,
@@ -81,6 +84,7 @@ import {
 } from "@workspace/api-zod";
 import { calculatePortfolioFinancialSummary, type FinancialProject } from "../lib/financialSummary";
 import { DatabasePanoramaStore } from "../lib/panoramaStore";
+import { DatabaseScheduleImageStore } from "../lib/scheduleImageStore";
 import {
   db,
   importedInvoicesTable,
@@ -121,6 +125,7 @@ import { requireWorkspaceRole, workspaceUserDisplayName } from "./users";
 type AuthenticatedRequest = Request & { userId?: string };
 const router: IRouter = Router();
 const panoramaStore = new DatabasePanoramaStore();
+const scheduleImageStore = new DatabaseScheduleImageStore();
 const storage = new ObjectStorageService();
 
 const mediaOrganizationModelSchema = z.object({
@@ -1247,7 +1252,7 @@ export const organizeImportedProjectFiles = async (projectId: string, ownerId: s
   return { filesOrganized: documents.length, collectionsCreated: new Set(collectionByFolder.values()).size, attachmentsMatched };
 };
 
-const detailsFor = async (project: Project, ownerId?: string) => {
+const detailsFor = async (project: Project, ownerId?: string, workspaceId?: string) => {
   const [importedProject] = await db.select({ importBatchId: importedProjectsTable.importBatchId })
     .from(importedProjectsTable)
     .where(ownerId
@@ -1256,14 +1261,28 @@ const detailsFor = async (project: Project, ownerId?: string) => {
     .limit(1);
 
   if (importedProject) {
-    const [projectInvoices, vendorRows, documents, panoramas, clientQuote] = await Promise.all([
+    const [projectInvoices, vendorRows, documents, panoramas, scheduleImages, clientQuote] = await Promise.all([
       allInvoices().then((records) => records.filter((invoice) => invoice.projectId === project.id)),
       db.select({ data: importedVendorsTable.data }).from(importedVendorsTable)
         .where(eq(importedVendorsTable.importBatchId, importedProject.importBatchId)),
       db.select().from(projectDocumentsTable).where(eq(projectDocumentsTable.projectId, project.id)),
       panoramaStore.list(project.id),
+      scheduleImageStore.list(project.id, workspaceId),
       latestClientQuoteDetail(project),
     ]);
+    const importedScheduleImages = documents
+      .filter((document) =>
+        document.classification === "schedule" &&
+        document.contentType.toLowerCase().startsWith("image/"),
+      )
+      .map((document) => ({
+        id: document.id,
+        url: `/api/storage${document.objectPath}`,
+        name: document.name,
+        relativePath: document.relativePath,
+        contentType: document.contentType,
+        size: document.size,
+      }));
     const photos = documents
       .filter((document) => document.contentType.toLowerCase().startsWith("image/") && document.classification === "photo")
       .map((document) => {
@@ -1301,6 +1320,7 @@ const detailsFor = async (project: Project, ownerId?: string) => {
         aiConfidence: document.aiConfidence,
       })),
       panoramas,
+      scheduleImages: [...importedScheduleImages, ...scheduleImages],
       activity: [],
     };
   }
@@ -1316,6 +1336,7 @@ const detailsFor = async (project: Project, ownerId?: string) => {
     photos: [],
     files: [],
     panoramas: await panoramaStore.list(project.id),
+    scheduleImages: await scheduleImageStore.list(project.id, workspaceId),
     activity: [],
   };
 };
@@ -2025,7 +2046,7 @@ router.get("/projects/:projectId", async (req: AuthenticatedRequest, res): Promi
   try {
     const clients = await clientBrandingForWorkspace(requestWorkspaceId(req));
     res.json(GetProjectResponse.parse(enrichProjectClient(
-      await detailsFor(project, req.userId),
+      await detailsFor(project, req.userId, requestWorkspaceId(req)),
       clients,
     )));
   } catch (error) {
@@ -2071,6 +2092,43 @@ router.post("/projects/:projectId/panoramas", async (req, res): Promise<void> =>
   } catch (error) {
     req.log.error({ err: error, projectId: project.id }, "Failed to persist project panorama");
     res.status(500).json({ error: "The uploaded panorama could not be saved. Try again." });
+  }
+});
+
+router.post("/projects/:projectId/schedule-images", async (req: AuthenticatedRequest, res): Promise<void> => {
+  const params = CreateProjectScheduleImageParams.safeParse(req.params);
+  const body = CreateProjectScheduleImageBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: "Add a valid JPEG, PNG, or WebP schedule image." });
+    return;
+  }
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  const project = projects.find((candidate) => candidate.id === params.data.projectId)
+    ?? (await db.select({ data: importedProjectsTable.data }).from(importedProjectsTable).where(and(
+      eq(importedProjectsTable.id, params.data.projectId),
+      eq(importedProjectsTable.ownerId, req.userId),
+    )).limit(1))[0]?.data as Project | undefined;
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+  try {
+    const scheduleImage = await scheduleImageStore.create({
+      projectId: project.id,
+      objectPath: body.data.objectPath,
+      name: body.data.name.trim(),
+      size: body.data.size,
+      contentType: body.data.contentType,
+      ownerId: req.userId,
+      workspaceId: requestWorkspaceId(req),
+    });
+    res.status(201).json(CreateProjectScheduleImageResponse.parse(scheduleImage));
+  } catch (error) {
+    req.log.error({ err: error, projectId: project.id }, "Failed to persist project schedule image");
+    res.status(400).json({ error: "The schedule image could not be saved. Check the file and try again." });
   }
 });
 

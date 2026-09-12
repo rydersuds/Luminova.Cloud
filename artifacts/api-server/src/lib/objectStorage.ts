@@ -97,6 +97,22 @@ export class ObjectStorageService {
     }
   }
 
+  async verifyScheduleImage(input: {
+    objectPath: string;
+    size: number;
+    contentType: string;
+  }): Promise<void> {
+    const file = await this.getObjectEntityFile(input.objectPath);
+    const [metadata] = await file.getMetadata();
+    const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+    if (!allowedTypes.has(input.contentType) ||
+      input.size > 8 * 1024 * 1024 ||
+      Number(metadata.size) !== input.size ||
+      String(metadata.contentType || "application/octet-stream") !== input.contentType) {
+      throw new Error("Stored object is not a supported schedule image or its metadata does not match");
+    }
+  }
+
   async verifyClientLogo(objectPath: string): Promise<void> {
     const file = await this.getObjectEntityFile(objectPath);
     const [metadata] = await file.getMetadata();

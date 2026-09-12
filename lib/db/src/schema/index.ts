@@ -20,6 +20,7 @@
 export * from "./projectPanoramas";
 export * from "./projectImports";
 export * from "./projectExteriorPhotos";
+export * from "./projectScheduleImages";
 export * from "./vendorRecords";
 export * from "./projectConversations";
 export * from "./clients";

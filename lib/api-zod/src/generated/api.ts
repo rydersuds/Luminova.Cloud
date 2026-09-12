@@ -124,6 +124,7 @@ export const getProjectResponseTwoFilesItemAiConfidenceMax = 100;
 
 
 
+
 export const GetProjectResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
@@ -221,6 +222,14 @@ export const GetProjectResponse = zod.object({
   "label": zod.string().nullable(),
   "location": zod.string().nullable(),
   "date": zod.string().nullable()
+})),
+  "scheduleImages": zod.array(zod.object({
+  "id": zod.string(),
+  "url": zod.string(),
+  "name": zod.string(),
+  "relativePath": zod.string(),
+  "contentType": zod.string(),
+  "size": zod.number().int().min(1)
 })),
   "activity": zod.array(zod.object({
   "id": zod.string(),
@@ -330,6 +339,42 @@ export const UpdateProjectPanoramaResponse = zod.object({
   "label": zod.string().nullable(),
   "location": zod.string().nullable(),
   "date": zod.string().nullable()
+})
+
+
+/**
+ * @summary Add a schedule image to a project
+ */
+export const CreateProjectScheduleImageParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+
+
+export const createProjectScheduleImageBodyObjectPathRegExp = new RegExp('^/objects/uploads/[A-Za-z0-9-]+$');
+export const createProjectScheduleImageBodyNameMax = 255;
+
+export const createProjectScheduleImageBodySizeMax = 8388608;
+
+
+
+export const CreateProjectScheduleImageBody = zod.object({
+  "objectPath": zod.string().min(1).regex(createProjectScheduleImageBodyObjectPathRegExp),
+  "name": zod.string().min(1).max(createProjectScheduleImageBodyNameMax),
+  "size": zod.number().int().min(1).max(createProjectScheduleImageBodySizeMax),
+  "contentType": zod.enum(['image/jpeg', 'image/png', 'image/webp'])
+})
+
+
+
+
+export const CreateProjectScheduleImageResponse = zod.object({
+  "id": zod.string(),
+  "url": zod.string(),
+  "name": zod.string(),
+  "relativePath": zod.string(),
+  "contentType": zod.string(),
+  "size": zod.number().int().min(1)
 })
 
 

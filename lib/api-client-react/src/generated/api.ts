@@ -54,6 +54,8 @@ import type {
   ProjectMessageInput,
   ProjectUpdate,
   Review,
+  ScheduleImage,
+  ScheduleImageInput,
   SearchWorkspaceParams,
   Trade,
   TradeDetail,
@@ -704,6 +706,78 @@ export const useUpdateProjectPanorama = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateProjectPanoramaMutationOptions(options));
+    }
+
+export const getCreateProjectScheduleImageUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/schedule-images`
+}
+
+/**
+ * @summary Add a schedule image to a project
+ */
+export const createProjectScheduleImage = async (projectId: string,
+    scheduleImageInput: ScheduleImageInput, options?: Parameters<typeof customFetch>[1]): Promise<ScheduleImage> => {
+
+  return customFetch<ScheduleImage>(getCreateProjectScheduleImageUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(scheduleImageInput)
+  }
+);}
+
+
+
+
+
+export const getCreateProjectScheduleImageMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProjectScheduleImage>>, TError,{projectId: string;data: BodyType<ScheduleImageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createProjectScheduleImage>>, TError,{projectId: string;data: BodyType<ScheduleImageInput>}, TContext> => {
+
+const mutationKey = ['createProjectScheduleImage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createProjectScheduleImage>>, {projectId: string;data: BodyType<ScheduleImageInput>}> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  createProjectScheduleImage(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateProjectScheduleImageMutationResult = NonNullable<Awaited<ReturnType<typeof createProjectScheduleImage>>>
+    export type CreateProjectScheduleImageMutationBody = BodyType<ScheduleImageInput>
+    export type CreateProjectScheduleImageMutationError = ErrorType<void>
+
+    /**
+ * @summary Add a schedule image to a project
+ */
+export const useCreateProjectScheduleImage = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProjectScheduleImage>>, TError,{projectId: string;data: BodyType<ScheduleImageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createProjectScheduleImage>>,
+        TError,
+        {projectId: string;data: BodyType<ScheduleImageInput>},
+        TContext
+      > => {
+      return useMutation(getCreateProjectScheduleImageMutationOptions(options));
     }
 
 export const getRequestUploadUrlUrl = () => {

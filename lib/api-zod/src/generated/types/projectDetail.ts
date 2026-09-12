@@ -13,6 +13,7 @@ import type { Panorama } from './panorama';
 import type { Photo } from './photo';
 import type { Project } from './project';
 import type { ProjectFile } from './projectFile';
+import type { ScheduleImage } from './scheduleImage';
 import type { Trade } from './trade';
 
 export type ProjectDetail = Project & {
@@ -24,5 +25,6 @@ export type ProjectDetail = Project & {
   photos: Photo[];
   files: ProjectFile[];
   panoramas: Panorama[];
+  scheduleImages: ScheduleImage[];
   activity: Activity[];
 };
