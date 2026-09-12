@@ -119,7 +119,11 @@ import
 import 
 {
 
- calculatePortfolioFinancialSummary, type FinancialProject 
+ acceptedClientQuoteForProject,
+ acceptedClientQuoteTotal,
+ calculatePortfolioFinancialSummary,
+ invoicedRevenueForProject,
+ type FinancialProject
 }
 
  from "../lib/financialSummary"
@@ -2979,15 +2983,30 @@ const financialRecordsForOwner = async (ownerId: string, scope = ownerId) =>
 
 const projectsForOwner = async (ownerId: string) => {
   await applyMadisonParkRevenueCorrection(ownerId);
-  const [projectRows, exteriorPhotos] = await Promise.all([
+  const [projectRows, exteriorPhotos, financialRecords] = await Promise.all([
     db.select({ data: importedProjectsTable.data })
       .from(importedProjectsTable)
       .where(eq(importedProjectsTable.ownerId, ownerId)),
     db.select().from(projectExteriorPhotosTable),
+    financialRecordsForOwner(ownerId),
   ]);
   const exteriorPhotoByProject = new Map(exteriorPhotos.map((item) => [item.projectId, item]));
   const ownedProjects = projectRows.map((row) => {
-    const project = withCalculatedProjectProgress(row.data as Project);
+    const persistedProject = row.data as Project;
+    const projectQuotes = financialRecords.quotes.filter((quote) => quote.projectId === persistedProject.id);
+    const acceptedQuote = acceptedClientQuoteForProject(projectQuotes, persistedProject.id);
+    const quoteTotal = acceptedQuote
+      ? acceptedClientQuoteTotal(projectQuotes)
+      : persistedProject.clientQuote?.total ?? 0;
+    const project = withCalculatedProjectProgress({
+      ...persistedProject,
+      invoiced: invoicedRevenueForProject(financialRecords.invoices, persistedProject.id),
+      clientQuote: {
+        total: quoteTotal,
+        revision: acceptedQuote?.quoteNumber ?? persistedProject.clientQuote?.revision ?? "",
+        portions: persistedProject.clientQuote?.portions ?? [],
+      },
+    });
     const exteriorPhoto = exteriorPhotoByProject.get(project.id);
     return exteriorPhoto?.ownerId === ownerId ? { ...project, exteriorImage: exteriorPhoto.exteriorImage } : project;
   });
@@ -3188,23 +3207,7 @@ const findAuthorizedProject = async (projectId: string, ownerId: string): Promis
 ;
 
 
-  const [importedProject] = await db.select(
-{
-
- data: importedProjectsTable.data 
-}
-
-)
-    .from(importedProjectsTable)
-    .where(and(
-      eq(importedProjectsTable.id, projectId),
-      eq(importedProjectsTable.ownerId, ownerId),
-    ))
-    .limit(1)
-;
-
-
-  return importedProject?.data ? withCalculatedProjectProgress(importedProject.data as Project) : undefined
+  return findOwnedProject(projectId, ownerId)
 ;
 
 
@@ -4051,16 +4054,10 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
 {
 
 
-    const [projectInvoices, vendorRows, documents, panoramas, scheduleImages, clientQuote] = await Promise.all([
+    const [financialRecords, vendorRows, documents, panoramas, scheduleImages] = await Promise.all([
       (ownerId
-        ? financialRecordsForOwner(ownerId, workspaceId ?? ownerId).then((
-{
-
- invoices 
-}
-
-) => invoices.filter((invoice) => invoice.projectId === project.id))
-        : allInvoices().then((records) => records.filter((invoice) => invoice.projectId === project.id))),
+        ? financialRecordsForOwner(ownerId, workspaceId ?? ownerId)
+        : Promise.all([allInvoices(), allVendorQuotes()]).then(([invoices, quotes]) => ({ invoices, quotes }))),
       db.select(
 {
 
@@ -4072,8 +4069,25 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
       db.select().from(projectDocumentsTable).where(eq(projectDocumentsTable.projectId, project.id)),
       panoramaStore.list(project.id),
       scheduleImageStore.list(project.id, workspaceId),
-      latestClientQuoteDetail(project),
     ])
+;
+    const projectInvoices = financialRecords.invoices.filter((invoice) => invoice.projectId === project.id)
+;
+    const acceptedQuote = acceptedClientQuoteForProject(financialRecords.quotes, project.id)
+;
+    const clientQuote = acceptedQuote
+      ? {
+          total: acceptedClientQuoteTotal(
+            financialRecords.quotes.filter((quote) => quote.projectId === project.id),
+          ),
+          revision: acceptedQuote.quoteNumber,
+          portions: acceptedQuote.lineItems?.map((lineItem) => ({
+            code: lineItem.id,
+            label: lineItem.description,
+            amount: lineItem.amount,
+          })) ?? [],
+        }
+      : project.clientQuote ?? { total: 0, revision: "", portions: [] }
 ;
 
 
@@ -4225,15 +4239,24 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
 ;
 
 
-router.get("/dashboard/summary", async (req, res) => 
+router.get("/dashboard/summary", async (req: AuthenticatedRequest, res) =>
 {
 
 
   try 
 {
+    if (!req.userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
 
 
-    const [projectRecords, invoiceRecords] = await Promise.all([allProjects(), allInvoices()])
+    const [projectRecords, financialRecords] = await Promise.all([
+      projectsForOwner(req.userId),
+      financialRecordsForOwner(req.userId, requestWorkspaceId(req)),
+    ])
+;
+    const invoiceRecords = financialRecords.invoices
 ;
 
 

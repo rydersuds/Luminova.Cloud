@@ -8,6 +8,7 @@ import {
   db,
   importedInvoicesTable,
   importedProjectsTable,
+  importedVendorQuotesTable,
   projectDocumentsTable,
   projectImportBatchesTable,
 } from "@workspace/db";
@@ -16,6 +17,7 @@ import {
   findMadisonParkRevenueSource,
   MADISON_PARK_REVENUE_CORRECTION_KEY,
   MADISON_PARK_REVENUE_AMOUNT,
+  MADISON_PARK_CLIENT_QUOTE_TOTAL,
 } from "./madisonParkRevenueCorrection";
 import luminovaRouter from "../routes/luminova";
 
@@ -100,12 +102,12 @@ test("corrects the first project response once, scopes it to the owner, and pres
     address: "79 Cambridge Ave, Regina, SK",
     region: "Regina",
     status: "Planning",
-    progress: 47.3,
+    progress: 100,
     pmName: "Test PM",
     clientName: "Weidner Investment Services, Inc.",
     targetDate: "2026-12-31",
     budgeted: 1200000,
-    invoiced: 446070.71,
+    invoiced: 1388786.55,
     exteriorImage: "",
     description: "Madison Park test project",
     clientQuote: { total: MADISON_PARK_REVENUE_AMOUNT, revision: "Revised June 18, 2026", portions: [] },
@@ -116,6 +118,17 @@ test("corrects the first project response once, scopes it to the owner, and pres
       budgeted: 0,
       invoiced: 196801.5,
       variance: -196801.5,
+    }],
+    revenueAdjustments: [{
+      key: "madison-park-rebuild-revenue-2026-06-18",
+      amount: MADISON_PARK_REVENUE_AMOUNT,
+      sourceDocumentId: "legacy-correction-document",
+      sourcePath: "legacy-correction.pdf",
+    }, {
+      key: "unrelated-adjustment",
+      amount: 25,
+      sourceDocumentId: "unrelated-document",
+      sourcePath: "unrelated.pdf",
     }],
   };
   const otherProject = { ...project, id: otherProjectId, name: "Madison Park Building 79", invoiced: 100 };
@@ -138,6 +151,7 @@ test("corrects the first project response once, scopes it to the owner, and pres
       projectId,
       projectName: project.name,
       vendor: project.clientName,
+        direction: "luminova_to_client",
       amount: 446070.71,
       date: "2026-05-29",
       status: "Paid",
@@ -173,8 +187,37 @@ test("corrects the first project response once, scopes it to the owner, and pres
       textSnippet: sourceText,
     },
   ]);
+  await db.insert(importedVendorQuotesTable).values({
+    id: `madison-draft-${suffix}`,
+    importBatchId: batchId,
+    ownerId,
+    data: {
+      id: `madison-draft-${suffix}`,
+      quoteNumber: "NEWER-DRAFT-SHOULD-NOT-DISPLAY",
+      projectId,
+      projectName: project.name,
+      vendorId: "luminova-construction",
+      vendorName: "Luminova Construction",
+      direction: "luminova_to_client",
+      isProjectTotal: true,
+      trade: "Client proposal",
+      status: "Draft",
+      revision: 2,
+      issueDate: "2026-07-01",
+      dueDate: "2026-07-31",
+      notes: "",
+      lineItems: [],
+      total: 2000000,
+      attachments: [],
+      sourceRelativePaths: [],
+      importConfidence: 100,
+      createdAt: "2026-07-01T00:00:00.000Z",
+      updatedAt: "2026-07-01T00:00:00.000Z",
+    },
+  });
   t.after(async () => {
     await db.delete(importedInvoicesTable).where(inArray(importedInvoicesTable.importBatchId, [batchId, otherBatchId]));
+    await db.delete(importedVendorQuotesTable).where(inArray(importedVendorQuotesTable.importBatchId, [batchId, otherBatchId]));
     await db.delete(projectDocumentsTable).where(inArray(projectDocumentsTable.importBatchId, [batchId, otherBatchId]));
     await db.delete(importedProjectsTable).where(inArray(importedProjectsTable.importBatchId, [batchId, otherBatchId]));
     await db.delete(projectImportBatchesTable).where(inArray(projectImportBatchesTable.id, [batchId, otherBatchId]));
@@ -195,8 +238,11 @@ test("corrects the first project response once, scopes it to the owner, and pres
   const [projectAfterRollback] = await db.select({ data: importedProjectsTable.data })
     .from(importedProjectsTable)
     .where(and(eq(importedProjectsTable.id, projectId), eq(importedProjectsTable.ownerId, ownerId)));
-  assert.equal((projectAfterRollback!.data as typeof project).invoiced, 446070.71);
-  assert.equal("revenueAdjustments" in (projectAfterRollback!.data as object), false);
+  assert.equal((projectAfterRollback!.data as typeof project).invoiced, 1388786.55);
+  assert.deepEqual(
+    (projectAfterRollback!.data as typeof project).revenueAdjustments,
+    project.revenueAdjustments,
+  );
 
   const app = express();
   app.use(express.json());
@@ -217,16 +263,48 @@ test("corrects the first project response once, scopes it to the owner, and pres
   const firstProject = await firstResponse.json() as {
     invoiced: number;
     progress: number;
+    clientQuote: { total: number };
     invoices: Array<{ amount: number; direction?: string; invoiceNumber: string }>;
   };
-  assert.equal(firstProject.invoiced, 1388786.55);
-  assert.equal(firstProject.progress, 100);
+  assert.equal(firstProject.invoiced, 446070.71);
+  assert.equal(firstProject.clientQuote.total, MADISON_PARK_CLIENT_QUOTE_TOTAL);
+  assert.equal(firstProject.progress, 32.1);
   assert.deepEqual(
     firstProject.invoices
       .filter((invoice) => invoice.invoiceNumber === "MADISON-PARK-REV-2026-06-18")
       .map((invoice) => ({ amount: invoice.amount, direction: invoice.direction })),
-    [{ amount: MADISON_PARK_REVENUE_AMOUNT, direction: "luminova_to_client" }],
+    [],
   );
+  const listResponse = await fetch(`http://127.0.0.1:${port}/projects`);
+  assert.equal(listResponse.status, 200);
+  const listedProjects = await listResponse.json() as Array<{
+    id: string;
+    invoiced: number;
+    progress: number;
+  }>;
+  const listedProject = listedProjects.find((item) => item.id === projectId);
+  assert.equal(listedProject?.invoiced, 446070.71);
+  assert.equal(listedProject?.progress, 32.1);
+
+  const dashboardResponse = await fetch(`http://127.0.0.1:${port}/dashboard/summary`);
+  assert.equal(dashboardResponse.status, 200);
+  const dashboard = await dashboardResponse.json() as { invoiced: number };
+  assert.equal(dashboard.invoiced, 446070.71);
+
+  const summaryResponse = await fetch(`http://127.0.0.1:${port}/invoices/summary`);
+  assert.equal(summaryResponse.status, 200);
+  const summary = await summaryResponse.json() as {
+    invoicedRevenue: number;
+    invoicedExpenses: number;
+    acceptedClientQuoteValue: number;
+    upcomingClientPayments: number;
+  };
+  assert.deepEqual(summary, {
+    invoicedRevenue: 446070.71,
+    invoicedExpenses: 196801.5,
+    acceptedClientQuoteValue: MADISON_PARK_CLIENT_QUOTE_TOTAL,
+    upcomingClientPayments: 942715.84,
+  });
 
   const second = await applyMadisonParkRevenueCorrection(ownerId);
   assert.equal(second.applied, false);
@@ -237,28 +315,50 @@ test("corrects the first project response once, scopes it to the owner, and pres
     .from(importedProjectsTable)
     .where(and(eq(importedProjectsTable.id, projectId), eq(importedProjectsTable.ownerId, ownerId)));
   const saved = savedProject!.data as typeof project & { revenueAdjustments: Array<{ key: string }> };
-  assert.equal(saved.invoiced, 1388786.55);
+  assert.equal(saved.invoiced, 446070.71);
+  assert.equal(saved.clientQuote.total, MADISON_PARK_CLIENT_QUOTE_TOTAL);
   assert.equal(saved.budgetLineItems[0].invoiced, 196801.5);
-  assert.deepEqual(saved.revenueAdjustments, [{
-    key: MADISON_PARK_REVENUE_CORRECTION_KEY,
-    amount: MADISON_PARK_REVENUE_AMOUNT,
-    sourceDocumentId: documentId,
-    sourcePath: "Building 79/Rebuild Quote/client-proposal.pdf",
-  }]);
+  assert.deepEqual(saved.revenueAdjustments, [
+    {
+      key: "unrelated-adjustment",
+      amount: 25,
+      sourceDocumentId: "unrelated-document",
+      sourcePath: "unrelated.pdf",
+    },
+    {
+      key: MADISON_PARK_REVENUE_CORRECTION_KEY,
+      amount: 0,
+      sourceDocumentId: documentId,
+      sourcePath: "Building 79/Rebuild Quote/client-proposal.pdf",
+    },
+  ]);
 
   const savedInvoices = await db.select({ data: importedInvoicesTable.data })
     .from(importedInvoicesTable)
     .where(and(eq(importedInvoicesTable.ownerId, ownerId), eq(importedInvoicesTable.importBatchId, batchId)));
-  assert.equal(savedInvoices.length, 2);
-  const correctionInvoice = savedInvoices
-    .map((row) => row.data as { direction?: string; sourceDocumentId?: string; amount: number })
-    .find((invoice) => invoice.sourceDocumentId === documentId);
-  assert.equal(correctionInvoice?.direction, "luminova_to_client");
-  assert.equal(correctionInvoice?.sourceDocumentId, documentId);
-  assert.equal(correctionInvoice?.amount, MADISON_PARK_REVENUE_AMOUNT);
+  assert.equal(savedInvoices.length, 1);
+  const savedQuotes = await db.select({ data: importedVendorQuotesTable.data })
+    .from(importedVendorQuotesTable)
+    .where(and(eq(importedVendorQuotesTable.ownerId, ownerId), eq(importedVendorQuotesTable.importBatchId, batchId)));
+  assert.equal(savedQuotes.length, 2);
+  const correctionQuote = savedQuotes
+    .map((row) => row.data as {
+      correctionKey?: string;
+      direction: string;
+      status: string;
+      isProjectTotal: boolean;
+      sourceDocumentId: string;
+      total: number;
+    })
+    .find((quote) => quote.correctionKey === MADISON_PARK_REVENUE_CORRECTION_KEY)!;
+  assert.equal(correctionQuote.direction, "luminova_to_client");
+  assert.equal(correctionQuote.status, "Accepted");
+  assert.equal(correctionQuote.isProjectTotal, true);
+  assert.equal(correctionQuote.sourceDocumentId, documentId);
+  assert.equal(correctionQuote.total, MADISON_PARK_CLIENT_QUOTE_TOTAL);
 
-  const otherInvoices = await db.select({ data: importedInvoicesTable.data })
-    .from(importedInvoicesTable)
-    .where(and(eq(importedInvoicesTable.ownerId, otherOwnerId), eq(importedInvoicesTable.importBatchId, otherBatchId)));
-  assert.equal(otherInvoices.length, 1);
+  const otherQuotes = await db.select({ data: importedVendorQuotesTable.data })
+    .from(importedVendorQuotesTable)
+    .where(and(eq(importedVendorQuotesTable.ownerId, otherOwnerId), eq(importedVendorQuotesTable.importBatchId, otherBatchId)));
+  assert.equal(otherQuotes.length, 1);
 });

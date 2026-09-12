@@ -3,6 +3,7 @@ import test from "node:test";
 import { GetFinancialSummaryResponse } from "@workspace/api-zod";
 import {
   calculatePortfolioFinancialSummary,
+  acceptedClientQuoteForProject,
   invoicedRevenueForProject,
   type FinancialInvoice,
   type FinancialQuote,
@@ -77,6 +78,23 @@ test("keeps quoted value out of a project's invoiced revenue", () => {
   ];
 
   assert.equal(invoicedRevenueForProject(invoices, "project-1"), 275);
+});
+
+test("selects the canonical accepted client quote without treating it as an invoice", () => {
+  const quotes = [
+    quote({ id: "accepted-total", quoteNumber: "Q-TOTAL", total: 1.38, isProjectTotal: true }),
+    quote({ id: "draft-newer", quoteNumber: "Q-DRAFT", total: 500, status: "Draft", issueDate: "2026-02-01" }),
+  ];
+  const invoices = [invoice({ amount: 0.42 })];
+
+  assert.equal(acceptedClientQuoteForProject(quotes, "project-1")?.total, 1.38);
+  assert.equal(invoicedRevenueForProject(invoices, "project-1"), 0.42);
+  assert.deepEqual(calculatePortfolioFinancialSummary(invoices, quotes), {
+    invoicedRevenue: 0.42,
+    invoicedExpenses: 0,
+    acceptedClientQuoteValue: 1.38,
+    upcomingClientPayments: 0.96,
+  });
 });
 
 test("a latest project-total quote prevents overlapping scope quotes from being added", () => {

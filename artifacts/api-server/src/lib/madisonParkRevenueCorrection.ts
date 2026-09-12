@@ -3,12 +3,14 @@ import {
   db,
   importedInvoicesTable,
   importedProjectsTable,
+  importedVendorQuotesTable,
   projectDocumentsTable,
 } from "@workspace/db";
 import { enrichFinancialDocumentSnippets } from "./financialDocumentExtraction";
 
-export const MADISON_PARK_REVENUE_CORRECTION_KEY = "madison-park-rebuild-revenue-2026-06-18";
+export const MADISON_PARK_REVENUE_CORRECTION_KEY = "madison-park-client-quote-2026-06-18";
 export const MADISON_PARK_REVENUE_AMOUNT = 942715.84;
+export const MADISON_PARK_CLIENT_QUOTE_TOTAL = 1388786.55;
 export const MADISON_PARK_REVENUE_DATE = "2026-06-18";
 const MADISON_PARK_PROJECT_ID = "madison-park-building-79-1788749816036";
 
@@ -130,24 +132,43 @@ const isMadisonParkProject = (project: MadisonProject) => {
 };
 
 const correctionInvoiceId = (ownerId: string) =>
-  `revenue-adjustment-${ownerId}-${MADISON_PARK_REVENUE_CORRECTION_KEY}`;
+  `revenue-adjustment-${ownerId}-madison-park-rebuild-revenue-2026-06-18`;
 
-const importedInvoiceForCorrection = (
+const correctionQuoteId = (ownerId: string) =>
+  `client-quote-${ownerId}-${MADISON_PARK_REVENUE_CORRECTION_KEY}`;
+
+const importedQuoteForCorrection = (
   project: MadisonProject,
   source: MadisonParkRevenueSource,
   ownerId: string,
 ) => ({
-  id: correctionInvoiceId(ownerId),
-  invoiceNumber: "MADISON-PARK-REV-2026-06-18",
+  id: correctionQuoteId(ownerId),
+  quoteNumber: "MADISON-PARK-QUOTE-2026-06-18",
   projectId: project.id,
   projectName: project.name ?? "Madison Park Building 79",
-  vendor: project.clientName ?? "Weidner Investment Services, Inc.",
+  vendorId: "luminova-construction",
+  vendorName: "Luminova Construction",
   direction: "luminova_to_client" as const,
-  amount: source.amount,
-  date: source.date,
-  status: "Sent",
-  lineItem: "Madison Park abatement/change-order revenue adjustment",
-  overage: 0,
+  isProjectTotal: true,
+  trade: "Client proposal",
+  status: "Accepted",
+  revision: 1,
+  issueDate: source.date,
+  dueDate: source.date,
+  notes: "Canonical accepted client quote reconstructed from the revised proposal.",
+  lineItems: [{
+    id: "madison-park-project-total",
+    description: "Madison Park Building 79 accepted project quote",
+    quantity: 1,
+    unitPrice: MADISON_PARK_CLIENT_QUOTE_TOTAL,
+    amount: MADISON_PARK_CLIENT_QUOTE_TOTAL,
+  }],
+  total: MADISON_PARK_CLIENT_QUOTE_TOTAL,
+  attachments: [],
+  sourceRelativePaths: [source.sourcePath],
+  importConfidence: 100,
+  createdAt: `${source.date}T00:00:00.000Z`,
+  updatedAt: `${source.date}T00:00:00.000Z`,
   correctionKey: MADISON_PARK_REVENUE_CORRECTION_KEY,
   sourceDocumentId: source.documentId,
   sourceDocumentPath: source.sourcePath,
@@ -171,11 +192,11 @@ export async function applyMadisonParkRevenueCorrection(
   const projectRow = projectRows.find((row) => isMadisonParkProject(row.data as MadisonProject));
   if (!projectRow) return { applied: false, alreadyApplied: false, source: null };
   const project = projectRow.data as MadisonProject;
-  const [existingCorrection] = await db.select({ id: importedInvoicesTable.id })
-    .from(importedInvoicesTable)
+  const [existingCorrection] = await db.select({ id: importedVendorQuotesTable.id })
+    .from(importedVendorQuotesTable)
     .where(and(
-      eq(importedInvoicesTable.id, correctionInvoiceId(ownerId)),
-      eq(importedInvoicesTable.ownerId, ownerId),
+      eq(importedVendorQuotesTable.id, correctionQuoteId(ownerId)),
+      eq(importedVendorQuotesTable.ownerId, ownerId),
     ))
     .limit(1);
   const projectAlreadyUpdated = project.revenueAdjustments?.some(
@@ -230,41 +251,56 @@ export async function applyMadisonParkRevenueCorrection(
     const adjustmentApplied = lockedProject.revenueAdjustments?.some(
       (adjustment) => adjustment.key === MADISON_PARK_REVENUE_CORRECTION_KEY,
     ) ?? false;
-    const [savedInvoice] = await tx.select({ id: importedInvoicesTable.id })
-      .from(importedInvoicesTable)
+    const [savedQuote] = await tx.select({ id: importedVendorQuotesTable.id })
+      .from(importedVendorQuotesTable)
       .where(and(
-        eq(importedInvoicesTable.id, correctionInvoiceId(ownerId)),
-        eq(importedInvoicesTable.ownerId, ownerId),
+        eq(importedVendorQuotesTable.id, correctionQuoteId(ownerId)),
+        eq(importedVendorQuotesTable.ownerId, ownerId),
       ))
       .limit(1);
 
-    let invoiceInserted = false;
-    if (!savedInvoice) {
-      const invoice = importedInvoiceForCorrection(lockedProject, source, ownerId);
-      await tx.insert(importedInvoicesTable).values({
-        id: invoice.id,
+    let quoteInserted = false;
+    if (!savedQuote) {
+      const quote = importedQuoteForCorrection(lockedProject, source, ownerId);
+      await tx.insert(importedVendorQuotesTable).values({
+        id: quote.id,
         importBatchId: sourceDocument.importBatchId,
         ownerId,
-        data: invoice,
+        data: quote,
       });
-      invoiceInserted = true;
+      quoteInserted = true;
     }
+    await tx.delete(importedInvoicesTable).where(and(
+      eq(importedInvoicesTable.id, correctionInvoiceId(ownerId)),
+      eq(importedInvoicesTable.ownerId, ownerId),
+    ));
 
     let projectUpdated = false;
     if (!adjustmentApplied) {
       await hooks?.beforeProjectUpdate?.();
-      const currentRevenue = typeof lockedProject.invoiced === "number" ? lockedProject.invoiced : 0;
+      const priorAdjustment = lockedProject.revenueAdjustments?.find(
+        (adjustment) => adjustment.key === "madison-park-rebuild-revenue-2026-06-18",
+      );
+      const currentRevenue = roundCurrency(
+        Math.max((typeof lockedProject.invoiced === "number" ? lockedProject.invoiced : 0) - (priorAdjustment?.amount ?? 0), 0),
+      );
       const updatedProject: MadisonProject = {
         ...lockedProject,
-        invoiced: roundCurrency(currentRevenue + source.amount),
-        progress: lockedProject.clientQuote?.total
-          ? Math.round(Math.min(Math.max((currentRevenue + source.amount) / lockedProject.clientQuote.total, 0), 1) * 1000) / 10
-          : lockedProject.progress,
+        invoiced: currentRevenue,
+        clientQuote: {
+          total: MADISON_PARK_CLIENT_QUOTE_TOTAL,
+          revision: "MADISON-PARK-QUOTE-2026-06-18",
+          portions: [],
+        },
+        progress: Math.round(Math.min(currentRevenue / MADISON_PARK_CLIENT_QUOTE_TOTAL, 1) * 1000) / 10,
         revenueAdjustments: [
-          ...(lockedProject.revenueAdjustments ?? []),
+          ...(lockedProject.revenueAdjustments ?? []).filter((adjustment) =>
+            adjustment.key !== "madison-park-rebuild-revenue-2026-06-18" &&
+            adjustment.key !== MADISON_PARK_REVENUE_CORRECTION_KEY
+          ),
           {
             key: MADISON_PARK_REVENUE_CORRECTION_KEY,
-            amount: source.amount,
+            amount: 0,
             sourceDocumentId: source.documentId,
             sourcePath: source.sourcePath,
           },
@@ -288,8 +324,8 @@ export async function applyMadisonParkRevenueCorrection(
     }
 
     return {
-      applied: invoiceInserted || projectUpdated,
-      alreadyApplied: !invoiceInserted && !projectUpdated,
+      applied: quoteInserted || projectUpdated,
+      alreadyApplied: !quoteInserted && !projectUpdated,
       source,
     };
   });

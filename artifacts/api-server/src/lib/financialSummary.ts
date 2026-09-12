@@ -21,6 +21,11 @@ export type FinancialQuote = {
   issueDate: string;
   createdAt: string;
   total: number;
+  lineItems?: Array<{
+    id: string;
+    description: string;
+    amount: number;
+  }>;
 };
 
 export type PortfolioFinancialSummary = {
@@ -78,6 +83,21 @@ export function acceptedClientQuoteTotal(quotes: FinancialQuote[]): number {
     if (!latestRevisions.has(key)) latestRevisions.set(key, quote);
   }
   return [...latestRevisions.values()].reduce((total, quote) => total + quote.total, 0);
+}
+
+export function acceptedClientQuoteForProject(
+  quotes: FinancialQuote[],
+  projectId: string,
+): FinancialQuote | undefined {
+  const accepted = quotes
+    .filter((quote) =>
+      quote.projectId === projectId &&
+      quote.direction === "luminova_to_client" &&
+      quote.status === "Accepted"
+    )
+    .sort(newestFirst);
+  return accepted.filter((quote) => quote.isProjectTotal === true).sort(latestProjectTotalFirst)[0]
+    ?? accepted[0];
 }
 
 export function calculatePortfolioFinancialSummary(
