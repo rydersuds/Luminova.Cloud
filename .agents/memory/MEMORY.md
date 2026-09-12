@@ -15,3 +15,4 @@
 - [Workspace-scoped private media](workspace-scoped-private-media.md) — private media shared within a workspace needs ACL scope checks in addition to owner checks.
 - [Destructive upload cleanup](destructive-upload-cleanup.md) — delete failed uploads only through owned, target-bound reservations claimed atomically before attachment.
 - [Folder import build recovery](folder-import-build-recovery.md) — reconcile unknown build outcomes before retrying, and rebuild only sessions the server marks retryable.
+- [Codegen dependency remediation](codegen-dependency-remediation.md) — keep the resolved generator stable when safe transitive pins remove advisories without output changes.
