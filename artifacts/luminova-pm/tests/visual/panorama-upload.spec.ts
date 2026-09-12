@@ -342,9 +342,12 @@ test('reports upload failures', async ({ page }) => {
 });
 
 test('shows an empty schedule state and validates unsupported schedule files', async ({ page }) => {
-  await openGallery(page);
+  await openOverview(page);
   await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible();
   await expect(page.getByText('No schedule images yet', { exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: 'Photos & 360s' }).click();
+  await expect(page.getByRole('heading', { name: 'Schedule' })).not.toBeVisible();
+  await page.getByRole('tab', { name: 'Overview' }).click();
   await page.getByRole('button', { name: 'Upload schedule image' }).first().click();
   await expect(page.getByRole('dialog', { name: 'Upload schedule image' })).toBeVisible();
   await page.locator('#schedule-image').setInputFiles({
@@ -371,7 +374,7 @@ test('renders imported schedule images with their paths and full-image link', as
   await page.unroute('**/api/projects/riverstone');
   await page.route('**/api/projects/riverstone', route => route.fulfill({ json: current }));
 
-  await openGallery(page);
+  await openOverview(page);
   await expect(page.getByRole('img', { name: 'master-schedule.png' })).toBeVisible();
   await expect(page.getByText('Schedules/master-schedule.png', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Open full image' }).first()).toHaveAttribute(
@@ -411,7 +414,7 @@ test('uploads a schedule image, refreshes the project, and supports retry after 
     await route.fulfill({ status: 201, json: uploaded });
   });
 
-  await openGallery(page);
+  await openOverview(page);
   await page.getByRole('button', { name: 'Upload schedule image' }).first().click();
   await page.locator('#schedule-image').setInputFiles({
     name: uploaded.name,
@@ -445,7 +448,7 @@ test.describe('responsive schedule images', () => {
     };
     await page.unroute('**/api/projects/riverstone');
     await page.route('**/api/projects/riverstone', route => route.fulfill({ json: current }));
-    await openGallery(page);
+    await openOverview(page);
     await expect(page.getByRole('img', { name: 'schedule-1.png' })).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     expect(overflow).toBe(false);

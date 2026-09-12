@@ -736,6 +736,105 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
             </TabsList>
 
             <TabsContent value="overview" className="space-y-6">
+              <Card>
+                <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <CardTitle>Schedule</CardTitle>
+                    <CardDescription>Project schedule images uploaded by your team or imported with the project folder.</CardDescription>
+                  </div>
+                  <Dialog open={isScheduleUploadOpen} onOpenChange={handleScheduleDialogChange}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="w-full gap-2 sm:w-auto">
+                        <FileText className="h-4 w-4" />
+                        Upload schedule image
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Upload schedule image</DialogTitle>
+                        <DialogDescription>Add a JPEG, PNG, or WebP schedule image to {project.name}.</DialogDescription>
+                      </DialogHeader>
+                      <form onSubmit={handleScheduleUpload} className="space-y-4" noValidate>
+                        <div className="space-y-2">
+                          <Label htmlFor="schedule-image">Schedule image</Label>
+                          <Input
+                            id="schedule-image"
+                            name="schedule-image"
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            onChange={handleScheduleFile}
+                            aria-describedby="schedule-image-help"
+                          />
+                          <p id="schedule-image-help" className="text-xs text-muted-foreground">JPEG, PNG, or WebP, up to 8 MB.</p>
+                        </div>
+                        {scheduleImage && (
+                          <div className="overflow-hidden rounded-md border bg-muted">
+                            <img src={scheduleImage.dataUrl} alt="Selected schedule preview" className="max-h-48 w-full object-contain" />
+                            <p className="truncate px-3 py-2 text-xs text-muted-foreground">{scheduleImage.name}</p>
+                          </div>
+                        )}
+                        {scheduleError && <p role="alert" className="text-sm text-destructive">{scheduleError}</p>}
+                        <DialogFooter>
+                          <Button type="button" variant="outline" onClick={() => handleScheduleDialogChange(false)} disabled={isScheduleUploading}>Cancel</Button>
+                          <Button type="submit" disabled={isScheduleUploading}>
+                            {isScheduleUploading ? "Uploading…" : "Upload schedule image"}
+                          </Button>
+                        </DialogFooter>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </CardHeader>
+                <CardContent>
+                  {project.scheduleImages.length === 0 ? (
+                    <div className="rounded-lg border border-dashed px-6 py-10 text-center">
+                      <FileText className="mx-auto h-7 w-7 text-muted-foreground" />
+                      <p className="mt-3 font-medium">No schedule images yet</p>
+                      <p className="mt-1 text-sm text-muted-foreground">Upload a schedule image or import a project folder containing one.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                      {project.scheduleImages.map((image) => (
+                        <article key={image.id} className="min-w-0 overflow-hidden rounded-lg border bg-card">
+                          <button
+                            type="button"
+                            className="group block aspect-[4/3] w-full cursor-zoom-in bg-muted text-left"
+                            onClick={() => setActiveScheduleImage(image)}
+                            aria-label={`Open schedule image ${image.name}`}
+                          >
+                            <img src={image.url} alt={image.name} loading="lazy" decoding="async" className="h-full w-full object-contain transition-transform group-hover:scale-[1.02]" />
+                          </button>
+                          <div className="min-w-0 space-y-2 border-t p-3">
+                            <p className="truncate font-medium" title={image.relativePath}>{image.name}</p>
+                            <p className="truncate text-xs text-muted-foreground" title={image.relativePath}>{image.relativePath}</p>
+                            <a href={image.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-primary hover:underline">
+                              Open full image
+                            </a>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Dialog open={activeScheduleImage !== null} onOpenChange={(open) => !open && setActiveScheduleImage(null)}>
+                <DialogContent className="h-[92dvh] w-[96vw] !max-w-6xl overflow-hidden p-0">
+                  {activeScheduleImage && (
+                    <div className="flex h-full min-w-0 flex-col">
+                      <div className="flex min-h-0 flex-1 items-center justify-center bg-muted p-4 sm:p-8">
+                        <img src={activeScheduleImage.url} alt={activeScheduleImage.name} className="max-h-full max-w-full object-contain" />
+                      </div>
+                      <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 border-t px-4 py-3 sm:px-8">
+                        <p className="min-w-0 truncate font-medium" title={activeScheduleImage.relativePath}>{activeScheduleImage.relativePath}</p>
+                        <a href={activeScheduleImage.url} target="_blank" rel="noreferrer" className="shrink-0 text-sm font-medium text-primary hover:underline">
+                          Open full image
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="md:col-span-2 space-y-6">
                   <Card>
@@ -894,105 +993,6 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
             </TabsContent>
 
             <TabsContent value="photos" className="space-y-6">
-              <Card>
-                <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <CardTitle>Schedule</CardTitle>
-                    <CardDescription>Project schedule images uploaded by your team or imported with the project folder.</CardDescription>
-                  </div>
-                  <Dialog open={isScheduleUploadOpen} onOpenChange={handleScheduleDialogChange}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" className="w-full gap-2 sm:w-auto">
-                        <FileText className="h-4 w-4" />
-                        Upload schedule image
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Upload schedule image</DialogTitle>
-                        <DialogDescription>Add a JPEG, PNG, or WebP schedule image to {project.name}.</DialogDescription>
-                      </DialogHeader>
-                      <form onSubmit={handleScheduleUpload} className="space-y-4" noValidate>
-                        <div className="space-y-2">
-                          <Label htmlFor="schedule-image">Schedule image</Label>
-                          <Input
-                            id="schedule-image"
-                            name="schedule-image"
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            onChange={handleScheduleFile}
-                            aria-describedby="schedule-image-help"
-                          />
-                          <p id="schedule-image-help" className="text-xs text-muted-foreground">JPEG, PNG, or WebP, up to 8 MB.</p>
-                        </div>
-                        {scheduleImage && (
-                          <div className="overflow-hidden rounded-md border bg-muted">
-                            <img src={scheduleImage.dataUrl} alt="Selected schedule preview" className="max-h-48 w-full object-contain" />
-                            <p className="truncate px-3 py-2 text-xs text-muted-foreground">{scheduleImage.name}</p>
-                          </div>
-                        )}
-                        {scheduleError && <p role="alert" className="text-sm text-destructive">{scheduleError}</p>}
-                        <DialogFooter>
-                          <Button type="button" variant="outline" onClick={() => handleScheduleDialogChange(false)} disabled={isScheduleUploading}>Cancel</Button>
-                          <Button type="submit" disabled={isScheduleUploading}>
-                            {isScheduleUploading ? "Uploading…" : "Upload schedule image"}
-                          </Button>
-                        </DialogFooter>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-                </CardHeader>
-                <CardContent>
-                  {project.scheduleImages.length === 0 ? (
-                    <div className="rounded-lg border border-dashed px-6 py-10 text-center">
-                      <FileText className="mx-auto h-7 w-7 text-muted-foreground" />
-                      <p className="mt-3 font-medium">No schedule images yet</p>
-                      <p className="mt-1 text-sm text-muted-foreground">Upload a schedule image or import a project folder containing one.</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                      {project.scheduleImages.map((image) => (
-                        <article key={image.id} className="overflow-hidden rounded-lg border bg-card">
-                          <button
-                            type="button"
-                            className="group block aspect-[4/3] w-full cursor-zoom-in bg-muted text-left"
-                            onClick={() => setActiveScheduleImage(image)}
-                            aria-label={`Open schedule image ${image.name}`}
-                          >
-                            <img src={image.url} alt={image.name} loading="lazy" decoding="async" className="h-full w-full object-contain transition-transform group-hover:scale-[1.02]" />
-                          </button>
-                          <div className="space-y-2 border-t p-3">
-                            <p className="truncate font-medium" title={image.relativePath}>{image.name}</p>
-                            <p className="truncate text-xs text-muted-foreground" title={image.relativePath}>{image.relativePath}</p>
-                            <a href={image.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-primary hover:underline">
-                              Open full image
-                            </a>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Dialog open={activeScheduleImage !== null} onOpenChange={(open) => !open && setActiveScheduleImage(null)}>
-                <DialogContent className="h-[92dvh] w-[96vw] !max-w-6xl overflow-hidden p-0">
-                  {activeScheduleImage && (
-                    <div className="flex h-full flex-col">
-                      <div className="flex min-h-0 flex-1 items-center justify-center bg-muted p-4 sm:p-8">
-                        <img src={activeScheduleImage.url} alt={activeScheduleImage.name} className="max-h-full max-w-full object-contain" />
-                      </div>
-                      <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 sm:px-8">
-                        <p className="min-w-0 truncate font-medium" title={activeScheduleImage.relativePath}>{activeScheduleImage.relativePath}</p>
-                        <a href={activeScheduleImage.url} target="_blank" rel="noreferrer" className="shrink-0 text-sm font-medium text-primary hover:underline">
-                          Open full image
-                        </a>
-                      </div>
-                    </div>
-                  )}
-                </DialogContent>
-              </Dialog>
-
               <div className="flex justify-between items-center">
                 <h3 className="text-xl font-heading font-semibold">360° Panoramas</h3>
                 <Dialog open={isPanoramaUploadOpen} onOpenChange={handlePanoramaDialogChange}>
