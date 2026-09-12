@@ -240,6 +240,9 @@ export default function Dashboard() {
   const totalProfit = financials
     ? financials.invoicedRevenue - financials.invoicedExpenses
     : undefined
+  const projectedProfit = financials && summary
+    ? financials.acceptedClientQuoteValue - summary.budgeted
+    : undefined
   const financialCards = [
     {
       label: "Portfolio Budget",
@@ -268,6 +271,13 @@ export default function Dashboard() {
       icon: DollarSign,
       accent: (totalProfit ?? 0) >= 0 ? "text-success bg-success/10" : "text-destructive bg-destructive/10",
       loading: financialSummary.isLoading,
+    },
+    {
+      label: "Projected Profit",
+      value: projectedProfit,
+      icon: DollarSign,
+      accent: (projectedProfit ?? 0) >= 0 ? "text-success bg-success/10" : "text-destructive bg-destructive/10",
+      loading: financialSummary.isLoading || loadingSummary,
     },
     {
       label: "Accepted Client Work",
