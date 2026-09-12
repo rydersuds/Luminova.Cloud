@@ -150,6 +150,26 @@ for (const viewport of [
     const focusStyle = await link.evaluate((element) => getComputedStyle(element).boxShadow);
     expect(focusStyle).not.toBe('none');
 
+    await page.keyboard.press('Tab');
+    for (const agreement of agreements.toReversed()) {
+      await page.keyboard.press('Shift+Tab');
+      const link = page.getByRole('link', { name: `Open on-site agreement ${agreement.name}` });
+      await expect(link).toBeFocused();
+
+      const focusedBounds = await link.evaluate((element) => {
+        const list = element.closest('[aria-label="On-site agreement files"]');
+        if (!list) throw new Error('Agreement list not found');
+        const linkRect = element.getBoundingClientRect();
+        const listRect = list.getBoundingClientRect();
+        return {
+          withinVisibleList:
+            linkRect.top >= listRect.top &&
+            linkRect.bottom <= listRect.bottom,
+        };
+      });
+      expect(focusedBounds.withinVisibleList).toBe(true);
+    }
+
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     expect(overflow).toBe(false);
   });
