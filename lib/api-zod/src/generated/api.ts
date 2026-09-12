@@ -423,6 +423,7 @@ export const RestoreProjectScheduleImageResponse = zod.object({
  * @summary Request a direct upload URL
  */
 
+
 export const requestUploadUrlBodyNameMax = 255;
 
 
@@ -434,11 +435,14 @@ export const requestUploadUrlBodyRelativePathMax = 1024;
 
 export const RequestUploadUrlBody = zod.object({
   "importId": zod.string().min(1).optional(),
+  "purpose": zod.enum(['schedule-image']).optional(),
+  "projectId": zod.string().min(1).optional(),
   "name": zod.string().min(1).max(requestUploadUrlBodyNameMax),
   "size": zod.number().int().min(1),
   "contentType": zod.string().max(requestUploadUrlBodyContentTypeMax),
   "relativePath": zod.string().min(1).max(requestUploadUrlBodyRelativePathMax).optional()
 })
+
 
 
 export const requestUploadUrlResponseMetadataNameMax = 255;
@@ -455,6 +459,8 @@ export const RequestUploadUrlResponse = zod.object({
   "objectPath": zod.string(),
   "metadata": zod.object({
   "importId": zod.string().min(1).optional(),
+  "purpose": zod.enum(['schedule-image']).optional(),
+  "projectId": zod.string().min(1).optional(),
   "name": zod.string().min(1).max(requestUploadUrlResponseMetadataNameMax),
   "size": zod.number().int().min(1),
   "contentType": zod.string().max(requestUploadUrlResponseMetadataContentTypeMax),
@@ -980,6 +986,7 @@ export const RequestTradeProfilePhotoUploadParams = zod.object({
 })
 
 
+
 export const requestTradeProfilePhotoUploadBodyNameMax = 255;
 
 
@@ -991,11 +998,14 @@ export const requestTradeProfilePhotoUploadBodyRelativePathMax = 1024;
 
 export const RequestTradeProfilePhotoUploadBody = zod.object({
   "importId": zod.string().min(1).optional(),
+  "purpose": zod.enum(['schedule-image']).optional(),
+  "projectId": zod.string().min(1).optional(),
   "name": zod.string().min(1).max(requestTradeProfilePhotoUploadBodyNameMax),
   "size": zod.number().int().min(1),
   "contentType": zod.string().max(requestTradeProfilePhotoUploadBodyContentTypeMax),
   "relativePath": zod.string().min(1).max(requestTradeProfilePhotoUploadBodyRelativePathMax).optional()
 })
+
 
 
 export const requestTradeProfilePhotoUploadResponseMetadataNameMax = 255;
@@ -1012,6 +1022,8 @@ export const RequestTradeProfilePhotoUploadResponse = zod.object({
   "objectPath": zod.string(),
   "metadata": zod.object({
   "importId": zod.string().min(1).optional(),
+  "purpose": zod.enum(['schedule-image']).optional(),
+  "projectId": zod.string().min(1).optional(),
   "name": zod.string().min(1).max(requestTradeProfilePhotoUploadResponseMetadataNameMax),
   "size": zod.number().int().min(1),
   "contentType": zod.string().max(requestTradeProfilePhotoUploadResponseMetadataContentTypeMax),
@@ -1854,6 +1866,7 @@ export const RequestClientLogoUploadBody = zod.object({
 })
 
 
+
 export const requestClientLogoUploadResponseMetadataNameMax = 255;
 
 
@@ -1868,6 +1881,8 @@ export const RequestClientLogoUploadResponse = zod.object({
   "objectPath": zod.string(),
   "metadata": zod.object({
   "importId": zod.string().min(1).optional(),
+  "purpose": zod.enum(['schedule-image']).optional(),
+  "projectId": zod.string().min(1).optional(),
   "name": zod.string().min(1).max(requestClientLogoUploadResponseMetadataNameMax),
   "size": zod.number().int().min(1),
   "contentType": zod.string().max(requestClientLogoUploadResponseMetadataContentTypeMax),

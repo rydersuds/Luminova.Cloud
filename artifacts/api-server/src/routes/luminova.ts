@@ -5786,8 +5786,9 @@ router.post("/projects/:projectId/schedule-images/:documentId/restore", async (r
     res.status(401).json({ error: "Authentication required" });
     return;
   }
+  const userId = req.userId;
 
-  const project = await findAuthorizedProject(params.data.projectId, req.userId);
+  const project = await findAuthorizedProject(params.data.projectId, userId);
   if (!project) {
     res.status(404).json({ error: "Project not found" });
     return;
@@ -5798,7 +5799,7 @@ router.post("/projects/:projectId/schedule-images/:documentId/restore", async (r
       .where(and(
         eq(projectDocumentsTable.id, params.data.documentId),
         eq(projectDocumentsTable.projectId, project.id),
-        eq(projectDocumentsTable.ownerId, req.userId),
+        eq(projectDocumentsTable.ownerId, userId),
       ))
       .limit(1);
     if (!document || !document.contentType.toLowerCase().startsWith("image/")) {
@@ -5812,7 +5813,7 @@ router.post("/projects/:projectId/schedule-images/:documentId/restore", async (r
         .where(and(
           eq(projectDocumentsTable.id, document.id),
           eq(projectDocumentsTable.projectId, project.id),
-          eq(projectDocumentsTable.ownerId, req.userId),
+          eq(projectDocumentsTable.ownerId, userId),
         ))
         .returning({ id: projectDocumentsTable.id });
       if (!restoredDocument) {
@@ -5822,11 +5823,11 @@ router.post("/projects/:projectId/schedule-images/:documentId/restore", async (r
       await tx.insert(projectActivitiesTable).values({
         id: randomUUID(),
         projectId: project.id,
-        ownerId: req.userId,
+        ownerId: userId,
         type: "schedule",
         title: "Schedule image restored",
         description: `${document.name} was restored to the project schedule.`,
-        author: req.userId,
+        author: userId,
       });
     });
     res.json(RestoreProjectScheduleImageResponse.parse({
@@ -6976,6 +6977,7 @@ project.id
 )
 ;
 
+}
 }
 )
 ;

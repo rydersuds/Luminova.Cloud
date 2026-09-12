@@ -39,7 +39,6 @@ export type BulkClientAccessReconciliationResponseFailedItem = {
   error: string;
 };
 
-
 export interface BulkClientAccessReconciliationResponse {
   reconciled: string[];
   failed: BulkClientAccessReconciliationResponseFailedItem[];
@@ -723,10 +722,6 @@ export const VendorQuoteImportOutcomeStatus = {
   unreadable: 'unreadable',
 } as const;
 
-export const UploadUrlRequestPurpose = {
-  'schedule-image': 'schedule-image',
-} as const;
-
 export interface VendorQuoteImportOutcome {
   documentId: string;
   name: string;
@@ -817,6 +812,12 @@ export interface ScheduleImageInput {
 }
 
 export type UploadUrlRequestPurpose = typeof UploadUrlRequestPurpose[keyof typeof UploadUrlRequestPurpose];
+
+
+export const UploadUrlRequestPurpose = {
+  'schedule-image': 'schedule-image',
+} as const;
+
 export interface UploadUrlRequest {
   /** @minLength 1 */
   importId?: string;
