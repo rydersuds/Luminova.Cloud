@@ -245,13 +245,6 @@ export default function Dashboard() {
     : undefined
   const financialCards = [
     {
-      label: "Portfolio Budget",
-      value: summary?.budgeted,
-      icon: DollarSign,
-      accent: "text-primary bg-primary/10",
-      loading: loadingSummary,
-    },
-    {
       label: "Invoiced Revenue",
       value: financials?.invoicedRevenue,
       icon: FileText,
