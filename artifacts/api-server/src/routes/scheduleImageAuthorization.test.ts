@@ -56,6 +56,17 @@ test("schedule images require project authorization and imported schedule images
     size: 2048,
     classification: "schedule",
   });
+  await db.insert(projectScheduleImagesTable).values({
+    id: `manual-schedule-${suffix}`,
+    projectId,
+    ownerId,
+    workspaceId: "default",
+    objectPath: `/objects/uploads/manual-${suffix}`,
+    relativePath: "manual-schedule.png",
+    name: "manual-schedule.png",
+    contentType: "image/png",
+    size: 2048,
+  });
 
   const app = express();
   app.use(express.json());
@@ -75,10 +86,14 @@ test("schedule images require project authorization and imported schedule images
     size: 2048,
     contentType: "image/png",
   };
+  let directProjectId: string | undefined;
 
   t.after(async () => {
     server.close();
     await db.delete(projectScheduleImagesTable).where(eq(projectScheduleImagesTable.projectId, projectId));
+    if (directProjectId) {
+      await db.delete(projectScheduleImagesTable).where(eq(projectScheduleImagesTable.projectId, directProjectId));
+    }
     await db.delete(projectDocumentsTable).where(eq(projectDocumentsTable.projectId, projectId));
     await db.delete(importedProjectsTable).where(eq(importedProjectsTable.id, projectId));
     await db.delete(projectImportBatchesTable).where(and(
@@ -104,16 +119,86 @@ test("schedule images require project authorization and imported schedule images
   });
   assert.equal(details.status, 200);
   const detail = await details.json() as { scheduleImages: Array<{ name: string; relativePath: string; url: string }> };
-  assert.deepEqual(detail.scheduleImages, [{
-    id: `schedule-document-${suffix}`,
-    name: "master-schedule.png",
-    relativePath: "Schedules/master-schedule.png",
-    url: `/api/storage${objectPath}`,
-    contentType: "image/png",
-    size: 2048,
-  }]);
+  assert.deepEqual(detail.scheduleImages, [
+    {
+      id: `schedule-document-${suffix}`,
+      name: "master-schedule.png",
+      relativePath: "Schedules/master-schedule.png",
+      url: `/api/storage${objectPath}`,
+      contentType: "image/png",
+      size: 2048,
+    },
+    {
+      id: `manual-schedule-${suffix}`,
+      name: "manual-schedule.png",
+      relativePath: "manual-schedule.png",
+      url: `/api/storage/objects/uploads/manual-${suffix}`,
+      contentType: "image/png",
+      size: 2048,
+    },
+  ]);
 
   assert.equal((await fetch(`${base}/projects/${projectId}`, {
     headers: { "x-test-user": otherOwnerId },
   })).status, 404);
+
+  const importedDeleteUrl = `${base}/projects/${projectId}/schedule-images/schedule-document-${suffix}`;
+  assert.equal((await fetch(importedDeleteUrl, { method: "DELETE" })).status, 401);
+  assert.equal((await fetch(importedDeleteUrl, {
+    method: "DELETE",
+    headers: { "x-test-user": otherOwnerId },
+  })).status, 404);
+  assert.equal((await fetch(importedDeleteUrl, {
+    method: "DELETE",
+    headers: { "x-test-user": ownerId },
+  })).status, 204);
+
+  const [sourceDocument] = await db.select().from(projectDocumentsTable)
+    .where(eq(projectDocumentsTable.id, `schedule-document-${suffix}`));
+  assert.equal(sourceDocument.classification, "other");
+  assert.equal(sourceDocument.objectPath, objectPath);
+
+  const createDirectProject = await fetch(`${base}/projects`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-test-user": ownerId },
+    body: JSON.stringify({
+      name: `Private schedule project ${suffix}`,
+      address: "",
+      region: "Calgary",
+      status: "Planning",
+      pmName: "",
+      clientName: "",
+      targetDate: "",
+      budgeted: 0,
+      description: "",
+    }),
+  });
+  assert.equal(createDirectProject.status, 201);
+  directProjectId = (await createDirectProject.json() as { id: string }).id;
+  const directImageId = `direct-schedule-${suffix}`;
+  await db.insert(projectScheduleImagesTable).values({
+    id: directImageId,
+    projectId: directProjectId,
+    ownerId,
+    workspaceId: "default",
+    objectPath: `/objects/uploads/direct-${suffix}`,
+    relativePath: "private-schedule.png",
+    name: "private-schedule.png",
+    contentType: "image/png",
+    size: 2048,
+  });
+
+  assert.equal((await fetch(`${base}/projects/${directProjectId}/schedule-images`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-test-user": otherOwnerId },
+    body: JSON.stringify(body),
+  })).status, 404);
+  assert.equal((await fetch(`${base}/projects/${directProjectId}/schedule-images/${directImageId}`, {
+    method: "DELETE",
+    headers: { "x-test-user": otherOwnerId },
+  })).status, 404);
+  const [protectedDirectImage] = await db.select({ id: projectScheduleImagesTable.id })
+    .from(projectScheduleImagesTable)
+    .where(eq(projectScheduleImagesTable.id, directImageId));
+  assert.equal(protectedDirectImage.id, directImageId);
 });

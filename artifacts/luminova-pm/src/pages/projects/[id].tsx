@@ -7,6 +7,7 @@ import {
   getGetProjectsQueryKey,
   useCreateProjectPanorama,
   useCreateProjectScheduleImage,
+  useDeleteProjectScheduleImage,
   useUpdateProjectPanorama,
   useUpdateProject,
   useGetProjectActivity,
@@ -19,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -116,6 +118,8 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const [scheduleError, setScheduleError] = React.useState("")
   const [isScheduleUploading, setIsScheduleUploading] = React.useState(false)
   const [activeScheduleImage, setActiveScheduleImage] = React.useState<ProjectScheduleImage | null>(null)
+  const [scheduleImageToRemove, setScheduleImageToRemove] = React.useState<ProjectScheduleImage | null>(null)
+  const [scheduleRemoveError, setScheduleRemoveError] = React.useState("")
   const [photoIndex, setPhotoIndex] = React.useState<number | null>(null)
   const [activePanorama, setActivePanorama] = React.useState<ProjectPanorama | null>(null)
   const [editingPanorama, setEditingPanorama] = React.useState<ProjectPanorama | null>(null)
@@ -146,6 +150,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const updateProject = useUpdateProject()
   const createPanorama = useCreateProjectPanorama()
   const createScheduleImage = useCreateProjectScheduleImage()
+  const deleteScheduleImage = useDeleteProjectScheduleImage()
   const updatePanorama = useUpdateProjectPanorama()
   const photoFolderTree = React.useMemo(() => {
     if (!project) return []
@@ -378,6 +383,27 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
       setScheduleError(error instanceof Error ? error.message : "The schedule image could not be uploaded. Try again.")
     } finally {
       setIsScheduleUploading(false)
+    }
+  }
+
+  const handleScheduleRemove = async () => {
+    if (!scheduleImageToRemove) return
+    setScheduleRemoveError("")
+    try {
+      await deleteScheduleImage.mutateAsync({
+        projectId,
+        scheduleImageId: scheduleImageToRemove.id,
+      })
+      await queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) })
+      setActiveScheduleImage((current) => current?.id === scheduleImageToRemove.id ? null : current)
+      setScheduleImageToRemove(null)
+      toast({
+        title: "Schedule image removed",
+        description: `${scheduleImageToRemove.name} is no longer shown in the project schedule.`,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "The schedule image could not be removed. Try again."
+      setScheduleRemoveError(message)
     }
   }
 
@@ -802,9 +828,25 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                           <div className="min-w-0 space-y-2 border-t p-3">
                             <p className="truncate font-medium" title={image.relativePath}>{image.name}</p>
                             <p className="truncate text-xs text-muted-foreground" title={image.relativePath}>{image.relativePath}</p>
-                            <a href={image.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-primary hover:underline">
-                              Open full image
-                            </a>
+                            <div className="flex items-center justify-between gap-3">
+                              <a href={image.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-primary hover:underline">
+                                Open full image
+                              </a>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 gap-1.5 text-destructive hover:text-destructive"
+                                onClick={() => {
+                                  setScheduleRemoveError("")
+                                  setScheduleImageToRemove(image)
+                                }}
+                                aria-label={`Remove schedule image ${image.name}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Remove
+                              </Button>
+                            </div>
                           </div>
                         </article>
                       ))}
@@ -830,6 +872,39 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                   )}
                 </DialogContent>
               </Dialog>
+
+              <AlertDialog
+                open={scheduleImageToRemove !== null}
+                onOpenChange={(open) => {
+                  if (!open && !deleteScheduleImage.isPending) {
+                    setScheduleImageToRemove(null)
+                    setScheduleRemoveError("")
+                  }
+                }}
+              >
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Remove schedule image?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {scheduleImageToRemove?.name} will be removed from this schedule gallery. Imported source documents and other project media will stay in place.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  {scheduleRemoveError && <p role="alert" className="text-sm text-destructive">{scheduleRemoveError}</p>}
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={deleteScheduleImage.isPending}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={(event) => {
+                        event.preventDefault()
+                        void handleScheduleRemove()
+                      }}
+                      disabled={deleteScheduleImage.isPending}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      {deleteScheduleImage.isPending ? "Removing…" : "Remove image"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="md:col-span-2 space-y-6">

@@ -921,8 +921,6 @@ trade?: string;
 status?: VendorQuoteStatus;
 direction?: QuoteDirection;
 };
-
-
 export interface BulkClientAccessReconciliationResponse {
   reconciled: string[];
   failed: BulkClientAccessReconciliationResponseFailedItem[];

@@ -29,6 +29,8 @@ export type ScheduleImageInput = {
 export interface ScheduleImageRepository {
   list(projectId: string, workspaceId?: string): Promise<ProjectScheduleImage[]>;
   insert(image: Omit<ProjectScheduleImage, "createdAt">): Promise<ProjectScheduleImage>;
+  find(projectId: string, imageId: string, workspaceId: string): Promise<ProjectScheduleImage | undefined>;
+  delete(projectId: string, imageId: string, workspaceId: string): Promise<void>;
 }
 
 export interface ScheduleImageObjectStorage {
@@ -42,6 +44,7 @@ export interface ScheduleImageObjectStorage {
     visibility: "public" | "private";
     workspaceId?: string;
   }): Promise<void>;
+  deleteObject(objectPath: string): Promise<void>;
 }
 
 const servingUrl = (objectPath: string) => `/api/storage${objectPath}`;
@@ -61,6 +64,23 @@ export class DrizzleScheduleImageRepository implements ScheduleImageRepository {
   async insert(image: Omit<ProjectScheduleImage, "createdAt">): Promise<ProjectScheduleImage> {
     const [row] = await db.insert(projectScheduleImagesTable).values(image).returning();
     return row;
+  }
+
+  async find(projectId: string, imageId: string, workspaceId: string): Promise<ProjectScheduleImage | undefined> {
+    const [row] = await db.select().from(projectScheduleImagesTable).where(and(
+      eq(projectScheduleImagesTable.id, imageId),
+      eq(projectScheduleImagesTable.projectId, projectId),
+      eq(projectScheduleImagesTable.workspaceId, workspaceId),
+    )).limit(1);
+    return row;
+  }
+
+  async delete(projectId: string, imageId: string, workspaceId: string): Promise<void> {
+    await db.delete(projectScheduleImagesTable).where(and(
+      eq(projectScheduleImagesTable.id, imageId),
+      eq(projectScheduleImagesTable.projectId, projectId),
+      eq(projectScheduleImagesTable.workspaceId, workspaceId),
+    ));
   }
 }
 
@@ -112,5 +132,13 @@ export class DatabaseScheduleImageStore {
       contentType: row.contentType,
       size: row.size,
     };
+  }
+
+  async remove(projectId: string, imageId: string, workspaceId: string): Promise<boolean> {
+    const row = await this.repository.find(projectId, imageId, workspaceId);
+    if (!row) return false;
+    await this.storage.deleteObject(row.objectPath);
+    await this.repository.delete(projectId, imageId, workspaceId);
+    return true;
   }
 }

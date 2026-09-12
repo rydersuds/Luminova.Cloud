@@ -21,11 +21,29 @@ class MemoryRepository implements ScheduleImageRepository {
     this.rows.push(stored);
     return stored;
   }
+
+  async find(projectId: string, imageId: string, workspaceId: string) {
+    return this.rows.find((row) =>
+      row.projectId === projectId &&
+      row.id === imageId &&
+      row.workspaceId === workspaceId
+    );
+  }
+
+  async delete(projectId: string, imageId: string, workspaceId: string) {
+    const index = this.rows.findIndex((row) =>
+      row.projectId === projectId &&
+      row.id === imageId &&
+      row.workspaceId === workspaceId
+    );
+    if (index >= 0) this.rows.splice(index, 1);
+  }
 }
 
 class FakeStorage implements ScheduleImageObjectStorage {
   verified: Array<{ objectPath: string; size: number; contentType: string }> = [];
   policies: Array<{ path: string; owner: string; visibility: "public" | "private"; workspaceId?: string }> = [];
+  deleted: string[] = [];
   failure?: Error;
 
   async verifyScheduleImage(input: { objectPath: string; size: number; contentType: string }) {
@@ -35,6 +53,11 @@ class FakeStorage implements ScheduleImageObjectStorage {
 
   async setAcl(objectPath: string, policy: { owner: string; visibility: "public" | "private"; workspaceId?: string }) {
     this.policies.push({ path: objectPath, ...policy });
+  }
+
+  async deleteObject(objectPath: string) {
+    if (this.failure) throw this.failure;
+    this.deleted.push(objectPath);
   }
 }
 
@@ -106,6 +129,32 @@ test("lists only schedule images from the requesting workspace when scoped", asy
 
   const visible = await new DatabaseScheduleImageStore(new FakeStorage(), repository).list(upload.projectId, upload.workspaceId);
   assert.deepEqual(visible.map((image) => image.name), [upload.name]);
+});
+
+test("removes an uploaded schedule image object and record only within its project workspace", async () => {
+  const repository = new MemoryRepository();
+  const storage = new FakeStorage();
+  const store = new DatabaseScheduleImageStore(storage, repository);
+  const created = await store.create(upload);
+
+  assert.equal(await store.remove(upload.projectId, created.id, "workspace-2"), false);
+  assert.deepEqual(storage.deleted, []);
+  assert.equal(repository.rows.length, 1);
+
+  assert.equal(await store.remove(upload.projectId, created.id, upload.workspaceId), true);
+  assert.deepEqual(storage.deleted, [upload.objectPath]);
+  assert.equal(repository.rows.length, 0);
+});
+
+test("keeps an uploaded schedule image record when private object cleanup fails", async () => {
+  const repository = new MemoryRepository();
+  const storage = new FakeStorage();
+  const store = new DatabaseScheduleImageStore(storage, repository);
+  const created = await store.create(upload);
+  storage.failure = new Error("storage unavailable");
+
+  await assert.rejects(store.remove(upload.projectId, created.id, upload.workspaceId), /storage unavailable/);
+  assert.equal(repository.rows.length, 1);
 });
 
 test("persists and reloads schedule image metadata through PostgreSQL", async () => {

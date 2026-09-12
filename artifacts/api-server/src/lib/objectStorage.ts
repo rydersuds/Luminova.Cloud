@@ -84,8 +84,13 @@ export class ObjectStorageService {
   }
 
   async deleteObject(objectPath: string): Promise<void> {
-    const file = await this.getObjectEntityFile(objectPath);
-    await file.delete({ ignoreNotFound: true });
+    try {
+      const file = await this.getObjectEntityFile(objectPath);
+      await file.delete({ ignoreNotFound: true });
+    } catch (error) {
+      if (error instanceof ObjectNotFoundError) return;
+      throw error;
+    }
   }
 
   async verifyPanorama(objectPath: string): Promise<void> {

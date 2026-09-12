@@ -370,7 +370,10 @@ export const CreateProjectScheduleImageResponse = zod.object({
   "size": zod.number().int().min(1)
 })
 
-
+export const DeleteProjectScheduleImageParams = zod.object({
+  "projectId": zod.coerce.string(),
+  "scheduleImageId": zod.coerce.string().min(1)
+})
 /**
  * @summary Request a direct upload URL
  */
@@ -1575,6 +1578,7 @@ export const GetWorkspaceUsersResponseItem = zod.object({
 })
 export const GetWorkspaceUsersResponse = zod.array(GetWorkspaceUsersResponseItem)
 
+
 /**
  * @summary Reconcile all pending client access cleanups
  */
@@ -1909,3 +1913,5 @@ export const DeleteWorkspaceUserParams = zod.object({
 })
 
 export const DeleteWorkspaceUserResponse = zod.void()
+
+export const DeleteProjectScheduleImageResponse = zod.void()

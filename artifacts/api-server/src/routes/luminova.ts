@@ -25,6 +25,7 @@ import {
   CreateProjectScheduleImageBody,
   CreateProjectScheduleImageParams,
   CreateProjectScheduleImageResponse,
+  DeleteProjectScheduleImageParams,
   GetDashboardSummaryResponse,
   SearchWorkspaceQueryParams,
   SearchWorkspaceResponse,
@@ -1052,6 +1053,21 @@ const tradesForOwner = async (ownerId: string) => {
 const findOwnedProject = async (projectId: string, ownerId: string) =>
   (await projectsForOwner(ownerId)).find((project) => project.id === projectId);
 const findProject = async (projectId: string) => (await allProjects()).find((project) => project.id === projectId);
+const findAuthorizedProject = async (projectId: string, ownerId: string): Promise<Project | undefined> => {
+  const directProject = projects.find((project) =>
+    project.id === projectId &&
+    (!createdProjectOwners.has(project.id) || createdProjectOwners.get(project.id) === ownerId),
+  );
+  if (directProject) return directProject;
+  const [importedProject] = await db.select({ data: importedProjectsTable.data })
+    .from(importedProjectsTable)
+    .where(and(
+      eq(importedProjectsTable.id, projectId),
+      eq(importedProjectsTable.ownerId, ownerId),
+    ))
+    .limit(1);
+  return importedProject?.data as Project | undefined;
+};
 
 const conversationsForOwner = async (ownerId: string) => {
   const [conversationRows, projectRows] = await Promise.all([
@@ -2082,17 +2098,7 @@ router.get("/projects/:projectId", async (req: AuthenticatedRequest, res): Promi
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const seededProject = projects.find((project) =>
-    project.id === parsed.data.projectId &&
-    (!createdProjectOwners.has(project.id) || createdProjectOwners.get(project.id) === req.userId),
-  );
-  const [ownedImportedProject] = !seededProject && req.userId
-    ? await db.select({ data: importedProjectsTable.data }).from(importedProjectsTable).where(and(
-        eq(importedProjectsTable.id, parsed.data.projectId),
-        eq(importedProjectsTable.ownerId, req.userId),
-      )).limit(1)
-    : [];
-  const project = seededProject ?? ownedImportedProject?.data as Project | undefined;
+  const project = await findAuthorizedProject(parsed.data.projectId, req.userId);
   if (!project) {
     res.status(404).json({ error: "Project not found" });
     return;
@@ -2160,11 +2166,7 @@ router.post("/projects/:projectId/schedule-images", async (req: AuthenticatedReq
     res.status(401).json({ error: "Authentication required" });
     return;
   }
-  const project = projects.find((candidate) => candidate.id === params.data.projectId)
-    ?? (await db.select({ data: importedProjectsTable.data }).from(importedProjectsTable).where(and(
-      eq(importedProjectsTable.id, params.data.projectId),
-      eq(importedProjectsTable.ownerId, req.userId),
-    )).limit(1))[0]?.data as Project | undefined;
+  const project = await findAuthorizedProject(params.data.projectId, req.userId);
   if (!project) {
     res.status(404).json({ error: "Project not found" });
     return;
@@ -2183,6 +2185,61 @@ router.post("/projects/:projectId/schedule-images", async (req: AuthenticatedReq
   } catch (error) {
     req.log.error({ err: error, projectId: project.id }, "Failed to persist project schedule image");
     res.status(400).json({ error: "The schedule image could not be saved. Check the file and try again." });
+  }
+});
+
+router.delete("/projects/:projectId/schedule-images/:scheduleImageId", async (req: AuthenticatedRequest, res): Promise<void> => {
+  const params = DeleteProjectScheduleImageParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Invalid schedule image." });
+    return;
+  }
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  const project = await findAuthorizedProject(params.data.projectId, req.userId);
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  try {
+    const removedUpload = await scheduleImageStore.remove(
+      params.data.projectId,
+      params.data.scheduleImageId,
+      requestWorkspaceId(req),
+    );
+    if (removedUpload) {
+      res.sendStatus(204);
+      return;
+    }
+
+    const [importedImage] = await db.select({ id: projectDocumentsTable.id })
+      .from(projectDocumentsTable)
+      .where(and(
+        eq(projectDocumentsTable.id, params.data.scheduleImageId),
+        eq(projectDocumentsTable.projectId, params.data.projectId),
+        eq(projectDocumentsTable.ownerId, req.userId),
+        eq(projectDocumentsTable.classification, "schedule"),
+      ))
+      .limit(1);
+    if (!importedImage) {
+      res.status(404).json({ error: "Schedule image not found" });
+      return;
+    }
+    await db.update(projectDocumentsTable)
+      .set({ classification: "other" })
+      .where(and(
+        eq(projectDocumentsTable.id, importedImage.id),
+        eq(projectDocumentsTable.projectId, params.data.projectId),
+        eq(projectDocumentsTable.ownerId, req.userId),
+      ));
+    res.sendStatus(204);
+  } catch (error) {
+    req.log.error({ err: error, projectId: params.data.projectId, scheduleImageId: params.data.scheduleImageId }, "Failed to remove project schedule image");
+    res.status(500).json({ error: "The schedule image could not be removed. Try again." });
   }
 });
 

@@ -214,6 +214,28 @@ paths:
           description: Authentication required
         "404":
           description: Project not found
+  /projects/{projectId}/schedule-images/{scheduleImageId}:
+    delete:
+      operationId: deleteProjectScheduleImage
+      tags: [projects]
+      summary: Remove a schedule image from a project
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - name: scheduleImageId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+      responses:
+        "204":
+          description: Schedule image removed
+        "400":
+          description: Invalid schedule image
+        "401":
+          description: Authentication required
+        "404":
+          description: Project or schedule image not found
+        "500":
+          description: Schedule image could not be removed
   /storage/uploads/request-url:
     post:
       operationId: requestUploadUrl
