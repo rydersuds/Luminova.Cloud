@@ -647,7 +647,7 @@ export default function Dashboard() {
                       <div className="absolute top-0 left-0 w-full h-full pointer-events-none border-[0.5px] border-primary/20 scale-[0.98] group-hover:scale-[0.96] transition-transform duration-500"></div>
                       
                       <div className="absolute top-3 left-3 flex gap-2">
-                        <Badge variant={getStatusColor(project.status) as any} className="uppercase font-mono text-[10px] tracking-widest rounded-none border-primary/30 backdrop-blur-md bg-background/80">
+                        <Badge variant={getStatusColor(project.status) as any} className="uppercase font-mono text-[10px] tracking-widest rounded-none border-primary/30 bg-background/90">
                           {project.status}
                         </Badge>
                       </div>
@@ -655,7 +655,7 @@ export default function Dashboard() {
                         ID:{project.id.split('-')[0].toUpperCase()}
                       </div>
                     </div>
-                    <CardContent className="p-5 flex-1 flex flex-col relative bg-card/60 backdrop-blur-sm z-10">
+                    <CardContent className="p-5 flex-1 flex flex-col relative bg-card/85 z-10">
                       <div className="flex justify-between items-start mb-4">
                         <h3 className="font-heading font-bold text-xl tracking-tight leading-tight line-clamp-1 group-hover:text-primary transition-colors">{project.name}</h3>
                       </div>

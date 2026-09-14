@@ -326,8 +326,8 @@ export function AppLayoutView({
   return (
     <div data-testid="app-layout" className="relative isolate min-h-[100dvh] flex flex-col md:flex-row overflow-x-clip bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
       <div data-testid="app-background" aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-tech-grid">
-        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-primary/20 blur-[120px] opacity-60" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-accent/20 blur-[120px] opacity-40" />
+        <div className="absolute top-[-20%] left-[-10%] h-[60%] w-[60%] rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.11),transparent_68%)] opacity-45" />
+        <div className="absolute bottom-[-20%] right-[-10%] h-[50%] w-[50%] rounded-full bg-[radial-gradient(circle,hsl(var(--accent)/0.09),transparent_68%)] opacity-35" />
         <div className="absolute inset-0 bg-gradient-to-br from-background/40 via-background/70 to-background/95" />
       </div>
       <div className="md:hidden flex items-center justify-between p-4 glass-panel-dark text-sidebar-foreground z-30 relative border-b border-sidebar-border shadow-md">
@@ -352,7 +352,7 @@ export function AppLayoutView({
           type="button"
           aria-label="Dismiss navigation"
           data-testid="sidebar-overlay"
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-20 md:hidden transition-opacity"
+          className="fixed inset-0 z-20 bg-black/80 transition-opacity md:hidden"
           onClick={closeSidebar}
         />
       )}
@@ -376,7 +376,7 @@ export function AppLayoutView({
           sidebarCollapsed ? "px-2 pt-12 pb-2" : "px-6 py-8",
         )}>
           <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-primary/20 to-transparent opacity-50" />
-          <div className="absolute top-[-20px] left-[-20px] w-[100px] h-[100px] rounded-full bg-primary/30 blur-[40px] opacity-60" />
+          <div className="absolute left-[-20px] top-[-20px] h-[100px] w-[100px] rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.18),transparent_70%)] opacity-50" />
           {sidebarCollapsed ? (
             <Building2
               aria-label="Luminova Construction"
@@ -417,7 +417,7 @@ export function AppLayoutView({
             data-last-motion={indicator.lastMotion}
             aria-hidden="true"
             className={cn(
-              "pointer-events-none absolute z-0 overflow-hidden rounded-xl border border-white/45 backdrop-blur-xl backdrop-saturate-150 shadow-[inset_0_2px_4px_rgba(255,255,255,0.48),inset_0_-2px_4px_rgba(75,59,0,0.18),0_0_24px_hsl(var(--primary)/0.56),0_10px_28px_-6px_hsl(var(--primary)/0.85)] will-change-transform",
+              "pointer-events-none absolute z-0 overflow-hidden rounded-xl border border-white/45 shadow-[inset_0_2px_4px_rgba(255,255,255,0.48),inset_0_-2px_4px_rgba(75,59,0,0.18),0_0_20px_hsl(var(--primary)/0.48),0_8px_22px_-6px_hsl(var(--primary)/0.72)] will-change-transform",
               sidebarCollapsed ? "left-2 right-2" : "left-4 right-4",
               !indicator.ready && "opacity-0",
             )}

@@ -16,7 +16,7 @@ const buttonVariants = cva(
           "btn-liquid btn-liquid-outline",
         secondary:
           "btn-liquid btn-liquid-secondary",
-        ghost: "hover:bg-accent/50 hover:text-accent-foreground backdrop-blur-sm rounded-lg",
+        ghost: "hover:bg-accent/50 hover:text-accent-foreground rounded-lg",
         link: "text-primary underline-offset-4 hover:underline rounded-lg",
       },
       size: {

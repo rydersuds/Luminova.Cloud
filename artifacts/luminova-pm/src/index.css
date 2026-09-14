@@ -241,7 +241,7 @@
 
   /* Core 3D Glass Surface */
   .surface-3d {
-    @apply relative border-none rounded-xl overflow-hidden transition-all duration-300 backdrop-blur-xl;
+    @apply relative border-none rounded-xl overflow-hidden transition-all duration-300;
     background:
       radial-gradient(circle at 8% 0%, hsl(0 0% 100% / 0.28), transparent 34%),
       linear-gradient(135deg, hsl(var(--card) / 0.92) 0%, hsl(var(--card) / 0.78) 100%);
@@ -288,7 +288,7 @@
 
   /* Liquid Glass Buttons */
   .btn-liquid {
-    @apply relative overflow-hidden transition-all duration-300 rounded-lg font-bold tracking-wide backdrop-blur-md flex items-center justify-center;
+    @apply relative overflow-hidden transition-all duration-300 rounded-lg font-bold tracking-wide flex items-center justify-center;
   }
 
   .btn-liquid-primary {
@@ -414,7 +414,7 @@
 
   /* Recessed Liquid Glass Inputs */
   .recessed-3d {
-    @apply relative border-none bg-input/40 backdrop-blur-md rounded-lg transition-all duration-300;
+    @apply relative border-none bg-input/70 rounded-lg transition-all duration-300;
     box-shadow:
       inset 0 2px 6px hsl(0 0% 0% / 0.15),
       inset 0 0 0 1px hsl(var(--border) / 0.5),
@@ -449,7 +449,7 @@
 
   /* Large Glass Panels (Sidebar, Modals) */
   .glass-panel {
-    @apply relative border-none backdrop-blur-3xl overflow-hidden rounded-2xl transition-all duration-300;
+    @apply relative border-none overflow-hidden rounded-2xl transition-all duration-300;
     background:
       radial-gradient(circle at 10% 0%, hsl(0 0% 100% / 0.34), transparent 36%),
       linear-gradient(135deg, hsl(var(--background) / 0.92) 0%, hsl(var(--background) / 0.8) 100%);
@@ -461,7 +461,7 @@
   }
 
   .glass-panel-dark {
-    @apply relative border-none backdrop-blur-3xl overflow-hidden rounded-2xl transition-all duration-300;
+    @apply relative border-none overflow-hidden rounded-2xl transition-all duration-300;
     background-color: hsl(var(--sidebar) / 0.96);
     background-image:
       radial-gradient(circle at 16% 0%, hsl(0 0% 100% / 0.14), transparent 34%),
