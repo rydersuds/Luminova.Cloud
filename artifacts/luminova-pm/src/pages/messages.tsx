@@ -12,7 +12,6 @@ import {
 } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { ChevronLeft, Inbox, Search, Send, ShieldCheck, Plus, X, Check } from "lucide-react"
-import { AppLayout } from "@/components/layout/app-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form"
@@ -169,7 +168,7 @@ export default function Messages() {
   )
 
   return (
-    <AppLayout>
+    <>
       <div className="dark relative flex flex-1 overflow-hidden bg-background text-foreground">
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute inset-0 bg-[#080808]" />
@@ -530,6 +529,6 @@ export default function Messages() {
           </Form>
         </DialogContent>
       </Dialog>
-    </AppLayout>
+    </>
   )
 }

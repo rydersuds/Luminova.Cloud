@@ -4,7 +4,6 @@ import {
   getGetProjectsQueryKey,
   useGetProjects,
 } from "@workspace/api-client-react"
-import { AppLayout } from "@/components/layout/app-layout"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -76,7 +75,7 @@ export default function Projects() {
   const hasFilters = Boolean(search || status || region || client)
 
   return (
-    <AppLayout>
+    <>
       <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto bg-transparent">
         <div className="mx-auto max-w-[1600px] space-y-7 p-4 sm:p-6 md:p-8">
           <header className="flex flex-col gap-5 border-b border-border/60 pb-7 lg:flex-row lg:items-end lg:justify-between">
@@ -261,6 +260,6 @@ export default function Projects() {
           )}
         </div>
       </div>
-    </AppLayout>
+    </>
   )
 }

@@ -11,7 +11,6 @@ import {
   getGetDashboardSummaryQueryKey,
   getGetFinancialSummaryQueryKey,
 } from "@workspace/api-client-react"
-import { AppLayout } from "@/components/layout/app-layout"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -289,7 +288,7 @@ export default function Dashboard() {
   ]
 
   return (
-    <AppLayout>
+    <>
       <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto bg-transparent pb-12">
         <div className="p-4 sm:p-6 md:p-8 max-w-[1600px] mx-auto space-y-8">
           
@@ -731,6 +730,6 @@ export default function Dashboard() {
 
         </div>
       </div>
-    </AppLayout>
+    </>
   )
 }

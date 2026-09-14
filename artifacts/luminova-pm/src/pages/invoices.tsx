@@ -1,5 +1,4 @@
 import * as React from "react"
-import { AppLayout } from "@/components/layout/app-layout"
 import { 
   useGetInvoices,
   useCreateInvoice,
@@ -63,7 +62,7 @@ export default function Invoices() {
   const pendingCount = invoices?.filter(i => i.status === 'Pending').length || 0
 
   return (
-    <AppLayout>
+    <>
       <div className="flex-1 overflow-x-hidden overflow-y-auto bg-background p-6 md:p-8">
         <div className="max-w-6xl mx-auto space-y-8">
           
@@ -289,7 +288,7 @@ export default function Invoices() {
 
         </div>
       </div>
-    </AppLayout>
+    </>
   )
 }
 

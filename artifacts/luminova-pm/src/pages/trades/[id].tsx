@@ -1,7 +1,6 @@
 import * as React from "react"
 import { useLocation, useParams } from "wouter"
 import { useQueryClient } from "@tanstack/react-query"
-import { AppLayout } from "@/components/layout/app-layout"
 import { 
   useGetTrade, 
   getGetTradeQueryKey,
@@ -349,27 +348,27 @@ export default function TradeDetail() {
 
   if (isLoading) {
     return (
-      <AppLayout>
+      <>
         <div className="flex-1 p-8 flex items-center justify-center">
           <div className="animate-pulse h-12 w-12 rounded-full bg-muted" />
         </div>
-      </AppLayout>
+      </>
     )
   }
 
   if (!trade) {
     return (
-      <AppLayout>
+      <>
         <div className="flex-1 p-8 text-center">
           <h2 className="text-2xl font-bold mb-4">Trade profile not found</h2>
           <Button onClick={() => setLocation("/trades")}>Back to Directory</Button>
         </div>
-      </AppLayout>
+      </>
     )
   }
 
   return (
-    <AppLayout>
+    <>
       <div className="flex-1 overflow-x-hidden overflow-y-auto bg-background flex flex-col">
         <div className="border-b border-border bg-card">
           <div className="max-w-5xl mx-auto p-6 md:p-8">
@@ -854,6 +853,6 @@ export default function TradeDetail() {
           </form>
         </DialogContent>
       </Dialog>
-    </AppLayout>
+    </>
   )
 }

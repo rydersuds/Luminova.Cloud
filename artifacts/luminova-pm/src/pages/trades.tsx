@@ -1,6 +1,5 @@
 import * as React from "react"
 import { useLocation } from "wouter"
-import { AppLayout } from "@/components/layout/app-layout"
 import { 
   useGetTrades, 
   getGetTradesQueryKey 
@@ -29,7 +28,7 @@ export default function TradesDirectory() {
   })
 
   return (
-    <AppLayout>
+    <>
       <div className="flex-1 overflow-x-hidden overflow-y-auto bg-transparent">
         <div className="border-b border-border bg-transparent text-foreground dark:text-sidebar-foreground">
           <div className="max-w-5xl mx-auto space-y-6">
@@ -151,6 +150,6 @@ export default function TradesDirectory() {
           )}
         </div>
       </div>
-    </AppLayout>
+    </>
   )
 }

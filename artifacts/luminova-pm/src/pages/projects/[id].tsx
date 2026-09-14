@@ -1,6 +1,5 @@
 import * as React from "react"
 import { useLocation, useParams } from "wouter"
-import { AppLayout } from "@/components/layout/app-layout"
 import { 
   useGetProject, 
   getGetProjectQueryKey,
@@ -640,25 +639,25 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
 
   if (isLoading) {
     return (
-      <AppLayout>
+      <>
         <div className="flex-1 p-8 flex items-center justify-center">
           <div className="animate-pulse flex flex-col items-center gap-4">
             <div className="h-12 w-12 rounded-full bg-muted" />
             <div className="h-4 w-32 bg-muted rounded" />
           </div>
         </div>
-      </AppLayout>
+      </>
     )
   }
 
   if (!project) {
     return (
-      <AppLayout>
+      <>
         <div className="flex-1 p-8 text-center">
           <h2 className="text-2xl font-bold mb-4">Project not found</h2>
           <Button onClick={() => setLocation("/")}>Back to Dashboard</Button>
         </div>
-      </AppLayout>
+      </>
     )
   }
 
@@ -729,7 +728,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   }
 
   return (
-    <AppLayout>
+    <>
       <div className="flex-1 overflow-x-hidden overflow-y-auto bg-transparent flex flex-col">
         {/* Project Header (Dark Chrome) */}
         <div className="bg-transparent text-foreground shrink-0 border-b border-border/60">
@@ -1807,6 +1806,6 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
           </Tabs>
         </div>
       </div>
-    </AppLayout>
+    </>
   )
 }

@@ -30,7 +30,6 @@ import {
   type Client as ClientOrganization,
 } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
-import { AppLayout } from "@/components/layout/app-layout"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -427,7 +426,7 @@ export default function Users() {
   )
 
   return (
-    <AppLayout>
+    <>
       <div data-testid="users-page-scroll" className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 md:p-8">
         <div className="mx-auto max-w-6xl space-y-7">
           <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -946,6 +945,6 @@ export default function Users() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </AppLayout>
+    </>
   )
 }

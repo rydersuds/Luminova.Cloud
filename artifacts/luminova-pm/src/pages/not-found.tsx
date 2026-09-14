@@ -1,5 +1,4 @@
 import { useLocation } from "wouter";
-import { AppLayout } from "@/components/layout/app-layout";
 import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -7,7 +6,7 @@ export default function NotFound() {
   const [, setLocation] = useLocation();
   
   return (
-    <AppLayout>
+    <>
       <div className="flex w-full flex-1 items-center justify-center p-8 bg-background">
         <div className="flex flex-col items-center justify-center space-y-4 text-center">
           <div className="rounded-full bg-destructive/10 p-4">
@@ -24,6 +23,6 @@ export default function NotFound() {
           </Button>
         </div>
       </div>
-    </AppLayout>
+    </>
   );
 }

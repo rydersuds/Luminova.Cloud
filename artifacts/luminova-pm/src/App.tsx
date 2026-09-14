@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { AppLayoutView } from '@/components/layout/app-layout';
+import { AppLayout, AppLayoutView } from '@/components/layout/app-layout';
 import { ClerkProvider, Show, useAuth, useClerk } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
@@ -54,6 +54,18 @@ function PageFallback() {
   );
 }
 
+function WorkspacePageFallback() {
+  return (
+    <section
+      aria-busy="true"
+      aria-live="polite"
+      className="flex min-h-64 flex-1 items-center justify-center text-muted-foreground"
+    >
+      <p className="font-mono text-xs uppercase tracking-[0.2em]">Loading page…</p>
+    </section>
+  );
+}
+
 function Protected({ children }: { children: ReactNode }) {
   return <>
     <Show when="signed-in">{children}</Show>
@@ -62,19 +74,16 @@ function Protected({ children }: { children: ReactNode }) {
 }
 
 function Home() {
-  return <>
-    <Show when="signed-in"><Dashboard /></Show>
-    <Show when="signed-out">
-      <main className="flex min-h-[100dvh] items-center justify-center overflow-hidden bg-sidebar bg-tech-grid-soft p-6 text-sidebar-foreground">
-        <div className="relative z-10 max-w-xl text-center">
-          <img src="/luminova-logo.png" alt="Luminova Construction" className="mx-auto mb-8 h-32 w-72 object-contain" />
-          <p className="font-mono text-xs uppercase tracking-[.24em] text-primary">Secure construction operations</p>
-          <h1 className="mt-4 text-4xl font-extrabold sm:text-5xl">Build with complete visibility.</h1>
-          <Link href="/sign-in" className="tech-clip gold-glow mx-auto mt-8 inline-flex h-12 items-center justify-center bg-primary px-8 font-bold text-primary-foreground">Sign in</Link>
-        </div>
-      </main>
-    </Show>
-  </>;
+  return (
+    <main className="flex min-h-[100dvh] items-center justify-center overflow-hidden bg-sidebar bg-tech-grid-soft p-6 text-sidebar-foreground">
+      <div className="relative z-10 max-w-xl text-center">
+        <img src="/luminova-logo.png" alt="Luminova Construction" className="mx-auto mb-8 h-32 w-72 object-contain" />
+        <p className="font-mono text-xs uppercase tracking-[.24em] text-primary">Secure construction operations</p>
+        <h1 className="mt-4 text-4xl font-extrabold sm:text-5xl">Build with complete visibility.</h1>
+        <Link href="/sign-in" className="tech-clip gold-glow mx-auto mt-8 inline-flex h-12 items-center justify-center bg-primary px-8 font-bold text-primary-foreground">Sign in</Link>
+      </div>
+    </main>
+  );
 }
 
 function Intro() {
@@ -112,6 +121,48 @@ function Intro() {
   );
 }
 
+function AuthenticatedRoutes() {
+  return (
+    <RoutedErrorBoundary>
+      <Switch>
+        <Route path="/" component={Dashboard} />
+        <Route path="/projects/:id"><ProjectDetail /></Route>
+        <Route path="/projects" component={Projects} />
+        <Route path="/trades" component={TradesDirectory} />
+        <Route path="/trades/:id" component={TradeDetail} />
+        <Route path="/invoices" component={Invoices} />
+        <Route path="/quotes" component={Quotes} />
+        <Route path="/messages" component={Messages} />
+        <Route path="/users" component={Users} />
+        <Route component={NotFound} />
+      </Switch>
+    </RoutedErrorBoundary>
+  );
+}
+
+function AuthenticatedWorkspace() {
+  return (
+    <AppLayout>
+      <Suspense fallback={<WorkspacePageFallback />}>
+        <AuthenticatedRoutes />
+      </Suspense>
+    </AppLayout>
+  );
+}
+
+function WorkspaceOrHome() {
+  const [location] = useLocation();
+
+  return (
+    <>
+      <Show when="signed-in"><AuthenticatedWorkspace /></Show>
+      <Show when="signed-out">
+        {location === "/" ? <Home /> : <Redirect to="/sign-in" />}
+      </Show>
+    </>
+  );
+}
+
 function Router() {
   return (
     <RoutedErrorBoundary>
@@ -121,17 +172,8 @@ function Router() {
         <Route path="/login" component={Login} />
         <Route path="/terms" component={TermsPage} />
         <Route path="/privacy" component={PrivacyPage} />
-        <Route path="/" component={Home} />
         <Route path="/intro"><Protected><Intro /></Protected></Route>
-        <Route path="/projects/:id"><Protected><ProjectDetail /></Protected></Route>
-        <Route path="/projects"><Protected><Projects /></Protected></Route>
-        <Route path="/trades"><Protected><TradesDirectory /></Protected></Route>
-        <Route path="/trades/:id"><Protected><TradeDetail /></Protected></Route>
-        <Route path="/invoices"><Protected><Invoices /></Protected></Route>
-        <Route path="/quotes"><Protected><Quotes /></Protected></Route>
-        <Route path="/messages"><Protected><Messages /></Protected></Route>
-        <Route path="/users"><Protected><Users /></Protected></Route>
-        <Route component={NotFound} />
+        <Route><WorkspaceOrHome /></Route>
       </Switch>
     </RoutedErrorBoundary>
   );
@@ -182,7 +224,7 @@ function App() {
         <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl}>
           <QueryClientProvider client={queryClient}>
             <TooltipProvider>
-              <Suspense fallback={<PageFallback />}><Messages /></Suspense>
+              <AppLayout><Suspense fallback={<WorkspacePageFallback />}><Messages /></Suspense></AppLayout>
             </TooltipProvider>
           </QueryClientProvider>
         </ClerkProvider>
@@ -196,7 +238,7 @@ function App() {
         <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl}>
           <QueryClientProvider client={queryClient}>
             <TooltipProvider>
-              <Suspense fallback={<PageFallback />}><ProjectDetail projectIdOverride="riverstone" /></Suspense>
+              <AppLayout><Suspense fallback={<WorkspacePageFallback />}><ProjectDetail projectIdOverride="riverstone" /></Suspense></AppLayout>
               <Toaster />
             </TooltipProvider>
           </QueryClientProvider>
@@ -211,7 +253,7 @@ function App() {
         <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl}>
           <QueryClientProvider client={queryClient}>
             <TooltipProvider>
-              <Suspense fallback={<PageFallback />}><Projects /></Suspense>
+              <AppLayout><Suspense fallback={<WorkspacePageFallback />}><Projects /></Suspense></AppLayout>
             </TooltipProvider>
           </QueryClientProvider>
         </ClerkProvider>
@@ -226,7 +268,7 @@ function App() {
           <QueryClientProvider client={queryClient}>
             <ProjectFolderImportProvider authState={{ isLoaded: true, isSignedIn: true }}>
               <TooltipProvider>
-                <Suspense fallback={<PageFallback />}><Dashboard /></Suspense>
+                 <AppLayout><Suspense fallback={<WorkspacePageFallback />}><Dashboard /></Suspense></AppLayout>
               </TooltipProvider>
             </ProjectFolderImportProvider>
           </QueryClientProvider>
@@ -241,7 +283,7 @@ function App() {
         <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl}>
           <QueryClientProvider client={queryClient}>
             <TooltipProvider>
-              <Invoices />
+               <AppLayout><Suspense fallback={<WorkspacePageFallback />}><Invoices /></Suspense></AppLayout>
             </TooltipProvider>
           </QueryClientProvider>
         </ClerkProvider>
@@ -255,7 +297,7 @@ function App() {
         <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl}>
           <QueryClientProvider client={queryClient}>
             <TooltipProvider>
-              <Suspense fallback={<PageFallback />}><Users /></Suspense>
+               <AppLayout><Suspense fallback={<WorkspacePageFallback />}><Users /></Suspense></AppLayout>
             </TooltipProvider>
           </QueryClientProvider>
         </ClerkProvider>
