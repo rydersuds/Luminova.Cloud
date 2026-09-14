@@ -216,44 +216,33 @@ export function AppLayoutView({
       const indicatorElement = indicatorRef.current
       const direction = target.top > startTop ? 1 : -1
       const distance = Math.abs(target.top - startTop)
-      const stretch = Math.min(1.62, 1.22 + distance / 520)
+      const stretch = Math.min(1.1, 1.02 + distance / 1800)
       const travelAnimation = indicatorElement.animate(
         [
           {
             transform: `translateY(${startTop}px) scale(1.025, 1)`,
             borderRadius: "12px",
-            filter: "brightness(1) saturate(1)",
             offset: 0,
           },
           {
-            transform: `translate(7px, ${startTop + (target.top - startTop) * 0.18}px) scale(0.86, ${stretch})`,
-            borderRadius: direction > 0 ? "28px 16px 46px 34px" : "46px 34px 28px 16px",
-            filter: "brightness(1.2) saturate(1.25)",
-            offset: 0.28,
+            transform: `translateY(${startTop + (target.top - startTop) * 0.5}px) scale(0.98, ${stretch})`,
+            borderRadius: "18px",
+            offset: 0.52,
           },
           {
-            transform: `translate(-5px, ${startTop + (target.top - startTop) * 0.62}px) scale(0.93, 1.24)`,
-            borderRadius: direction > 0 ? "18px 36px 42px 20px" : "42px 20px 18px 36px",
-            filter: "brightness(1.3) saturate(1.35)",
-            offset: 0.62,
+            transform: `translateY(${target.top - direction * 5}px) scale(1.04, 0.97)`,
+            borderRadius: "15px",
+            offset: 0.88,
           },
           {
-            transform: `translate(3px, ${target.top - direction * 16}px) scale(1.16, 0.78)`,
-            borderRadius: direction > 0 ? "38px 30px 14px 18px" : "14px 18px 38px 30px",
-            filter: "brightness(1.22) saturate(1.2)",
-            offset: 0.86,
-          },
-          {
-            transform: `translateY(${target.top - direction * 7}px) scale(1.08, 0.92)`,
-            borderRadius: "20px",
-            filter: "brightness(1.1) saturate(1.1)",
-            opacity: 0.88,
+            transform: `translateY(${target.top}px) scale(1.025, 1)`,
+            borderRadius: "12px",
             offset: 1,
           },
         ],
         {
-          duration: Math.min(720, 500 + distance * 0.55),
-          easing: "cubic-bezier(0.18, 0.72, 0.16, 1)",
+          duration: Math.min(520, 360 + distance * 0.3),
+          easing: "cubic-bezier(0.2, 0.72, 0.25, 1)",
           fill: "both",
         },
       )
@@ -267,35 +256,22 @@ export function AppLayoutView({
         const settleAnimation = indicatorElement.animate(
           [
             {
-              transform: `translateY(${target.top - direction * 7}px) scale(1.08, 0.92)`,
-              borderRadius: "20px",
-              filter: "brightness(1.16) saturate(1.14)",
-              opacity: 0.88,
+              transform: `translateY(${target.top - direction * 5}px) scale(1.04, 0.97)`,
+              borderRadius: "15px",
             },
             {
-              transform: `translateY(${target.top + direction * 7}px) scale(0.9, 1.15)`,
-              borderRadius: "24px 16px 22px 18px",
-              filter: "brightness(1.1) saturate(1.08)",
-              opacity: 0.93,
-              offset: 0.42,
-            },
-            {
-              transform: `translateY(${target.top - direction * 2}px) scale(1.09, 0.94)`,
-              borderRadius: "16px 22px 15px 20px",
-              filter: "brightness(1.04) saturate(1.03)",
-              opacity: 0.975,
-              offset: 0.72,
+              transform: `translateY(${target.top + direction * 2}px) scale(1.015, 1.01)`,
+              borderRadius: "13px",
+              offset: 0.5,
             },
             {
               transform: `translateY(${target.top}px) scale(1.025, 1)`,
               borderRadius: "12px",
-              filter: "brightness(1) saturate(1)",
-              opacity: 1,
             },
           ],
           {
-            duration: 390,
-            easing: "cubic-bezier(0.16, 0.82, 0.22, 1)",
+            duration: 180,
+            easing: "cubic-bezier(0.2, 0.7, 0.25, 1)",
             fill: "both",
           },
         )
