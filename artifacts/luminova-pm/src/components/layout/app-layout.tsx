@@ -412,7 +412,11 @@ export function AppLayoutView({
               sidebarCollapsed ? "left-2 right-2" : "left-4 right-4",
               !indicator.ready && "opacity-0",
             )}
-            style={{ height: indicator.height, transform: `translateY(${indicator.top}px) scale(1.025)` }}
+            style={{
+              height: indicator.height,
+              transform: `translateY(${indicator.top}px) scale(1.025)`,
+              backgroundColor: "hsl(var(--primary))",
+            }}
           />
           <div
             data-contrast-label="navigation section label"

@@ -308,6 +308,7 @@ test.describe('navigation selection motion', () => {
     await expect(indicator).toHaveAttribute('data-motion-phase', 'travel');
     await expect(indicator).toHaveAttribute('data-motion-direction', direction);
     await expect(indicator).toHaveAttribute('data-last-motion', 'staged');
+    await expect.poll(() => indicator.evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe('rgb(0, 0, 0)');
     await expect(indicator).toHaveAttribute('data-motion-phase', 'idle');
     await expectIndicatorAligned(indicator, link);
   };
