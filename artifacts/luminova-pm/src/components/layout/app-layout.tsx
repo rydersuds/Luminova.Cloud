@@ -89,7 +89,9 @@ export function AppLayoutView({
   const navRef = useRef<HTMLElement>(null)
   const activeLinkRef = useRef<HTMLAnchorElement>(null)
   const indicatorRef = useRef<HTMLDivElement>(null)
+  const indicatorSheenRef = useRef<HTMLDivElement>(null)
   const indicatorAnimationRef = useRef<Animation | null>(null)
+  const indicatorSheenAnimationRef = useRef<Animation | null>(null)
   const indicatorPhaseRef = useRef<IndicatorPhase>("idle")
   const finishTimerRef = useRef<number | null>(null)
   const hasPositionedIndicator = useRef(previousMountedIndicatorLocation !== null)
@@ -190,6 +192,8 @@ export function AppLayoutView({
     const clearMotion = () => {
       indicatorAnimationRef.current?.cancel()
       indicatorAnimationRef.current = null
+      indicatorSheenAnimationRef.current?.cancel()
+      indicatorSheenAnimationRef.current = null
       if (finishTimerRef.current !== null) {
         window.clearTimeout(finishTimerRef.current)
         finishTimerRef.current = null
@@ -217,37 +221,45 @@ export function AppLayoutView({
       const indicatorElement = indicatorRef.current
       const direction = target.top > startTop ? 1 : -1
       const distance = Math.abs(target.top - startTop)
-      const stretch = Math.min(1.1, 1.02 + distance / 1800)
+      const travelDuration = Math.min(520, 360 + distance * 0.18)
       const travelAnimation = indicatorElement.animate(
         [
           {
-            transform: `translateY(${startTop}px) scale(1.025, 1)`,
+            transform: `translateY(${startTop}px) scale(1.025)`,
             borderRadius: "12px",
             offset: 0,
           },
           {
-            transform: `translateY(${startTop + (target.top - startTop) * 0.5}px) scale(0.98, ${stretch})`,
+            transform: `translateY(${startTop + (target.top - startTop) * 0.58}px) scale(0.99)`,
             borderRadius: "18px",
-            offset: 0.52,
+            offset: 0.56,
           },
           {
-            transform: `translateY(${target.top - direction * 5}px) scale(1.04, 0.97)`,
-            borderRadius: "15px",
-            offset: 0.88,
-          },
-          {
-            transform: `translateY(${target.top}px) scale(1.025, 1)`,
+            transform: `translateY(${target.top}px) scale(1)`,
             borderRadius: "12px",
             offset: 1,
           },
         ],
         {
-          duration: Math.min(520, 360 + distance * 0.3),
-          easing: "cubic-bezier(0.2, 0.72, 0.25, 1)",
+          duration: travelDuration,
+          easing: "cubic-bezier(0.16, 1, 0.3, 1)",
           fill: "both",
         },
       )
       indicatorAnimationRef.current = travelAnimation
+      const sheenAnimation = indicatorSheenRef.current?.animate(
+        [
+          { transform: `translateX(${direction > 0 ? "-145%" : "145%"}) skewX(-12deg)`, opacity: 0 },
+          { transform: "translateX(0%) skewX(-12deg)", opacity: 0.62, offset: 0.5 },
+          { transform: `translateX(${direction > 0 ? "145%" : "-145%"}) skewX(-12deg)`, opacity: 0 },
+        ],
+        {
+          duration: travelDuration + 60,
+          easing: "cubic-bezier(0.16, 1, 0.3, 1)",
+          fill: "both",
+        },
+      )
+      if (sheenAnimation) indicatorSheenAnimationRef.current = sheenAnimation
       travelAnimation.finished.then(() => {
         if (indicatorAnimationRef.current !== travelAnimation) return
         indicatorPhaseRef.current = "settle"
@@ -257,22 +269,15 @@ export function AppLayoutView({
         const settleAnimation = indicatorElement.animate(
           [
             {
-              transform: `translateY(${target.top - direction * 5}px) scale(1.04, 0.97)`,
-              borderRadius: "15px",
+              transform: `translateY(${target.top}px) scale(1)`,
             },
             {
-              transform: `translateY(${target.top + direction * 2}px) scale(1.015, 1.01)`,
-              borderRadius: "13px",
-              offset: 0.5,
-            },
-            {
-              transform: `translateY(${target.top}px) scale(1.025, 1)`,
-              borderRadius: "12px",
+              transform: `translateY(${target.top}px) scale(1.025)`,
             },
           ],
           {
-            duration: 180,
-            easing: "cubic-bezier(0.2, 0.7, 0.25, 1)",
+            duration: 130,
+            easing: "cubic-bezier(0.16, 1, 0.3, 1)",
             fill: "both",
           },
         )
@@ -321,7 +326,9 @@ export function AppLayoutView({
   return (
     <div data-testid="app-layout" className="relative isolate min-h-[100dvh] flex flex-col md:flex-row overflow-x-clip bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
       <div data-testid="app-background" aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-tech-grid">
-        <div className="absolute inset-0 bg-gradient-to-br from-background/20 via-transparent to-background/80" />
+        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-primary/20 blur-[120px] opacity-60" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-accent/20 blur-[120px] opacity-40" />
+        <div className="absolute inset-0 bg-gradient-to-br from-background/40 via-background/70 to-background/95" />
       </div>
       <div className="md:hidden flex items-center justify-between p-4 glass-panel-dark text-sidebar-foreground z-30 relative border-b border-sidebar-border shadow-md">
         <div className="flex items-center">
@@ -368,7 +375,8 @@ export function AppLayoutView({
           "hidden md:flex flex-col relative items-center",
           sidebarCollapsed ? "px-2 pt-12 pb-2" : "px-6 py-8",
         )}>
-          <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-primary/10 to-transparent opacity-50" />
+          <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-primary/20 to-transparent opacity-50" />
+          <div className="absolute top-[-20px] left-[-20px] w-[100px] h-[100px] rounded-full bg-primary/30 blur-[40px] opacity-60" />
           {sidebarCollapsed ? (
             <Building2
               aria-label="Luminova Construction"
@@ -409,16 +417,24 @@ export function AppLayoutView({
             data-last-motion={indicator.lastMotion}
             aria-hidden="true"
             className={cn(
-              "pointer-events-none absolute z-0 overflow-visible rounded-xl bg-primary shadow-[inset_0_2px_3px_rgba(255,255,255,0.52),0_0_18px_hsl(var(--primary)/0.55),0_8px_28px_-4px_hsl(var(--primary)/0.9)] will-change-transform",
+              "pointer-events-none absolute z-0 overflow-hidden rounded-xl border border-white/45 backdrop-blur-xl backdrop-saturate-150 shadow-[inset_0_2px_4px_rgba(255,255,255,0.48),inset_0_-2px_4px_rgba(75,59,0,0.18),0_0_24px_hsl(var(--primary)/0.56),0_10px_28px_-6px_hsl(var(--primary)/0.85)] will-change-transform",
               sidebarCollapsed ? "left-2 right-2" : "left-4 right-4",
               !indicator.ready && "opacity-0",
             )}
             style={{
               height: indicator.height,
               transform: `translateY(${indicator.top}px) scale(1.025)`,
-              backgroundColor: "hsl(var(--primary))",
+              backgroundColor: "hsl(var(--primary) / 0.9)",
+              backgroundImage: "radial-gradient(circle at 18% 0%, hsl(0 0% 100% / 0.58), transparent 36%), linear-gradient(180deg, hsl(0 0% 100% / 0.24) 0%, transparent 42%, hsl(0 0% 0% / 0.12) 100%)",
             }}
-          />
+          >
+            <div
+              ref={indicatorSheenRef}
+              className="absolute inset-y-[-12%] left-[-42%] w-[84%] rounded-[50%] bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.56),transparent)] blur-[1px] opacity-0"
+            />
+            <div className="absolute inset-x-3 top-[2px] h-px rounded-full bg-white/70 opacity-90" />
+            <div className="absolute inset-x-5 bottom-[3px] h-px rounded-full bg-white/25" />
+          </div>
           <div
             data-contrast-label="navigation section label"
             className={cn(
@@ -497,7 +513,7 @@ export function AppLayoutView({
                 sidebarCollapsed ? "justify-center px-2" : "gap-3 px-3",
               )}
             >
-              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center font-heading font-bold text-primary-foreground shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),0_4px_8px_rgba(0,0,0,0.5)]">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/80 to-primary flex items-center justify-center font-heading font-bold text-primary-foreground shadow-[inset_0_1px_3px_rgba(255,255,255,0.5),0_4px_12px_hsl(var(--primary)/0.4)]">
                 {initials || "PM"}
               </div>
               <div className={cn("min-w-0 flex-1", sidebarCollapsed && "sr-only")}>
@@ -565,8 +581,8 @@ export function AppLayoutView({
         </div>
       </aside>
 
-      <main className="relative z-10 flex-1 flex flex-col min-w-0 md:overflow-hidden">
-        <div className="relative z-10 flex-1 flex flex-col min-h-0 md:h-full md:overflow-hidden">
+      <main className="relative z-10 flex-1 flex min-w-0 max-w-full flex-col overflow-x-hidden md:overflow-hidden">
+        <div className="relative z-10 flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-x-hidden md:h-full md:overflow-hidden">
           {children}
         </div>
       </main>

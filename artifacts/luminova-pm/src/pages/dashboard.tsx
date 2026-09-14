@@ -439,8 +439,8 @@ export default function Dashboard() {
                               onDragLeave={() => setDragActive(false)}
                               onDrop={handleFolderDrop}
                               className={cn(
-                                "p-12 flex flex-col items-center justify-center text-center transition-all bg-black/10 rounded-xl recessed-3d",
-                                dragActive ? "border-primary bg-primary/10 scale-[1.01]" : ""
+                                "p-12 flex flex-col items-center justify-center text-center transition-all bg-black/10 rounded-2xl recessed-3d",
+                                dragActive ? "border-primary bg-primary/10 scale-[1.02]" : ""
                               )}
                             >
                               <input

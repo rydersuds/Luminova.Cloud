@@ -14,6 +14,13 @@ const stabilize = async (page: import('@playwright/test').Page) => {
   await expect(page.getByTestId('app-layout')).toBeVisible();
 };
 
+const assertNoPageHorizontalOverflow = async (page: import('@playwright/test').Page) => {
+  await expect.poll(() => page.evaluate(() => Math.max(
+    document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    document.body.scrollWidth - document.body.clientWidth,
+  ))).toBeLessThanOrEqual(0);
+};
+
 const assertBackgroundlessSidebarControls = async (page: import('@playwright/test').Page) => {
   const controls = [
     page.locator('[data-contrast-label="profile control"]'),
@@ -145,6 +152,7 @@ test.describe('navigation contrast', () => {
   test('desktop active, hover, and shared dark surface', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await stabilize(page);
+    await assertNoPageHorizontalOverflow(page);
     await assertNavigationContrast(page, 'desktop active');
     await expect(page).toHaveScreenshot('desktop-active-dark-surface.png', { animations: 'disabled' });
 
@@ -248,11 +256,13 @@ test.describe('navigation contrast', () => {
   test('mobile header, drawer, and overlay', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await stabilize(page);
+    await assertNoPageHorizontalOverflow(page);
     await assertNavigationContrast(page, 'mobile header');
     await expect(page).toHaveScreenshot('mobile-header.png', { animations: 'disabled' });
 
     await page.goto('/__visual/sidebar?drawer=open&profile=open');
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+    await assertNoPageHorizontalOverflow(page);
     await assertBackgroundlessSidebarControls(page);
     await assertNavigationContrast(page, 'mobile drawer profile expanded');
     await expect(page).toHaveScreenshot('mobile-drawer-overlay.png', { animations: 'disabled' });

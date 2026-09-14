@@ -57,6 +57,9 @@ const conversations = [
 
 test.describe('Messages Interface', () => {
   test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem('luminova-cookie-consent-v1', 'accepted');
+    });
     await page.route('**/api/conversations/options', async (route) => {
       await route.fulfill({ json: {
         currentUserId: 'me',
