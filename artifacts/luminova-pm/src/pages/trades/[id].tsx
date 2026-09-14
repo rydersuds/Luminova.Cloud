@@ -29,6 +29,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { uploadToSignedUrl, validateImageFile } from "@/lib/image-upload"
 
 type Feedback = { kind: "success" | "error"; message: string } | null
 type ErrorWithData = { data?: { error?: string }; message?: string }
@@ -142,8 +143,14 @@ export default function TradeDetail() {
   const chooseProfilePhoto = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null
     if (!file) return
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 8 * 1024 * 1024) {
-      setProfileError("Choose a JPEG, PNG, or WebP image under 8 MB.")
+    const validation = validateImageFile(file, {
+      messages: {
+        "unsupported-type": "Choose a JPEG, PNG, or WebP image under 8 MB.",
+        "too-large": "Choose a JPEG, PNG, or WebP image under 8 MB.",
+      },
+    })
+    if (!validation.valid) {
+      setProfileError(validation.message)
       event.target.value = ""
       return
     }
@@ -166,12 +173,9 @@ export default function TradeDetail() {
             contentType: profilePhoto.type,
           },
         })
-        const stored = await fetch(upload.uploadURL, {
-          method: "PUT",
-          headers: { "Content-Type": profilePhoto.type },
-          body: profilePhoto,
+        await uploadToSignedUrl(profilePhoto, upload.uploadURL, {
+          errorMessage: "The logo or profile image could not be stored.",
         })
-        if (!stored.ok) throw new Error("The logo or profile image could not be stored.")
         profilePhotoObjectPath = upload.objectPath
       } else if (removeProfilePhoto) {
         profilePhotoObjectPath = null

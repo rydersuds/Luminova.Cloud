@@ -38,11 +38,7 @@ import { toast } from "@/hooks/use-toast"
 import { PanoramaViewer } from "@/components/panorama-viewer"
 import { ClientIdentity } from "@/components/client-identity"
 import { cn, formatCurrency, formatDate, formatDateOnly, getStatusColor } from "@/lib/utils"
-
-const PANORAMA_TYPES = ["image/jpeg", "image/png", "image/webp"]
-const MAX_PANORAMA_BYTES = 8 * 1024 * 1024
-const SCHEDULE_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"]
-const MAX_SCHEDULE_IMAGE_BYTES = 8 * 1024 * 1024
+import { readImageDataUrl, uploadToSignedUrl, validateImageFile } from "@/lib/image-upload"
 type ProjectPanorama = {
   id: string
   url: string
@@ -263,20 +259,15 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
     setPanoramaError("")
     setPanoramaImage(null)
     if (!file) return
-    if (!PANORAMA_TYPES.includes(file.type)) {
-      setPanoramaError("Choose a JPEG, PNG, or WebP image.")
+    const validation = validateImageFile(file)
+    if (!validation.valid) {
+      setPanoramaError(validation.message)
       event.target.value = ""
       return
     }
-    if (file.size > MAX_PANORAMA_BYTES) {
-      setPanoramaError("Choose an image that is 8 MB or smaller.")
-      event.target.value = ""
-      return
-    }
-    const reader = new FileReader()
-    reader.onerror = () => setPanoramaError("The image could not be read. Choose another file.")
-    reader.onload = () => setPanoramaImage({ file, dataUrl: String(reader.result), name: file.name })
-    reader.readAsDataURL(file)
+    void readImageDataUrl(file)
+      .then((dataUrl) => setPanoramaImage({ file, dataUrl, name: file.name }))
+      .catch((error) => setPanoramaError(error instanceof Error ? error.message : "The image could not be read. Choose another file."))
   }
 
   const handlePanoramaUpload = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -308,12 +299,9 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
         throw new Error(upload.error || "The panorama upload could not be started.")
       }
 
-      const stored = await fetch(upload.uploadURL, {
-        method: "PUT",
-        headers: { "Content-Type": panoramaImage.file.type },
-        body: panoramaImage.file,
+      await uploadToSignedUrl(panoramaImage.file, upload.uploadURL, {
+        errorMessage: "The image could not be stored. Try again.",
       })
-      if (!stored.ok) throw new Error("The image could not be stored. Try again.")
 
       const details = {
         ...(label ? { label } : {}),
@@ -354,20 +342,20 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
     setScheduleError("")
     setScheduleImage(null)
     if (!file) return
-    if (!SCHEDULE_IMAGE_TYPES.includes(file.type)) {
-      setScheduleError("Choose a JPEG, PNG, or WebP schedule image.")
+    const validation = validateImageFile(file, {
+      messages: {
+        "unsupported-type": "Choose a JPEG, PNG, or WebP schedule image.",
+        "too-large": "Choose a schedule image that is 8 MB or smaller.",
+      },
+    })
+    if (!validation.valid) {
+      setScheduleError(validation.message)
       event.target.value = ""
       return
     }
-    if (file.size > MAX_SCHEDULE_IMAGE_BYTES) {
-      setScheduleError("Choose a schedule image that is 8 MB or smaller.")
-      event.target.value = ""
-      return
-    }
-    const reader = new FileReader()
-    reader.onerror = () => setScheduleError("The schedule image could not be read. Choose another file.")
-    reader.onload = () => setScheduleImage({ file, dataUrl: String(reader.result), name: file.name })
-    reader.readAsDataURL(file)
+    void readImageDataUrl(file)
+      .then((dataUrl) => setScheduleImage({ file, dataUrl, name: file.name }))
+      .catch((error) => setScheduleError(error instanceof Error ? error.message.replace("The image", "The schedule image") : "The schedule image could not be read. Choose another file."))
   }
 
   const handleScheduleUpload = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -379,6 +367,8 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
     }
     setIsScheduleUploading(true)
     try {
+      const validation = validateImageFile(scheduleImage.file)
+      if (!validation.valid) throw new Error(validation.message)
       const request = await fetch("/api/storage/uploads/request-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -387,26 +377,23 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
           projectId,
           name: scheduleImage.file.name,
           size: scheduleImage.file.size,
-          contentType: scheduleImage.file.type,
+          contentType: validation.contentType,
         }),
       })
       const upload = await request.json() as { uploadURL?: string; objectPath?: string; error?: string }
       if (!request.ok || !upload.uploadURL || !upload.objectPath) {
         throw new Error(upload.error || "The schedule upload could not be started.")
       }
-      const stored = await fetch(upload.uploadURL, {
-        method: "PUT",
-        headers: { "Content-Type": scheduleImage.file.type },
-        body: scheduleImage.file,
+      await uploadToSignedUrl(scheduleImage.file, upload.uploadURL, {
+        errorMessage: "The schedule image could not be stored. Try again.",
       })
-      if (!stored.ok) throw new Error("The schedule image could not be stored. Try again.")
       await createScheduleImage.mutateAsync({
         projectId,
         data: {
           objectPath: upload.objectPath,
           name: scheduleImage.file.name,
           size: scheduleImage.file.size,
-          contentType: scheduleImage.file.type as "image/jpeg" | "image/png" | "image/webp",
+          contentType: validation.contentType,
         },
       })
       await queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) })

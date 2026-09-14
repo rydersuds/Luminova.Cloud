@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { AlertTriangle, Building2, Loader2, MailPlus, Pencil, Plus, RefreshCw, Search, ShieldCheck, Trash2, UserPlus, UserRoundMinus, Users as UsersIcon, X } from "lucide-react"
 import { ClientIdentity } from "@/components/client-identity"
+import { uploadToSignedUrl, validateImageFile } from "@/lib/image-upload"
 
 const ROLES: WorkspaceRole[] = ["Admin", "Project Manager", "Field Team", "Client"]
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -185,24 +186,23 @@ export default function Users() {
     setFeedback(null)
     setLogoBusyClientId(client.id)
     setLogoProgress(0)
-    const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"])
     try {
-      if (!allowedTypes.has(file.type)) throw new Error("Choose a JPEG, PNG, or WebP image.")
-      if (file.size < 1 || file.size > 8 * 1024 * 1024) throw new Error("Client logos must be smaller than 8 MB.")
+      const validation = validateImageFile(file, {
+        minBytes: 1,
+        messages: {
+          "unsupported-type": "Choose a JPEG, PNG, or WebP image.",
+          "too-small": "Client logos must not be empty.",
+          "too-large": "Client logos must be smaller than 8 MB.",
+        },
+      })
+      if (!validation.valid) throw new Error(validation.message)
       const upload = await requestClientLogoUpload.mutateAsync({
         clientId: client.id,
-        data: { name: file.name, size: file.size, contentType: file.type as "image/jpeg" | "image/png" | "image/webp" },
+        data: { name: file.name, size: file.size, contentType: validation.contentType },
       })
-      await new Promise<void>((resolve, reject) => {
-        const request = new XMLHttpRequest()
-        request.open("PUT", upload.uploadURL)
-        request.setRequestHeader("Content-Type", file.type)
-        request.upload.onprogress = (event) => {
-          if (event.lengthComputable) setLogoProgress(Math.round((event.loaded / event.total) * 100))
-        }
-        request.onerror = () => reject(new Error("The logo upload failed."))
-        request.onload = () => request.status >= 200 && request.status < 300 ? resolve() : reject(new Error("The logo upload failed."))
-        request.send(file)
+      await uploadToSignedUrl(file, upload.uploadURL, {
+        onProgress: setLogoProgress,
+        errorMessage: "The logo upload failed.",
       })
       await attachClientLogo.mutateAsync({ clientId: client.id, data: { objectPath: upload.objectPath } })
       await refreshClientBranding()

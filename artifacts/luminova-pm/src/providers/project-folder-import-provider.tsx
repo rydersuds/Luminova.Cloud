@@ -458,7 +458,7 @@ export function ProjectFolderImportProvider({
     void restore()
     return () => {
       cancelled = true
-      if (poll !== undefined) window.clearInterval(poll)
+      if (poll !== undefined) window.clearTimeout(poll)
     }
   }, [authenticatedFetch, isLoaded, isSignedIn, queryClient, startFolderImport])
 
