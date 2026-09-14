@@ -162,6 +162,7 @@ test.describe('navigation contrast', () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/__visual/sidebar?profile=open');
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/profile');
     await assertBackgroundlessSidebarControls(page);
     await assertNavigationContrast(page, 'desktop profile expanded');
     await expect(page).toHaveScreenshot('desktop-profile-sign-out.png', { animations: 'disabled' });

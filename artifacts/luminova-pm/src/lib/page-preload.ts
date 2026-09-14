@@ -8,6 +8,7 @@ export const pageModules = {
   messages: () => import("@/pages/messages"),
   users: () => import("@/pages/users"),
   quotes: () => import("@/pages/quotes"),
+  profile: () => import("@/pages/profile"),
 }
 
 const primaryPageLoaders = [
@@ -31,6 +32,7 @@ export function preloadPage(href: string) {
                 : href === "/quotes" ? pageModules.quotes
                   : href === "/messages" ? pageModules.messages
                     : href === "/users" ? pageModules.users
+                        : href === "/profile" ? pageModules.profile
                       : undefined
 
   if (loader) void loader()

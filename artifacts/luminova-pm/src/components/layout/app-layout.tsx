@@ -13,6 +13,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   LogOut,
+  UserRound,
   Moon,
   Sun,
 } from "lucide-react"
@@ -512,18 +513,36 @@ export function AppLayoutView({
               <ChevronDown className={cn("h-4 w-4 shrink-0 text-primary transition-transform drop-shadow-sm", sidebarCollapsed && "hidden", profileOpen && "rotate-180")} />
             </button>
             {profileOpen && (
-              <button
-                type="button"
-                data-contrast-label="sign-out control"
-                onClick={onSignOut}
+              <div
                 className={cn(
-                  "mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-destructive/10 border border-destructive/20 px-3 py-3 text-xs font-bold uppercase tracking-wider text-red-400 transition-all hover:bg-destructive hover:text-destructive-foreground hover:shadow-[0_4px_10px_rgba(255,0,0,0.3)] motion-reduce:transition-none",
-                  sidebarCollapsed && "md:absolute md:left-[calc(100%+0.5rem)] md:bottom-0 md:z-50 md:mt-0 md:w-44 md:bg-[#202020] md:p-3 md:shadow-xl",
+                  "mt-2 space-y-2",
+                  sidebarCollapsed && "md:absolute md:left-[calc(100%+0.5rem)] md:bottom-0 md:z-50 md:mt-0 md:w-44 md:rounded-xl md:bg-[#202020] md:p-2 md:shadow-xl",
                 )}
               >
-                <LogOut className="h-4 w-4" />
-                Sign out
-              </button>
+                <Link
+                  href="/profile"
+                  data-contrast-label="profile page link"
+                  onClick={() => {
+                    setProfileOpen(false)
+                    closeSidebar()
+                  }}
+                  onMouseEnter={() => preloadPage("/profile")}
+                  onFocus={() => preloadPage("/profile")}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-primary/25 bg-primary/10 px-3 py-3 text-xs font-bold uppercase tracking-wider text-primary transition-colors hover:bg-primary hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transition-none"
+                >
+                  <UserRound className="h-4 w-4" />
+                  Profile
+                </Link>
+                <button
+                  type="button"
+                  data-contrast-label="sign-out control"
+                  onClick={onSignOut}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-3 text-xs font-bold uppercase tracking-wider text-red-400 transition-all hover:bg-destructive hover:text-destructive-foreground hover:shadow-[0_4px_10px_rgba(255,0,0,0.3)] motion-reduce:transition-none"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign out
+                </button>
+              </div>
             )}
             <button
               type="button"

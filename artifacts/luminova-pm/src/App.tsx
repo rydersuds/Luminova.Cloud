@@ -42,6 +42,7 @@ const Invoices = lazy(pageModules.invoices);
 const Messages = lazy(pageModules.messages);
 const Users = lazy(pageModules.users);
 const Quotes = lazy(pageModules.quotes);
+const Profile = lazy(pageModules.profile);
 const SignUpPage = lazy(() => import('@/pages/login').then(({ SignUpPage }) => ({ default: SignUpPage })));
 const PrivacyPage = lazy(() => import('@/pages/legal').then(({ PrivacyPage }) => ({ default: PrivacyPage })));
 const TermsPage = lazy(() => import('@/pages/legal').then(({ TermsPage }) => ({ default: TermsPage })));
@@ -134,6 +135,7 @@ function AuthenticatedRoutes() {
         <Route path="/quotes" component={Quotes} />
         <Route path="/messages" component={Messages} />
         <Route path="/users" component={Users} />
+        <Route path="/profile" component={Profile} />
         <Route component={NotFound} />
       </Switch>
     </RoutedErrorBoundary>
