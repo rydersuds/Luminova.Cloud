@@ -253,20 +253,44 @@ test.describe('navigation contrast', () => {
     await expect(page.locator('html')).not.toHaveClass(/dark/);
   });
 
-  test('custom cursor follows the pointer and expands over interactive controls', async ({ page }) => {
+  test('custom cursor changes precisely for surfaces, controls, text, and presses', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await stabilize(page);
 
     await page.mouse.move(1296, 810);
     const cursor = page.getByTestId('custom-cursor');
     await expect(cursor).toHaveAttribute('data-visible', 'true');
-    await expect(cursor).toHaveAttribute('data-interactive', 'false');
-    await expect(cursor).toHaveCSS('width', '26px');
+    await expect(cursor).toHaveAttribute('data-mode', 'default');
+    await expect(cursor).toHaveCSS('width', '24px');
 
     const themeToggle = page.getByTestId('theme-toggle');
     await themeToggle.hover();
-    await expect(cursor).toHaveAttribute('data-interactive', 'true');
-    await expect(cursor).toHaveCSS('width', '38px');
+    await expect(cursor).toHaveAttribute('data-mode', 'interactive');
+    await expect(cursor).toHaveCSS('width', '32px');
+
+    await page.mouse.down();
+    await expect(cursor).toHaveAttribute('data-down', 'true');
+    await expect(cursor).toHaveCSS('width', '26px');
+    await page.mouse.up();
+    await expect(cursor).toHaveAttribute('data-down', 'false');
+
+    await page.getByTestId('app-layout').evaluate((layout) => {
+      const input = document.createElement('input');
+      input.dataset.testid = 'cursor-text-input';
+      input.setAttribute('aria-label', 'Cursor text mode');
+      input.style.position = 'fixed';
+      input.style.left = '50%';
+      input.style.top = '50%';
+      input.style.width = '120px';
+      input.style.height = '32px';
+      input.style.zIndex = '10000';
+      layout.append(input);
+    });
+    const textInput = page.getByTestId('cursor-text-input');
+    await textInput.hover();
+    await expect(cursor).toHaveAttribute('data-mode', 'text');
+    await expect(cursor).toHaveCSS('width', '2px');
+    await expect(cursor).toHaveCSS('height', '24px');
   });
 
   test('mobile header, drawer, and overlay', async ({ page }) => {

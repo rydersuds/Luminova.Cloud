@@ -334,12 +334,37 @@ export function AppLayoutView({
         cursor.style.setProperty("--cursor-x", `${event.clientX}px`)
         cursor.style.setProperty("--cursor-y", `${event.clientY}px`)
         cursor.dataset.visible = "true"
-        cursor.dataset.interactive = String(Boolean(
-          (event.target as Element).closest("a, button, input, select, textarea, [role='button'], [tabindex]"),
-        ))
+
+        const target = event.target as Element
+        const isText = target.closest(
+          "input:not([type='button']):not([type='submit']):not([type='reset']):not([type='radio']):not([type='checkbox']):not([type='file']), textarea, [contenteditable='true']",
+        )
+        const isInteractive = target.closest(
+          "a, button, select, [role='button'], [tabindex], input[type='button'], input[type='submit'], input[type='reset'], input[type='radio'], input[type='checkbox'], input[type='file']",
+        )
+
+        cursor.dataset.mode = isText ? "text" : (isInteractive ? "interactive" : "default")
       }}
       onPointerLeave={() => {
-        if (cursorRef.current) cursorRef.current.dataset.visible = "false"
+        if (cursorRef.current) {
+          cursorRef.current.dataset.visible = "false"
+          cursorRef.current.dataset.down = "false"
+        }
+      }}
+      onPointerDown={(event) => {
+        if (cursorRef.current && event.pointerType !== "touch") {
+          cursorRef.current.dataset.down = "true"
+        }
+      }}
+      onPointerUp={(event) => {
+        if (cursorRef.current && event.pointerType !== "touch") {
+          cursorRef.current.dataset.down = "false"
+        }
+      }}
+      onPointerCancel={(event) => {
+        if (cursorRef.current && event.pointerType !== "touch") {
+          cursorRef.current.dataset.down = "false"
+        }
       }}
     >
       <div data-testid="app-background" aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-tech-grid">
@@ -608,9 +633,10 @@ export function AppLayoutView({
         ref={cursorRef}
         data-testid="custom-cursor"
         data-visible="false"
-        data-interactive="false"
+        data-mode="default"
+        data-down="false"
         aria-hidden="true"
-        className="futuristic-cursor"
+        className="precision-cursor"
       />
     </div>
   )
