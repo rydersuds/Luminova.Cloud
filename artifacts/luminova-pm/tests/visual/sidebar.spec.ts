@@ -280,7 +280,7 @@ test.describe('navigation contrast', () => {
     if (!reducedMotionBounds) throw new Error('Expected a visible reduced-motion panel');
     await page.mouse.move(reducedMotionBounds.x + reducedMotionBounds.width * 0.5, reducedMotionBounds.y + reducedMotionBounds.height * 0.5);
     await expect(reducedMotionPanel).not.toHaveCSS('--panel-light-color', 'transparent');
-    await expect.poll(() => reducedMotionPanel.evaluate((element) => getComputedStyle(element).backgroundImage)).toContain('radial-gradient(96px at 76% 22%');
+    await expect.poll(() => reducedMotionPanel.evaluate((element) => getComputedStyle(element).backgroundImage)).toContain('radial-gradient(62px at 76% 22%');
   });
 
   test('mobile header, drawer, and overlay', async ({ page }) => {

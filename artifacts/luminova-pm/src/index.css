@@ -245,7 +245,7 @@
     --surface-light-color: transparent;
     --surface-shine-color: transparent;
     background:
-      radial-gradient(circle 72px at var(--local-light-x, 18%) var(--local-light-y, 8%), var(--surface-light-color), transparent 100%),
+      radial-gradient(ellipse 82px 28px at var(--local-light-x, 18%) var(--local-light-y, 8%), var(--surface-light-color), transparent 100%),
       linear-gradient(145deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.94) 58%, hsl(var(--primary) / 0.08) 100%);
     box-shadow:
       inset 0 1px 0 hsl(0 0% 100% / 0.58),
@@ -256,7 +256,7 @@
 
   .dark .surface-3d {
     background:
-      radial-gradient(circle 72px at var(--local-light-x, 18%) var(--local-light-y, 8%), var(--surface-light-color), transparent 100%),
+      radial-gradient(ellipse 82px 28px at var(--local-light-x, 18%) var(--local-light-y, 8%), var(--surface-light-color), transparent 100%),
       linear-gradient(145deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.96) 58%, hsl(var(--primary) / 0.09) 100%);
     box-shadow:
       inset 0 1px 0 hsl(0 0% 100% / 0.14),
@@ -272,15 +272,15 @@
     pointer-events: none;
     border-radius: inherit;
     background:
-      radial-gradient(circle 54px at var(--local-light-x, 18%) var(--local-light-y, 8%), var(--surface-shine-color), transparent 100%),
-      linear-gradient(180deg, hsl(0 0% 100% / 0.24) 0%, transparent 28%);
+      radial-gradient(ellipse 56px 12px at var(--local-light-x, 18%) var(--local-light-y, 8%), var(--surface-shine-color), transparent 100%),
+      linear-gradient(112deg, hsl(0 0% 100% / 0.18) 0%, transparent 24%, transparent 76%, hsl(var(--primary) / 0.08) 100%);
     z-index: 0;
   }
 
   .dark .surface-3d::before {
     background:
-      radial-gradient(circle 54px at var(--local-light-x, 18%) var(--local-light-y, 8%), var(--surface-shine-color), transparent 100%),
-      linear-gradient(180deg, hsl(0 0% 100% / 0.1) 0%, transparent 28%);
+      radial-gradient(ellipse 56px 12px at var(--local-light-x, 18%) var(--local-light-y, 8%), var(--surface-shine-color), transparent 100%),
+      linear-gradient(112deg, hsl(0 0% 100% / 0.08) 0%, transparent 24%, transparent 76%, hsl(var(--primary) / 0.06) 100%);
   }
 
   .surface-3d > * {
@@ -317,8 +317,8 @@
   .btn-liquid-primary {
     background-color: hsl(var(--primary) / 0.85);
     background-image:
-      radial-gradient(circle 44px at var(--local-light-x, 88%) var(--local-light-y, 72%), var(--button-light-color), transparent 100%),
-      linear-gradient(180deg, hsl(0 0% 100% / 0.3) 0%, transparent 45%, hsl(0 0% 0% / 0.25) 100%);
+      radial-gradient(ellipse 16px 46px at var(--local-light-x, 88%) var(--local-light-y, 72%), var(--button-light-color), transparent 100%),
+      linear-gradient(132deg, hsl(0 0% 100% / 0.28) 0%, transparent 34%, hsl(var(--primary) / 0.18) 68%, hsl(0 0% 0% / 0.25) 100%);
     box-shadow:
       inset 0 1px 2px hsl(0 0% 100% / 0.5),
       inset 0 -2px 4px hsl(0 0% 0% / 0.3),
@@ -362,8 +362,8 @@
   .btn-liquid-secondary {
     background-color: hsl(var(--secondary) / 0.7);
     background-image:
-      radial-gradient(circle 44px at var(--local-light-x, 88%) var(--local-light-y, 72%), var(--button-light-color), transparent 100%),
-      linear-gradient(180deg, hsl(0 0% 100% / 0.2) 0%, transparent 45%, hsl(0 0% 0% / 0.15) 100%);
+      radial-gradient(ellipse 18px 42px at var(--local-light-x, 88%) var(--local-light-y, 72%), var(--button-light-color), transparent 100%),
+      linear-gradient(164deg, hsl(0 0% 100% / 0.18) 0%, transparent 42%, hsl(0 0% 0% / 0.16) 100%);
     box-shadow:
       inset 0 1px 2px hsl(0 0% 100% / 0.4),
       inset 0 -2px 3px hsl(0 0% 0% / 0.2),
@@ -394,8 +394,8 @@
   .btn-liquid-destructive {
     background-color: hsl(var(--destructive) / 0.85);
     background-image:
-      radial-gradient(circle 44px at var(--local-light-x, 88%) var(--local-light-y, 72%), var(--button-light-color), transparent 100%),
-      linear-gradient(180deg, hsl(0 0% 100% / 0.25) 0%, transparent 45%, hsl(0 0% 0% / 0.3) 100%);
+      radial-gradient(ellipse 14px 40px at var(--local-light-x, 88%) var(--local-light-y, 72%), var(--button-light-color), transparent 100%),
+      linear-gradient(118deg, hsl(0 0% 100% / 0.22) 0%, transparent 38%, hsl(0 0% 0% / 0.32) 100%);
     box-shadow:
       inset 0 1px 2px hsl(0 0% 100% / 0.4),
       inset 0 -2px 4px hsl(0 0% 0% / 0.3),
@@ -418,8 +418,8 @@
   .btn-liquid-outline {
     background-color: hsl(var(--background));
     background-image:
-      radial-gradient(circle 44px at var(--local-light-x, 88%) var(--local-light-y, 72%), var(--button-light-color), transparent 100%),
-      linear-gradient(180deg, hsl(0 0% 100% / 0.1) 0%, transparent 50%, hsl(0 0% 0% / 0.05) 100%);
+      radial-gradient(ellipse 20px 38px at var(--local-light-x, 88%) var(--local-light-y, 72%), var(--button-light-color), transparent 100%),
+      linear-gradient(96deg, hsl(0 0% 100% / 0.09) 0%, transparent 46%, hsl(var(--primary) / 0.05) 72%, hsl(0 0% 0% / 0.06) 100%);
     box-shadow:
       inset 0 1px 1px hsl(0 0% 100% / 0.15),
       inset 0 -1px 2px hsl(0 0% 0% / 0.1),
@@ -430,8 +430,8 @@
 
   .dark .btn-liquid-outline {
     background-image:
-      radial-gradient(circle 44px at var(--local-light-x, 88%) var(--local-light-y, 72%), var(--button-light-color), transparent 100%),
-      linear-gradient(180deg, hsl(0 0% 100% / 0.05) 0%, transparent 50%, hsl(0 0% 0% / 0.15) 100%);
+      radial-gradient(ellipse 20px 38px at var(--local-light-x, 88%) var(--local-light-y, 72%), var(--button-light-color), transparent 100%),
+      linear-gradient(96deg, hsl(0 0% 100% / 0.05) 0%, transparent 46%, hsl(var(--primary) / 0.04) 72%, hsl(0 0% 0% / 0.16) 100%);
     box-shadow:
       inset 0 1px 1px hsl(0 0% 100% / 0.05),
       inset 0 -1px 2px hsl(0 0% 0% / 0.2),
@@ -490,7 +490,7 @@
     --panel-light-color: transparent;
     --panel-shine-color: transparent;
     background:
-      radial-gradient(circle 96px at var(--local-light-x, 76%) var(--local-light-y, 22%), var(--panel-light-color), transparent 100%),
+      radial-gradient(circle 62px at var(--local-light-x, 76%) var(--local-light-y, 22%), transparent 52%, var(--panel-light-color) 66%, transparent 78%),
       linear-gradient(135deg, hsl(var(--background) / 0.92) 0%, hsl(var(--background) / 0.8) 100%);
     box-shadow:
       inset 0 1px 0 hsl(0 0% 100% / 0.6),
@@ -505,7 +505,7 @@
     --panel-shine-color: transparent;
     background-color: hsl(var(--sidebar) / 0.96);
     background-image:
-      radial-gradient(circle 96px at var(--local-light-x, 76%) var(--local-light-y, 22%), var(--panel-light-color), transparent 100%),
+      radial-gradient(circle 62px at var(--local-light-x, 76%) var(--local-light-y, 22%), transparent 52%, var(--panel-light-color) 66%, transparent 78%),
       linear-gradient(135deg, hsl(0 0% 100% / 0.08) 0%, transparent 42%, hsl(var(--primary) / 0.06) 100%);
     box-shadow:
       inset 0 1px 0 hsl(0 0% 100% / 0.16),
@@ -521,15 +521,15 @@
     pointer-events: none;
     border-radius: inherit;
     background:
-      radial-gradient(circle 72px at var(--local-light-x, 76%) var(--local-light-y, 22%), var(--panel-shine-color), transparent 100%),
-      linear-gradient(180deg, hsl(0 0% 100% / 0.24) 0%, transparent 28%);
+      radial-gradient(ellipse 26px 88px at var(--local-light-x, 76%) var(--local-light-y, 22%), var(--panel-shine-color), transparent 100%),
+      linear-gradient(152deg, hsl(0 0% 100% / 0.16) 0%, transparent 20%, transparent 82%, hsl(var(--primary) / 0.08) 100%);
     z-index: 0;
   }
 
   .glass-panel-dark::before {
     background:
-      radial-gradient(circle 72px at var(--local-light-x, 76%) var(--local-light-y, 22%), var(--panel-shine-color), transparent 100%),
-      linear-gradient(180deg, hsl(0 0% 100% / 0.1) 0%, transparent 28%);
+      radial-gradient(ellipse 26px 88px at var(--local-light-x, 76%) var(--local-light-y, 22%), var(--panel-shine-color), transparent 100%),
+      linear-gradient(152deg, hsl(0 0% 100% / 0.07) 0%, transparent 20%, transparent 82%, hsl(var(--primary) / 0.06) 100%);
   }
 
   .glass-panel > *, .glass-panel-dark > * {

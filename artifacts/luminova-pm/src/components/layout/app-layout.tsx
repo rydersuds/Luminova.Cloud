@@ -440,7 +440,7 @@ export function AppLayoutView({
               height: indicator.height,
               transform: `translateY(${indicator.top}px) scale(1.025)`,
               backgroundColor: "hsl(var(--primary) / 0.9)",
-              backgroundImage: "radial-gradient(circle 48px at var(--indicator-light-x, 34%) var(--indicator-light-y, 18%), var(--indicator-light-color, transparent), transparent 100%), linear-gradient(180deg, hsl(0 0% 100% / 0.24) 0%, transparent 42%, hsl(0 0% 0% / 0.12) 100%)",
+              backgroundImage: "radial-gradient(ellipse 58px 14px at var(--indicator-light-x, 34%) var(--indicator-light-y, 18%), var(--indicator-light-color, transparent), transparent 100%), linear-gradient(128deg, hsl(0 0% 100% / 0.22) 0%, transparent 34%, hsl(var(--primary) / 0.14) 72%, hsl(0 0% 0% / 0.14) 100%)",
             }}
           >
             <div
