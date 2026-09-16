@@ -253,18 +253,21 @@ test.describe('navigation contrast', () => {
     await expect(page.locator('html')).not.toHaveClass(/dark/);
   });
 
-  test('layered surface lighting follows the pointer at varied depths and respects reduced motion', async ({ page }) => {
+  test('only the surface under the pointer moves its light and reduced motion stays still', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await stabilize(page);
 
     await page.mouse.move(1296, 810);
-    await expect.poll(() => page.getByTestId('app-layout').evaluate((element) => ({
-      pointer: Number.parseFloat(element.style.getPropertyValue('--light-x')),
-      near: Number.parseFloat(element.style.getPropertyValue('--light-near-x')),
-      far: Number.parseFloat(element.style.getPropertyValue('--light-far-x')),
-      reverse: Number.parseFloat(element.style.getPropertyValue('--light-reverse-x')),
-      accentY: Number.parseFloat(element.style.getPropertyValue('--light-accent-y')),
-    }))).toEqual({ pointer: 90, near: 82.8, far: 62.8, reverse: 38.8, accentY: 42 });
+    await expect(page.getByTestId('app-layout')).toHaveCSS('--light-x', '90%');
+    const panel = page.locator('.glass-panel-dark').first();
+    await expect(panel).toBeVisible();
+    const panelBounds = await panel.boundingBox();
+    if (!panelBounds) throw new Error('Expected a visible reactive panel');
+    await page.mouse.move(panelBounds.x + panelBounds.width * 0.72, panelBounds.y + panelBounds.height * 0.28);
+    await expect.poll(() => panel.evaluate((element) => ({
+      x: element.style.getPropertyValue('--local-light-x'),
+      y: element.style.getPropertyValue('--local-light-y'),
+    }))).toEqual({ x: '72.0%', y: '28.0%' });
 
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.reload();

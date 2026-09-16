@@ -243,7 +243,7 @@
   .surface-3d {
     @apply relative border-none rounded-xl overflow-hidden transition-all duration-300;
     background:
-      radial-gradient(circle at var(--local-light-x, var(--light-near-x, 18%)) var(--local-light-y, var(--light-near-y, 8%)), hsl(var(--primary) / 0.16), transparent 34%),
+      radial-gradient(circle at var(--local-light-x, 18%) var(--local-light-y, 8%), hsl(var(--primary) / 0.16), transparent 34%),
       linear-gradient(145deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.94) 58%, hsl(var(--primary) / 0.08) 100%);
     box-shadow:
       inset 0 1px 0 hsl(0 0% 100% / 0.58),
@@ -254,7 +254,7 @@
 
   .dark .surface-3d {
     background:
-      radial-gradient(circle at var(--local-light-x, var(--light-near-x, 18%)) var(--local-light-y, var(--light-near-y, 8%)), hsl(var(--primary) / 0.13), transparent 34%),
+      radial-gradient(circle at var(--local-light-x, 18%) var(--local-light-y, 8%), hsl(var(--primary) / 0.13), transparent 34%),
       linear-gradient(145deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.96) 58%, hsl(var(--primary) / 0.09) 100%);
     box-shadow:
       inset 0 1px 0 hsl(0 0% 100% / 0.14),
@@ -270,14 +270,14 @@
     pointer-events: none;
     border-radius: inherit;
     background:
-      radial-gradient(circle at var(--local-light-x, var(--light-near-x, 18%)) var(--local-light-y, var(--light-near-y, 8%)), hsl(0 0% 100% / 0.28), transparent 30%),
+      radial-gradient(circle at var(--local-light-x, 18%) var(--local-light-y, 8%), hsl(0 0% 100% / 0.28), transparent 30%),
       linear-gradient(180deg, hsl(0 0% 100% / 0.24) 0%, transparent 28%);
     z-index: 0;
   }
 
   .dark .surface-3d::before {
     background:
-      radial-gradient(circle at var(--local-light-x, var(--light-near-x, 18%)) var(--local-light-y, var(--light-near-y, 8%)), hsl(0 0% 100% / 0.14), transparent 30%),
+      radial-gradient(circle at var(--local-light-x, 18%) var(--local-light-y, 8%), hsl(0 0% 100% / 0.14), transparent 30%),
       linear-gradient(180deg, hsl(0 0% 100% / 0.1) 0%, transparent 28%);
   }
 
@@ -312,7 +312,7 @@
   .btn-liquid-primary {
     background-color: hsl(var(--primary) / 0.85);
     background-image:
-      radial-gradient(circle at var(--local-light-x, var(--light-reverse-x, 88%)) var(--local-light-y, var(--light-reverse-y, 72%)), hsl(0 0% 100% / 0.42), transparent 38%),
+      radial-gradient(circle at var(--local-light-x, 88%) var(--local-light-y, 72%), hsl(0 0% 100% / 0.42), transparent 38%),
       linear-gradient(180deg, hsl(0 0% 100% / 0.3) 0%, transparent 45%, hsl(0 0% 0% / 0.25) 100%);
     box-shadow:
       inset 0 1px 2px hsl(0 0% 100% / 0.5),
@@ -356,7 +356,7 @@
   .btn-liquid-secondary {
     background-color: hsl(var(--secondary) / 0.7);
     background-image:
-      radial-gradient(circle at var(--local-light-x, var(--light-reverse-x, 88%)) var(--local-light-y, var(--light-reverse-y, 72%)), hsl(0 0% 100% / 0.28), transparent 38%),
+      radial-gradient(circle at var(--local-light-x, 88%) var(--local-light-y, 72%), hsl(0 0% 100% / 0.28), transparent 38%),
       linear-gradient(180deg, hsl(0 0% 100% / 0.2) 0%, transparent 45%, hsl(0 0% 0% / 0.15) 100%);
     box-shadow:
       inset 0 1px 2px hsl(0 0% 100% / 0.4),
@@ -387,7 +387,7 @@
   .btn-liquid-destructive {
     background-color: hsl(var(--destructive) / 0.85);
     background-image:
-      radial-gradient(circle at var(--local-light-x, var(--light-reverse-x, 88%)) var(--local-light-y, var(--light-reverse-y, 72%)), hsl(0 0% 100% / 0.3), transparent 38%),
+      radial-gradient(circle at var(--local-light-x, 88%) var(--local-light-y, 72%), hsl(0 0% 100% / 0.3), transparent 38%),
       linear-gradient(180deg, hsl(0 0% 100% / 0.25) 0%, transparent 45%, hsl(0 0% 0% / 0.3) 100%);
     box-shadow:
       inset 0 1px 2px hsl(0 0% 100% / 0.4),
@@ -410,7 +410,7 @@
   .btn-liquid-outline {
     background-color: hsl(var(--background));
     background-image:
-      radial-gradient(circle at var(--local-light-x, var(--light-reverse-x, 88%)) var(--local-light-y, var(--light-reverse-y, 72%)), hsl(var(--primary) / 0.14), transparent 38%),
+      radial-gradient(circle at var(--local-light-x, 88%) var(--local-light-y, 72%), hsl(var(--primary) / 0.14), transparent 38%),
       linear-gradient(180deg, hsl(0 0% 100% / 0.1) 0%, transparent 50%, hsl(0 0% 0% / 0.05) 100%);
     box-shadow:
       inset 0 1px 1px hsl(0 0% 100% / 0.15),
@@ -422,7 +422,7 @@
 
   .dark .btn-liquid-outline {
     background-image:
-      radial-gradient(circle at var(--local-light-x, var(--light-reverse-x, 88%)) var(--local-light-y, var(--light-reverse-y, 72%)), hsl(var(--primary) / 0.12), transparent 38%),
+      radial-gradient(circle at var(--local-light-x, 88%) var(--local-light-y, 72%), hsl(var(--primary) / 0.12), transparent 38%),
       linear-gradient(180deg, hsl(0 0% 100% / 0.05) 0%, transparent 50%, hsl(0 0% 0% / 0.15) 100%);
     box-shadow:
       inset 0 1px 1px hsl(0 0% 100% / 0.05),
@@ -479,7 +479,7 @@
   .glass-panel {
     @apply relative border-none overflow-hidden rounded-2xl transition-all duration-300;
     background:
-      radial-gradient(circle at var(--local-light-x, var(--light-far-x, 76%)) var(--local-light-y, var(--light-far-y, 22%)), hsl(0 0% 100% / 0.36), transparent 36%),
+      radial-gradient(circle at var(--local-light-x, 76%) var(--local-light-y, 22%), hsl(0 0% 100% / 0.36), transparent 36%),
       linear-gradient(135deg, hsl(var(--background) / 0.92) 0%, hsl(var(--background) / 0.8) 100%);
     box-shadow:
       inset 0 1px 0 hsl(0 0% 100% / 0.6),
@@ -492,7 +492,7 @@
     @apply relative border-none overflow-hidden rounded-2xl transition-all duration-300;
     background-color: hsl(var(--sidebar) / 0.96);
     background-image:
-      radial-gradient(circle at var(--local-light-x, var(--light-far-x, 76%)) var(--local-light-y, var(--light-far-y, 22%)), hsl(0 0% 100% / 0.16), transparent 34%),
+      radial-gradient(circle at var(--local-light-x, 76%) var(--local-light-y, 22%), hsl(0 0% 100% / 0.16), transparent 34%),
       linear-gradient(135deg, hsl(0 0% 100% / 0.08) 0%, transparent 42%, hsl(var(--primary) / 0.06) 100%);
     box-shadow:
       inset 0 1px 0 hsl(0 0% 100% / 0.16),
@@ -508,14 +508,14 @@
     pointer-events: none;
     border-radius: inherit;
     background:
-      radial-gradient(circle at var(--local-light-x, var(--light-far-x, 76%)) var(--local-light-y, var(--light-far-y, 22%)), hsl(0 0% 100% / 0.24), transparent 30%),
+      radial-gradient(circle at var(--local-light-x, 76%) var(--local-light-y, 22%), hsl(0 0% 100% / 0.24), transparent 30%),
       linear-gradient(180deg, hsl(0 0% 100% / 0.24) 0%, transparent 28%);
     z-index: 0;
   }
 
   .glass-panel-dark::before {
     background:
-      radial-gradient(circle at var(--local-light-x, var(--light-far-x, 76%)) var(--local-light-y, var(--light-far-y, 22%)), hsl(0 0% 100% / 0.12), transparent 30%),
+      radial-gradient(circle at var(--local-light-x, 76%) var(--local-light-y, 22%), hsl(0 0% 100% / 0.12), transparent 30%),
       linear-gradient(180deg, hsl(0 0% 100% / 0.1) 0%, transparent 28%);
   }
 
@@ -542,14 +542,6 @@
     [data-testid='app-layout'] {
       --light-x: 16% !important;
       --light-y: 0% !important;
-      --light-near-x: 18% !important;
-      --light-near-y: 8% !important;
-      --light-far-x: 76% !important;
-      --light-far-y: 22% !important;
-      --light-reverse-x: 88% !important;
-      --light-reverse-y: 72% !important;
-      --light-accent-x: 34% !important;
-      --light-accent-y: 18% !important;
     }
 
     .surface-3d,
