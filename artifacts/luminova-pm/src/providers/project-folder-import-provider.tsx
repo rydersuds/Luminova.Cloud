@@ -487,7 +487,7 @@ function FolderImportActivity({ isSignedIn }: { isSignedIn: boolean }) {
     ? 100
     : Math.round((processed / Math.max(folderFiles.length, 1)) * 100)
 
-  return <aside aria-live="polite" aria-label="Project folder import activity" className="fixed bottom-4 left-4 right-4 z-50 overflow-hidden rounded-2xl border border-primary/35 bg-sidebar/95 text-sidebar-foreground shadow-[0_12px_45px_rgba(0,0,0,.65),0_0_30px_rgba(181,156,63,.12)] backdrop-blur-xl sm:left-auto sm:w-[390px]">
+  return <aside aria-live="polite" aria-label="Project folder import activity" className="fixed bottom-4 left-4 right-4 z-50 overflow-hidden rounded-2xl border border-primary/35 bg-sidebar text-sidebar-foreground shadow-[0_12px_45px_rgba(0,0,0,.65),0_0_0_1px_rgba(181,156,63,.18)] sm:left-auto sm:w-[390px]">
     <div className="flex items-center gap-3 px-4 py-3">
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/25 bg-primary/10">
         {active ? <LoaderCircle className="h-4 w-4 animate-spin text-primary" aria-hidden="true" /> : isError ? <XCircle className="h-4 w-4 text-destructive" aria-hidden="true" /> : <CheckCircle2 className="h-4 w-4 text-primary" aria-hidden="true" />}

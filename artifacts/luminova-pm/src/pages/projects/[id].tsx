@@ -847,21 +847,21 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
             </div>
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border/50 rounded-lg overflow-hidden border border-border/70">
-              <div className="bg-card/35 p-4 space-y-1 backdrop-blur-sm">
+              <div className="bg-card p-4 space-y-1">
                 <p className="text-sm text-muted-foreground">Internal Budget</p>
                 <p className="text-xl font-bold tabular-nums">{formatCurrency(project.budgeted)}</p>
               </div>
-              <div className="bg-card/35 p-4 space-y-1 backdrop-blur-sm">
+              <div className="bg-card p-4 space-y-1">
                 <p className="text-sm text-muted-foreground">Invoiced expenses</p>
                 <p className="text-xl font-bold tabular-nums">{formatCurrency(actualCost)}</p>
               </div>
-              <div className="bg-card/35 p-4 space-y-1 backdrop-blur-sm">
+              <div className="bg-card p-4 space-y-1">
                 <p className="text-sm text-muted-foreground">Budget Remaining</p>
                 <p className={cn("text-xl font-bold tabular-nums", varianceIsPositive ? "text-success" : "text-destructive")}>
                   {varianceIsPositive ? "+" : ""}{formatCurrency(budgetVariance)}
                 </p>
               </div>
-              <div className="bg-card/35 p-4 space-y-1 backdrop-blur-sm">
+              <div className="bg-card p-4 space-y-1">
                 <p className="text-sm text-muted-foreground">Total Progress</p>
                 <div className="flex items-center gap-2">
                   <p className="text-xl font-bold tabular-nums">{clientQuoteInvoicedPercent.toFixed(1)}%</p>

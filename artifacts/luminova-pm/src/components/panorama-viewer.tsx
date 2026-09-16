@@ -397,11 +397,11 @@ export function PanoramaViewer({
             </button>
           </div>
         )}
-        <div className="pointer-events-none absolute left-1/2 top-5 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/15 bg-black/55 px-4 py-2 text-xs font-medium text-white backdrop-blur-sm">
+        <div className="pointer-events-none absolute left-1/2 top-5 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/15 bg-black/90 px-4 py-2 text-xs font-medium text-white">
           <Move className="h-4 w-4" />
           Drag or use arrow keys to look around
         </div>
-        <div className="absolute bottom-5 right-5 flex overflow-hidden rounded-lg border border-white/20 bg-black/65 shadow-lg backdrop-blur-sm">
+        <div className="absolute bottom-5 right-5 flex overflow-hidden rounded-lg border border-white/20 bg-black/90 shadow-lg">
           <button
             type="button"
             aria-label="Zoom out"

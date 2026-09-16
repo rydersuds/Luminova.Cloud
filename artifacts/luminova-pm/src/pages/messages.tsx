@@ -172,8 +172,8 @@ export default function Messages() {
       <div className="dark relative flex flex-1 overflow-hidden bg-background text-foreground">
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute inset-0 bg-[#080808]" />
-          <div className="absolute -left-[10%] -top-[20%] h-[60%] w-[60%] animate-pulse rounded-full bg-primary/10 blur-[140px] motion-reduce:animate-none" />
-          <div className="absolute -bottom-[20%] -right-[10%] h-[60%] w-[60%] animate-pulse rounded-full bg-primary/5 blur-[140px] motion-reduce:animate-none" />
+          <div className="absolute -left-[10%] -top-[20%] h-[60%] w-[60%] animate-pulse rounded-full bg-primary/10 motion-reduce:animate-none" />
+          <div className="absolute -bottom-[20%] -right-[10%] h-[60%] w-[60%] animate-pulse rounded-full bg-primary/5 motion-reduce:animate-none" />
         </div>
         <div className="relative z-10 mx-auto flex min-w-0 w-full max-w-[1600px] flex-1 gap-6 p-0 md:p-6">
           <div className={cn(
@@ -181,7 +181,7 @@ export default function Messages() {
             isMobileListOpen ? "translate-x-0" : "hidden md:flex",
           )}>
             <div className="flex flex-1 flex-col overflow-hidden md:rounded-3xl md:border md:border-sidebar-border md:bg-sidebar/40 md:shadow-2xl">
-              <div className="shrink-0 border-b border-sidebar-border/50 bg-sidebar/80 p-4 backdrop-blur-xl md:p-6">
+              <div className="shrink-0 border-b border-sidebar-border/50 bg-sidebar p-4 md:p-6">
                 <div className="flex items-center justify-between">
                   <h2 className="font-heading text-2xl font-bold tracking-tight">Messages</h2>
                   <Button size="icon" variant="outline" onClick={() => setIsNewChatOpen(true)} className="h-8 w-8 rounded-full border-sidebar-border" data-testid="button-new-conversation">
@@ -252,7 +252,7 @@ export default function Messages() {
               isMobileListOpen ? "hidden md:flex" : "flex",
             )}>
               <div className="flex min-w-0 flex-1 flex-col overflow-hidden md:rounded-3xl md:border md:border-sidebar-border md:bg-sidebar/30 md:shadow-2xl">
-                <header className="flex h-[76px] shrink-0 items-center gap-3 border-b border-sidebar-border/50 bg-sidebar/80 px-4 backdrop-blur-xl md:px-6">
+                <header className="flex h-[76px] shrink-0 items-center gap-3 border-b border-sidebar-border/50 bg-sidebar px-4 md:px-6">
                   <button type="button" onClick={() => setIsMobileListOpen(true)} className="rounded-full p-2 md:hidden" aria-label="Back to conversations">
                     <ChevronLeft className="h-6 w-6" />
                   </button>
@@ -299,7 +299,7 @@ export default function Messages() {
                   })}
                   <div ref={messagesEndRef} />
                 </div>
-                <div className="shrink-0 border-t border-sidebar-border/50 bg-sidebar/80 p-4 backdrop-blur-xl md:p-5">
+                <div className="shrink-0 border-t border-sidebar-border/50 bg-sidebar p-4 md:p-5">
                   <div className="mx-auto flex max-w-4xl items-end gap-2 rounded-3xl border border-sidebar-border bg-sidebar p-1.5 focus-within:border-primary/50">
                     <textarea
                       placeholder="Transmit message..."

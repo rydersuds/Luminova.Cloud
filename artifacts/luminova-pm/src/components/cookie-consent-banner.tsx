@@ -30,7 +30,7 @@ export function CookieConsentBanner() {
   return (
     <aside
       aria-label="Cookie consent"
-      className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-3xl rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-2xl backdrop-blur-md sm:inset-x-6 sm:flex sm:items-center sm:gap-5"
+      className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-3xl rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-2xl sm:inset-x-6 sm:flex sm:items-center sm:gap-5"
     >
       <p className="flex-1 text-sm leading-6 text-muted-foreground">
         We use essential cookies and browser storage to keep you signed in and remember your preferences. See our{" "}

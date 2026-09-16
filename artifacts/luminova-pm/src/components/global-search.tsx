@@ -84,7 +84,7 @@ export function GlobalSearch() {
           setValue(event.target.value)
           setOpen(true)
         }}
-        className="w-full border-border/50 bg-background/70 pl-9 font-mono text-sm backdrop-blur-sm focus-visible:ring-primary/50"
+        className="w-full border-border/50 bg-background pl-9 font-mono text-sm focus-visible:ring-primary/50"
       />
 
       {showPanel && (
@@ -92,7 +92,7 @@ export function GlobalSearch() {
           id="global-search-results"
           role="listbox"
           aria-label="Workspace search results"
-          className="absolute right-0 top-[calc(100%+0.6rem)] z-50 max-h-[min(65vh,520px)] w-full min-w-0 overflow-y-auto rounded-2xl border border-border bg-card/98 p-2 text-card-foreground shadow-2xl backdrop-blur-xl sm:min-w-[420px]"
+        className="absolute right-0 top-[calc(100%+0.6rem)] z-50 max-h-[min(65vh,520px)] w-full min-w-0 overflow-y-auto rounded-2xl border border-border bg-card p-2 text-card-foreground shadow-2xl sm:min-w-[420px]"
         >
           {value.trim().length < 2 ? (
             <p className="px-3 py-4 text-sm text-muted-foreground">Type at least two characters to search.</p>

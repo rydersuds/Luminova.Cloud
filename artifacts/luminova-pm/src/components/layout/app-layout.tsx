@@ -19,7 +19,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { preloadPage } from "@/lib/page-preload"
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react"
 import { useClerk, useUser } from "@clerk/react"
 import { useTheme } from "@/hooks/use-theme"
 import { CookieConsentBanner } from "@/components/cookie-consent-banner"
@@ -324,7 +324,22 @@ export function AppLayoutView({
   }, [location, sidebarCollapsed, sidebarOpen])
 
   return (
-    <div data-testid="app-layout" className="relative isolate min-h-[100dvh] flex flex-col md:flex-row overflow-x-clip bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
+    <div
+      data-testid="app-layout"
+      className="relative isolate min-h-[100dvh] flex flex-col md:flex-row overflow-x-clip bg-background text-foreground selection:bg-primary selection:text-primary-foreground"
+      style={{ "--light-x": "16%", "--light-y": "0%" } as CSSProperties}
+      onPointerMove={(event) => {
+        const bounds = event.currentTarget.getBoundingClientRect()
+        const x = Math.min(100, Math.max(0, ((event.clientX - bounds.left) / bounds.width) * 100))
+        const y = Math.min(100, Math.max(0, ((event.clientY - bounds.top) / bounds.height) * 100))
+        event.currentTarget.style.setProperty("--light-x", `${x.toFixed(1)}%`)
+        event.currentTarget.style.setProperty("--light-y", `${y.toFixed(1)}%`)
+      }}
+      onPointerLeave={(event) => {
+        event.currentTarget.style.setProperty("--light-x", "16%")
+        event.currentTarget.style.setProperty("--light-y", "0%")
+      }}
+    >
       <div data-testid="app-background" aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-tech-grid">
         <div className="absolute top-[-20%] left-[-10%] h-[60%] w-[60%] rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.11),transparent_68%)] opacity-45" />
         <div className="absolute bottom-[-20%] right-[-10%] h-[50%] w-[50%] rounded-full bg-[radial-gradient(circle,hsl(var(--accent)/0.09),transparent_68%)] opacity-35" />
@@ -425,12 +440,12 @@ export function AppLayoutView({
               height: indicator.height,
               transform: `translateY(${indicator.top}px) scale(1.025)`,
               backgroundColor: "hsl(var(--primary) / 0.9)",
-              backgroundImage: "radial-gradient(circle at 18% 0%, hsl(0 0% 100% / 0.58), transparent 36%), linear-gradient(180deg, hsl(0 0% 100% / 0.24) 0%, transparent 42%, hsl(0 0% 0% / 0.12) 100%)",
+              backgroundImage: "radial-gradient(circle at var(--light-x) var(--light-y), hsl(0 0% 100% / 0.64), transparent 38%), linear-gradient(180deg, hsl(0 0% 100% / 0.24) 0%, transparent 42%, hsl(0 0% 0% / 0.12) 100%)",
             }}
           >
             <div
               ref={indicatorSheenRef}
-              className="absolute inset-y-[-12%] left-[-42%] w-[84%] rounded-[50%] bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.56),transparent)] blur-[1px] opacity-0"
+              className="absolute inset-y-[-12%] left-[-42%] w-[84%] rounded-[50%] bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.56),transparent)] opacity-0"
             />
             <div className="absolute inset-x-3 top-[2px] h-px rounded-full bg-white/70 opacity-90" />
             <div className="absolute inset-x-5 bottom-[3px] h-px rounded-full bg-white/25" />

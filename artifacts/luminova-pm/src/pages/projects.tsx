@@ -206,7 +206,7 @@ export default function Projects() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
                     <Badge
                       variant={getStatusColor(project.status) as any}
-                      className="absolute left-4 top-4 rounded-none bg-background/90 font-mono text-[10px] uppercase tracking-wider backdrop-blur"
+                      className="absolute left-4 top-4 rounded-none bg-background font-mono text-[10px] uppercase tracking-wider"
                     >
                       {project.status}
                     </Badge>
