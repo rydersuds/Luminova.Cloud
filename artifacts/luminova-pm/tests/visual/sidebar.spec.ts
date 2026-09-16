@@ -253,15 +253,18 @@ test.describe('navigation contrast', () => {
     await expect(page.locator('html')).not.toHaveClass(/dark/);
   });
 
-  test('shared surface lighting follows the pointer and respects reduced motion', async ({ page }) => {
+  test('layered surface lighting follows the pointer at varied depths and respects reduced motion', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await stabilize(page);
 
     await page.mouse.move(1296, 810);
     await expect.poll(() => page.getByTestId('app-layout').evaluate((element) => ({
-      x: Number.parseFloat(element.style.getPropertyValue('--light-x')),
-      y: Number.parseFloat(element.style.getPropertyValue('--light-y')),
-    }))).toEqual({ x: 90, y: 90 });
+      pointer: Number.parseFloat(element.style.getPropertyValue('--light-x')),
+      near: Number.parseFloat(element.style.getPropertyValue('--light-near-x')),
+      far: Number.parseFloat(element.style.getPropertyValue('--light-far-x')),
+      reverse: Number.parseFloat(element.style.getPropertyValue('--light-reverse-x')),
+      accentY: Number.parseFloat(element.style.getPropertyValue('--light-accent-y')),
+    }))).toEqual({ pointer: 90, near: 82.8, far: 62.8, reverse: 38.8, accentY: 42 });
 
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.reload();

@@ -327,17 +327,57 @@ export function AppLayoutView({
     <div
       data-testid="app-layout"
       className="relative isolate min-h-[100dvh] flex flex-col md:flex-row overflow-x-clip bg-background text-foreground selection:bg-primary selection:text-primary-foreground"
-      style={{ "--light-x": "16%", "--light-y": "0%" } as CSSProperties}
+      style={{
+        "--light-x": "16%",
+        "--light-y": "0%",
+        "--light-near-x": "18%",
+        "--light-near-y": "8%",
+        "--light-far-x": "76%",
+        "--light-far-y": "22%",
+        "--light-reverse-x": "88%",
+        "--light-reverse-y": "72%",
+        "--light-accent-x": "34%",
+        "--light-accent-y": "18%",
+      } as CSSProperties}
       onPointerMove={(event) => {
         const bounds = event.currentTarget.getBoundingClientRect()
         const x = Math.min(100, Math.max(0, ((event.clientX - bounds.left) / bounds.width) * 100))
         const y = Math.min(100, Math.max(0, ((event.clientY - bounds.top) / bounds.height) * 100))
+        const dx = x - 50
+        const dy = y - 50
         event.currentTarget.style.setProperty("--light-x", `${x.toFixed(1)}%`)
         event.currentTarget.style.setProperty("--light-y", `${y.toFixed(1)}%`)
+        event.currentTarget.style.setProperty("--light-near-x", `${(50 + dx * 0.82).toFixed(1)}%`)
+        event.currentTarget.style.setProperty("--light-near-y", `${(50 + dy * 0.72).toFixed(1)}%`)
+        event.currentTarget.style.setProperty("--light-far-x", `${(50 + dx * 0.32).toFixed(1)}%`)
+        event.currentTarget.style.setProperty("--light-far-y", `${(50 + dy * 0.3).toFixed(1)}%`)
+        event.currentTarget.style.setProperty("--light-reverse-x", `${(50 - dx * 0.28).toFixed(1)}%`)
+        event.currentTarget.style.setProperty("--light-reverse-y", `${(50 + dy * 0.46).toFixed(1)}%`)
+        event.currentTarget.style.setProperty("--light-accent-x", `${(50 + dx * 0.58).toFixed(1)}%`)
+        event.currentTarget.style.setProperty("--light-accent-y", `${(50 - dy * 0.2).toFixed(1)}%`)
+
+        const reactiveSurface = (event.target as Element).closest(
+          ".surface-3d, .btn-liquid, .glass-panel, .glass-panel-dark",
+        )
+        if (reactiveSurface instanceof HTMLElement && event.currentTarget.contains(reactiveSurface)) {
+          const surfaceBounds = reactiveSurface.getBoundingClientRect()
+          const localX = Math.min(115, Math.max(-15, ((event.clientX - surfaceBounds.left) / surfaceBounds.width) * 100))
+          const localY = Math.min(115, Math.max(-15, ((event.clientY - surfaceBounds.top) / surfaceBounds.height) * 100))
+          reactiveSurface.style.setProperty("--local-light-x", `${localX.toFixed(1)}%`)
+          reactiveSurface.style.setProperty("--local-light-y", `${localY.toFixed(1)}%`)
+        }
       }}
       onPointerLeave={(event) => {
         event.currentTarget.style.setProperty("--light-x", "16%")
         event.currentTarget.style.setProperty("--light-y", "0%")
+        event.currentTarget.style.setProperty("--light-near-x", "18%")
+        event.currentTarget.style.setProperty("--light-near-y", "8%")
+        event.currentTarget.style.setProperty("--light-far-x", "76%")
+        event.currentTarget.style.setProperty("--light-far-y", "22%")
+        event.currentTarget.style.setProperty("--light-reverse-x", "88%")
+        event.currentTarget.style.setProperty("--light-reverse-y", "72%")
+        event.currentTarget.style.setProperty("--light-accent-x", "34%")
+        event.currentTarget.style.setProperty("--light-accent-y", "18%")
       }}
     >
       <div data-testid="app-background" aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-tech-grid">
@@ -440,7 +480,7 @@ export function AppLayoutView({
               height: indicator.height,
               transform: `translateY(${indicator.top}px) scale(1.025)`,
               backgroundColor: "hsl(var(--primary) / 0.9)",
-              backgroundImage: "radial-gradient(circle at var(--light-x) var(--light-y), hsl(0 0% 100% / 0.64), transparent 38%), linear-gradient(180deg, hsl(0 0% 100% / 0.24) 0%, transparent 42%, hsl(0 0% 0% / 0.12) 100%)",
+              backgroundImage: "radial-gradient(circle at var(--light-accent-x) var(--light-accent-y), hsl(0 0% 100% / 0.64), transparent 38%), linear-gradient(180deg, hsl(0 0% 100% / 0.24) 0%, transparent 42%, hsl(0 0% 0% / 0.12) 100%)",
             }}
           >
             <div
