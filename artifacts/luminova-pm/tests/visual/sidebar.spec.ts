@@ -253,34 +253,20 @@ test.describe('navigation contrast', () => {
     await expect(page.locator('html')).not.toHaveClass(/dark/);
   });
 
-  test('only the surface under the pointer moves its light and reduced motion stays still', async ({ page }) => {
+  test('custom cursor follows the pointer and expands over interactive controls', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await stabilize(page);
 
-    const panel = page.locator('.glass-panel-dark:visible').first();
-    await expect(panel).toBeVisible();
-    await expect(panel).toHaveCSS('--panel-light-color', 'transparent');
-    const panelBounds = await panel.boundingBox();
-    if (!panelBounds) throw new Error('Expected a visible reactive panel');
-    await page.mouse.move(panelBounds.x + panelBounds.width * 0.72, panelBounds.y + panelBounds.height * 0.28);
-    await expect.poll(() => panel.evaluate((element) => ({
-      x: element.style.getPropertyValue('--local-light-x'),
-      y: element.style.getPropertyValue('--local-light-y'),
-    }))).toEqual({ x: '72.0%', y: '28.0%' });
-    await expect(panel).not.toHaveCSS('--panel-light-color', 'transparent');
-
     await page.mouse.move(1296, 810);
-    await expect(panel).toHaveCSS('--panel-light-color', 'transparent');
+    const cursor = page.getByTestId('custom-cursor');
+    await expect(cursor).toHaveAttribute('data-visible', 'true');
+    await expect(cursor).toHaveAttribute('data-interactive', 'false');
+    await expect(cursor).toHaveCSS('width', '26px');
 
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.reload();
-    const reducedMotionPanel = page.locator('.glass-panel-dark:visible').first();
-    await expect(reducedMotionPanel).toBeVisible();
-    const reducedMotionBounds = await reducedMotionPanel.boundingBox();
-    if (!reducedMotionBounds) throw new Error('Expected a visible reduced-motion panel');
-    await page.mouse.move(reducedMotionBounds.x + reducedMotionBounds.width * 0.5, reducedMotionBounds.y + reducedMotionBounds.height * 0.5);
-    await expect(reducedMotionPanel).not.toHaveCSS('--panel-light-color', 'transparent');
-    await expect.poll(() => reducedMotionPanel.evaluate((element) => getComputedStyle(element).backgroundImage)).toContain('radial-gradient(62px at 76% 22%');
+    const themeToggle = page.getByTestId('theme-toggle');
+    await themeToggle.hover();
+    await expect(cursor).toHaveAttribute('data-interactive', 'true');
+    await expect(cursor).toHaveCSS('width', '38px');
   });
 
   test('mobile header, drawer, and overlay', async ({ page }) => {

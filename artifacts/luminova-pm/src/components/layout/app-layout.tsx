@@ -92,6 +92,7 @@ export function AppLayoutView({
   const indicatorSheenRef = useRef<HTMLDivElement>(null)
   const indicatorAnimationRef = useRef<Animation | null>(null)
   const indicatorSheenAnimationRef = useRef<Animation | null>(null)
+  const cursorRef = useRef<HTMLDivElement>(null)
   const indicatorPhaseRef = useRef<IndicatorPhase>("idle")
   const finishTimerRef = useRef<number | null>(null)
   const hasPositionedIndicator = useRef(previousMountedIndicatorLocation !== null)
@@ -328,16 +329,17 @@ export function AppLayoutView({
       data-testid="app-layout"
       className="relative isolate min-h-[100dvh] flex flex-col md:flex-row overflow-x-clip bg-background text-foreground selection:bg-primary selection:text-primary-foreground"
       onPointerMove={(event) => {
-        const reactiveSurface = (event.target as Element).closest(
-          ".surface-3d, .btn-liquid, .glass-panel, .glass-panel-dark",
-        )
-        if (reactiveSurface instanceof HTMLElement && event.currentTarget.contains(reactiveSurface)) {
-          const surfaceBounds = reactiveSurface.getBoundingClientRect()
-          const localX = Math.min(115, Math.max(-15, ((event.clientX - surfaceBounds.left) / surfaceBounds.width) * 100))
-          const localY = Math.min(115, Math.max(-15, ((event.clientY - surfaceBounds.top) / surfaceBounds.height) * 100))
-          reactiveSurface.style.setProperty("--local-light-x", `${localX.toFixed(1)}%`)
-          reactiveSurface.style.setProperty("--local-light-y", `${localY.toFixed(1)}%`)
-        }
+        const cursor = cursorRef.current
+        if (!cursor || event.pointerType === "touch") return
+        cursor.style.setProperty("--cursor-x", `${event.clientX}px`)
+        cursor.style.setProperty("--cursor-y", `${event.clientY}px`)
+        cursor.dataset.visible = "true"
+        cursor.dataset.interactive = String(Boolean(
+          (event.target as Element).closest("a, button, input, select, textarea, [role='button'], [tabindex]"),
+        ))
+      }}
+      onPointerLeave={() => {
+        if (cursorRef.current) cursorRef.current.dataset.visible = "false"
       }}
     >
       <div data-testid="app-background" aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-tech-grid">
@@ -602,6 +604,14 @@ export function AppLayoutView({
         </div>
       </main>
       {showCookieConsent && <CookieConsentBanner />}
+      <div
+        ref={cursorRef}
+        data-testid="custom-cursor"
+        data-visible="false"
+        data-interactive="false"
+        aria-hidden="true"
+        className="futuristic-cursor"
+      />
     </div>
   )
 }
