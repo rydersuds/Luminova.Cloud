@@ -19,7 +19,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { preloadPage } from "@/lib/page-preload"
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react"
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useClerk, useUser } from "@clerk/react"
 import { useTheme } from "@/hooks/use-theme"
 import { CookieConsentBanner } from "@/components/cookie-consent-banner"
@@ -327,14 +327,7 @@ export function AppLayoutView({
     <div
       data-testid="app-layout"
       className="relative isolate min-h-[100dvh] flex flex-col md:flex-row overflow-x-clip bg-background text-foreground selection:bg-primary selection:text-primary-foreground"
-      style={{ "--light-x": "16%", "--light-y": "0%" } as CSSProperties}
       onPointerMove={(event) => {
-        const bounds = event.currentTarget.getBoundingClientRect()
-        const x = Math.min(100, Math.max(0, ((event.clientX - bounds.left) / bounds.width) * 100))
-        const y = Math.min(100, Math.max(0, ((event.clientY - bounds.top) / bounds.height) * 100))
-        event.currentTarget.style.setProperty("--light-x", `${x.toFixed(1)}%`)
-        event.currentTarget.style.setProperty("--light-y", `${y.toFixed(1)}%`)
-
         const reactiveSurface = (event.target as Element).closest(
           ".surface-3d, .btn-liquid, .glass-panel, .glass-panel-dark",
         )
@@ -345,10 +338,6 @@ export function AppLayoutView({
           reactiveSurface.style.setProperty("--local-light-x", `${localX.toFixed(1)}%`)
           reactiveSurface.style.setProperty("--local-light-y", `${localY.toFixed(1)}%`)
         }
-      }}
-      onPointerLeave={(event) => {
-        event.currentTarget.style.setProperty("--light-x", "16%")
-        event.currentTarget.style.setProperty("--light-y", "0%")
       }}
     >
       <div data-testid="app-background" aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-tech-grid">
@@ -443,7 +432,7 @@ export function AppLayoutView({
             data-last-motion={indicator.lastMotion}
             aria-hidden="true"
             className={cn(
-              "pointer-events-none absolute z-0 overflow-hidden rounded-xl border border-white/45 shadow-[inset_0_2px_4px_rgba(255,255,255,0.48),inset_0_-2px_4px_rgba(75,59,0,0.18),0_0_20px_hsl(var(--primary)/0.48),0_8px_22px_-6px_hsl(var(--primary)/0.72)] will-change-transform",
+              "sidebar-selection-indicator pointer-events-none absolute z-0 overflow-hidden rounded-xl border border-white/45 shadow-[inset_0_2px_4px_rgba(255,255,255,0.48),inset_0_-2px_4px_rgba(75,59,0,0.18),0_0_20px_hsl(var(--primary)/0.48),0_8px_22px_-6px_hsl(var(--primary)/0.72)] will-change-transform",
               sidebarCollapsed ? "left-2 right-2" : "left-4 right-4",
               !indicator.ready && "opacity-0",
             )}
@@ -451,7 +440,7 @@ export function AppLayoutView({
               height: indicator.height,
               transform: `translateY(${indicator.top}px) scale(1.025)`,
               backgroundColor: "hsl(var(--primary) / 0.9)",
-              backgroundImage: "radial-gradient(circle at var(--indicator-light-x, 34%) var(--indicator-light-y, 18%), hsl(0 0% 100% / 0.64), transparent 38%), linear-gradient(180deg, hsl(0 0% 100% / 0.24) 0%, transparent 42%, hsl(0 0% 0% / 0.12) 100%)",
+              backgroundImage: "radial-gradient(circle 48px at var(--indicator-light-x, 34%) var(--indicator-light-y, 18%), var(--indicator-light-color, transparent), transparent 100%), linear-gradient(180deg, hsl(0 0% 100% / 0.24) 0%, transparent 42%, hsl(0 0% 0% / 0.12) 100%)",
             }}
           >
             <div

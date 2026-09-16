@@ -257,10 +257,9 @@ test.describe('navigation contrast', () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await stabilize(page);
 
-    await page.mouse.move(1296, 810);
-    await expect(page.getByTestId('app-layout')).toHaveCSS('--light-x', '90%');
-    const panel = page.locator('.glass-panel-dark').first();
+    const panel = page.locator('.glass-panel-dark:visible').first();
     await expect(panel).toBeVisible();
+    await expect(panel).toHaveCSS('--panel-light-color', 'transparent');
     const panelBounds = await panel.boundingBox();
     if (!panelBounds) throw new Error('Expected a visible reactive panel');
     await page.mouse.move(panelBounds.x + panelBounds.width * 0.72, panelBounds.y + panelBounds.height * 0.28);
@@ -268,13 +267,20 @@ test.describe('navigation contrast', () => {
       x: element.style.getPropertyValue('--local-light-x'),
       y: element.style.getPropertyValue('--local-light-y'),
     }))).toEqual({ x: '72.0%', y: '28.0%' });
+    await expect(panel).not.toHaveCSS('--panel-light-color', 'transparent');
+
+    await page.mouse.move(1296, 810);
+    await expect(panel).toHaveCSS('--panel-light-color', 'transparent');
 
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.reload();
-    await expect(page.getByTestId('app-layout')).toBeVisible();
-    await page.mouse.move(720, 450);
-    await expect(page.getByTestId('app-layout')).toHaveCSS('--light-x', '16%');
-    await expect(page.getByTestId('app-layout')).toHaveCSS('--light-y', '0%');
+    const reducedMotionPanel = page.locator('.glass-panel-dark:visible').first();
+    await expect(reducedMotionPanel).toBeVisible();
+    const reducedMotionBounds = await reducedMotionPanel.boundingBox();
+    if (!reducedMotionBounds) throw new Error('Expected a visible reduced-motion panel');
+    await page.mouse.move(reducedMotionBounds.x + reducedMotionBounds.width * 0.5, reducedMotionBounds.y + reducedMotionBounds.height * 0.5);
+    await expect(reducedMotionPanel).not.toHaveCSS('--panel-light-color', 'transparent');
+    await expect.poll(() => reducedMotionPanel.evaluate((element) => getComputedStyle(element).backgroundImage)).toContain('radial-gradient(96px at 76% 22%');
   });
 
   test('mobile header, drawer, and overlay', async ({ page }) => {
