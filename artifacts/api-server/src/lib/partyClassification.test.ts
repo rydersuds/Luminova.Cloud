@@ -21,6 +21,7 @@ test("treats every Weidner name as a client, not a vendor", () => {
   assert.equal(isClientParty("Weidner Apartment Homes"), true);
   assert.equal(isClientParty("WEIDNER"), true);
   assert.equal(isDirectoryVendorName("Weidner Apartment Homes"), false);
+  assert.equal(isDirectoryVendorName("Luminova Construction"), false);
   assert.equal(canonicalClientName("WEIDNER"), WEIDNER_CLIENT_NAME);
 });
 

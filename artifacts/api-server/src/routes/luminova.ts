@@ -4232,7 +4232,9 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
       clientQuote,
       lineItems: project.budgetLineItems ?? [],
       invoices: projectInvoices,
-      trades: vendorRows.map((row) => row.data as Trade),
+       trades: vendorRows
+         .map((row) => row.data as Trade)
+         .filter(isDirectoryTrade),
       photos,
       files: documents.map((document) => (
 {

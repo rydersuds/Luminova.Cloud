@@ -326,8 +326,10 @@ test("portfolio financial summary only includes the authenticated owner's record
   const projectDetail = await projectDetailResponse.json() as {
     clientLogoUrl?: string | null;
     invoices: typeof invoiceList;
+    trades: Array<{ companyName: string }>;
   };
   assert.equal(projectDetail.clientLogoUrl, `/api/storage/objects/test-client-logo-${suffix}`);
+  assert.equal(projectDetail.trades.some((trade) => /luminova|weidner/i.test(trade.companyName)), false);
   assert.equal(
     projectDetail.invoices.find((invoice) => invoice.id === `invoice-a-${suffix}`)?.clientLogoUrl,
     `/api/storage/objects/test-client-logo-${suffix}`,
