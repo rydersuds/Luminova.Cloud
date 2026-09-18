@@ -314,8 +314,8 @@ export default function Dashboard() {
                     <span className="hidden sm:inline drop-shadow-sm">INITIALIZE PROJECT</span>
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-4xl surface-3d p-0 border-border/50">
-                  <div className="p-6 border-b border-border/50 bg-black/20 flex justify-between items-center shadow-[inset_0_-1px_3px_rgba(0,0,0,0.2)]">
+                 <DialogContent className="max-w-4xl w-[calc(100%-1rem)] max-h-[calc(100dvh-2rem)] overflow-hidden surface-3d p-0 border-border/50 flex flex-col">
+                   <div className="shrink-0 p-6 border-b border-border/50 bg-black/20 flex justify-between items-center shadow-[inset_0_-1px_3px_rgba(0,0,0,0.2)]">
                     <div>
                       <DialogTitle className="text-2xl font-heading tracking-tight flex items-center gap-2">
                         <Building className="h-6 w-6 text-primary" />
@@ -325,8 +325,8 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div className="bg-background/40">
-                    <div className="flex border-b border-border/50 px-6 bg-black/10">
+                   <div className="min-h-0 flex-1 overflow-y-auto bg-background/40">
+                     <div className="sticky top-0 z-10 flex shrink-0 border-b border-border/50 px-6 bg-black/10">
                       <button 
                         onClick={() => setIntakeMode("manual")} 
                         className={cn(
@@ -347,7 +347,7 @@ export default function Dashboard() {
                       </button>
                     </div>
 
-                    <div className="p-6 max-h-[65vh] overflow-y-auto">
+                     <div className="p-6">
                       {intakeMode === "manual" ? (
                         <form onSubmit={handleSubmit(onSubmitManual)} className="space-y-6">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
