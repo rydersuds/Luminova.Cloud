@@ -39,6 +39,8 @@ async function installImportApi(page: Page) {
   let statusCheckFailures = 0;
   let interruptNextBuild = false;
   let returnHistoricalFailureAfterCompletion = false;
+  const dismissedImportIds = new Set<string>();
+  let dismissRequests = 0;
 
   await page.route('**/api/project-import-sessions', async (route) => {
     if (route.request().method() === 'POST') {
@@ -55,9 +57,15 @@ async function installImportApi(page: Page) {
       await route.fulfill({ json: session('failed', documents, [...uploadedPaths], 'An older import failed.', 'older-failed-import') });
       return;
     }
-    await route.fulfill({ json: documents.length ? session(status, documents, [...uploadedPaths], error, importId) : null });
+    await route.fulfill({ json: documents.length && !dismissedImportIds.has(importId) ? session(status, documents, [...uploadedPaths], error, importId) : null });
   });
   await page.route('**/api/project-import-sessions/*', async (route) => {
+    if (route.request().method() === 'DELETE') {
+      dismissRequests++;
+      dismissedImportIds.add(importId);
+      await route.fulfill({ status: 204 });
+      return;
+    }
     await route.fulfill({ json: session(status, documents, [...uploadedPaths], error, importId) });
   });
   await page.route('**/api/storage/uploads/request-url', async (route) => {
@@ -114,6 +122,7 @@ async function installImportApi(page: Page) {
     get attachRequests() { return attachRequests; },
     get buildRequests() { return buildRequests; },
     get projectsCreated() { return projectsCreated; },
+    get dismissRequests() { return dismissRequests; },
     setStatus(next: SessionStatus, message: string | null = null) { status = next; error = message; },
     holdBuild() { holdBuild = true; },
     blockAdditionalAttaches(value: boolean) { blockAdditionalAttaches = value; },
@@ -354,8 +363,10 @@ test('dismissed import errors stay hidden after refresh without suppressing a ne
   await activity.getByRole('button', { name: 'Dismiss error' }).click();
   await expect(activity).not.toBeVisible();
   await expect(dashboardAlert).not.toBeVisible();
+  await expect.poll(() => api.dismissRequests).toBe(1);
   await expect(page.evaluate(() => localStorage.getItem('luminova-folder-import-dismissed:import-dismissed'))).resolves.toBe('true');
 
+  await page.evaluate(() => localStorage.clear());
   await page.reload();
   await expect(activity).not.toBeVisible();
   await expect(dashboardAlert).not.toBeVisible();

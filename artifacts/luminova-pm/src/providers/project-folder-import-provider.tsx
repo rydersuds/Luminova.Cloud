@@ -143,7 +143,25 @@ export function ProjectFolderImportProvider({
       rememberDismissedImportError("__pending__")
     }
     clearFolderImport()
-  }, [clearFolderImport])
+    if (importId) {
+      void (async () => {
+        for (const delay of [0, 500, 1500]) {
+          if (delay) await new Promise((resolve) => window.setTimeout(resolve, delay))
+          try {
+            const response = await authenticatedFetch(`/api/project-import-sessions/${importId}`, { method: "DELETE" })
+            if (response.ok || response.status === 404) return
+          } catch {
+            // Retry below so a temporary preview or network failure does not restore the dismissed import.
+          }
+        }
+        toast({
+          variant: "destructive",
+          title: "Import dismissal could not be saved",
+          description: "The error is hidden in this browser, but may reappear elsewhere until the API is available.",
+        })
+      })()
+    }
+  }, [authenticatedFetch, clearFolderImport])
 
   const collectFolderFiles = React.useCallback((files: File[]) => {
     if (activeImportRef.current) return

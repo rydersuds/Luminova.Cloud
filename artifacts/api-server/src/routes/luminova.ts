@@ -5874,20 +5874,27 @@ router.post("/project-import-sessions", async (req, res): Promise<void> =>
 }
 
 
-  const [batch] = await db.insert(projectImportBatchesTable).values(
-{
-
-
-    id: `import-${randomUUID()}`,
-    ownerId,
-    workspaceId: requestWorkspaceId(req as AuthenticatedRequest),
-    status: "uploading",
-    manifest: parsed.data.documents,
-  
-}
-
-).returning()
-;
+  const workspaceId = requestWorkspaceId(req as AuthenticatedRequest);
+  const batch = await db.transaction(async (transaction) => {
+    const now = new Date();
+    await transaction.update(projectImportBatchesTable).set({
+      dismissedAt: now,
+      updatedAt: now,
+    }).where(and(
+      eq(projectImportBatchesTable.ownerId, ownerId),
+      eq(projectImportBatchesTable.workspaceId, workspaceId),
+      isNull(projectImportBatchesTable.dismissedAt),
+      inArray(projectImportBatchesTable.status, ["uploading", "ready", "failed"]),
+    ));
+    const [created] = await transaction.insert(projectImportBatchesTable).values({
+      id: `import-${randomUUID()}`,
+      ownerId,
+      workspaceId,
+      status: "uploading",
+      manifest: parsed.data.documents,
+    }).returning();
+    return created;
+  });
 
 
   res.status(201).json(CreateProjectImportSessionResponse.parse(await importSessionResponse(batch)))
@@ -5964,6 +5971,7 @@ router.get("/project-import-sessions", async (req, res): Promise<void> =>
     .where(and(
       eq(projectImportBatchesTable.ownerId, ownerId),
       eq(projectImportBatchesTable.workspaceId, workspaceId),
+      isNull(projectImportBatchesTable.dismissedAt),
       inArray(projectImportBatchesTable.status, ["uploading", "building"]),
     ))
     .orderBy(desc(projectImportBatchesTable.updatedAt)).limit(1)
@@ -5978,6 +5986,7 @@ router.get("/project-import-sessions", async (req, res): Promise<void> =>
       .where(and(
         eq(projectImportBatchesTable.ownerId, ownerId),
         eq(projectImportBatchesTable.workspaceId, workspaceId),
+        isNull(projectImportBatchesTable.dismissedAt),
         eq(projectImportBatchesTable.status, "failed"),
       ))
       .orderBy(desc(projectImportBatchesTable.updatedAt)).limit(1)
@@ -6031,6 +6040,7 @@ router.get("/project-import-sessions/:importId", async (req, res): Promise<void>
       eq(projectImportBatchesTable.id, params.data.importId),
       eq(projectImportBatchesTable.ownerId, ownerId),
       eq(projectImportBatchesTable.workspaceId, workspaceId),
+      isNull(projectImportBatchesTable.dismissedAt),
     ))
     .limit(1);
   if (!batch) {
@@ -6038,6 +6048,48 @@ router.get("/project-import-sessions/:importId", async (req, res): Promise<void>
     return;
   }
   res.json(GetProjectImportSessionResponse.parse(await importSessionResponse(batch)));
+});
+
+router.delete("/project-import-sessions/:importId", async (req, res): Promise<void> => {
+  const params = GetProjectImportSessionParams.safeParse(req.params);
+  const ownerId = String((req as typeof req & { userId?: string }).userId ?? "");
+  const workspaceId = requestWorkspaceId(req as AuthenticatedRequest);
+  if (!params.success || !ownerId) {
+    res.status(400).json({ error: "Invalid import session." });
+    return;
+  }
+
+  const [batch] = await db.select({
+    id: projectImportBatchesTable.id,
+    status: projectImportBatchesTable.status,
+    dismissedAt: projectImportBatchesTable.dismissedAt,
+  }).from(projectImportBatchesTable).where(and(
+    eq(projectImportBatchesTable.id, params.data.importId),
+    eq(projectImportBatchesTable.ownerId, ownerId),
+    eq(projectImportBatchesTable.workspaceId, workspaceId),
+  )).limit(1);
+  if (!batch) {
+    res.status(404).json({ error: "Import session not found." });
+    return;
+  }
+  if (batch.dismissedAt || batch.status === "completed") {
+    res.status(204).end();
+    return;
+  }
+  if (batch.status === "building") {
+    res.status(409).json({ error: "This import is currently being built." });
+    return;
+  }
+
+  await db.update(projectImportBatchesTable).set({
+    dismissedAt: new Date(),
+    updatedAt: new Date(),
+  }).where(and(
+    eq(projectImportBatchesTable.id, batch.id),
+    eq(projectImportBatchesTable.ownerId, ownerId),
+    eq(projectImportBatchesTable.workspaceId, workspaceId),
+  ));
+  res.status(204).end();
 });
 
 router.post("/project-import-sessions/:importId/documents", async (req, res): Promise<void> => {
@@ -6054,6 +6106,7 @@ router.post("/project-import-sessions/:importId/documents", async (req, res): Pr
       eq(projectImportBatchesTable.id, params.data.importId),
       eq(projectImportBatchesTable.ownerId, ownerId),
       eq(projectImportBatchesTable.workspaceId, workspaceId),
+      isNull(projectImportBatchesTable.dismissedAt),
     )).limit(1)
 ;
 
@@ -7110,6 +7163,7 @@ router.post("/project-import-sessions/:importId/build", async (req, res): Promis
       eq(projectImportBatchesTable.id, params.data.importId),
       eq(projectImportBatchesTable.ownerId, ownerId),
       eq(projectImportBatchesTable.workspaceId, workspaceId),
+      isNull(projectImportBatchesTable.dismissedAt),
     )).limit(1);
   if (!batch) {
     res.status(404).json({ error: "Import session not found." });

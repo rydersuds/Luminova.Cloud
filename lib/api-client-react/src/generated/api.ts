@@ -18,7 +18,6 @@ import type {
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
-
 import type {
   Activity,
   BulkClientAccessReconciliationResponse,
@@ -1449,6 +1448,77 @@ export function useGetProjectImportSession<TData = Awaited<ReturnType<typeof get
 
 
 
+
+export const getDismissProjectImportSessionUrl = (importId: string,) => {
+
+
+
+
+  return `/api/project-import-sessions/${importId}`
+}
+
+/**
+ * @summary Dismiss an unfinished folder import so it is no longer restored
+ */
+export const dismissProjectImportSession = async (importId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDismissProjectImportSessionUrl(importId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDismissProjectImportSessionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof dismissProjectImportSession>>, TError,{importId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof dismissProjectImportSession>>, TError,{importId: string}, TContext> => {
+
+const mutationKey = ['dismissProjectImportSession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof dismissProjectImportSession>>, {importId: string}> = (props) => {
+          const {importId} = props ?? {};
+
+          return  dismissProjectImportSession(importId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DismissProjectImportSessionMutationResult = NonNullable<Awaited<ReturnType<typeof dismissProjectImportSession>>>
+
+    export type DismissProjectImportSessionMutationError = ErrorType<void>
+
+    /**
+ * @summary Dismiss an unfinished folder import so it is no longer restored
+ */
+export const useDismissProjectImportSession = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof dismissProjectImportSession>>, TError,{importId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof dismissProjectImportSession>>,
+        TError,
+        {importId: string},
+        TContext
+      > => {
+      return useMutation(getDismissProjectImportSessionMutationOptions(options));
+    }
 
 export const getAttachProjectImportDocumentUrl = (importId: string,) => {
 

@@ -34,6 +34,7 @@ test("project import session routes are available at their public API paths", as
     }],
     ["/api/project-import-sessions", undefined],
     ["/api/project-import-sessions/import-route-test", undefined],
+    ["/api/project-import-sessions/import-route-test", { method: "DELETE" }],
     ["/api/project-import-sessions/import-route-test/documents", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -62,6 +63,7 @@ test("project import session routes are available at their public API paths", as
     )
     .sort();
   assert.deepEqual(importRouteMethods, [
+    "DELETE /project-import-sessions/:importId",
     "GET /project-import-sessions",
     "GET /project-import-sessions/:importId",
     "POST /project-import-sessions",

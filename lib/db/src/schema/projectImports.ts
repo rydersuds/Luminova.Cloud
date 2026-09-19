@@ -10,6 +10,7 @@ export const projectImportBatchesTable = pgTable("project_import_batches", {
   analysis: jsonb("analysis"),
   error: text("error"),
   buildLeaseId: text("build_lease_id"),
+  dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

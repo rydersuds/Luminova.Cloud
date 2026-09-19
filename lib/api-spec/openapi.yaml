@@ -406,6 +406,19 @@ paths:
                 $ref: "#/components/schemas/ProjectImportSession"
         "404":
           description: Import session not found
+    delete:
+      operationId: dismissProjectImportSession
+      tags: [project-imports]
+      summary: Dismiss an unfinished folder import so it is no longer restored
+      parameters:
+        - $ref: "#/components/parameters/ImportId"
+      responses:
+        "204":
+          description: Import session dismissed
+        "404":
+          description: Import session not found
+        "409":
+          description: Import session is currently building
   /project-import-sessions/{importId}/documents:
     post:
       operationId: attachProjectImportDocument

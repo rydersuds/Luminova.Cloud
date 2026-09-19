@@ -7,7 +7,6 @@
  */
 export type WorkspaceRole = typeof WorkspaceRole[keyof typeof WorkspaceRole];
 
-
 export const WorkspaceRole = {
   Admin: 'Admin',
   Project_Manager: 'Project Manager',
@@ -1080,3 +1079,4 @@ trade?: string;
 status?: VendorQuoteStatus;
 direction?: QuoteDirection;
 };
+

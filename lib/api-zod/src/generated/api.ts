@@ -7,7 +7,6 @@
  */
 import * as zod from 'zod';
 
-
 /**
  * Returns server health status
  * @summary Health check
@@ -713,6 +712,19 @@ export const GetProjectImportSessionResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
+
+
+/**
+ * @summary Dismiss an unfinished folder import so it is no longer restored
+ */
+
+
+
+export const DismissProjectImportSessionParams = zod.object({
+  "importId": zod.coerce.string().min(1)
+})
+
+export const DismissProjectImportSessionResponse = zod.void()
 
 
 
