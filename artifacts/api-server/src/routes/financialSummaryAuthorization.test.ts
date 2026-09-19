@@ -338,6 +338,26 @@ test("portfolio financial summary only includes the authenticated owner's record
     headers: { "x-test-user": ownerId },
   })).status, 404);
 
+  const failedImportBatchId = `financial-failed-import-${suffix}`;
+  batchIds.push(failedImportBatchId);
+  await db.insert(projectImportBatchesTable).values({
+    id: failedImportBatchId,
+    ownerId,
+    status: "failed",
+    error: "An older import failed.",
+    manifest: [],
+  });
+  const dismissImportResponse = await fetch(
+    `http://127.0.0.1:${port}/project-import-sessions/${failedImportBatchId}`,
+    { method: "DELETE", headers: { "x-test-user": ownerId } },
+  );
+  assert.equal(dismissImportResponse.status, 204);
+  const activeImportResponse = await fetch(`http://127.0.0.1:${port}/project-import-sessions`, {
+    headers: { "x-test-user": ownerId },
+  });
+  assert.equal(activeImportResponse.status, 200);
+  assert.equal(await activeImportResponse.json(), null);
+
   const createdProjectResponse = await fetch(`http://127.0.0.1:${port}/projects`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-test-user": ownerId },

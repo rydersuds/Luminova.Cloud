@@ -57,7 +57,13 @@ async function installImportApi(page: Page) {
       await route.fulfill({ json: session('failed', documents, [...uploadedPaths], 'An older import failed.', 'older-failed-import') });
       return;
     }
-    await route.fulfill({ json: documents.length && !dismissedImportIds.has(importId) ? session(status, documents, [...uploadedPaths], error, importId) : null });
+    const activeSession = documents.length && !dismissedImportIds.has(importId)
+      ? session(status, documents, [...uploadedPaths], error, importId)
+      : null;
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify(activeSession),
+    });
   });
   await page.route('**/api/project-import-sessions/*', async (route) => {
     if (route.request().method() === 'DELETE') {
@@ -345,8 +351,9 @@ test('dismissed import errors stay hidden for the session when dismissal storage
   })).resolves.toBe(true);
 
   await page.reload();
-  await expect(activity.getByRole('alert')).toContainText('2 files still need to be uploaded', { timeout: 10_000 });
-  await expect(dashboardAlert).toContainText('2 files still need to be uploaded');
+  await expect(activity).not.toBeVisible();
+  await expect(dashboardAlert).not.toBeVisible();
+  await expect.poll(() => api.dismissRequests).toBe(1);
 });
 
 test('dismissed import errors stay hidden after refresh without suppressing a new import', async ({ page }) => {

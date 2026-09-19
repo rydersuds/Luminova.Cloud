@@ -130,6 +130,19 @@ export function ProjectFolderImportProvider({
     setFolderStatus("idle")
   }, [isActive])
 
+  const persistFolderImportDismissal = React.useCallback(async (importId: string) => {
+    for (const delay of [0, 500, 1500]) {
+      if (delay) await new Promise((resolve) => window.setTimeout(resolve, delay))
+      try {
+        const response = await authenticatedFetch(`/api/project-import-sessions/${importId}`, { method: "DELETE" })
+        if (response.ok || response.status === 404) return true
+      } catch {
+        // Retry below so a temporary preview or network failure does not restore the dismissed import.
+      }
+    }
+    return false
+  }, [authenticatedFetch])
+
   const dismissFolderError = React.useCallback(() => {
     importGenerationRef.current += 1
     const importId = sessionRef.current?.importId
@@ -145,23 +158,14 @@ export function ProjectFolderImportProvider({
     clearFolderImport()
     if (importId) {
       void (async () => {
-        for (const delay of [0, 500, 1500]) {
-          if (delay) await new Promise((resolve) => window.setTimeout(resolve, delay))
-          try {
-            const response = await authenticatedFetch(`/api/project-import-sessions/${importId}`, { method: "DELETE" })
-            if (response.ok || response.status === 404) return
-          } catch {
-            // Retry below so a temporary preview or network failure does not restore the dismissed import.
-          }
-        }
-        toast({
+        if (!await persistFolderImportDismissal(importId)) toast({
           variant: "destructive",
           title: "Import dismissal could not be saved",
           description: "The error is hidden in this browser, but may reappear elsewhere until the API is available.",
         })
       })()
     }
-  }, [authenticatedFetch, clearFolderImport])
+  }, [clearFolderImport, persistFolderImportDismissal])
 
   const collectFolderFiles = React.useCallback((files: File[]) => {
     if (activeImportRef.current) return
@@ -380,9 +384,11 @@ export function ProjectFolderImportProvider({
           rememberDismissedImportError(session.importId)
           dismissedPendingErrorRef.current = false
           forgetDismissedImportError("__pending__")
+          void persistFolderImportDismissal(session.importId)
           return
         }
         if (dismissedImportIdsRef.current.has(session.importId) || wasImportErrorDismissed(session.importId)) {
+          void persistFolderImportDismissal(session.importId)
           if (sessionRef.current?.importId === session.importId) clearFolderImport()
           return
         }
@@ -391,6 +397,7 @@ export function ProjectFolderImportProvider({
           return file ? { file, relativePath: document.relativePath } : null
         }))).filter((item): item is FolderCandidate => item !== null)
         if (dismissedImportIdsRef.current.has(session.importId) || wasImportErrorDismissed(session.importId)) {
+          void persistFolderImportDismissal(session.importId)
           if (sessionRef.current?.importId === session.importId) clearFolderImport()
           return
         }
@@ -478,7 +485,7 @@ export function ProjectFolderImportProvider({
       cancelled = true
       if (poll !== undefined) window.clearTimeout(poll)
     }
-  }, [authenticatedFetch, isLoaded, isSignedIn, queryClient, startFolderImport])
+  }, [authenticatedFetch, isLoaded, isSignedIn, persistFolderImportDismissal, queryClient, startFolderImport])
 
   return <ProjectFolderImportContext.Provider value={{ folderFiles, skippedFolderFiles, folderStatus, folderProgress, folderError, collectFolderFiles, startFolderImport, clearFolderImport, dismissFolderError, isActive }}>
     {children}
