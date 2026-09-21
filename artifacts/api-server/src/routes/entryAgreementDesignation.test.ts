@@ -2,15 +2,18 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import test from "node:test";
+import type { File } from "@google-cloud/storage";
 import express from "express";
 import { and, eq, inArray } from "drizzle-orm";
 import {
   db,
   importedProjectsTable,
+  projectActivitiesTable,
   projectDocumentsTable,
   projectImportBatchesTable,
 } from "@workspace/db";
 
+import { ObjectNotFoundError, ObjectStorageService } from "../lib/objectStorage";
 import {
   backfillLegacyEntryAgreementDesignations,
   isStandardEntryAgreementName,
@@ -125,6 +128,260 @@ test("only considers candidates explicitly supplied from the current import", ()
     selectEntryAgreementRelativePath([...currentImport, otherProjectDocument]),
     otherProjectDocument.relativePath,
   );
+});
+
+test("authorizes direct entry-agreement uploads and retains replaced contract records", async (t) => {
+  const suffix = randomUUID();
+  const ownerId = `direct-entry-owner-${suffix}`;
+  const otherUserId = `direct-entry-other-${suffix}`;
+  const projectId = `direct-entry-project-${suffix}`;
+  const importBatchId = `direct-entry-batch-${suffix}`;
+  const priorAgreementId = `prior-entry-agreement-${suffix}`;
+  const priorContractId = `prior-contract-${suffix}`;
+  const project = {
+    id: projectId,
+    name: "Direct entry agreement authorization project",
+    address: "",
+    region: "Calgary",
+    status: "Planning",
+    progress: 0,
+    pmName: "",
+    clientName: "",
+    targetDate: "",
+    budgeted: 0,
+    invoiced: 0,
+    exteriorImage: "",
+    description: "",
+  };
+
+  await db.insert(projectImportBatchesTable).values({
+    id: importBatchId,
+    projectId,
+    ownerId,
+    status: "completed",
+    manifest: [],
+  });
+  await db.insert(importedProjectsTable).values({
+    id: projectId,
+    importBatchId,
+    ownerId,
+    data: project,
+  });
+  await db.insert(projectDocumentsTable).values([
+    {
+      id: priorAgreementId,
+      importBatchId,
+      projectId,
+      ownerId,
+      objectPath: `/objects/uploads/${priorAgreementId}`,
+      relativePath: "Contracts/prior-entry-agreement.pdf",
+      name: "prior-entry-agreement.pdf",
+      contentType: "application/pdf",
+      size: 2048,
+      classification: "contract",
+      isEntryAgreement: true,
+    },
+    {
+      id: priorContractId,
+      importBatchId,
+      projectId,
+      ownerId,
+      objectPath: `/objects/uploads/${priorContractId}`,
+      relativePath: "Contracts/other-contract.pdf",
+      name: "other-contract.pdf",
+      contentType: "application/pdf",
+      size: 1024,
+      classification: "contract",
+    },
+  ]);
+
+  const originalGetObjectEntityFile = ObjectStorageService.prototype.getObjectEntityFile;
+  let verificationCalls = 0;
+  ObjectStorageService.prototype.getObjectEntityFile = async function (): Promise<File> {
+    verificationCalls += 1;
+    return {
+      getMetadata: async () => [{ size: "2048", contentType: "application/pdf" }],
+    } as unknown as File;
+  };
+
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => {
+    const actor = req.header("x-test-user");
+    if (actor) Object.assign(req, { userId: actor });
+    Object.assign(req, { log: { error: () => undefined, warn: () => undefined } });
+    next();
+  });
+  app.use(luminovaRouter);
+  const server = app.listen(0);
+  await new Promise<void>((resolve) => server.once("listening", resolve));
+  const { port } = server.address() as AddressInfo;
+  const body = {
+    objectPath: `/objects/uploads/new-entry-agreement-${suffix}`,
+    name: "new-entry-agreement.pdf",
+    size: 2048,
+    contentType: "application/pdf",
+  };
+
+  t.after(async () => {
+    ObjectStorageService.prototype.getObjectEntityFile = originalGetObjectEntityFile;
+    server.close();
+    await db.delete(projectActivitiesTable).where(eq(projectActivitiesTable.projectId, projectId));
+    await db.delete(projectDocumentsTable).where(eq(projectDocumentsTable.projectId, projectId));
+    await db.delete(importedProjectsTable).where(eq(importedProjectsTable.id, projectId));
+    await db.delete(projectImportBatchesTable).where(eq(projectImportBatchesTable.id, importBatchId));
+  });
+
+  const upload = (actor: string) => fetch(
+    `http://127.0.0.1:${port}/projects/${projectId}/entry-agreement`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-test-user": actor,
+      },
+      body: JSON.stringify(body),
+    },
+  );
+
+  assert.equal((await upload(otherUserId)).status, 404);
+  assert.equal(verificationCalls, 0);
+
+  const response = await upload(ownerId);
+  const responseText = await response.text();
+  assert.equal(response.status, 201, responseText);
+  const created = JSON.parse(responseText) as {
+    id: string;
+    isEntryAgreement: boolean;
+    classification: string;
+  };
+  assert.equal(created.isEntryAgreement, true);
+  assert.equal(created.classification, "contract");
+  assert.equal(verificationCalls, 1);
+
+  const documents = await db.select({
+    id: projectDocumentsTable.id,
+    name: projectDocumentsTable.name,
+    isEntryAgreement: projectDocumentsTable.isEntryAgreement,
+    classification: projectDocumentsTable.classification,
+  }).from(projectDocumentsTable).where(eq(projectDocumentsTable.projectId, projectId));
+  assert.equal(documents.length, 3);
+  const designationById = documents
+    .map(({ id, isEntryAgreement }) => ({ id, isEntryAgreement }))
+    .sort((left, right) => left.id.localeCompare(right.id));
+  assert.deepEqual(
+    designationById,
+    [
+      { id: priorAgreementId, isEntryAgreement: false },
+      { id: priorContractId, isEntryAgreement: false },
+      { id: created.id, isEntryAgreement: true },
+    ].sort((left, right) => left.id.localeCompare(right.id)),
+  );
+  assert.equal(
+    documents.find((document) => document.id === priorAgreementId)?.classification,
+    "contract",
+  );
+});
+
+test("rejects direct entry-agreement uploads when the private object is missing or its metadata mismatches", async (t) => {
+  const suffix = randomUUID();
+  const ownerId = `direct-entry-metadata-owner-${suffix}`;
+  const projectId = `direct-entry-metadata-project-${suffix}`;
+  const importBatchId = `direct-entry-metadata-batch-${suffix}`;
+  const project = {
+    id: projectId,
+    name: "Direct entry agreement metadata project",
+    address: "",
+    region: "Calgary",
+    status: "Planning",
+    progress: 0,
+    pmName: "",
+    clientName: "",
+    targetDate: "",
+    budgeted: 0,
+    invoiced: 0,
+    exteriorImage: "",
+    description: "",
+  };
+
+  await db.insert(projectImportBatchesTable).values({
+    id: importBatchId,
+    projectId,
+    ownerId,
+    status: "completed",
+    manifest: [],
+  });
+  await db.insert(importedProjectsTable).values({
+    id: projectId,
+    importBatchId,
+    ownerId,
+    data: project,
+  });
+
+  const originalGetObjectEntityFile = ObjectStorageService.prototype.getObjectEntityFile;
+  ObjectStorageService.prototype.getObjectEntityFile = async function (): Promise<File> {
+    throw new ObjectNotFoundError();
+  };
+
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => {
+    Object.assign(req, {
+      userId: req.header("x-test-user"),
+      log: { error: () => undefined, warn: () => undefined },
+    });
+    next();
+  });
+  app.use(luminovaRouter);
+  const server = app.listen(0);
+  await new Promise<void>((resolve) => server.once("listening", resolve));
+  const { port } = server.address() as AddressInfo;
+  const request = (body: {
+    objectPath: string;
+    name: string;
+    size: number;
+    contentType: string;
+  }) => fetch(
+    `http://127.0.0.1:${port}/projects/${projectId}/entry-agreement`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-test-user": ownerId,
+      },
+      body: JSON.stringify(body),
+    },
+  );
+
+  t.after(async () => {
+    ObjectStorageService.prototype.getObjectEntityFile = originalGetObjectEntityFile;
+    server.close();
+    await db.delete(projectActivitiesTable).where(eq(projectActivitiesTable.projectId, projectId));
+    await db.delete(projectDocumentsTable).where(eq(projectDocumentsTable.projectId, projectId));
+    await db.delete(importedProjectsTable).where(eq(importedProjectsTable.id, projectId));
+    await db.delete(projectImportBatchesTable).where(eq(projectImportBatchesTable.id, importBatchId));
+  });
+
+  const baseBody = {
+    objectPath: `/objects/uploads/metadata-entry-agreement-${suffix}`,
+    name: "metadata-entry-agreement.pdf",
+    size: 2048,
+    contentType: "application/pdf",
+  };
+  const missing = await request(baseBody);
+  assert.equal(missing.status, 422);
+
+  ObjectStorageService.prototype.getObjectEntityFile = async function (): Promise<File> {
+    return {
+      getMetadata: async () => [{ size: "2048", contentType: "application/pdf" }],
+    } as unknown as File;
+  };
+  const mismatched = await request({ ...baseBody, size: 4096 });
+  assert.equal(mismatched.status, 422);
+
+  const documents = await db.select().from(projectDocumentsTable)
+    .where(eq(projectDocumentsTable.projectId, projectId));
+  assert.deepEqual(documents, []);
 });
 
 test("backfills a legacy agreement and preserves its designation after it is renamed", async (t) => {
