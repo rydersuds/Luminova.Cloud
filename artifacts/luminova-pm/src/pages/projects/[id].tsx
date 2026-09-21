@@ -1126,8 +1126,22 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                         {project.trades.slice(0,3).map(trade => (
                           <div key={trade.id} className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/20">
                             <div className="flex items-center gap-3">
-                              <div className="h-10 w-10 rounded-full flex items-center justify-center font-heading font-bold text-sm" style={{ backgroundColor: `${trade.accent}20`, color: trade.accent }}>
-                                {trade.initials}
+                              <div
+                                className="h-10 w-10 shrink-0 overflow-hidden rounded-full flex items-center justify-center font-heading font-bold text-sm"
+                                style={{ backgroundColor: `${trade.accent}20`, color: trade.accent }}
+                              >
+                                {trade.profilePhotoUrl ? (
+                                  <img
+                                    src={trade.profilePhotoUrl}
+                                    alt={`${trade.companyName} profile logo`}
+                                    className="h-full w-full object-contain p-1"
+                                    style={{
+                                      objectPosition: `${trade.profilePhotoPositionX ?? 50}% ${trade.profilePhotoPositionY ?? 50}%`,
+                                      transform: `scale(${trade.profilePhotoZoom ?? 1})`,
+                                      transformOrigin: `${trade.profilePhotoPositionX ?? 50}% ${trade.profilePhotoPositionY ?? 50}%`,
+                                    }}
+                                  />
+                                ) : trade.initials}
                               </div>
                               <div>
                                 <p className="font-medium">{trade.companyName}</p>

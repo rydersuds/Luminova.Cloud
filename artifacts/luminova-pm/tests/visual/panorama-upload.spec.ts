@@ -199,6 +199,42 @@ test('uploads an entry agreement from the project overview', async ({ page }) =>
   await expect(page.getByRole('link', { name: 'Open entry agreement authorized-contractor-access.pdf' })).toBeVisible();
 });
 
+test('shows recent trade profile logos with initials as a fallback', async ({ page }) => {
+  const current = {
+    ...structuredClone(project),
+    trades: [{
+      id: 'trade-logo',
+      companyName: 'Northline Electric',
+      tradeType: 'Electrical',
+      contactName: 'Jordan Lee',
+      initials: 'NE',
+      accent: '#c8ae4b',
+      profilePhotoUrl: '/trade-logo.svg',
+      profilePhotoPositionX: 50,
+      profilePhotoPositionY: 50,
+      profilePhotoZoom: 1,
+    }, {
+      id: 'trade-initials',
+      companyName: 'Redwood Plumbing',
+      tradeType: 'Plumbing',
+      contactName: 'Taylor Green',
+      initials: 'RP',
+      accent: '#4f86c6',
+      profilePhotoUrl: null,
+    }],
+  };
+  await page.route('**/trade-logo.svg', route => route.fulfill({
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#c8ae4b"/><path d="M12 32h40" stroke="#111" stroke-width="8"/></svg>',
+  }));
+  await page.unroute('**/api/projects/riverstone');
+  await page.route('**/api/projects/riverstone', route => route.fulfill({ json: current }));
+
+  await openOverview(page);
+  await expect(page.getByRole('img', { name: 'Northline Electric profile logo' })).toBeVisible();
+  await expect(page.getByText('RP', { exact: true })).toBeVisible();
+});
+
 for (const viewport of [
   { name: 'narrow', width: 390, height: 844 },
   { name: 'desktop', width: 1440, height: 1000 },
