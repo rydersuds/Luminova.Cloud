@@ -452,7 +452,11 @@ test("portfolio financial summary only includes the authenticated owner's record
     headers: { "x-test-user": ownerId },
   });
   const tradeList = await tradeListResponse.json() as Array<{ id: string; companyName: string }>;
-  assert.deepEqual(tradeList.map((item) => item.id), [`trade-a-${suffix}`]);
+  assert.deepEqual(
+    tradeList.filter((item) => !item.id.startsWith("standalone-vendor-")).map((item) => item.id),
+    [`trade-a-${suffix}`],
+  );
+  assert.equal(tradeList.some((item) => item.companyName === "DryBuild Group LTD"), true);
   assert.equal(tradeList.some((item) => /luminova|weidner/i.test(item.companyName)), false);
   assert.equal((await fetch(`http://127.0.0.1:${port}/trades/trade-b-${suffix}`, {
     headers: { "x-test-user": ownerId },

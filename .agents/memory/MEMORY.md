@@ -16,3 +16,4 @@
 - [Codegen dependency remediation](codegen-dependency-remediation.md) — keep the resolved generator stable when safe transitive pins remove advisories without output changes.
 - [Workspace invitation lifecycle](workspace-invitation-lifecycle.md) — scope provider invitations before exposure or mutation, and serialize provider cleanup with local access changes.
 - [Entry agreement replacement](entry-agreement-replacement.md) — direct uploads become the sole designated agreement while previous agreements remain ordinary contract files.
+- [Workspace-scoped standalone vendor seeding](standalone-vendor-seeding.md) — seed IDs must be workspace-safe without changing imported-vendor deduplication.

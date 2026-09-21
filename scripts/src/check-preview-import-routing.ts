@@ -3,15 +3,29 @@ import assert from "node:assert/strict"
 const previewOrigin = process.env.PREVIEW_ORIGIN
   ?? (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "http://localhost:80")
 const requestPath = "/api/project-import-sessions"
-const response = await fetch(new URL(requestPath, previewOrigin), {
+const request = {
   method: "POST",
   headers: {
     "content-type": "application/json",
     "x-preview-routing-check": "project-import-session",
   },
   body: JSON.stringify({ documents: [] }),
-  redirect: "manual",
-})
+  redirect: "manual" as const,
+}
+
+let response: Awaited<ReturnType<typeof fetch>> | undefined
+let lastError: unknown
+for (let attempt = 0; attempt < 10; attempt += 1) {
+  try {
+    response = await fetch(new URL(requestPath, previewOrigin), request)
+    if (response.status !== 502) break
+  } catch (error) {
+    lastError = error
+  }
+  await new Promise((resolve) => setTimeout(resolve, 500))
+}
+
+assert.ok(response, `Preview routing request failed: ${String(lastError)}`)
 const contentType = response.headers.get("content-type")?.toLowerCase() ?? ""
 const text = await response.text()
 

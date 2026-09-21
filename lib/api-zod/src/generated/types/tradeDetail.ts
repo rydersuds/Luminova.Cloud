@@ -17,6 +17,7 @@ export type TradeDetail = Trade & {
   licence: string;
   insurance: string;
   insuranceExpiry: string;
+  sourceNotes?: string;
   profilePhotoPositionX: number;
   profilePhotoPositionY: number;
   profilePhotoZoom: number;

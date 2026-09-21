@@ -44,7 +44,6 @@ export const GetDashboardSummaryResponse = zod.object({
 export const getProjectsQuerySearchMax = 100;
 
 
-
 export const GetProjectsQueryParams = zod.object({
   "status": zod.coerce.string().optional(),
   "search": zod.coerce.string().max(getProjectsQuerySearchMax).optional(),
@@ -75,7 +74,6 @@ export const GetProjectsResponse = zod.array(GetProjectsResponseItem)
 /**
  * @summary Create a project
  */
-
 
 
 export const CreateProjectBody = zod.object({
@@ -187,6 +185,7 @@ export const GetProjectResponse = zod.object({
   "companyName": zod.string(),
   "contactName": zod.string(),
   "tradeType": zod.string(),
+  "specialties": zod.array(zod.string()).optional(),
   "region": zod.string(),
   "rating": zod.number(),
   "reviewCount": zod.number().int(),
@@ -203,7 +202,8 @@ export const GetProjectResponse = zod.object({
   "regions": zod.array(zod.string()).optional(),
   "licence": zod.string().optional(),
   "insurance": zod.string().optional(),
-  "insuranceExpiry": zod.string().optional()
+  "insuranceExpiry": zod.string().optional(),
+  "sourceNotes": zod.string().optional()
 })),
   "photos": zod.array(zod.object({
   "id": zod.string(),
@@ -264,8 +264,6 @@ export const UpdateProjectParams = zod.object({
 })
 
 
-
-
 export const UpdateProjectBody = zod.object({
   "name": zod.string().optional(),
   "status": zod.string().optional(),
@@ -303,7 +301,6 @@ export const CreateProjectPanoramaParams = zod.object({
 })
 
 
-
 export const createProjectPanoramaBodyObjectPathRegExp = new RegExp('^/objects/uploads/[A-Za-z0-9-]+$');
 export const createProjectPanoramaBodyLabelMax = 100;
 
@@ -331,7 +328,6 @@ export const CreateProjectPanoramaResponse = zod.object({
 /**
  * @summary Update panorama details
  */
-
 
 
 export const UpdateProjectPanoramaParams = zod.object({
@@ -369,12 +365,10 @@ export const CreateProjectScheduleImageParams = zod.object({
 })
 
 
-
 export const createProjectScheduleImageBodyObjectPathRegExp = new RegExp('^/objects/uploads/[A-Za-z0-9-]+$');
 export const createProjectScheduleImageBodyNameMax = 255;
 
 export const createProjectScheduleImageBodySizeMax = 8388608;
-
 
 
 export const CreateProjectScheduleImageBody = zod.object({
@@ -404,7 +398,6 @@ export const CreateProjectScheduleImageResponse = zod.object({
 /**
  * @summary Update schedule image revision details or designate it as current
  */
-
 
 
 export const UpdateProjectScheduleImageParams = zod.object({
@@ -440,7 +433,6 @@ export const UpdateProjectScheduleImageResponse = zod.object({
  */
 
 
-
 export const DeleteProjectScheduleImageParams = zod.object({
   "projectId": zod.coerce.string(),
   "scheduleImageId": zod.coerce.string().min(1)
@@ -452,7 +444,6 @@ export const DeleteProjectScheduleImageResponse = zod.void()
 /**
  * @summary Restore a project image document to the schedule gallery
  */
-
 
 
 export const RestoreProjectScheduleImageParams = zod.object({
@@ -485,13 +476,11 @@ export const UploadProjectEntryAgreementParams = zod.object({
 })
 
 
-
 export const uploadProjectEntryAgreementBodyObjectPathRegExp = new RegExp('^/objects/uploads/[A-Za-z0-9-]+$');
 export const uploadProjectEntryAgreementBodyNameMax = 255;
 
 
 export const uploadProjectEntryAgreementBodyContentTypeMax = 255;
-
 
 
 export const UploadProjectEntryAgreementBody = zod.object({
@@ -503,7 +492,6 @@ export const UploadProjectEntryAgreementBody = zod.object({
 
 export const uploadProjectEntryAgreementResponseAiConfidenceMin = 0;
 export const uploadProjectEntryAgreementResponseAiConfidenceMax = 100;
-
 
 
 export const UploadProjectEntryAgreementResponse = zod.object({
@@ -534,7 +522,6 @@ export const requestUploadUrlBodyContentTypeMax = 255;
 export const requestUploadUrlBodyRelativePathMax = 1024;
 
 
-
 export const RequestUploadUrlBody = zod.object({
   "importId": zod.string().min(1).optional(),
   "purpose": zod.enum(['schedule-image']).optional(),
@@ -546,14 +533,12 @@ export const RequestUploadUrlBody = zod.object({
 })
 
 
-
 export const requestUploadUrlResponseMetadataNameMax = 255;
 
 
 export const requestUploadUrlResponseMetadataContentTypeMax = 255;
 
 export const requestUploadUrlResponseMetadataRelativePathMax = 1024;
-
 
 
 export const RequestUploadUrlResponse = zod.object({
@@ -595,7 +580,6 @@ export const createProjectImportBodyDocumentsItemContentTypeMax = 255;
 export const createProjectImportBodyDocumentsItemTextSnippetMax = 24000;
 
 export const createProjectImportBodyDocumentsMax = 1000;
-
 
 
 export const CreateProjectImportBody = zod.object({
@@ -649,7 +633,6 @@ export const createProjectImportSessionBodyDocumentsItemContentTypeMax = 255;
 export const createProjectImportSessionBodyDocumentsMax = 1000;
 
 
-
 export const CreateProjectImportSessionBody = zod.object({
   "documents": zod.array(zod.object({
   "relativePath": zod.string().min(1).max(createProjectImportSessionBodyDocumentsItemRelativePathMax),
@@ -665,7 +648,6 @@ export const createProjectImportSessionResponseDocumentsItemNameMax = 255;
 
 
 export const createProjectImportSessionResponseDocumentsItemContentTypeMax = 255;
-
 
 
 export const CreateProjectImportSessionResponse = zod.object({
@@ -699,7 +681,6 @@ export const getActiveProjectImportSessionResponseOneDocumentsItemNameMax = 255;
 export const getActiveProjectImportSessionResponseOneDocumentsItemContentTypeMax = 255;
 
 
-
 export const GetActiveProjectImportSessionResponse = zod.union([zod.object({
   "importId": zod.string(),
   "status": zod.enum(['uploading', 'ready', 'building', 'completed', 'failed']),
@@ -725,7 +706,6 @@ export const GetActiveProjectImportSessionResponse = zod.union([zod.object({
  */
 
 
-
 export const GetProjectImportSessionParams = zod.object({
   "importId": zod.coerce.string().min(1)
 })
@@ -736,7 +716,6 @@ export const getProjectImportSessionResponseDocumentsItemNameMax = 255;
 
 
 export const getProjectImportSessionResponseDocumentsItemContentTypeMax = 255;
-
 
 
 export const GetProjectImportSessionResponse = zod.object({
@@ -764,15 +743,11 @@ export const GetProjectImportSessionResponse = zod.object({
  */
 
 
-
 export const DismissProjectImportSessionParams = zod.object({
   "importId": zod.coerce.string().min(1)
 })
 
 export const DismissProjectImportSessionResponse = zod.void()
-
-
-
 
 
 export const AttachProjectImportDocumentParams = zod.object({
@@ -790,7 +765,6 @@ export const attachProjectImportDocumentBodyContentTypeMax = 255;
 export const attachProjectImportDocumentBodyTextSnippetMax = 24000;
 
 
-
 export const AttachProjectImportDocumentBody = zod.object({
   "relativePath": zod.string().min(1).max(attachProjectImportDocumentBodyRelativePathMax),
   "objectPath": zod.string().regex(attachProjectImportDocumentBodyObjectPathRegExp),
@@ -806,7 +780,6 @@ export const attachProjectImportDocumentResponseDocumentsItemNameMax = 255;
 
 
 export const attachProjectImportDocumentResponseDocumentsItemContentTypeMax = 255;
-
 
 
 export const AttachProjectImportDocumentResponse = zod.object({
@@ -827,9 +800,6 @@ export const AttachProjectImportDocumentResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
-
-
-
 
 
 export const BuildProjectImportSessionParams = zod.object({
@@ -911,7 +881,6 @@ export const rescanProjectVendorQuotesResponseSkippedMin = 0;
 export const rescanProjectVendorQuotesResponseUnreadableMin = 0;
 
 
-
 export const RescanProjectVendorQuotesResponse = zod.object({
   "documentsScanned": zod.number().int().min(rescanProjectVendorQuotesResponseDocumentsScannedMin),
   "imported": zod.number().int().min(rescanProjectVendorQuotesResponseImportedMin),
@@ -933,7 +902,7 @@ export const RescanProjectVendorQuotesResponse = zod.object({
  */
 export const GetTradesQueryParams = zod.object({
   "search": zod.coerce.string().optional(),
-  "tradeType": zod.coerce.string().optional(),
+  "tradeType": zod.coerce.string().optional().describe('Filter by any supported trade specialty'),
   "region": zod.coerce.string().optional()
 })
 
@@ -946,12 +915,12 @@ export const getTradesResponseProfilePhotoPositionYMax = 100;
 export const getTradesResponseProfilePhotoZoomMax = 2;
 
 
-
 export const GetTradesResponseItem = zod.object({
   "id": zod.string(),
   "companyName": zod.string(),
   "contactName": zod.string(),
   "tradeType": zod.string(),
+  "specialties": zod.array(zod.string()).optional(),
   "region": zod.string(),
   "rating": zod.number(),
   "reviewCount": zod.number().int(),
@@ -968,7 +937,8 @@ export const GetTradesResponseItem = zod.object({
   "regions": zod.array(zod.string()).optional(),
   "licence": zod.string().optional(),
   "insurance": zod.string().optional(),
-  "insuranceExpiry": zod.string().optional()
+  "insuranceExpiry": zod.string().optional(),
+  "sourceNotes": zod.string().optional()
 })
 export const GetTradesResponse = zod.array(GetTradesResponseItem)
 
@@ -989,12 +959,12 @@ export const getTradeResponseOneProfilePhotoPositionYMax = 100;
 export const getTradeResponseOneProfilePhotoZoomMax = 2;
 
 
-
 export const GetTradeResponse = zod.object({
   "id": zod.string(),
   "companyName": zod.string(),
   "contactName": zod.string(),
   "tradeType": zod.string(),
+  "specialties": zod.array(zod.string()).optional(),
   "region": zod.string(),
   "rating": zod.number(),
   "reviewCount": zod.number().int(),
@@ -1011,7 +981,8 @@ export const GetTradeResponse = zod.object({
   "regions": zod.array(zod.string()),
   "licence": zod.string(),
   "insurance": zod.string(),
-  "insuranceExpiry": zod.string()
+  "insuranceExpiry": zod.string(),
+  "sourceNotes": zod.string().optional()
 }).and(zod.object({
   "phone": zod.string(),
   "email": zod.string(),
@@ -1019,6 +990,7 @@ export const GetTradeResponse = zod.object({
   "licence": zod.string(),
   "insurance": zod.string(),
   "insuranceExpiry": zod.string(),
+  "sourceNotes": zod.string().optional(),
   "profilePhotoPositionX": zod.number(),
   "profilePhotoPositionY": zod.number(),
   "profilePhotoZoom": zod.number(),
@@ -1087,7 +1059,6 @@ export const updateTradeBodyProfilePhotoPositionYMax = 100;
 export const updateTradeBodyProfilePhotoZoomMax = 2;
 
 
-
 export const UpdateTradeBody = zod.object({
   "phone": zod.string().max(updateTradeBodyPhoneMax),
   "email": zod.string().max(updateTradeBodyEmailMax),
@@ -1111,12 +1082,12 @@ export const updateTradeResponseProfilePhotoPositionYMax = 100;
 export const updateTradeResponseProfilePhotoZoomMax = 2;
 
 
-
 export const UpdateTradeResponse = zod.object({
   "id": zod.string(),
   "companyName": zod.string(),
   "contactName": zod.string(),
   "tradeType": zod.string(),
+  "specialties": zod.array(zod.string()).optional(),
   "region": zod.string(),
   "rating": zod.number(),
   "reviewCount": zod.number().int(),
@@ -1133,7 +1104,8 @@ export const UpdateTradeResponse = zod.object({
   "regions": zod.array(zod.string()).optional(),
   "licence": zod.string().optional(),
   "insurance": zod.string().optional(),
-  "insuranceExpiry": zod.string().optional()
+  "insuranceExpiry": zod.string().optional(),
+  "sourceNotes": zod.string().optional()
 })
 
 
@@ -1145,14 +1117,12 @@ export const RequestTradeProfilePhotoUploadParams = zod.object({
 })
 
 
-
 export const requestTradeProfilePhotoUploadBodyNameMax = 255;
 
 
 export const requestTradeProfilePhotoUploadBodyContentTypeMax = 255;
 
 export const requestTradeProfilePhotoUploadBodyRelativePathMax = 1024;
-
 
 
 export const RequestTradeProfilePhotoUploadBody = zod.object({
@@ -1166,14 +1136,12 @@ export const RequestTradeProfilePhotoUploadBody = zod.object({
 })
 
 
-
 export const requestTradeProfilePhotoUploadResponseMetadataNameMax = 255;
 
 
 export const requestTradeProfilePhotoUploadResponseMetadataContentTypeMax = 255;
 
 export const requestTradeProfilePhotoUploadResponseMetadataRelativePathMax = 1024;
-
 
 
 export const RequestTradeProfilePhotoUploadResponse = zod.object({
@@ -1205,7 +1173,6 @@ export const createTradeJobHistoryBodyAmountMin = 0;
 export const createTradeJobHistoryBodySourceMax = 300;
 
 
-
 export const CreateTradeJobHistoryBody = zod.object({
   "projectId": zod.string().min(1),
   "date": zod.string().regex(createTradeJobHistoryBodyDateRegExp),
@@ -1230,7 +1197,6 @@ export const CreateTradeJobHistoryResponse = zod.object({
  */
 
 
-
 export const UpdateTradeJobHistoryParams = zod.object({
   "tradeId": zod.coerce.string(),
   "historyId": zod.coerce.string().min(1)
@@ -1241,7 +1207,6 @@ export const updateTradeJobHistoryBodyDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\
 export const updateTradeJobHistoryBodyAmountMin = 0;
 
 export const updateTradeJobHistoryBodySourceMax = 300;
-
 
 
 export const UpdateTradeJobHistoryBody = zod.object({
@@ -1268,7 +1233,6 @@ export const UpdateTradeJobHistoryResponse = zod.object({
  */
 
 
-
 export const DeleteTradeJobHistoryParams = zod.object({
   "tradeId": zod.coerce.string(),
   "historyId": zod.coerce.string().min(1)
@@ -1291,7 +1255,6 @@ export const createTradeReviewBodyRatingMax = 5;
 export const createTradeReviewBodyCommentMax = 2000;
 
 export const createTradeReviewBodySourceMax = 300;
-
 
 
 export const CreateTradeReviewBody = zod.object({
@@ -1321,7 +1284,6 @@ export const CreateTradeReviewResponse = zod.object({
  */
 
 
-
 export const UpdateTradeReviewParams = zod.object({
   "tradeId": zod.coerce.string(),
   "reviewId": zod.coerce.string().min(1)
@@ -1331,7 +1293,6 @@ export const updateTradeReviewBodyDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}
 export const updateTradeReviewBodyRatingMax = 5;
 
 export const updateTradeReviewBodyCommentMax = 2000;
-
 
 
 export const UpdateTradeReviewBody = zod.object({
@@ -1359,7 +1320,6 @@ export const UpdateTradeReviewResponse = zod.object({
  */
 
 
-
 export const DeleteTradeReviewParams = zod.object({
   "tradeId": zod.coerce.string(),
   "reviewId": zod.coerce.string().min(1)
@@ -1372,7 +1332,6 @@ export const DeleteTradeReviewResponse = zod.void()
  * @summary List invoices
  */
 export const getInvoicesQuerySearchMax = 100;
-
 
 
 export const GetInvoicesQueryParams = zod.object({
@@ -1434,7 +1393,6 @@ export const CreateInvoiceResponse = zod.object({
 export const getFinancialSummaryResponseUpcomingClientPaymentsMin = 0;
 
 
-
 export const GetFinancialSummaryResponse = zod.object({
   "invoicedRevenue": zod.number().describe('Total Luminova-to-client invoice value.'),
   "invoicedExpenses": zod.number().describe('Total internal expense value from company-to-Luminova invoices or persisted internal budget actuals.'),
@@ -1451,7 +1409,6 @@ export const searchWorkspaceQueryQueryMax = 100;
 
 export const searchWorkspaceQueryLimitDefault = 12;
 export const searchWorkspaceQueryLimitMax = 30;
-
 
 
 export const SearchWorkspaceQueryParams = zod.object({
@@ -1518,7 +1475,6 @@ export const createProjectConversationBodyContextMax = 200;
 
 
 export const createProjectConversationBodyParticipantIdsMax = 50;
-
 
 
 export const CreateProjectConversationBody = zod.object({
@@ -1635,7 +1591,6 @@ export const CreateProjectMessageParams = zod.object({
 export const createProjectMessageBodyTextMax = 5000;
 
 
-
 export const CreateProjectMessageBody = zod.object({
   "text": zod.string().min(1).max(createProjectMessageBodyTextMax)
 })
@@ -1687,7 +1642,6 @@ export const getVendorQuotesResponseAttachmentsItemConfidenceMin = 0;
 export const getVendorQuotesResponseAttachmentsItemConfidenceMax = 100;
 
 
-
 export const GetVendorQuotesResponseItem = zod.object({
   "id": zod.string(),
   "quoteNumber": zod.string(),
@@ -1731,17 +1685,12 @@ export const GetVendorQuotesResponse = zod.array(GetVendorQuotesResponseItem)
  */
 
 
-
-
-
 export const createVendorQuoteBodyIssueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const createVendorQuoteBodyDueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 
 export const createVendorQuoteBodyLineItemsItemQuantityExclusiveMin = 0;
 
 export const createVendorQuoteBodyLineItemsItemUnitPriceMin = 0;
-
-
 
 
 export const CreateVendorQuoteBody = zod.object({
@@ -1779,7 +1728,6 @@ export const createVendorQuoteResponseTotalMin = 0;
 
 export const createVendorQuoteResponseAttachmentsItemConfidenceMin = 0;
 export const createVendorQuoteResponseAttachmentsItemConfidenceMax = 100;
-
 
 
 export const CreateVendorQuoteResponse = zod.object({
@@ -1844,7 +1792,6 @@ export const getVendorQuoteResponseAttachmentsItemConfidenceMin = 0;
 export const getVendorQuoteResponseAttachmentsItemConfidenceMax = 100;
 
 
-
 export const GetVendorQuoteResponse = zod.object({
   "id": zod.string(),
   "quoteNumber": zod.string(),
@@ -1890,18 +1837,12 @@ export const UpdateVendorQuoteParams = zod.object({
 })
 
 
-
-
-
-
 export const updateVendorQuoteBodyIssueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const updateVendorQuoteBodyDueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 
 export const updateVendorQuoteBodyLineItemsItemQuantityExclusiveMin = 0;
 
 export const updateVendorQuoteBodyLineItemsItemUnitPriceMin = 0;
-
-
 
 
 export const UpdateVendorQuoteBody = zod.object({
@@ -1939,7 +1880,6 @@ export const updateVendorQuoteResponseTotalMin = 0;
 
 export const updateVendorQuoteResponseAttachmentsItemConfidenceMin = 0;
 export const updateVendorQuoteResponseAttachmentsItemConfidenceMax = 100;
-
 
 
 export const UpdateVendorQuoteResponse = zod.object({
@@ -2034,7 +1974,6 @@ export const ReconcileAllClientAccessResponse = zod.object({
  */
 
 
-
 export const ReconcileClientAccessParams = zod.object({
   "userId": zod.coerce.string().min(1)
 })
@@ -2076,7 +2015,6 @@ export const GetClientsResponse = zod.array(GetClientsResponseItem)
 export const createClientBodyNameMax = 160;
 
 
-
 export const CreateClientBody = zod.object({
   "name": zod.string().min(1).max(createClientBodyNameMax)
 })
@@ -2110,7 +2048,6 @@ export const CreateClientResponse = zod.object({
  */
 
 
-
 export const RequestClientLogoUploadParams = zod.object({
   "clientId": zod.coerce.string().min(1)
 })
@@ -2120,13 +2057,11 @@ export const requestClientLogoUploadBodyNameMax = 255;
 export const requestClientLogoUploadBodySizeMax = 8388608;
 
 
-
 export const RequestClientLogoUploadBody = zod.object({
   "name": zod.string().min(1).max(requestClientLogoUploadBodyNameMax),
   "size": zod.number().int().min(1).max(requestClientLogoUploadBodySizeMax),
   "contentType": zod.enum(['image/jpeg', 'image/png', 'image/webp'])
 })
-
 
 
 export const requestClientLogoUploadResponseMetadataNameMax = 255;
@@ -2135,7 +2070,6 @@ export const requestClientLogoUploadResponseMetadataNameMax = 255;
 export const requestClientLogoUploadResponseMetadataContentTypeMax = 255;
 
 export const requestClientLogoUploadResponseMetadataRelativePathMax = 1024;
-
 
 
 export const RequestClientLogoUploadResponse = zod.object({
@@ -2156,7 +2090,6 @@ export const RequestClientLogoUploadResponse = zod.object({
 /**
  * @summary Attach an uploaded client logo
  */
-
 
 
 export const AttachClientLogoParams = zod.object({
@@ -2199,7 +2132,6 @@ export const AttachClientLogoResponse = zod.object({
  */
 
 
-
 export const ClearClientLogoParams = zod.object({
   "clientId": zod.coerce.string().min(1)
 })
@@ -2233,7 +2165,6 @@ export const ClearClientLogoResponse = zod.object({
  */
 
 
-
 export const DeleteClientParams = zod.object({
   "clientId": zod.coerce.string().min(1)
 })
@@ -2246,12 +2177,9 @@ export const DeleteClientResponse = zod.void()
  */
 
 
-
 export const GrantClientAccessParams = zod.object({
   "clientId": zod.coerce.string().min(1)
 })
-
-
 
 
 export const GrantClientAccessBody = zod.object({
@@ -2287,13 +2215,11 @@ export const GrantClientAccessResponse = zod.object({
  */
 
 
-
 export const InviteClientUserParams = zod.object({
   "clientId": zod.coerce.string().min(1)
 })
 
 export const inviteClientUserBodyEmailMax = 254;
-
 
 
 export const InviteClientUserBody = zod.object({
@@ -2312,8 +2238,6 @@ export const InviteClientUserResponse = zod.object({
 /**
  * @summary Revoke a workspace user's access to a client organization
  */
-
-
 
 
 export const RevokeClientAccessParams = zod.object({
@@ -2344,7 +2268,6 @@ export const inviteWorkspaceUserBodyEmailMin = 3;
 export const inviteWorkspaceUserBodyEmailMax = 254;
 
 
-
 export const InviteWorkspaceUserBody = zod.object({
   "email": zod.string().email().min(inviteWorkspaceUserBodyEmailMin).max(inviteWorkspaceUserBodyEmailMax),
   "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client'])
@@ -2362,7 +2285,6 @@ export const InviteWorkspaceUserResponse = zod.object({
 /**
  * @summary Resend a pending workspace invitation
  */
-
 
 
 export const ResendWorkspaceInvitationParams = zod.object({
@@ -2383,7 +2305,6 @@ export const ResendWorkspaceInvitationResponse = zod.object({
  */
 
 
-
 export const RevokeWorkspaceInvitationParams = zod.object({
   "invitationId": zod.coerce.string().min(1)
 })
@@ -2396,7 +2317,6 @@ export const RevokeWorkspaceInvitationResponse = zod.void()
  */
 
 
-
 export const UpdateWorkspaceUserParams = zod.object({
   "userId": zod.coerce.string().min(1)
 })
@@ -2407,7 +2327,6 @@ export const updateWorkspaceUserBodyLastNameMax = 100;
 
 export const updateWorkspaceUserBodyEmailMin = 3;
 export const updateWorkspaceUserBodyEmailMax = 254;
-
 
 
 export const UpdateWorkspaceUserBody = zod.object({
@@ -2434,7 +2353,6 @@ export const UpdateWorkspaceUserResponse = zod.object({
 /**
  * @summary Delete a workspace user
  */
-
 
 
 export const DeleteWorkspaceUserParams = zod.object({

@@ -406,7 +406,9 @@ export default function TradeDetail() {
               <div className="flex-1 space-y-2">
                 <div className="flex min-w-0 flex-wrap items-center gap-3">
                   <h1 className="break-words text-3xl font-heading font-bold">{trade.companyName}</h1>
-                  <Badge variant="outline" className="border-primary text-primary">{trade.tradeType}</Badge>
+                  {(trade.specialties?.length ? trade.specialties : [trade.tradeType]).map((specialty) => (
+                    <Badge key={specialty} variant="outline" className="border-primary text-primary">{specialty}</Badge>
+                  ))}
                 </div>
                 <p className="text-lg text-muted-foreground">Contact: {trade.contactName}</p>
                 <div className="flex flex-wrap items-center gap-4 text-sm font-medium pt-2">
@@ -476,6 +478,12 @@ export default function TradeDetail() {
                       </div> : <p className="text-muted-foreground">Not added</p>}
                     </div>
                   </div>
+                  {trade.sourceNotes && (
+                    <div className="border-t border-border pt-4 text-sm">
+                      <p className="font-medium mb-1">Source notes</p>
+                      <p className="break-words whitespace-pre-wrap text-muted-foreground">{trade.sourceNotes}</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

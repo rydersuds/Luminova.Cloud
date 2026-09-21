@@ -11,6 +11,7 @@ export interface Trade {
   companyName: string;
   contactName: string;
   tradeType: string;
+  specialties?: string[];
   region: string;
   rating: number;
   reviewCount: number;
@@ -40,4 +41,5 @@ export interface Trade {
   licence?: string;
   insurance?: string;
   insuranceExpiry?: string;
+  sourceNotes?: string;
 }

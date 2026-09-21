@@ -541,6 +541,7 @@ paths:
           in: query
           schema:
             type: string
+          description: Filter by any supported trade specialty
         - name: region
           in: query
           schema:
@@ -1953,6 +1954,9 @@ components:
         companyName: { type: string }
         contactName: { type: string }
         tradeType: { type: string }
+        specialties:
+          type: array
+          items: { type: string }
         region: { type: string }
         rating: { type: number }
         reviewCount: { type: integer }
@@ -1974,6 +1978,7 @@ components:
         licence: { type: string }
         insurance: { type: string }
         insuranceExpiry: { type: string }
+        sourceNotes: { type: string }
     TradeDetail:
       allOf:
         - $ref: "#/components/schemas/Trade"
@@ -1986,6 +1991,7 @@ components:
             licence: { type: string }
             insurance: { type: string }
             insuranceExpiry: { type: string }
+            sourceNotes: { type: string }
             profilePhotoPositionX: { type: number }
             profilePhotoPositionY: { type: number }
             profilePhotoZoom: { type: number }

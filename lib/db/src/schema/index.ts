@@ -25,5 +25,6 @@ export * from "./projectScheduleMetadata";
 export * from "./projectActivities";
 export * from "./scheduleUploadReservations";
 export * from "./vendorRecords";
+export * from "./standaloneVendorProfiles";
 export * from "./projectConversations";
 export * from "./clients";

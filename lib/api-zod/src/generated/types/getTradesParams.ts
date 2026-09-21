@@ -8,6 +8,9 @@
 
 export type GetTradesParams = {
 search?: string;
+/**
+ * Filter by any supported trade specialty
+ */
 tradeType?: string;
 region?: string;
 };

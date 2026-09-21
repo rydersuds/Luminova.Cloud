@@ -393,6 +393,7 @@ export interface Trade {
   companyName: string;
   contactName: string;
   tradeType: string;
+  specialties?: string[];
   region: string;
   rating: number;
   reviewCount: number;
@@ -422,6 +423,7 @@ export interface Trade {
   licence?: string;
   insurance?: string;
   insuranceExpiry?: string;
+  sourceNotes?: string;
 }
 
 export interface Photo {
@@ -536,6 +538,7 @@ export type TradeDetail = Trade & {
   licence: string;
   insurance: string;
   insuranceExpiry: string;
+  sourceNotes?: string;
   profilePhotoPositionX: number;
   profilePhotoPositionY: number;
   profilePhotoZoom: number;
@@ -1067,6 +1070,9 @@ client?: string;
 
 export type GetTradesParams = {
 search?: string;
+/**
+ * Filter by any supported trade specialty
+ */
 tradeType?: string;
 region?: string;
 };

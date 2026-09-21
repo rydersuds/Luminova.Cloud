@@ -174,6 +174,8 @@ import
   projectActivitiesTable,
   vendorJobHistoryTable,
   vendorReviewTable,
+  standaloneVendorProfilesTable,
+  type StandaloneVendorProfileData,
   clientsTable,
   clientMembersTable,
 } from "@workspace/db";
@@ -184,6 +186,10 @@ import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import { ObjectStorageService } from "../lib/objectStorage";
+import {
+  ensureSeededVendorProfiles,
+  getStandaloneVendorProfile,
+} from "../lib/standaloneVendorProfiles";
 import {
   enrichFinancialDocumentSnippets,
   extractInternalBudgetFromDocuments,
@@ -1948,6 +1954,12 @@ type Invoice = (typeof invoices)[number] &
 type Trade = (typeof trades)[number] & 
 {
 
+  specialties?: string[]
+;
+
+  sourceNotes?: string
+;
+
 
   phone?: string
 ;
@@ -2000,6 +2012,39 @@ type Trade = (typeof trades)[number] &
 }
 
 ;
+
+const standaloneProfileData = (trade: Trade): StandaloneVendorProfileData => ({
+  companyName: trade.companyName,
+  contactName: trade.contactName,
+  tradeType: trade.tradeType,
+  specialties: trade.specialties ?? [trade.tradeType],
+  region: trade.region,
+  regions: trade.regions ?? (trade.region ? [trade.region] : []),
+  rating: trade.rating,
+  reviewCount: trade.reviewCount,
+  completedJobs: trade.completedJobs,
+  initials: trade.initials,
+  accent: trade.accent,
+  phone: trade.phone ?? "",
+  email: trade.email ?? "",
+  website: trade.website ?? "",
+  licence: trade.licence ?? "",
+  insurance: trade.insurance ?? "",
+  insuranceExpiry: trade.insuranceExpiry ?? "",
+  sourceNotes: trade.sourceNotes ?? "",
+  profilePhotoObjectPath: trade.profilePhotoObjectPath ?? null,
+  pendingProfilePhotoObjectPath: trade.pendingProfilePhotoObjectPath ?? null,
+  profilePhotoPositionX: trade.profilePhotoPositionX,
+  profilePhotoPositionY: trade.profilePhotoPositionY,
+  profilePhotoZoom: trade.profilePhotoZoom,
+});
+
+const tradeFromStandaloneProfile = (
+  record: { id: string; data: StandaloneVendorProfileData },
+): Trade => ({
+  ...record.data,
+  id: record.id,
+});
 
 
 type VendorQuote = (typeof vendorQuotes)[number] & 
@@ -3002,7 +3047,8 @@ const tradesForOwner = async (ownerId: string, workspaceId = "default") =>
 {
 
 
-  const [tradeRows, projectRows, 
+  await ensureSeededVendorProfiles(workspaceId);
+  const [tradeRows, standaloneRows, projectRows,
 {
 
  invoices: ownedInvoices 
@@ -3018,6 +3064,8 @@ const tradesForOwner = async (ownerId: string, workspaceId = "default") =>
 )
       .from(importedVendorsTable)
       .where(eq(importedVendorsTable.ownerId, ownerId)),
+    db.select().from(standaloneVendorProfilesTable)
+      .where(eq(standaloneVendorProfilesTable.workspaceId, workspaceId)),
     db.select(
 {
 
@@ -3124,7 +3172,7 @@ const tradesForOwner = async (ownerId: string, workspaceId = "default") =>
 }
 
 
-  return tradeRows
+  const importedDirectoryTrades = tradeRows
     .filter((row) => ownedImportBatchIds.has(row.importBatchId))
     .map((row) => row.data as Trade)
     .filter(isDirectoryTrade)
@@ -3160,7 +3208,30 @@ const tradesForOwner = async (ownerId: string, workspaceId = "default") =>
     
 }
 
-))
+));
+
+  const standaloneDirectoryTrades = standaloneRows
+    .map((row) => tradeFromStandaloneProfile(row))
+    .filter(isDirectoryTrade)
+    .map((trade) => (
+{
+      ...trade,
+      profilePhotoUrl: tradeProfilePhotoUrl(trade),
+      profilePhotoPositionX: trade.profilePhotoPositionX ?? 50,
+      profilePhotoPositionY: trade.profilePhotoPositionY ?? 50,
+      profilePhotoZoom: trade.profilePhotoZoom ?? 1,
+      completedJobs: completedProjectsByVendor.get(trade.id)?.size ?? 0,
+      reviewCount: reviewsByVendor.get(trade.id)?.length ?? 0,
+      rating: (() => {
+        const ratings = reviewsByVendor.get(trade.id) ?? [];
+        return ratings.length
+          ? Math.round((ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length) * 10) / 10
+          : 0;
+      })(),
+    }
+));
+
+  return [...importedDirectoryTrades, ...standaloneDirectoryTrades]
 ;
 
 
@@ -3189,6 +3260,13 @@ const findWorkspaceProject = async (projectId: string, workspaceId: string): Pro
 };
 
 const findWorkspaceTrade = async (tradeId: string, workspaceId: string): Promise<Trade | undefined> => {
+  await ensureSeededVendorProfiles(workspaceId);
+  const standalone = await getStandaloneVendorProfile(tradeId, workspaceId);
+  if (standalone) {
+    const trade = tradeFromStandaloneProfile(standalone);
+    return isDirectoryTrade(trade) ? trade : undefined;
+  }
+
   const [record] = await db.select({ data: importedVendorsTable.data })
     .from(importedVendorsTable)
     .innerJoin(
@@ -10020,9 +10098,19 @@ router.get("/trades", async (req: AuthenticatedRequest, res) =>
 
 
   const result = (await tradesForOwner(req.userId, requestWorkspaceId(req))).filter((trade) =>
-    (!tradeType || trade.tradeType === tradeType) &&
-    (!region || trade.region === region) &&
-    (!search || `${trade.companyName} ${trade.contactName} ${trade.tradeType}`.toLowerCase().includes(search.toLowerCase())),
+    (!tradeType || (trade.specialties ?? [trade.tradeType]).includes(tradeType)) &&
+    (!region || trade.region === region || (trade.regions ?? []).includes(region)) &&
+    (!search || [
+      trade.companyName,
+      trade.contactName,
+      trade.tradeType,
+      ...(trade.specialties ?? []),
+      trade.region,
+      ...(trade.regions ?? []),
+      trade.phone ?? "",
+      trade.email ?? "",
+      trade.sourceNotes ?? "",
+    ].join(" ").toLowerCase().includes(search.toLowerCase())),
   )
 ;
 
@@ -11173,6 +11261,8 @@ router.get("/trades/:tradeId", async (req: AuthenticatedRequest, res) =>
 
 
     ...trade,
+    specialties: trade.specialties ?? [trade.tradeType],
+    sourceNotes: trade.sourceNotes ?? "",
     profilePhotoUrl: tradeProfilePhotoUrl(trade),
     profilePhotoPositionX: trade.profilePhotoPositionX ?? 50,
     profilePhotoPositionY: trade.profilePhotoPositionY ?? 50,
@@ -11261,7 +11351,10 @@ router.post("/trades/:tradeId/profile-photo-upload", async (req: AuthenticatedRe
 }
 
 
-  const [tradeRow] = await db.select(
+  const workspaceId = requestWorkspaceId(req);
+  await ensureSeededVendorProfiles(workspaceId);
+  const standalone = await getStandaloneVendorProfile(params.data.tradeId, workspaceId);
+  const [tradeRow] = standalone ? [] : await db.select(
 {
 
  data: importedVendorsTable.data 
@@ -11277,7 +11370,9 @@ router.post("/trades/:tradeId/profile-photo-upload", async (req: AuthenticatedRe
 ;
 
 
-  const trade = tradeRow?.data as Trade | undefined
+  const trade = standalone
+    ? tradeFromStandaloneProfile(standalone)
+    : tradeRow?.data as Trade | undefined
 ;
 
 
@@ -11314,8 +11409,19 @@ router.post("/trades/:tradeId/profile-photo-upload", async (req: AuthenticatedRe
 ;
 
 
-    await db.update(importedVendorsTable)
-      .set(
+    if (standalone) {
+      await db.update(standaloneVendorProfilesTable)
+        .set({
+          data: { ...standaloneProfileData(trade), pendingProfilePhotoObjectPath: objectPath },
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(standaloneVendorProfilesTable.id, params.data.tradeId),
+          eq(standaloneVendorProfilesTable.workspaceId, workspaceId),
+        ));
+    } else {
+      await db.update(importedVendorsTable)
+        .set(
 {
 
  data: 
@@ -11331,8 +11437,8 @@ router.post("/trades/:tradeId/profile-photo-upload", async (req: AuthenticatedRe
       .where(and(
         eq(importedVendorsTable.id, params.data.tradeId),
         eq(importedVendorsTable.ownerId, req.userId),
-      ))
-;
+        ));
+    }
 
 
     res.json(RequestTradeProfilePhotoUploadResponse.parse(
@@ -11438,7 +11544,10 @@ router.patch("/trades/:tradeId", async (req: AuthenticatedRequest, res): Promise
 }
 
 
-  const [tradeRow] = await db.select(
+  const workspaceId = requestWorkspaceId(req);
+  await ensureSeededVendorProfiles(workspaceId);
+  const standalone = await getStandaloneVendorProfile(params.data.tradeId, workspaceId);
+  const [tradeRow] = standalone ? [] : await db.select(
 {
 
  data: importedVendorsTable.data 
@@ -11454,7 +11563,9 @@ router.patch("/trades/:tradeId", async (req: AuthenticatedRequest, res): Promise
 ;
 
 
-  const trade = tradeRow?.data as Trade | undefined
+  const trade = standalone
+    ? tradeFromStandaloneProfile(standalone)
+    : tradeRow?.data as Trade | undefined
 ;
 
 
@@ -11688,8 +11799,16 @@ router.patch("/trades/:tradeId", async (req: AuthenticatedRequest, res): Promise
 ;
 
 
-    await db.update(importedVendorsTable)
-      .set(
+    if (standalone) {
+      await db.update(standaloneVendorProfilesTable)
+        .set({ data: standaloneProfileData(updated), updatedAt: new Date() })
+        .where(and(
+          eq(standaloneVendorProfilesTable.id, params.data.tradeId),
+          eq(standaloneVendorProfilesTable.workspaceId, workspaceId),
+        ));
+    } else {
+      await db.update(importedVendorsTable)
+        .set(
 {
 
  data: updated 
@@ -11699,8 +11818,8 @@ router.patch("/trades/:tradeId", async (req: AuthenticatedRequest, res): Promise
       .where(and(
         eq(importedVendorsTable.id, params.data.tradeId),
         eq(importedVendorsTable.ownerId, req.userId),
-      ))
-;
+        ));
+    }
 
 
     if (trade.profilePhotoObjectPath && trade.profilePhotoObjectPath !== updated.profilePhotoObjectPath) 

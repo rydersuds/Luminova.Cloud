@@ -15,6 +15,11 @@ export default function TradesDirectory() {
   const [search, setSearch] = React.useState("")
   const [tradeType, setTradeType] = React.useState("")
 
+  const { data: availableTrades } = useGetTrades({}, {
+    query: {
+      queryKey: getGetTradesQueryKey({})
+    }
+  })
   const { data: trades, isLoading } = useGetTrades({ 
     search: search || undefined,
     tradeType: tradeType || undefined
@@ -26,6 +31,9 @@ export default function TradesDirectory() {
       })
     }
   })
+  const specialtyOptions = React.useMemo(() => Array.from(new Set(
+    (availableTrades ?? trades ?? []).flatMap((trade) => trade.specialties?.length ? trade.specialties : [trade.tradeType])
+  )).sort(), [availableTrades, trades])
 
   return (
     <>
@@ -46,7 +54,7 @@ export default function TradesDirectory() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground dark:text-sidebar-foreground/50" />
                 <Input 
-                  placeholder="Search by company or contact name..." 
+                  placeholder="Search company, contact, specialty, phone, email, or notes..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="h-12 border-input bg-card pl-10 text-foreground placeholder:text-muted-foreground dark:border-sidebar-border dark:bg-sidebar-accent dark:text-sidebar-foreground dark:placeholder:text-sidebar-foreground/50"
@@ -60,11 +68,7 @@ export default function TradesDirectory() {
                   className="h-12 w-full appearance-none rounded-md border border-input bg-card pl-10 pr-4 text-foreground focus:outline-none focus:ring-1 focus:ring-ring dark:border-sidebar-border dark:bg-sidebar-accent dark:text-sidebar-foreground dark:focus:ring-sidebar-primary"
                 >
                   <option value="">All Trades</option>
-                  <option value="Electrical">Electrical</option>
-                  <option value="Plumbing">Plumbing</option>
-                  <option value="HVAC">HVAC</option>
-                  <option value="Carpentry">Carpentry</option>
-                  <option value="Concrete">Concrete</option>
+                  {specialtyOptions.map((specialty) => <option key={specialty} value={specialty}>{specialty}</option>)}
                 </select>
               </div>
             </div>
@@ -111,9 +115,12 @@ export default function TradesDirectory() {
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="break-words text-lg font-heading font-semibold">{trade.companyName}</h3>
-                          <Badge variant="secondary" className="font-normal text-xs">{trade.tradeType}</Badge>
+                          {(trade.specialties?.length ? trade.specialties : [trade.tradeType]).map((specialty) => (
+                            <Badge key={specialty} variant="secondary" className="font-normal text-xs">{specialty}</Badge>
+                          ))}
                         </div>
                         <p className="text-sm text-muted-foreground">{trade.contactName}</p>
+                        {trade.sourceNotes && <p className="break-words text-xs text-muted-foreground">{trade.sourceNotes}</p>}
                         
                         <div className="flex flex-wrap items-center gap-4 mt-2 text-sm">
                           <div className="flex items-center gap-1 text-muted-foreground">
