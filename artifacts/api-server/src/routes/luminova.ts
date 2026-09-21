@@ -4237,7 +4237,14 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
       invoices: projectInvoices,
        trades: vendorRows
          .map((row) => row.data as Trade)
-         .filter(isDirectoryTrade),
+         .filter(isDirectoryTrade)
+         .map((trade) => ({
+           ...trade,
+           profilePhotoUrl: tradeProfilePhotoUrl(trade),
+           profilePhotoPositionX: trade.profilePhotoPositionX ?? 50,
+           profilePhotoPositionY: trade.profilePhotoPositionY ?? 50,
+           profilePhotoZoom: trade.profilePhotoZoom ?? 1,
+         })),
       photos,
       files: documents.map((document) => (
 {

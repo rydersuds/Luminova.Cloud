@@ -7,6 +7,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import {
   db,
   importedProjectsTable,
+  importedVendorsTable,
   projectDocumentsTable,
   projectActivitiesTable,
   projectImportBatchesTable,
@@ -59,6 +60,24 @@ test("schedule images require project authorization and imported schedule images
     manifest: [],
   });
   await db.insert(importedProjectsTable).values({ id: projectId, importBatchId, ownerId, data: project });
+  await db.insert(importedVendorsTable).values({
+    id: `vendor-${suffix}`,
+    importBatchId,
+    ownerId,
+    data: {
+      id: `vendor-${suffix}`,
+      companyName: "Northline Electric",
+      contactName: "Jordan Lee",
+      tradeType: "Electrical",
+      region: "Calgary",
+      rating: 0,
+      reviewCount: 0,
+      completedJobs: 0,
+      initials: "NE",
+      accent: "#c8ae4b",
+      profilePhotoObjectPath: `/objects/uploads/vendor-logo-${suffix}`,
+    },
+  });
   await db.insert(projectDocumentsTable).values({
     id: currentDocumentId,
     importBatchId,
@@ -156,6 +175,7 @@ test("schedule images require project authorization and imported schedule images
     if (directImportBatchId) {
       await db.delete(projectImportBatchesTable).where(eq(projectImportBatchesTable.id, directImportBatchId));
     }
+    await db.delete(importedVendorsTable).where(eq(importedVendorsTable.importBatchId, importBatchId));
     await db.delete(projectDocumentsTable).where(eq(projectDocumentsTable.projectId, projectId));
     await db.delete(importedProjectsTable).where(eq(importedProjectsTable.id, projectId));
     await db.delete(projectImportBatchesTable).where(and(
@@ -190,6 +210,12 @@ test("schedule images require project authorization and imported schedule images
     revision: string | null;
     effectiveDate: string | null;
     isCurrent: boolean;
+  }>; trades: Array<{
+    companyName: string;
+    profilePhotoUrl: string | null;
+    profilePhotoPositionX: number;
+    profilePhotoPositionY: number;
+    profilePhotoZoom: number;
   }> };
 
   const updateSchedule = (actor: string, imageId: string, update: {
@@ -221,6 +247,19 @@ test("schedule images require project authorization and imported schedule images
     },
   ]);
   assert.equal(detail.scheduleImages.some((image) => image.id === mismatchedDocumentId), false);
+  assert.deepEqual(detail.trades.map((trade) => ({
+    companyName: trade.companyName,
+    profilePhotoUrl: trade.profilePhotoUrl,
+    profilePhotoPositionX: trade.profilePhotoPositionX,
+    profilePhotoPositionY: trade.profilePhotoPositionY,
+    profilePhotoZoom: trade.profilePhotoZoom,
+  })), [{
+    companyName: "Northline Electric",
+    profilePhotoUrl: `/api/storage/objects/uploads/vendor-logo-${suffix}`,
+    profilePhotoPositionX: 50,
+    profilePhotoPositionY: 50,
+    profilePhotoZoom: 1,
+  }]);
 
   const rescan = await fetch(`${base}/projects/${projectId}/vendor-quotes/rescan`, {
     method: "POST",
