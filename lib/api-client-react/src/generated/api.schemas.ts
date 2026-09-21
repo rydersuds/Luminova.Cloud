@@ -7,6 +7,7 @@
  */
 export type WorkspaceRole = typeof WorkspaceRole[keyof typeof WorkspaceRole];
 
+
 export const WorkspaceRole = {
   Admin: 'Admin',
   Project_Manager: 'Project Manager',
@@ -787,6 +788,26 @@ export interface VendorQuoteUpdate {
   notes?: string;
   /** @minItems 1 */
   lineItems?: VendorQuoteLineItemInput[];
+}
+
+export interface ProjectEntryAgreementInput {
+  /**
+     * @minLength 1
+     * @pattern ^/objects/uploads/[A-Za-z0-9-]+$
+     */
+  objectPath: string;
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  name: string;
+  /** @minimum 1 */
+  size: number;
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  contentType: string;
 }
 
 export interface OrganizeProjectFilesResult {

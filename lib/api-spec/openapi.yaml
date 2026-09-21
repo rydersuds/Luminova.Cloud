@@ -295,6 +295,34 @@ paths:
           description: Project or image document not found
         "500":
           description: Schedule image could not be restored
+  /projects/{projectId}/entry-agreement:
+    post:
+      operationId: uploadProjectEntryAgreement
+      tags: [projects]
+      summary: Upload and designate a project's entry agreement
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectEntryAgreementInput"
+      responses:
+        "201":
+          description: Entry agreement uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectFile"
+        "400":
+          description: Invalid entry agreement metadata
+        "401":
+          description: Authentication required
+        "404":
+          description: Project not found
+        "422":
+          description: Uploaded object could not be verified
   /storage/uploads/request-url:
     post:
       operationId: requestUploadUrl
@@ -2258,6 +2286,18 @@ components:
         linkedEntityType: { type: [string, "null"] }
         linkedEntityId: { type: [string, "null"] }
         aiConfidence: { type: [integer, "null"], minimum: 0, maximum: 100 }
+    ProjectEntryAgreementInput:
+      type: object
+      additionalProperties: false
+      required: [objectPath, name, size, contentType]
+      properties:
+        objectPath:
+          type: string
+          minLength: 1
+          pattern: '^/objects/uploads/[A-Za-z0-9-]+$'
+        name: { type: string, minLength: 1, maxLength: 255 }
+        size: { type: integer, minimum: 1 }
+        contentType: { type: string, minLength: 1, maxLength: 255 }
     OrganizeProjectFilesResult:
       type: object
       required: [filesOrganized, collectionsCreated, attachmentsMatched]

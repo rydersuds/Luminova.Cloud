@@ -15,6 +15,7 @@ import {
   useGetProjectManagers,
   getGetProjectManagersQueryKey,
   useOrganizeProjectFiles,
+  useUploadProjectEntryAgreement,
   getGetProjectActivityQueryKey
 } from "@workspace/api-client-react"
 import { Badge } from "@/components/ui/badge"
@@ -127,6 +128,9 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const [scheduleEffectiveDate, setScheduleEffectiveDate] = React.useState("")
   const [scheduleIsCurrent, setScheduleIsCurrent] = React.useState(false)
   const [scheduleMetadataError, setScheduleMetadataError] = React.useState("")
+  const [entryAgreementFile, setEntryAgreementFile] = React.useState<File | null>(null)
+  const [entryAgreementError, setEntryAgreementError] = React.useState("")
+  const [isEntryAgreementUploading, setIsEntryAgreementUploading] = React.useState(false)
   const [photoIndex, setPhotoIndex] = React.useState<number | null>(null)
   const [activePanorama, setActivePanorama] = React.useState<ProjectPanorama | null>(null)
   const [editingPanorama, setEditingPanorama] = React.useState<ProjectPanorama | null>(null)
@@ -138,6 +142,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const [exteriorPhotoStatus, setExteriorPhotoStatus] = React.useState("")
   const [savingExteriorPhotoId, setSavingExteriorPhotoId] = React.useState<string | null>(null)
   const organizeFiles = useOrganizeProjectFiles()
+  const uploadEntryAgreement = useUploadProjectEntryAgreement()
   const panoramaName = (label: string | null) => label || "Untitled panorama"
   const { data: currentUser } = useGetCurrentWorkspaceUser()
   const isAdmin = currentUser?.role === "Admin"
@@ -216,6 +221,52 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
       toast({ title: "Files organized", description: `${result.filesOrganized} files sorted into ${result.collectionsCreated} collections.` })
     } catch {
       toast({ title: "Organization failed", description: "The AI organizer could not complete this project.", variant: "destructive" })
+    }
+  }
+
+  const handleEntryAgreementUpload = async () => {
+    if (!entryAgreementFile) {
+      setEntryAgreementError("Choose an agreement file first.")
+      return
+    }
+    setEntryAgreementError("")
+    setIsEntryAgreementUploading(true)
+    try {
+      const request = await fetch("/api/storage/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: entryAgreementFile.name,
+          size: entryAgreementFile.size,
+          contentType: entryAgreementFile.type || "application/octet-stream",
+        }),
+      })
+      const upload = await request.json() as { uploadURL?: string; objectPath?: string; error?: string }
+      if (!request.ok || !upload.uploadURL || !upload.objectPath) {
+        throw new Error(upload.error || "The entry agreement upload could not be started.")
+      }
+      await uploadToSignedUrl(entryAgreementFile, upload.uploadURL, {
+        errorMessage: "The agreement could not be stored. Try again.",
+      })
+      await uploadEntryAgreement.mutateAsync({
+        projectId,
+        data: {
+          objectPath: upload.objectPath,
+          name: entryAgreementFile.name,
+          size: entryAgreementFile.size,
+          contentType: entryAgreementFile.type || "application/octet-stream",
+        },
+      })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) }),
+        queryClient.invalidateQueries({ queryKey: getGetProjectActivityQueryKey(projectId) }),
+      ])
+      setEntryAgreementFile(null)
+      toast({ title: "Entry agreement uploaded", description: `${entryAgreementFile.name} is now the project's entry agreement.` })
+    } catch (error) {
+      setEntryAgreementError(error instanceof Error ? error.message : "The entry agreement could not be uploaded.")
+    } finally {
+      setIsEntryAgreementUploading(false)
     }
   }
   const togglePhotoCollection = (collection: string) => {
@@ -1122,11 +1173,35 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                     <CardHeader>
                       <div className="flex items-center justify-between gap-3">
                         <CardTitle>Entry agreement</CardTitle>
-                        {entryAgreement && (
-                          <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                            1 file
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {entryAgreement && (
+                            <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                              1 file
+                            </span>
+                          )}
+                          <input
+                            id="entry-agreement-upload"
+                            type="file"
+                            className="hidden"
+                            accept=".pdf,.doc,.docx,.txt,.rtf"
+                            onChange={(event) => {
+                              setEntryAgreementError("")
+                              setEntryAgreementFile(event.target.files?.[0] ?? null)
+                              event.target.value = ""
+                            }}
+                            disabled={isEntryAgreementUploading}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="font-mono text-[10px] uppercase tracking-wider"
+                            onClick={() => document.getElementById("entry-agreement-upload")?.click()}
+                            disabled={isEntryAgreementUploading}
+                          >
+                            {entryAgreement ? "Replace" : "Upload"}
+                          </Button>
+                        </div>
                       </div>
                       <CardDescription>
                         {entryAgreement
@@ -1158,8 +1233,23 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                           </a>
                         </div>
                       ) : (
-                        <p className="text-sm text-muted-foreground">Import the authorized contractor and insurance access notice to make it available here.</p>
+                        <p className="text-sm text-muted-foreground">Upload the authorized contractor and insurance access notice to make it available here.</p>
                       )}
+                      {entryAgreementFile && (
+                        <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                          <p className="min-w-0 truncate text-sm" title={entryAgreementFile.name}>{entryAgreementFile.name}</p>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="shrink-0 font-mono text-[10px] uppercase tracking-wider"
+                            onClick={() => void handleEntryAgreementUpload()}
+                            disabled={isEntryAgreementUploading}
+                          >
+                            {isEntryAgreementUploading ? "Uploading…" : "Save agreement"}
+                          </Button>
+                        </div>
+                      )}
+                      {entryAgreementError && <p role="alert" className="mt-3 text-sm text-destructive">{entryAgreementError}</p>}
                     </CardContent>
                   </Card>
                   

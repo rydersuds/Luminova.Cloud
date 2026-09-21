@@ -157,6 +157,48 @@ test('shows only the designated entry agreement in the Overview and opens it', a
   await newPage.close();
 });
 
+test('uploads an entry agreement from the project overview', async ({ page }) => {
+  let current = structuredClone(project);
+  let uploadedAgreement: { name: string; size: number; contentType: string } | null = null;
+  await page.unroute('**/api/projects/riverstone');
+  await page.route('**/api/projects/riverstone', route => route.fulfill({ json: current }));
+  await page.route('**/api/projects/riverstone/entry-agreement', async route => {
+    const body = route.request().postDataJSON() as {
+      objectPath: string;
+      name: string;
+      size: number;
+      contentType: string;
+    };
+    uploadedAgreement = body;
+    current = {
+      ...current,
+      files: [{
+        id: 'uploaded-entry-agreement',
+        name: body.name,
+        relativePath: body.name,
+        url: '/api/storage/objects/uploads/entry-agreement',
+        contentType: body.contentType,
+        classification: 'contract',
+        isEntryAgreement: true,
+        collection: '',
+      }],
+    };
+    await route.fulfill({ status: 201, json: current.files[0] });
+  });
+
+  await openOverview(page);
+  await page.locator('#entry-agreement-upload').setInputFiles({
+    name: 'authorized-contractor-access.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('entry agreement'),
+  });
+  await expect(page.getByText('authorized-contractor-access.pdf', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Save agreement' }).click();
+
+  await expect.poll(() => uploadedAgreement?.name).toBe('authorized-contractor-access.pdf');
+  await expect(page.getByRole('link', { name: 'Open entry agreement authorized-contractor-access.pdf' })).toBeVisible();
+});
+
 for (const viewport of [
   { name: 'narrow', width: 390, height: 844 },
   { name: 'desktop', width: 1440, height: 1000 },
@@ -219,7 +261,7 @@ test('shows a clear Overview empty state when the designated entry agreement is 
 
   await openOverview(page);
   await expect(page.getByText('No entry agreement is available.', { exact: true })).toBeVisible();
-  await expect(page.getByText('Import the authorized contractor and insurance access notice to make it available here.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Upload the authorized contractor and insurance access notice to make it available here.', { exact: true })).toBeVisible();
   await expect(page.getByText(unrelatedContract.name, { exact: true })).toHaveCount(0);
   await expect(page.getByText('1 file', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: /Open entry agreement/ })).toHaveCount(0);

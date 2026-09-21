@@ -18,6 +18,7 @@ import type {
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
+
 import type {
   Activity,
   BulkClientAccessReconciliationResponse,
@@ -46,6 +47,8 @@ import type {
   ProjectConversation,
   ProjectConversationInput,
   ProjectDetail,
+  ProjectEntryAgreementInput,
+  ProjectFile,
   ProjectImport,
   ProjectImportDocument,
   ProjectImportInput,
@@ -1003,6 +1006,78 @@ export const useRestoreProjectScheduleImage = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getRestoreProjectScheduleImageMutationOptions(options));
+    }
+
+export const getUploadProjectEntryAgreementUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/entry-agreement`
+}
+
+/**
+ * @summary Upload and designate a project's entry agreement
+ */
+export const uploadProjectEntryAgreement = async (projectId: string,
+    projectEntryAgreementInput: ProjectEntryAgreementInput, options?: Parameters<typeof customFetch>[1]): Promise<ProjectFile> => {
+
+  return customFetch<ProjectFile>(getUploadProjectEntryAgreementUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(projectEntryAgreementInput)
+  }
+);}
+
+
+
+
+
+export const getUploadProjectEntryAgreementMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadProjectEntryAgreement>>, TError,{projectId: string;data: BodyType<ProjectEntryAgreementInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadProjectEntryAgreement>>, TError,{projectId: string;data: BodyType<ProjectEntryAgreementInput>}, TContext> => {
+
+const mutationKey = ['uploadProjectEntryAgreement'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadProjectEntryAgreement>>, {projectId: string;data: BodyType<ProjectEntryAgreementInput>}> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  uploadProjectEntryAgreement(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadProjectEntryAgreementMutationResult = NonNullable<Awaited<ReturnType<typeof uploadProjectEntryAgreement>>>
+    export type UploadProjectEntryAgreementMutationBody = BodyType<ProjectEntryAgreementInput>
+    export type UploadProjectEntryAgreementMutationError = ErrorType<void>
+
+    /**
+ * @summary Upload and designate a project's entry agreement
+ */
+export const useUploadProjectEntryAgreement = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadProjectEntryAgreement>>, TError,{projectId: string;data: BodyType<ProjectEntryAgreementInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadProjectEntryAgreement>>,
+        TError,
+        {projectId: string;data: BodyType<ProjectEntryAgreementInput>},
+        TContext
+      > => {
+      return useMutation(getUploadProjectEntryAgreementMutationOptions(options));
     }
 
 export const getRequestUploadUrlUrl = () => {

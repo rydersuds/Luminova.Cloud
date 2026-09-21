@@ -7,6 +7,7 @@
  */
 import * as zod from 'zod';
 
+
 /**
  * Returns server health status
  * @summary Health check
@@ -475,6 +476,49 @@ export const RestoreProjectScheduleImageResponse = zod.object({
   "isCurrent": zod.boolean()
 })
 
+
+/**
+ * @summary Upload and designate a project's entry agreement
+ */
+export const UploadProjectEntryAgreementParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+
+
+export const uploadProjectEntryAgreementBodyObjectPathRegExp = new RegExp('^/objects/uploads/[A-Za-z0-9-]+$');
+export const uploadProjectEntryAgreementBodyNameMax = 255;
+
+
+export const uploadProjectEntryAgreementBodyContentTypeMax = 255;
+
+
+
+export const UploadProjectEntryAgreementBody = zod.object({
+  "objectPath": zod.string().min(1).regex(uploadProjectEntryAgreementBodyObjectPathRegExp),
+  "name": zod.string().min(1).max(uploadProjectEntryAgreementBodyNameMax),
+  "size": zod.number().int().min(1),
+  "contentType": zod.string().min(1).max(uploadProjectEntryAgreementBodyContentTypeMax)
+})
+
+export const uploadProjectEntryAgreementResponseAiConfidenceMin = 0;
+export const uploadProjectEntryAgreementResponseAiConfidenceMax = 100;
+
+
+
+export const UploadProjectEntryAgreementResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "relativePath": zod.string(),
+  "url": zod.string(),
+  "contentType": zod.string(),
+  "classification": zod.string(),
+  "isEntryAgreement": zod.boolean(),
+  "collection": zod.string(),
+  "linkedEntityType": zod.string().nullish(),
+  "linkedEntityId": zod.string().nullish(),
+  "aiConfidence": zod.number().int().min(uploadProjectEntryAgreementResponseAiConfidenceMin).max(uploadProjectEntryAgreementResponseAiConfidenceMax).nullish()
+})
 
 /**
  * @summary Request a direct upload URL

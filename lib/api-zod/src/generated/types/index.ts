@@ -44,6 +44,7 @@ export * from './projectConversationInput';
 export * from './projectConversationInputType';
 export * from './projectConversationType';
 export * from './projectDetail';
+export * from './projectEntryAgreementInput';
 export * from './projectFile';
 export * from './projectImport';
 export * from './projectImportDocument';

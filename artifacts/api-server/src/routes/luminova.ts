@@ -48,6 +48,9 @@ import
   CreateProjectScheduleImageBody,
   CreateProjectScheduleImageParams,
   CreateProjectScheduleImageResponse,
+  UploadProjectEntryAgreementBody,
+  UploadProjectEntryAgreementParams,
+  UploadProjectEntryAgreementResponse,
   DeleteProjectScheduleImageParams,
   RestoreProjectScheduleImageParams,
   RestoreProjectScheduleImageResponse,
@@ -7605,6 +7608,82 @@ router.post("/projects/:projectId/panoramas", async (req: AuthenticatedRequest, 
 )
 ;
 
+
+router.post("/projects/:projectId/entry-agreement", async (req: AuthenticatedRequest, res): Promise<void> => {
+  const params = UploadProjectEntryAgreementParams.safeParse(req.params);
+  const body = UploadProjectEntryAgreementBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: "Provide valid entry agreement metadata." });
+    return;
+  }
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  const ownerId = req.userId;
+
+  const project = await findAuthorizedProject(params.data.projectId, ownerId, requestWorkspaceId(req));
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+  const boundary = await resolveProjectDocumentBoundary(project.id, ownerId);
+  if (!boundary) {
+    res.status(404).json({ error: "Project documents not found" });
+    return;
+  }
+
+  try {
+    await storage.verifyConstructionDocument(body.data);
+    const [document] = await db.transaction(async (tx) => {
+      await tx.update(projectDocumentsTable).set({ isEntryAgreement: false }).where(and(
+        projectDocumentBoundaryWhere(boundary),
+        eq(projectDocumentsTable.classification, "contract"),
+        eq(projectDocumentsTable.isEntryAgreement, true),
+      ));
+      const [created] = await tx.insert(projectDocumentsTable).values({
+        id: `doc-${randomUUID()}`,
+        importBatchId: boundary.importBatchId,
+        projectId: boundary.projectId,
+        ownerId: boundary.ownerId,
+        objectPath: body.data.objectPath,
+        relativePath: body.data.name,
+        name: body.data.name,
+        contentType: body.data.contentType,
+        size: body.data.size,
+        classification: "contract",
+        isEntryAgreement: true,
+      }).returning();
+      await tx.insert(projectActivitiesTable).values({
+        id: randomUUID(),
+        projectId: project.id,
+        ownerId,
+        type: "document",
+        title: "Entry agreement uploaded",
+        description: `${body.data.name} was uploaded as the project's entry agreement.`,
+        author: ownerId,
+      });
+      return [created];
+    });
+
+    res.status(201).json(UploadProjectEntryAgreementResponse.parse({
+      id: document.id,
+      name: document.name,
+      relativePath: document.relativePath,
+      url: `/api/storage${document.objectPath}`,
+      contentType: document.contentType,
+      classification: document.classification,
+      isEntryAgreement: document.isEntryAgreement,
+      collection: document.collection,
+      linkedEntityType: document.linkedEntityType,
+      linkedEntityId: document.linkedEntityId,
+      aiConfidence: document.aiConfidence,
+    }));
+  } catch (error) {
+    req.log.error({ err: error, projectId: project.id }, "Entry agreement upload verification failed");
+    res.status(422).json({ error: "The uploaded entry agreement could not be verified." });
+  }
+});
 
 router.post("/projects/:projectId/schedule-images", async (req: AuthenticatedRequest, res): Promise<void> => 
 {

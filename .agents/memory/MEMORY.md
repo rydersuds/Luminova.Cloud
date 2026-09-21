@@ -15,3 +15,4 @@
 - [Folder import build recovery](folder-import-build-recovery.md) — reconcile unknown build outcomes before retrying, and rebuild only sessions the server marks retryable.
 - [Codegen dependency remediation](codegen-dependency-remediation.md) — keep the resolved generator stable when safe transitive pins remove advisories without output changes.
 - [Workspace invitation lifecycle](workspace-invitation-lifecycle.md) — scope provider invitations before exposure or mutation, and serialize provider cleanup with local access changes.
+- [Entry agreement replacement](entry-agreement-replacement.md) — direct uploads become the sole designated agreement while previous agreements remain ordinary contract files.
