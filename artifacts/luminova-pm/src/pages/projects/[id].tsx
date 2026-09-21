@@ -1640,12 +1640,11 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                 </CardContent>
               </Card>
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader>
                   <div>
                     <CardTitle>Budget vs Invoiced Expenses</CardTitle>
                     <CardDescription>Internal cost budget with verified expenses invoiced to Luminova; client billings are excluded.</CardDescription>
                   </div>
-                  <Button>Add Line Item</Button>
                 </CardHeader>
                 <CardContent>
                   <Table>

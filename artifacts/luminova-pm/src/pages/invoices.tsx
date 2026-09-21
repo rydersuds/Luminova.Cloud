@@ -13,7 +13,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { Filter, FileText, Check, X, AlertTriangle, Search, Plus, ArrowUpRight, ArrowDownRight, Clock3, RefreshCw } from "lucide-react"
+import { Filter, AlertTriangle, Search, Plus, ArrowUpRight, ArrowDownRight, Clock3, RefreshCw } from "lucide-react"
 import { formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
 import { ClientIdentity } from "@/components/client-identity"
@@ -210,15 +210,12 @@ export default function Invoices() {
                       <p className="mt-1 break-words text-muted-foreground">{invoice.lineItem}</p>
                     </div>
                   </div>
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                    {invoice.overage > 0 ? (
-                      <p className="flex min-w-0 items-start gap-1 text-[10px] text-destructive">
-                        <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-                        <span className="break-words">+{formatCurrency(invoice.overage)} overage</span>
-                      </p>
-                    ) : <span />}
-                    <InvoiceActions status={invoice.status} />
-                  </div>
+                   {invoice.overage > 0 && (
+                     <p className="mt-3 flex min-w-0 items-start gap-1 text-[10px] text-destructive">
+                       <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                       <span className="break-words">+{formatCurrency(invoice.overage)} overage</span>
+                     </p>
+                   )}
                 </article>
               ))}
             </CardContent>
@@ -234,17 +231,16 @@ export default function Invoices() {
                     <TableHead>Date</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Loading invoices...</TableCell>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Loading invoices...</TableCell>
                     </TableRow>
                   ) : invoices?.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No invoices found.</TableCell>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No invoices found.</TableCell>
                     </TableRow>
                   ) : invoices?.map((invoice) => (
                     <TableRow key={invoice.id}>
@@ -276,9 +272,6 @@ export default function Invoices() {
                       <TableCell>
                         <Badge variant={getStatusColor(invoice.status) as any}>{invoice.status}</Badge>
                       </TableCell>
-                      <TableCell className="min-w-[8rem] text-right">
-                        <InvoiceActions status={invoice.status} />
-                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -289,26 +282,6 @@ export default function Invoices() {
         </div>
       </div>
     </>
-  )
-}
-
-function InvoiceActions({ status }: { status: string }) {
-  return (
-    <div className="flex flex-wrap justify-end gap-1">
-      <Button variant="ghost" size="icon" title="View PDF" aria-label="View PDF">
-        <FileText className="h-4 w-4" />
-      </Button>
-      {status === 'Pending' && (
-        <>
-          <Button variant="ghost" size="icon" className="text-success hover:bg-success/10 hover:text-success" title="Approve" aria-label="Approve invoice">
-            <Check className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" title="Reject" aria-label="Reject invoice">
-            <X className="h-4 w-4" />
-          </Button>
-        </>
-      )}
-    </div>
   )
 }
 
