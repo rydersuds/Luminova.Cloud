@@ -520,6 +520,7 @@ export const UploadProjectEntryAgreementResponse = zod.object({
   "aiConfidence": zod.number().int().min(uploadProjectEntryAgreementResponseAiConfidenceMin).max(uploadProjectEntryAgreementResponseAiConfidenceMax).nullish()
 })
 
+
 /**
  * @summary Request a direct upload URL
  */
