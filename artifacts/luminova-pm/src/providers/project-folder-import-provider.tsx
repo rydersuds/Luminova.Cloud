@@ -107,6 +107,7 @@ export function ProjectFolderImportProvider({
   const sessionRef = React.useRef<ImportSession | null>(null)
   const dismissedImportIdsRef = React.useRef(new Set<string>())
   const dismissedPendingErrorRef = React.useRef(false)
+  const restoreStartedRef = React.useRef(false)
   const authenticatedFetch = React.useCallback(async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const send = async (token: string | null) => {
       const headers = new Headers(init.headers)
@@ -347,14 +348,29 @@ export function ProjectFolderImportProvider({
   }, [authenticatedFetch, queryClient])
 
   React.useEffect(() => {
-    if (!isLoaded || !isSignedIn) return
+    if (!isLoaded || !isSignedIn) {
+      restoreStartedRef.current = false
+      return
+    }
     let cancelled = false
     let poll: number | undefined
     const restore = async () => {
+      if (
+        restoreStartedRef.current ||
+        dismissedPendingErrorRef.current ||
+        wasImportErrorDismissed("__pending__")
+      ) return
+      restoreStartedRef.current = true
       const importGeneration = importGenerationRef.current
       try {
         let session: ImportSession | null = null
         for (let attempt = 0; attempt < 6; attempt++) {
+          if (
+            cancelled ||
+            importGenerationRef.current !== importGeneration ||
+            dismissedPendingErrorRef.current ||
+            wasImportErrorDismissed("__pending__")
+          ) return
           try {
             const response = await authenticatedFetch("/api/project-import-sessions")
             session = await readBatchImportResponse<ImportSession | null>(response, { operation: "Restoring the import session" })
@@ -465,6 +481,11 @@ export function ProjectFolderImportProvider({
         }
       } catch (error) {
         if (!cancelled) {
+          if (
+            importGenerationRef.current !== importGeneration ||
+            dismissedPendingErrorRef.current ||
+            wasImportErrorDismissed("__pending__")
+          ) return
           if (error instanceof ImportFileStorageError) {
             sessionRef.current = null
             folderFilesRef.current = []

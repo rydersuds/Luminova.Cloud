@@ -8,3 +8,9 @@ Treat a disconnected build request as an unknown outcome, not an immediate failu
 **Why:** A gateway can return an error after the server has already created the project. Blind retries can duplicate work, while fail-fast behavior strands uploads that are still usable.
 
 **How to apply:** Keep completed imports protected, serialize builders with a database lease that has a unique owner token and heartbeat, mark only stale leases retryable, tolerate bounded status outages, and reuse attached documents when retrying an interrupted session. Every persistence and failure transition must verify the lease token so an old worker cannot overwrite a newer retry.
+
+When restoring with no identified session, gate the recovery attempt once per authenticated provider mount and check pending dismissal before each retry and before rendering the error.
+
+**Why:** An unstable callback dependency or a still-failing gateway can restart the restore effect after dismissal and repeatedly show the same transient 502 even though the user already hid it.
+
+**How to apply:** Reset the one-run guard when authentication is lost; clear it through a new provider mount or an explicit new import rather than allowing ordinary rerenders to start another restore loop.

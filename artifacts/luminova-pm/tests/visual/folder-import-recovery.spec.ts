@@ -301,6 +301,20 @@ test('temporary build-status gateway failures do not stop recovery', async ({ pa
   expect(api.buildRequests).toBe(1);
 });
 
+test('dismissed restore errors stay hidden while the gateway remains unavailable', async ({ page }) => {
+  const api = await installImportApi(page);
+  api.failStatusChecks(20);
+
+  await page.goto('/__visual/folder-import');
+  const activity = page.getByRole('complementary', { name: 'Project folder import activity' });
+  await expect(activity.getByRole('alert')).toContainText('Restoring the import session failed (HTTP 502)');
+
+  await activity.getByRole('button', { name: 'Dismiss error' }).click();
+  await expect(activity).not.toBeVisible();
+  await page.waitForTimeout(3_500);
+  await expect(activity).not.toBeVisible();
+});
+
 test('an interrupted build retries the preserved session exactly once', async ({ page }) => {
   const api = await installImportApi(page);
   api.interruptNextBuild();
