@@ -134,6 +134,11 @@ import
  from "../lib/financialSummary"
 ;
 import { applyMadisonParkRevenueCorrection } from "../lib/madisonParkRevenueCorrection";
+import {
+  calculateProjectProgress,
+  isValidCalendarDate,
+  resolveProjectStartDate,
+} from "../lib/projectProgress";
 
 
 import 
@@ -379,6 +384,7 @@ const importAnalysisSchema = z.object(
     region: z.string().max(100).default(""),
     clientName: z.string().max(160).default(""),
     pmName: z.string().max(160).default(""),
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     targetDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     budgetDollars: z.number().finite().nonnegative().max(100_000_000).optional(),
     description: z.string().max(2000).default(""),
@@ -475,6 +481,7 @@ const importAnalysisModelSchema = z.object(
     region: z.string().max(100).nullable(),
     clientName: z.string().max(160).nullable(),
     pmName: z.string().max(160).nullable(),
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
     targetDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
     budgetDollars: z.number().finite().nonnegative().max(100_000_000).nullable(),
     description: z.string().max(2000).nullable(),
@@ -1329,6 +1336,7 @@ async function analyzeProjectImport(documents: Array<
       region: analysis.project.region ?? "",
       clientName: analysis.project.clientName ?? "",
       pmName: analysis.project.pmName ?? "",
+      startDate: analysis.project.startDate ?? undefined,
       targetDate: analysis.project.targetDate ?? undefined,
       budgetDollars: analysis.project.budgetDollars ?? undefined,
       description: analysis.project.description ?? "",
@@ -1472,23 +1480,6 @@ function deduplicateFinancialRecords<T extends
 }
 
 
-const isValidCalendarDate = (date: string) => 
-{
-
-
-  const parsedDate = new Date(`${date}T00:00:00.000Z`)
-;
-
-
-  return !Number.isNaN(parsedDate.valueOf()) && parsedDate.toISOString().slice(0, 10) === date
-;
-
-
-}
-
-;
-
-
 const activities = [
   
 {
@@ -1533,6 +1524,7 @@ let projects = [
     region: "Calgary",
     status: "In progress",
     progress: 64,
+    startDate: "2026-03-18",
     pmName: "Maya Chen",
     clientName: "Avery & Morgan Reid",
     targetDate: "2027-02-12",
@@ -1554,6 +1546,7 @@ let projects = [
     region: "Canmore",
     status: "In progress",
     progress: 38,
+    startDate: "2026-04-01",
     pmName: "Jordan Bell",
     clientName: "The Laurent Family",
     targetDate: "2027-05-28",
@@ -1575,6 +1568,7 @@ let projects = [
     region: "Edmonton",
     status: "On hold",
     progress: 72,
+    startDate: "2026-01-15",
     pmName: "Maya Chen",
     clientName: "Nadia Foster",
     targetDate: "2026-12-18",
@@ -1596,6 +1590,7 @@ let projects = [
     region: "Calgary",
     status: "Pre-construction",
     progress: 12,
+    startDate: "2026-07-01",
     pmName: "Jordan Bell",
     clientName: "Arden Cooper",
     targetDate: "2027-09-10",
@@ -2112,31 +2107,14 @@ type VendorQuote = (typeof vendorQuotes)[number] &
 
 const withCalculatedProjectProgress = (project: Project): Project => 
 {
-
-
-  const quoteTotal = project.clientQuote?.total ?? 0
-;
-
-
-  if (quoteTotal <= 0) return {
-
- ...project, projectManagerId: project.projectManagerId ?? null, clientName: canonicalClientName(project.clientName)
-}
-
-;
-
-
+  const startDate = resolveProjectStartDate(project);
   return {
-
-
     ...project,
     projectManagerId: project.projectManagerId ?? null,
     clientName: canonicalClientName(project.clientName),
-    progress: Math.round(Math.min(Math.max(project.invoiced, 0) / quoteTotal, 1) * 1000) / 10,
-  
-}
-
-;
+    startDate,
+    progress: calculateProjectProgress(startDate, project.targetDate),
+  };
 
 
 }
@@ -4309,7 +4287,7 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
 
 
       ...project,
-      startDate: "",
+      startDate: resolveProjectStartDate(project),
       clientQuote,
       lineItems: project.budgetLineItems ?? [],
       invoices: projectInvoices,
@@ -4367,7 +4345,7 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
 
 
     ...project,
-    startDate: "",
+    startDate: resolveProjectStartDate(project),
     clientQuote,
     lineItems: project.budgetLineItems ?? [],
     invoices: await (ownerId
@@ -5720,9 +5698,7 @@ router.post("/projects", async (req, res): Promise<void> =>
     const importBatchId = `manual-${randomUUID()}`
 ;
 
-    const project = 
-{
-
+    const project = withCalculatedProjectProgress({
       ...parsed.data,
       pmName: manager.profile.name,
       projectManagerId: manager.profile.id,
@@ -5730,9 +5706,7 @@ router.post("/projects", async (req, res): Promise<void> =>
       progress: 0,
       invoiced: 0,
       exteriorImage: parsed.data.exteriorImage ?? "",
-    
-}
-;
+    });
 
     await db.transaction(async (transaction) => 
 {
@@ -5777,11 +5751,7 @@ router.post("/projects", async (req, res): Promise<void> =>
  catch (error) 
 {
 
-    req.log.error(
-{
- error 
-}
-, "Project creation failed")
+    req.log?.error?.({ error }, "Project creation failed");
 ;
 
     if (!res.headersSent) res.status(500).json(
@@ -6592,6 +6562,10 @@ const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: R
     pmName: analysis.project.pmName,
     projectManagerId: null,
     clientName: analysis.project.clientName,
+    startDate: resolveProjectStartDate({
+      startDate: analysis.project.startDate,
+      targetDate: analysis.project.targetDate,
+    }),
     targetDate: analysis.project.targetDate && isValidCalendarDate(analysis.project.targetDate) ? analysis.project.targetDate : "",
     budgeted: internalBudget?.total ?? Math.round((analysis.project.budgetDollars ?? 0) * 100) / 100,
     invoiced: 0,
@@ -8891,10 +8865,11 @@ router.patch("/projects/:projectId", async (req: AuthenticatedRequest, res): Pro
 {
 
 
+    const normalizedImportedProject = withCalculatedProjectProgress(imported.data as Project);
     const updated = withCalculatedProjectProgress(
 {
 
- ...(imported.data as Project), ...normalizedUpdate 
+ ...normalizedImportedProject, ...normalizedUpdate
 }
 
 )

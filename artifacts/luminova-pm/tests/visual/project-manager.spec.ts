@@ -48,6 +48,7 @@ test('selects a workspace Project Manager while creating a project', async ({ pa
     if (route.request().method() === 'POST') {
       const body = route.request().postDataJSON();
       expect(body.projectManagerId).toBe('user-sam');
+      expect(body.startDate).toBe('2026-09-01');
       expect(body).not.toHaveProperty('pmName');
       await route.fulfill({
         status: 201,
@@ -85,6 +86,7 @@ test('selects a workspace Project Manager while creating a project', async ({ pa
   await dialog.getByLabel('PM Assignment').selectOption('user-sam');
   await dialog.locator('input[name="address"]').fill('100 Prairie Way');
   await dialog.locator('input[name="region"]').fill('Calgary');
+  await dialog.locator('input[name="startDate"]').fill('2026-09-01');
   await dialog.locator('input[name="targetDate"]').fill('2027-04-30');
   await dialog.locator('input[name="budgeted"]').fill('250000');
   await dialog.locator('textarea[name="description"]').fill('New residential construction.');
@@ -121,6 +123,35 @@ test('changes and displays a saved Project Manager across project surfaces', asy
   await page.goto('/__visual/project-cards');
   await expect(page.getByRole('heading', { name: 'Riverstone Residence' })).toBeVisible();
   await expect(page.getByText('Sam Carter', { exact: true })).toBeVisible();
+});
+
+test('edits the project end date without exposing manual progress', async ({ page }) => {
+  await installIdentity(page);
+  let current = structuredClone(project);
+  await page.route('**/api/projects/riverstone/activity', route => route.fulfill({ json: [] }));
+  await page.route('**/api/projects/riverstone', async route => {
+    if (route.request().method() === 'PATCH') {
+      const body = route.request().postDataJSON();
+      expect(body.targetDate).toBe('2026-09-30');
+      expect(body).not.toHaveProperty('progress');
+      current = { ...current, ...body, progress: 74.3 };
+      await route.fulfill({ json: current });
+      return;
+    }
+    await route.fulfill({ json: current });
+  });
+
+  await page.goto('/__visual/project-panorama');
+  await expect(page.getByText('Start: Mar 18, 2026', { exact: true })).toBeVisible();
+  await expect(page.getByText('End: Feb 12, 2027', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit Project' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Edit Project' });
+  await expect(dialog.getByLabel('Progress (%)')).toHaveCount(0);
+  await dialog.getByLabel('End Date').fill('2026-09-30');
+  await dialog.getByRole('button', { name: 'Save Changes' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText('End: Sep 30, 2026', { exact: true })).toBeVisible();
+  await expect(page.getByText('74.3%', { exact: true })).toBeVisible();
 });
 
 test('does not expose the assignment control to non-administrators', async ({ page }) => {

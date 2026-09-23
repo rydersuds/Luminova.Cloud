@@ -14,6 +14,9 @@ export interface ProjectInput {
   /** @minLength 1 */
   projectManagerId: string;
   clientName: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  startDate: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   targetDate: string;
   budgeted: number;
   description: string;

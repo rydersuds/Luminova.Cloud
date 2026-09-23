@@ -53,7 +53,7 @@ test("portfolio financial summary only includes the authenticated owner's record
       data: {
         id: `project-a-${suffix}`, name: "Owned project", address: "1 Test Street", region: "Calgary",
         status: "Planning", progress: 0, pmName: "Test PM", clientName: "Test Client",
-        targetDate: "2026-12-31", budgeted: 1200, invoiced: 375, exteriorImage: "", description: "Test project",
+        startDate: "2026-07-26", targetDate: "2026-12-31", budgeted: 1200, invoiced: 375, exteriorImage: "", description: "Test project",
         clientQuote: { total: 1000, revision: "Q-A", portions: [] },
         budgetLineItems: [{ id: "actual-a", code: "ACT-01", description: "Verified internal cost", budgeted: 50, invoiced: 50, variance: -50 }],
       },
@@ -259,7 +259,7 @@ test("portfolio financial summary only includes the authenticated owner's record
   });
   assert.equal(projectsResponse.status, 200);
   const projects = await projectsResponse.json() as Array<{ id: string; progress: number; clientLogoUrl?: string | null }>;
-  assert.equal(projects.find((project) => project.id === `project-a-${suffix}`)?.progress, 37.5);
+  assert.equal(projects.find((project) => project.id === `project-a-${suffix}`)?.progress, 37.3);
   assert.equal(projects.some((project) => project.id === `project-b-${suffix}`), false);
   assert.equal(
     projects.find((project) => project.id === `project-a-${suffix}`)?.clientLogoUrl,
@@ -368,6 +368,7 @@ test("portfolio financial summary only includes the authenticated owner's record
       status: "Planning",
       projectManagerId: managerId,
       clientName: "Test Client",
+      startDate: "2026-01-01",
       targetDate: "2027-03-31",
       budgeted: 500,
       description: "Created directly.",

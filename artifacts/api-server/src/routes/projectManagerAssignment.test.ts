@@ -84,6 +84,7 @@ const projectInput = {
   status: "Planning",
   projectManagerId: "manager-one",
   clientName: "Test Client",
+  startDate: "2026-01-01",
   targetDate: "2027-04-30",
   budgeted: 25000000,
   description: "Project manager assignment test.",
@@ -112,10 +113,11 @@ test("persists validated assignments and protects assignment changes", async () 
   });
   const createdText = await createdResponse.text();
   assert.equal(createdResponse.status, 201, createdText);
-  const created = JSON.parse(createdText) as { id: string; projectManagerId: string; pmName: string };
+  const created = JSON.parse(createdText) as { id: string; projectManagerId: string; pmName: string; startDate: string };
   projectIds.push(created.id);
   assert.equal(created.projectManagerId, "manager-one");
   assert.equal(created.pmName, "manager-one Builder");
+  assert.equal(created.startDate, projectInput.startDate);
 
   const [stored] = await db.select().from(importedProjectsTable).where(eq(importedProjectsTable.id, created.id));
   assert(stored);
@@ -126,6 +128,18 @@ test("persists validated assignments and protects assignment changes", async () 
     headers: { "x-test-user": "admin" },
   })).json() as Array<{ id: string; projectManagerId: string | null }>;
   assert.equal(listed.find((project) => project.id === created.id)?.projectManagerId, "manager-one");
+
+  const updatedEndDate = "2026-12-31";
+  const dateUpdatedResponse = await fetch(`${base}/projects/${created.id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", "x-test-user": "admin" },
+    body: JSON.stringify({ targetDate: updatedEndDate }),
+  });
+  const dateUpdated = await dateUpdatedResponse.json() as { targetDate: string; startDate: string; progress: number };
+  assert.equal(dateUpdatedResponse.status, 200);
+  assert.equal(dateUpdated.targetDate, updatedEndDate);
+  assert.equal(dateUpdated.startDate, projectInput.startDate);
+  assert.equal(dateUpdated.progress, 72.8);
 
   const forbidden = await fetch(`${base}/projects/${created.id}`, {
     method: "PATCH",

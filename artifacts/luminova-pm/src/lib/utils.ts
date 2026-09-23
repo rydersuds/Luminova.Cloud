@@ -21,11 +21,15 @@ export function formatDate(dateString: string) {
 }
 
 export function formatDateOnly(dateString: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return "Not set"
+  const calendarDate = new Date(`${dateString}T00:00:00Z`)
+  if (Number.isNaN(calendarDate.valueOf()) || calendarDate.toISOString().slice(0, 10) !== dateString) return "Not set"
+  const parsed = new Date(`${dateString}T00:00:00`)
   return new Intl.DateTimeFormat("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
-  }).format(new Date(`${dateString}T00:00:00`))
+  }).format(parsed)
 }
 
 export function getStatusColor(status: string) {

@@ -105,6 +105,7 @@ test("corrects the first project response once, scopes it to the owner, and pres
     region: "Regina",
     status: "Planning",
     progress: 100,
+    startDate: "2026-08-07",
     pmName: "Test PM",
     clientName: "Weidner Investment Services, Inc.",
     targetDate: "2026-12-31",
@@ -304,7 +305,7 @@ test("corrects the first project response once, scopes it to the owner, and pres
   };
   assert.equal(firstProject.invoiced, 446070.71);
   assert.equal(firstProject.clientQuote.total, MADISON_PARK_CLIENT_QUOTE_TOTAL);
-  assert.equal(firstProject.progress, 32.1);
+  assert.equal(firstProject.progress, 32.2);
   assert.deepEqual(
     firstProject.invoices
       .filter((invoice) => invoice.invoiceNumber === "MADISON-PARK-REV-2026-06-18")
@@ -320,7 +321,7 @@ test("corrects the first project response once, scopes it to the owner, and pres
   }>;
   const listedProject = listedProjects.find((item) => item.id === projectId);
   assert.equal(listedProject?.invoiced, 446070.71);
-  assert.equal(listedProject?.progress, 32.1);
+  assert.equal(listedProject?.progress, 32.2);
 
   const dashboardResponse = await fetch(`http://127.0.0.1:${port}/dashboard/summary`);
   assert.equal(dashboardResponse.status, 200);

@@ -19,6 +19,8 @@ test("legal consent names and links both public policies", () => {
 
 test("formatDateOnly preserves the calendar day west of UTC", () => {
   assert.equal(formatDateOnly("2026-09-12"), "Sep 12, 2026")
+  assert.equal(formatDateOnly(""), "Not set")
+  assert.equal(formatDateOnly("2026-02-30"), "Not set")
 })
 
 test("project folder paths remain relative and reject traversal or controls", () => {

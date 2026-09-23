@@ -4,6 +4,7 @@ import {
   useGetProject, 
   getGetProjectQueryKey,
   getGetProjectsQueryKey,
+  getGetDashboardSummaryQueryKey,
   useCreateProjectPanorama,
   useCreateProjectScheduleImage,
   useDeleteProjectScheduleImage,
@@ -547,7 +548,6 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
       data: {
         name: formData.get("name") as string,
         status: formData.get("status") as string,
-        progress: Number(formData.get("progress")),
         targetDate: formData.get("targetDate") as string,
         description: formData.get("description") as string,
         ...(isAdmin &&
@@ -562,6 +562,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) })
         queryClient.invalidateQueries({ queryKey: getGetProjectsQueryKey() })
+        queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() })
         setIsEditOpen(false)
       },
       onError: () => toast({ title: "Project could not be saved", description: "Check the project manager selection and try again.", variant: "destructive" }),
@@ -661,9 +662,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const budgetVariance = project.budgeted - actualCost
   const varianceIsPositive = budgetVariance >= 0
   const clientQuoteRemaining = project.clientQuote.total - project.invoiced
-  const clientQuoteInvoicedPercent = project.clientQuote.total > 0
-    ? Math.min((project.invoiced / project.clientQuote.total) * 100, 100)
-    : 0
+  const projectProgress = Math.min(Math.max(project.progress, 0), 100)
   const renderPhotoCard = (photo: ProjectPhoto) => {
     const index = project.photos.findIndex((item) => item.id === photo.id)
     return (
@@ -753,7 +752,11 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Calendar className="h-4 w-4 text-primary" />
-                    Target: {formatDate(project.targetDate)}
+                    Start: {formatDateOnly(project.startDate)}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="h-4 w-4 text-primary" />
+                    End: {formatDateOnly(project.targetDate)}
                   </div>
                   <div className="flex items-center gap-1.5">
                     <ClientIdentity name={project.clientName} logoUrl={project.clientLogoUrl} size="sm" />
@@ -799,10 +802,6 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                              <option value="Rejected for bid">Rejected for bid</option>
                           </select>
                         </div>
-                         <div className="space-y-2">
-                          <Label htmlFor="progress">Progress (%)</Label>
-                          <Input id="progress" name="progress" type="number" min="0" max="100" defaultValue={project.progress} required />
-                        </div>
                       </div>
                        {isAdmin && (
                          <div className="space-y-2">
@@ -837,7 +836,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                          </div>
                        )}
                       <div className="space-y-2">
-                        <Label htmlFor="targetDate">Target Date</Label>
+                        <Label htmlFor="targetDate">End Date</Label>
                         <Input id="targetDate" name="targetDate" type="date" defaultValue={project.targetDate} required />
                       </div>
                       <div className="space-y-2">
@@ -873,9 +872,9 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
               <div className="bg-card p-4 space-y-1">
                 <p className="text-sm text-muted-foreground">Total Progress</p>
                 <div className="flex items-center gap-2">
-                  <p className="text-xl font-bold tabular-nums">{clientQuoteInvoicedPercent.toFixed(1)}%</p>
+                  <p className="text-xl font-bold tabular-nums">{projectProgress}%</p>
                   <div className="flex-1 h-1.5 bg-muted/70 rounded-full overflow-hidden">
-                    <div className="h-full bg-primary rounded-full" style={{ width: `${clientQuoteInvoicedPercent}%` }} />
+                    <div className="h-full bg-primary rounded-full" style={{ width: `${projectProgress}%` }} />
                   </div>
                 </div>
               </div>
@@ -1590,10 +1589,10 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Total progress</span>
-                      <span className="font-medium tabular-nums">{clientQuoteInvoicedPercent.toFixed(1)}%</span>
+                      <span className="font-medium tabular-nums">{projectProgress}%</span>
                     </div>
                     <div className="h-2 overflow-hidden rounded-full bg-muted">
-                      <div className="h-full rounded-full bg-primary" style={{ width: `${clientQuoteInvoicedPercent}%` }} />
+                      <div className="h-full rounded-full bg-primary" style={{ width: `${projectProgress}%` }} />
                     </div>
                   </div>
                   {project.invoices.length > 0 && (

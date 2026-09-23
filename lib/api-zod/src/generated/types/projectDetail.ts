@@ -17,7 +17,6 @@ import type { ScheduleImage } from './scheduleImage';
 import type { Trade } from './trade';
 
 export type ProjectDetail = Project & {
-  startDate: string;
   clientQuote: ClientQuote;
   lineItems: BudgetLineItem[];
   invoices: Invoice[];

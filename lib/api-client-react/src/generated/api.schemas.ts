@@ -305,6 +305,9 @@ export interface Project {
   clientName: string;
   /** @nullable */
   clientLogoUrl?: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  startDate: string;
+  /** @pattern ^$|^\d{4}-\d{2}-\d{2}$ */
   targetDate: string;
   budgeted: number;
   invoiced: number;
@@ -320,6 +323,9 @@ export interface ProjectInput {
   /** @minLength 1 */
   projectManagerId: string;
   clientName: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  startDate: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   targetDate: string;
   budgeted: number;
   description: string;
@@ -329,7 +335,7 @@ export interface ProjectInput {
 export interface ProjectUpdate {
   name?: string;
   status?: string;
-  progress?: number;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   targetDate?: string;
   description?: string;
   /** @minLength 1 */
@@ -487,7 +493,6 @@ export interface ScheduleImage {
 }
 
 export type ProjectDetail = Project & {
-  startDate: string;
   clientQuote: ClientQuote;
   lineItems: BudgetLineItem[];
   invoices: Invoice[];

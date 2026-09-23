@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Building2, Grid2X2, List, MapPin, Search, SlidersHorizontal, X } from "lucide-react"
-import { cn, formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
+import { cn, formatCurrency, formatDateOnly, getStatusColor } from "@/lib/utils"
 import { ClientIdentity } from "@/components/client-identity"
 
 const STATUSES = ["Pre-construction", "Planning", "Active", "In progress", "On hold", "Completed", "Rejected for bid"]
@@ -225,8 +225,8 @@ export default function Projects() {
                           <p className="mt-1 break-words font-medium">{project.pmName || "Unassigned"}</p>
                       </div>
                         <div className="min-w-0">
-                        <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Target</p>
-                          <p className="mt-1 break-words font-medium">{formatDate(project.targetDate)}</p>
+                         <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">End date</p>
+                          <p className="mt-1 break-words font-medium">{formatDateOnly(project.targetDate)}</p>
                       </div>
                         <div className="min-w-0">
                         <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Budget</p>

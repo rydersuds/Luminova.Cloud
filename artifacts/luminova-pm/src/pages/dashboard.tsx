@@ -39,6 +39,7 @@ const projectSchema = z.object({
   projectManagerId: z.string().min(1, "Select a Project Manager"),
   pmName: z.string().optional(),
   clientName: z.string().min(1, "Required"),
+  startDate: z.string().min(1, "Required"),
   targetDate: z.string().min(1, "Required"),
   budgeted: z.coerce.number().min(0.01, "Invalid budget"),
   description: z.string().min(1, "Required"),
@@ -95,7 +96,7 @@ export default function Dashboard() {
     resolver: zodResolver(projectSchema),
     defaultValues: {
        name: "", address: "", region: "", status: "", projectManagerId: "",
-      clientName: "", targetDate: "", description: "", exteriorImage: ""
+      clientName: "", startDate: "", targetDate: "", description: "", exteriorImage: ""
     } // strictly empty to enforce manual selection
   })
 
@@ -405,7 +406,12 @@ export default function Dashboard() {
                               {errors.region && <span className="text-[10px] font-mono text-destructive uppercase">{errors.region.message as string}</span>}
                             </div>
                             <div className="space-y-2">
-                              <Label className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Target Date *</Label>
+                              <Label className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Start Date *</Label>
+                              <Input {...register("startDate")} type="date" className="bg-black/20 focus:border-primary recessed-3d [color-scheme:dark]" />
+                              {errors.startDate && <span className="text-[10px] font-mono text-destructive uppercase">{errors.startDate.message as string}</span>}
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="font-mono text-xs uppercase tracking-wider text-muted-foreground">End Date *</Label>
                               <Input {...register("targetDate")} type="date" className="bg-black/20 focus:border-primary recessed-3d [color-scheme:dark]" />
                               {errors.targetDate && <span className="text-[10px] font-mono text-destructive uppercase">{errors.targetDate.message as string}</span>}
                             </div>

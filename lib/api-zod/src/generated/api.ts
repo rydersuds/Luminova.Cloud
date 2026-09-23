@@ -52,6 +52,10 @@ export const GetProjectsQueryParams = zod.object({
   "client": zod.coerce.string().optional()
 })
 
+export const getProjectsResponseStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getProjectsResponseTargetDateRegExp = new RegExp('^$|^\\d{4}-\\d{2}-\\d{2}$');
+
+
 export const GetProjectsResponseItem = zod.object({
   "id": zod.string(),
   "name": zod.string(),
@@ -63,7 +67,8 @@ export const GetProjectsResponseItem = zod.object({
   "projectManagerId": zod.string().nullable(),
   "clientName": zod.string(),
   "clientLogoUrl": zod.string().nullish(),
-  "targetDate": zod.string(),
+  "startDate": zod.string().regex(getProjectsResponseStartDateRegExp),
+  "targetDate": zod.string().regex(getProjectsResponseTargetDateRegExp),
   "budgeted": zod.number(),
   "invoiced": zod.number(),
   "exteriorImage": zod.string(),
@@ -76,6 +81,8 @@ export const GetProjectsResponse = zod.array(GetProjectsResponseItem)
  * @summary Create a project
  */
 
+export const createProjectBodyStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createProjectBodyTargetDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 
 
 export const CreateProjectBody = zod.object({
@@ -85,11 +92,16 @@ export const CreateProjectBody = zod.object({
   "status": zod.string(),
   "projectManagerId": zod.string().min(1),
   "clientName": zod.string(),
-  "targetDate": zod.string(),
+  "startDate": zod.string().regex(createProjectBodyStartDateRegExp),
+  "targetDate": zod.string().regex(createProjectBodyTargetDateRegExp),
   "budgeted": zod.number(),
   "description": zod.string(),
   "exteriorImage": zod.string().optional()
 })
+
+export const createProjectResponseStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createProjectResponseTargetDateRegExp = new RegExp('^$|^\\d{4}-\\d{2}-\\d{2}$');
+
 
 export const CreateProjectResponse = zod.object({
   "id": zod.string(),
@@ -102,7 +114,8 @@ export const CreateProjectResponse = zod.object({
   "projectManagerId": zod.string().nullable(),
   "clientName": zod.string(),
   "clientLogoUrl": zod.string().nullish(),
-  "targetDate": zod.string(),
+  "startDate": zod.string().regex(createProjectResponseStartDateRegExp),
+  "targetDate": zod.string().regex(createProjectResponseTargetDateRegExp),
   "budgeted": zod.number(),
   "invoiced": zod.number(),
   "exteriorImage": zod.string(),
@@ -117,6 +130,8 @@ export const GetProjectParams = zod.object({
   "projectId": zod.coerce.string()
 })
 
+export const getProjectResponseOneStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getProjectResponseOneTargetDateRegExp = new RegExp('^$|^\\d{4}-\\d{2}-\\d{2}$');
 export const getProjectResponseTwoTradesItemProfilePhotoPositionXMin = 0;
 export const getProjectResponseTwoTradesItemProfilePhotoPositionXMax = 100;
 
@@ -143,13 +158,13 @@ export const GetProjectResponse = zod.object({
   "projectManagerId": zod.string().nullable(),
   "clientName": zod.string(),
   "clientLogoUrl": zod.string().nullish(),
-  "targetDate": zod.string(),
+  "startDate": zod.string().regex(getProjectResponseOneStartDateRegExp),
+  "targetDate": zod.string().regex(getProjectResponseOneTargetDateRegExp),
   "budgeted": zod.number(),
   "invoiced": zod.number(),
   "exteriorImage": zod.string(),
   "description": zod.string()
 }).and(zod.object({
-  "startDate": zod.string(),
   "clientQuote": zod.object({
   "total": zod.number(),
   "revision": zod.string(),
@@ -265,18 +280,22 @@ export const UpdateProjectParams = zod.object({
   "projectId": zod.coerce.string()
 })
 
+export const updateProjectBodyTargetDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 
 
 
 export const UpdateProjectBody = zod.object({
   "name": zod.string().optional(),
   "status": zod.string().optional(),
-  "progress": zod.number().int().optional(),
-  "targetDate": zod.string().optional(),
+  "targetDate": zod.string().regex(updateProjectBodyTargetDateRegExp).optional(),
   "description": zod.string().optional(),
   "projectManagerId": zod.string().min(1).optional(),
   "exteriorImage": zod.string().nullish().describe('URL of an existing standard photo belonging to this project, or null to clear the exterior photo')
 })
+
+export const updateProjectResponseStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateProjectResponseTargetDateRegExp = new RegExp('^$|^\\d{4}-\\d{2}-\\d{2}$');
+
 
 export const UpdateProjectResponse = zod.object({
   "id": zod.string(),
@@ -289,7 +308,8 @@ export const UpdateProjectResponse = zod.object({
   "projectManagerId": zod.string().nullable(),
   "clientName": zod.string(),
   "clientLogoUrl": zod.string().nullish(),
-  "targetDate": zod.string(),
+  "startDate": zod.string().regex(updateProjectResponseStartDateRegExp),
+  "targetDate": zod.string().regex(updateProjectResponseTargetDateRegExp),
   "budgeted": zod.number(),
   "invoiced": zod.number(),
   "exteriorImage": zod.string(),
@@ -611,6 +631,10 @@ export const CreateProjectImportBody = zod.object({
 })).min(1).max(createProjectImportBodyDocumentsMax)
 })
 
+export const createProjectImportResponseProjectStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createProjectImportResponseProjectTargetDateRegExp = new RegExp('^$|^\\d{4}-\\d{2}-\\d{2}$');
+
+
 export const CreateProjectImportResponse = zod.object({
   "project": zod.object({
   "id": zod.string(),
@@ -623,7 +647,8 @@ export const CreateProjectImportResponse = zod.object({
   "projectManagerId": zod.string().nullable(),
   "clientName": zod.string(),
   "clientLogoUrl": zod.string().nullish(),
-  "targetDate": zod.string(),
+  "startDate": zod.string().regex(createProjectImportResponseProjectStartDateRegExp),
+  "targetDate": zod.string().regex(createProjectImportResponseProjectTargetDateRegExp),
   "budgeted": zod.number(),
   "invoiced": zod.number(),
   "exteriorImage": zod.string(),
@@ -838,6 +863,10 @@ export const BuildProjectImportSessionParams = zod.object({
   "importId": zod.coerce.string().min(1)
 })
 
+export const buildProjectImportSessionResponseProjectStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const buildProjectImportSessionResponseProjectTargetDateRegExp = new RegExp('^$|^\\d{4}-\\d{2}-\\d{2}$');
+
+
 export const BuildProjectImportSessionResponse = zod.object({
   "project": zod.object({
   "id": zod.string(),
@@ -850,7 +879,8 @@ export const BuildProjectImportSessionResponse = zod.object({
   "projectManagerId": zod.string().nullable(),
   "clientName": zod.string(),
   "clientLogoUrl": zod.string().nullish(),
-  "targetDate": zod.string(),
+  "startDate": zod.string().regex(buildProjectImportSessionResponseProjectStartDateRegExp),
+  "targetDate": zod.string().regex(buildProjectImportSessionResponseProjectTargetDateRegExp),
   "budgeted": zod.number(),
   "invoiced": zod.number(),
   "exteriorImage": zod.string(),
