@@ -125,13 +125,14 @@ test('changes and displays a saved Project Manager across project surfaces', asy
   await expect(page.getByText('Sam Carter', { exact: true })).toBeVisible();
 });
 
-test('edits the project end date without exposing manual progress', async ({ page }) => {
+test('edits the project start and end dates without exposing manual progress', async ({ page }) => {
   await installIdentity(page);
   let current = structuredClone(project);
   await page.route('**/api/projects/riverstone/activity', route => route.fulfill({ json: [] }));
   await page.route('**/api/projects/riverstone', async route => {
     if (route.request().method() === 'PATCH') {
       const body = route.request().postDataJSON();
+      expect(body.startDate).toBe('2026-02-01');
       expect(body.targetDate).toBe('2026-09-30');
       expect(body).not.toHaveProperty('progress');
       current = { ...current, ...body, progress: 74.3 };
@@ -147,9 +148,12 @@ test('edits the project end date without exposing manual progress', async ({ pag
   await page.getByRole('button', { name: 'Edit Project' }).click();
   const dialog = page.getByRole('dialog', { name: 'Edit Project' });
   await expect(dialog.getByLabel('Progress (%)')).toHaveCount(0);
+  await expect(dialog.getByLabel('Start Date')).toHaveValue('2026-03-18');
   await dialog.getByLabel('End Date').fill('2026-09-30');
+  await dialog.getByLabel('Start Date').fill('2026-02-01');
   await dialog.getByRole('button', { name: 'Save Changes' }).click();
   await expect(dialog).toBeHidden();
+  await expect(page.getByText('Start: Feb 1, 2026', { exact: true })).toBeVisible();
   await expect(page.getByText('End: Sep 30, 2026', { exact: true })).toBeVisible();
   await expect(page.getByText('74.3%', { exact: true })).toBeVisible();
 });

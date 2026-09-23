@@ -133,12 +133,12 @@ test("persists validated assignments and protects assignment changes", async () 
   const dateUpdatedResponse = await fetch(`${base}/projects/${created.id}`, {
     method: "PATCH",
     headers: { "content-type": "application/json", "x-test-user": "admin" },
-    body: JSON.stringify({ targetDate: updatedEndDate }),
+      body: JSON.stringify({ startDate: "2025-12-01", targetDate: updatedEndDate }),
   });
   const dateUpdated = await dateUpdatedResponse.json() as { targetDate: string; startDate: string; progress: number };
   assert.equal(dateUpdatedResponse.status, 200);
   assert.equal(dateUpdated.targetDate, updatedEndDate);
-  assert.equal(dateUpdated.startDate, projectInput.startDate);
+  assert.equal(dateUpdated.startDate, "2025-12-01");
   assert.equal(dateUpdated.progress, 72.8);
 
   const forbidden = await fetch(`${base}/projects/${created.id}`, {

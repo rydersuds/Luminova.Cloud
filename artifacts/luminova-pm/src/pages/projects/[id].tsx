@@ -548,6 +548,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
       data: {
         name: formData.get("name") as string,
         status: formData.get("status") as string,
+        startDate: formData.get("startDate") as string,
         targetDate: formData.get("targetDate") as string,
         description: formData.get("description") as string,
         ...(isAdmin &&
@@ -835,10 +836,16 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                            {projectManagersError && <p role="alert" className="text-xs text-destructive">Project Managers could not be loaded. Refresh and try again.</p>}
                          </div>
                        )}
-                      <div className="space-y-2">
-                        <Label htmlFor="targetDate">End Date</Label>
-                        <Input id="targetDate" name="targetDate" type="date" defaultValue={project.targetDate} required />
-                      </div>
+                       <div className="grid grid-cols-2 gap-4">
+                         <div className="space-y-2">
+                           <Label htmlFor="startDate">Start Date</Label>
+                           <Input id="startDate" name="startDate" type="date" defaultValue={project.startDate} required />
+                         </div>
+                         <div className="space-y-2">
+                           <Label htmlFor="targetDate">End Date</Label>
+                           <Input id="targetDate" name="targetDate" type="date" defaultValue={project.targetDate} required />
+                         </div>
+                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="description">Description</Label>
                         <Textarea id="description" name="description" defaultValue={project.description} />
