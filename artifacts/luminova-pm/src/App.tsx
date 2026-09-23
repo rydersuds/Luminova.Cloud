@@ -263,6 +263,20 @@ function App() {
     );
   }
 
+  if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/trades')) {
+    return (
+      <WouterRouter base={basePath}>
+        <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl}>
+          <QueryClientProvider client={queryClient}>
+            <TooltipProvider>
+              <AppLayout><Suspense fallback={<WorkspacePageFallback />}><TradesDirectory /></Suspense></AppLayout>
+            </TooltipProvider>
+          </QueryClientProvider>
+        </ClerkProvider>
+      </WouterRouter>
+    );
+  }
+
   if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/dashboard-cards')) {
     return (
       <WouterRouter base={basePath}>

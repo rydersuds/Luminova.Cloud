@@ -101,7 +101,7 @@ export default function TradesDirectory() {
                         {trade.profilePhotoUrl
                             ? <img
                                 src={trade.profilePhotoUrl}
-                                alt=""
+                                alt={`${trade.companyName} profile logo`}
                                 className="h-full w-full object-contain p-1"
                                 style={{
                                   objectPosition: `${trade.profilePhotoPositionX ?? 50}% ${trade.profilePhotoPositionY ?? 50}%`,
