@@ -202,6 +202,8 @@
     @apply font-sans antialiased bg-background text-foreground;
     overflow-y: auto;
     overscroll-behavior-x: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading tracking-tight;
@@ -226,8 +228,8 @@
 
   .bg-tech-grid {
     background-image:
-      linear-gradient(to right, hsl(var(--border) / 0.4) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(var(--border) / 0.4) 1px, transparent 1px);
+      linear-gradient(to right, hsl(var(--border) / 0.28) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.28) 1px, transparent 1px);
     background-size: 60px 60px;
     background-position: center top;
   }
@@ -241,7 +243,7 @@
 
   /* Core 3D Glass Surface */
   .surface-3d {
-    @apply relative border-none rounded-xl overflow-hidden transition-all duration-300;
+    @apply relative border-none rounded-xl overflow-hidden transition-[box-shadow,transform] duration-200;
     --surface-light-color: transparent;
     --surface-shine-color: transparent;
     background:
@@ -480,7 +482,7 @@
 
   /* Large Glass Panels (Sidebar, Modals) */
   .glass-panel {
-    @apply relative border-none overflow-hidden rounded-2xl transition-all duration-300;
+    @apply relative border-none overflow-hidden rounded-2xl transition-[box-shadow,background-color] duration-200;
     --panel-light-color: transparent;
     --panel-shine-color: transparent;
     background:
@@ -494,7 +496,7 @@
   }
 
   .glass-panel-dark {
-    @apply relative border-none overflow-hidden rounded-2xl transition-all duration-300;
+    @apply relative border-none overflow-hidden rounded-2xl transition-[box-shadow,background-color] duration-200;
     --panel-light-color: transparent;
     --panel-shine-color: transparent;
     background-color: hsl(var(--sidebar) / 0.96);
@@ -670,6 +672,17 @@
 
     .surface-3d:hover {
       transform: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
     }
   }
 

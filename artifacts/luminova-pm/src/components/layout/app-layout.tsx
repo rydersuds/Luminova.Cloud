@@ -367,10 +367,16 @@ export function AppLayoutView({
         }
       }}
     >
+      <a
+        href="#main-content"
+        className="sr-only fixed left-4 top-4 z-[100] rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow-lg focus:not-sr-only focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      >
+        Skip to main content
+      </a>
       <div data-testid="app-background" aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-tech-grid">
-        <div className="absolute top-[-20%] left-[-10%] h-[60%] w-[60%] rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.11),transparent_68%)] opacity-45" />
-        <div className="absolute bottom-[-20%] right-[-10%] h-[50%] w-[50%] rounded-full bg-[radial-gradient(circle,hsl(var(--accent)/0.09),transparent_68%)] opacity-35" />
-        <div className="absolute inset-0 bg-gradient-to-br from-background/40 via-background/70 to-background/95" />
+        <div className="absolute top-[-20%] left-[-10%] h-[60%] w-[60%] rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.09),transparent_68%)] opacity-35" />
+        <div className="absolute bottom-[-20%] right-[-10%] h-[50%] w-[50%] rounded-full bg-[radial-gradient(circle,hsl(var(--accent)/0.07),transparent_68%)] opacity-25" />
+        <div className="absolute inset-0 bg-gradient-to-br from-background/50 via-background/75 to-background/95" />
       </div>
       <div className="md:hidden flex items-center justify-between p-4 glass-panel-dark text-sidebar-foreground z-30 relative border-b border-sidebar-border shadow-md">
         <div className="flex items-center">
@@ -623,7 +629,7 @@ export function AppLayoutView({
         </div>
       </aside>
 
-      <main className="relative z-10 flex-1 flex min-w-0 max-w-full flex-col overflow-x-hidden md:overflow-hidden">
+      <main id="main-content" tabIndex={-1} className="relative z-10 flex-1 flex min-w-0 max-w-full flex-col overflow-x-hidden outline-none md:overflow-hidden">
         <div className="relative z-10 flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-x-hidden md:h-full md:overflow-hidden">
           {children}
         </div>
