@@ -1122,4 +1122,3 @@ trade?: string;
 status?: VendorQuoteStatus;
 direction?: QuoteDirection;
 };
-
