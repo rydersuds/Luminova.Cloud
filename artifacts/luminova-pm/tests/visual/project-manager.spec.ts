@@ -78,6 +78,7 @@ test('selects a workspace Project Manager while creating a project', async ({ pa
   }));
 
   await page.goto('/__visual/dashboard-cards');
+  await expect(page.getByText(/\d+ days remaining/, { exact: true }).first()).toBeVisible();
   await page.getByRole('button', { name: 'INITIALIZE PROJECT' }).click();
   const dialog = page.getByRole('dialog', { name: 'Initialize New Project' });
   await dialog.locator('input[name="name"]').fill('Prairie House');

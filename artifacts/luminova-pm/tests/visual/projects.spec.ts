@@ -62,6 +62,7 @@ test.describe('All Projects region filter', () => {
     });
 
     await page.goto('/__visual/project-cards');
+    await expect(page.getByText(/\d+ days remaining/, { exact: true }).first()).toBeVisible();
 
     const regionFilter = page.getByRole('combobox', { name: 'Project region' });
     await expect(regionFilter.locator('option')).toHaveText(['All regions', 'Calgary', 'Red Deer']);

@@ -15,7 +15,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
+import { formatCurrency, formatDate, formatDaysRemaining, getDaysRemaining, getStatusColor } from "@/lib/utils"
 import { Plus, MapPin, Building, Activity, DollarSign, Clock, FileJson, FileSpreadsheet, X, CheckCircle2, AlertTriangle, ShieldAlert, FolderUp, FileText } from "lucide-react"
 import { Link, useLocation } from "wouter"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -669,6 +669,17 @@ export default function Dashboard() {
                         <div className="flex items-start gap-2 text-sm text-muted-foreground/80 font-mono">
                           <MapPin className="h-4 w-4 shrink-0 text-primary/50" />
                           <span className="truncate text-xs">{project.address}</span>
+                        </div>
+                        <div className="flex items-center justify-between border-t border-border/30 pt-2 text-xs font-mono uppercase tracking-wider">
+                          <span className="text-muted-foreground">Time remaining</span>
+                          <span className={cn(
+                            "font-bold",
+                            getDaysRemaining(project.targetDate) !== null && getDaysRemaining(project.targetDate)! < 0
+                              ? "text-destructive"
+                              : "text-primary",
+                          )}>
+                            {formatDaysRemaining(project.targetDate)}
+                          </span>
                         </div>
                         
                         <div className="pt-2 border-t border-border/30">

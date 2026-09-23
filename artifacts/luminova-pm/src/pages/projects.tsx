@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Building2, Grid2X2, List, MapPin, Search, SlidersHorizontal, X } from "lucide-react"
-import { cn, formatCurrency, formatDateOnly, getStatusColor } from "@/lib/utils"
+import { cn, formatCurrency, formatDateOnly, formatDaysRemaining, getDaysRemaining, getStatusColor } from "@/lib/utils"
 import { ClientIdentity } from "@/components/client-identity"
 
 const STATUSES = ["Pre-construction", "Planning", "Active", "In progress", "On hold", "Completed", "Rejected for bid"]
@@ -228,6 +228,15 @@ export default function Projects() {
                          <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">End date</p>
                           <p className="mt-1 break-words font-medium">{formatDateOnly(project.targetDate)}</p>
                       </div>
+                         <div className="min-w-0">
+                           <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Time remaining</p>
+                           <p className={cn(
+                             "mt-1 break-words font-medium",
+                             getDaysRemaining(project.targetDate) !== null && getDaysRemaining(project.targetDate)! < 0 && "text-destructive",
+                           )}>
+                             {formatDaysRemaining(project.targetDate)}
+                           </p>
+                         </div>
                         <div className="min-w-0">
                         <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Budget</p>
                           <p className="mt-1 break-words font-semibold tabular-nums">{formatCurrency(project.budgeted)}</p>
