@@ -122,6 +122,11 @@ function fakeClerk(
         });
         return user;
       },
+      updateUserProfileImage: async (id: string, input: { file: Blob | File | string }) => {
+        const user = await client.users.getUser(id);
+        Object.assign(user, { imageUrl: typeof input.file === "string" ? input.file : `https://example.com/updated-avatar-${id}.png` });
+        return user;
+      },
       replaceUserEmailAddress: async (id: string, input: { emailAddress: string }) => {
         const user = await client.users.getUser(id);
         Object.assign(user, { primaryEmailAddress: { emailAddress: input.emailAddress } });
@@ -440,6 +445,43 @@ test("blocks non-administrators from listing and mutating users", async () => {
   })).status, 403);
   assert.equal((await fetch(`${base}/users/admin`, { method: "DELETE" })).status, 403);
   assert.equal((await inviteClientUser(base, "client-not-owned", "new-client@example.com")).status, 403);
+});
+
+test("allows users to update their own profile image and administrators to update workspace members", async () => {
+  const fake = fakeClerk([makeUser("admin", "Admin"), makeUser("member", "Field Team")]);
+  const memberBase = await startApi("member", fake.client);
+  const imageData = "data:image/png;base64,aGVsbG8=";
+
+  const ownUpdate = await fetch(`${memberBase}/users/member/profile-image`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ imageData }),
+  });
+  assert.equal(ownUpdate.status, 200);
+  assert.equal(((await ownUpdate.json()) as { imageUrl: string }).imageUrl, "https://example.com/updated-avatar-member.png");
+
+  const forbidden = await fetch(`${memberBase}/users/admin/profile-image`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ imageData }),
+  });
+  assert.equal(forbidden.status, 403);
+
+  const adminBase = await startApi("admin", fake.client);
+  const adminUpdate = await fetch(`${adminBase}/users/member/profile-image`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ imageData }),
+  });
+  assert.equal(adminUpdate.status, 200);
+  assert.equal(((await adminUpdate.json()) as { imageUrl: string }).imageUrl, "https://example.com/updated-avatar-member.png");
+
+  const invalid = await fetch(`${adminBase}/users/member/profile-image`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ imageData: "data:image/svg+xml;base64,invalid" }),
+  });
+  assert.equal(invalid.status, 400);
 });
 
 test("lists only eligible Project Managers for administrators", async () => {

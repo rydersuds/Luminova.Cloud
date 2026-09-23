@@ -94,4 +94,5 @@ export * from './workspaceRole';
 export * from './workspaceSearchResult';
 export * from './workspaceSearchResultKind';
 export * from './workspaceUser';
+export * from './workspaceUserProfileImageUpdate';
 export * from './workspaceUserUpdate';

@@ -160,6 +160,15 @@ export interface WorkspaceUserUpdate {
   role?: WorkspaceRole;
 }
 
+export interface WorkspaceUserProfileImageUpdate {
+  /**
+     * @minLength 30
+     * @maxLength 11184840
+     * @pattern ^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$
+     */
+  imageData: string;
+}
+
 export interface HealthStatus {
   status: string;
 }

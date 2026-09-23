@@ -2030,6 +2030,41 @@ export const GetCurrentWorkspaceUserResponse = zod.object({
 
 
 /**
+ * @summary Update a workspace user's profile image
+ */
+
+
+
+export const UpdateWorkspaceUserProfileImageParams = zod.object({
+  "userId": zod.coerce.string().min(1)
+})
+
+export const updateWorkspaceUserProfileImageBodyImageDataMin = 30;
+export const updateWorkspaceUserProfileImageBodyImageDataMax = 11184840;
+
+
+export const updateWorkspaceUserProfileImageBodyImageDataRegExp = new RegExp('^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$');
+
+
+export const UpdateWorkspaceUserProfileImageBody = zod.object({
+  "imageData": zod.string().min(updateWorkspaceUserProfileImageBodyImageDataMin).max(updateWorkspaceUserProfileImageBodyImageDataMax).regex(updateWorkspaceUserProfileImageBodyImageDataRegExp)
+})
+
+export const UpdateWorkspaceUserProfileImageResponse = zod.object({
+  "id": zod.string(),
+  "firstName": zod.string(),
+  "lastName": zod.string(),
+  "name": zod.string(),
+  "email": zod.string().email(),
+  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client']),
+  "createdAt": zod.number().int(),
+  "lastSignInAt": zod.number().int().nullish(),
+  "imageUrl": zod.string(),
+  "clientAccessCleanupPending": zod.boolean()
+})
+
+
+/**
  * @summary List workspace users
  */
 export const GetWorkspaceUsersResponseItem = zod.object({

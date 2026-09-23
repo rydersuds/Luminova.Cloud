@@ -163,6 +163,36 @@ test.describe('Users & Roles background treatment', () => {
     await expect(page).toHaveScreenshot('desktop-users-search-empty.png', { animations: 'disabled' });
   });
 
+  test('updates a workspace user photo from the administrator card', async ({ page }) => {
+    let updateRequests = 0;
+    await page.route('**/api/users/user-sam/profile-image', async (route) => {
+      expect(route.request().method()).toBe('PATCH');
+      const body = route.request().postDataJSON() as { imageData: string };
+      expect(body.imageData).toMatch(/^data:image\/png;base64,/);
+      updateRequests += 1;
+      await route.fulfill({
+        json: {
+          ...workspaceUsers[1],
+          imageUrl: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="96" height="96"%3E%3Crect width="96" height="96" rx="48" fill="%23ffffff"/%3E%3C/svg%3E',
+        },
+      });
+    });
+
+    await page.goto('/__visual/users');
+    const changePhoto = page.getByRole('button', { name: 'Change profile photo for Sam Carter' });
+    await expect(changePhoto).toBeVisible();
+    const fileChooserPromise = page.waitForEvent('filechooser');
+    await changePhoto.click();
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles({
+      name: 'sam-profile.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from('fake-png'),
+    });
+    await expect.poll(() => updateRequests).toBe(1);
+    await expect(page.locator('img[alt="Sam Carter profile"]')).toHaveAttribute('src', /data:image\/svg/);
+  });
+
   test('keeps the shell background continuous on mobile across both tabs', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/__visual/users');

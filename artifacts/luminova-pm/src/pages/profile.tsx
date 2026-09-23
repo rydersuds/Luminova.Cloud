@@ -4,6 +4,7 @@ import { Link } from "wouter"
 import { useGetCurrentWorkspaceUser } from "@workspace/api-client-react"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ProfilePhotoControl } from "@/components/profile-photo-control"
 
 function DetailRow({
   icon: Icon,
@@ -39,7 +40,6 @@ export default function Profile() {
 
   const displayName = user?.fullName || user?.firstName || "Project Manager"
   const email = user?.primaryEmailAddress?.emailAddress || "Signed in"
-  const initials = displayName.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()
   const role = workspaceUser.data?.role
     || (typeof user?.publicMetadata?.role === "string" ? user.publicMetadata.role : "Workspace member")
 
@@ -70,16 +70,14 @@ export default function Profile() {
           <Card className="overflow-hidden">
             <div className="border-b border-border/60 bg-gradient-to-br from-primary/15 via-card/60 to-transparent p-6 md:p-8">
               <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-                {user?.imageUrl ? (
-                  <img
-                    src={user.imageUrl}
-                    alt=""
-                    className="h-20 w-20 rounded-2xl border border-primary/40 object-cover shadow-[0_0_22px_hsl(var(--primary)/0.22)]"
+                {user && (
+                  <ProfilePhotoControl
+                    userId={user.id}
+                    name={displayName}
+                    imageUrl={user.imageUrl}
+                    size="lg"
+                    onUploaded={() => void user.reload()}
                   />
-                ) : (
-                  <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary text-2xl font-bold text-primary-foreground shadow-[0_0_22px_hsl(var(--primary)/0.22)]">
-                    {initials || "PM"}
-                  </div>
                 )}
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">

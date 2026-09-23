@@ -81,6 +81,7 @@ import type {
   WorkspaceInvitationInput,
   WorkspaceSearchResult,
   WorkspaceUser,
+  WorkspaceUserProfileImageUpdate,
   WorkspaceUserUpdate
 } from './api.schemas';
 
@@ -3759,6 +3760,78 @@ export function useGetCurrentWorkspaceUser<TData = Awaited<ReturnType<typeof get
 
 
 
+
+export const getUpdateWorkspaceUserProfileImageUrl = (userId: string,) => {
+
+
+
+
+  return `/api/users/${userId}/profile-image`
+}
+
+/**
+ * @summary Update a workspace user's profile image
+ */
+export const updateWorkspaceUserProfileImage = async (userId: string,
+    workspaceUserProfileImageUpdate: WorkspaceUserProfileImageUpdate, options?: Parameters<typeof customFetch>[1]): Promise<WorkspaceUser> => {
+
+  return customFetch<WorkspaceUser>(getUpdateWorkspaceUserProfileImageUrl(userId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(workspaceUserProfileImageUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateWorkspaceUserProfileImageMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWorkspaceUserProfileImage>>, TError,{userId: string;data: BodyType<WorkspaceUserProfileImageUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateWorkspaceUserProfileImage>>, TError,{userId: string;data: BodyType<WorkspaceUserProfileImageUpdate>}, TContext> => {
+
+const mutationKey = ['updateWorkspaceUserProfileImage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateWorkspaceUserProfileImage>>, {userId: string;data: BodyType<WorkspaceUserProfileImageUpdate>}> = (props) => {
+          const {userId,data} = props ?? {};
+
+          return  updateWorkspaceUserProfileImage(userId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateWorkspaceUserProfileImageMutationResult = NonNullable<Awaited<ReturnType<typeof updateWorkspaceUserProfileImage>>>
+    export type UpdateWorkspaceUserProfileImageMutationBody = BodyType<WorkspaceUserProfileImageUpdate>
+    export type UpdateWorkspaceUserProfileImageMutationError = ErrorType<void>
+
+    /**
+ * @summary Update a workspace user's profile image
+ */
+export const useUpdateWorkspaceUserProfileImage = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWorkspaceUserProfileImage>>, TError,{userId: string;data: BodyType<WorkspaceUserProfileImageUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateWorkspaceUserProfileImage>>,
+        TError,
+        {userId: string;data: BodyType<WorkspaceUserProfileImageUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateWorkspaceUserProfileImageMutationOptions(options));
+    }
 
 export const getGetWorkspaceUsersUrl = () => {
 

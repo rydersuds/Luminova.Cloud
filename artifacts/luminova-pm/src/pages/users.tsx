@@ -48,6 +48,7 @@ import {
 import { AlertTriangle, Building2, Loader2, MailPlus, Pencil, Plus, RefreshCw, Search, ShieldCheck, Trash2, UserPlus, UserRoundMinus, Users as UsersIcon, X } from "lucide-react"
 import { ClientIdentity } from "@/components/client-identity"
 import { uploadToSignedUrl, validateImageFile } from "@/lib/image-upload"
+import { ProfilePhotoControl } from "@/components/profile-photo-control"
 
 const ROLES: WorkspaceRole[] = ["Admin", "Project Manager", "Field Team", "Client"]
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -129,6 +130,12 @@ export default function Users() {
   const otherWorkspaceUsers = visible.filter((user) => user.role !== "Project Manager")
   const hasSearch = search.trim().length > 0
   const pendingReconciliations = users.filter((user) => user.clientAccessCleanupPending)
+
+  const switchTab = (tab: "users" | "clients") => {
+    setActiveTab(tab)
+    setInviteOpen(false)
+    setFeedback(null)
+  }
 
   const refreshUsers = () => queryClient.invalidateQueries({ queryKey: getGetWorkspaceUsersQueryKey() })
   const refreshInvitations = () => queryClient.invalidateQueries({ queryKey: getGetWorkspaceInvitationsQueryKey() })
@@ -405,7 +412,17 @@ export default function Users() {
 
   const renderUserCard = (user: WorkspaceUser) => (
     <Card key={user.id} className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
-      <img src={user.imageUrl} alt="" className="h-12 w-12 rounded-full object-cover" />
+      <ProfilePhotoControl
+        userId={user.id}
+        name={user.name}
+        imageUrl={user.imageUrl}
+        disabled={pending}
+        onUploaded={(imageUrl) => {
+          queryClient.setQueryData<WorkspaceUser[]>(getGetWorkspaceUsersQueryKey(), (current = []) =>
+            current.map((candidate) => candidate.id === user.id ? { ...candidate, imageUrl } : candidate),
+          )
+        }}
+      />
       <div className="min-w-0 flex-1">
         <h3 className="font-semibold">{user.name}</h3>
         <p className="truncate text-sm text-muted-foreground">{user.email}</p>
@@ -454,7 +471,7 @@ export default function Users() {
               type="button"
               role="tab"
               aria-selected={activeTab === "users"}
-              onClick={() => { setActiveTab("users"); setFeedback(null) }}
+              onClick={() => switchTab("users")}
               className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${activeTab === "users" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:bg-card/70 hover:text-foreground"}`}
             >
               <UsersIcon className="mr-2 inline-block h-4 w-4" />Users & Roles
@@ -463,7 +480,7 @@ export default function Users() {
               type="button"
               role="tab"
               aria-selected={activeTab === "clients"}
-              onClick={() => { setActiveTab("clients"); setInviteOpen(false); setFeedback(null) }}
+              onClick={() => switchTab("clients")}
               className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${activeTab === "clients" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:bg-card/70 hover:text-foreground"}`}
             >
               <Building2 className="mr-2 inline-block h-4 w-4" />Clients

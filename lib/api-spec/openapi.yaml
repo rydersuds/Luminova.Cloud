@@ -1072,6 +1072,36 @@ paths:
                 $ref: "#/components/schemas/CurrentWorkspaceUser"
         "401":
           description: Authentication required
+  /users/{userId}/profile-image:
+    patch:
+      operationId: updateWorkspaceUserProfileImage
+      tags: [users]
+      summary: Update a workspace user's profile image
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkspaceUserProfileImageUpdate"
+      responses:
+        "200":
+          description: Updated workspace user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceUser"
+        "400":
+          description: Invalid profile image
+        "401":
+          description: Authentication required
+        "403":
+          description: Administrator access required to update another user
+        "404":
+          description: User not found
+        "502":
+          description: Identity provider rejected the update
   /users:
     get:
       operationId: getWorkspaceUsers
@@ -1705,6 +1735,16 @@ components:
           maxLength: 254
         role:
           $ref: "#/components/schemas/WorkspaceRole"
+    WorkspaceUserProfileImageUpdate:
+      type: object
+      additionalProperties: false
+      required: [imageData]
+      properties:
+        imageData:
+          type: string
+          minLength: 30
+          maxLength: 11184840
+          pattern: '^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$'
     HealthStatus:
       type: object
       properties:

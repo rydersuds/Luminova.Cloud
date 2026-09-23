@@ -17,3 +17,4 @@
 - [Workspace invitation lifecycle](workspace-invitation-lifecycle.md) — scope provider invitations before exposure or mutation, and serialize provider cleanup with local access changes.
 - [Entry agreement replacement](entry-agreement-replacement.md) — direct uploads become the sole designated agreement while previous agreements remain ordinary contract files.
 - [Workspace-scoped standalone vendor seeding](standalone-vendor-seeding.md) — seed IDs must be workspace-safe without changing imported-vendor deduplication.
+- [Profile photo control layout](profile-photo-layout.md) — keep avatar actions fixed-size so responsive user-card scroll behavior stays stable.

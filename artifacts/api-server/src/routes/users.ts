@@ -32,6 +32,7 @@ import {
   UpdateWorkspaceUserBody,
   UpdateWorkspaceUserParams,
   UpdateWorkspaceUserResponse,
+  UpdateWorkspaceUserProfileImageBody,
 } from "@workspace/api-zod";
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { and, asc, eq, inArray } from "drizzle-orm";
@@ -41,6 +42,8 @@ import { ObjectStorageService } from "../lib/objectStorage";
 
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 export const ROLES = ["Admin", "Project Manager", "Field Team", "Client"] as const;
+const MAX_PROFILE_IMAGE_BYTES = 8 * 1024 * 1024;
+const PROFILE_IMAGE_DATA_URL = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/;
 
 export const CLIENT_MEMBER_PROFILE_LOOKUP_CONCURRENCY = 8;
 type AuthenticatedRequest = Request & { userId?: string };
@@ -171,6 +174,14 @@ function workspaceId(req: AuthenticatedRequest) {
 
 function clientLogoUrl(objectPath: string | null) {
   return objectPath ? `/api/storage${objectPath}` : null;
+}
+
+function profileImageBlob(imageData: string): Blob | null {
+  const match = PROFILE_IMAGE_DATA_URL.exec(imageData);
+  if (!match || match[2].length % 4 === 1) return null;
+  const bytes = Buffer.from(match[2], "base64");
+  if (bytes.length === 0 || bytes.length > MAX_PROFILE_IMAGE_BYTES) return null;
+  return new Blob([new Uint8Array(bytes)], { type: match[1] });
 }
 
 async function resolveClientMemberUsers(client: ClerkClient, memberUserIds: string[]) {
@@ -693,6 +704,36 @@ router.get("/users", async (req: AuthenticatedRequest, res): Promise<void> => {
     ...serializeUser(user, workspaceId(req)),
     clientAccessCleanupPending: pendingUserIds.has(user.id),
   }))));
+});
+
+router.patch("/users/:userId/profile-image", async (req: AuthenticatedRequest, res): Promise<void> => {
+  const params = UpdateWorkspaceUserParams.safeParse(req.params);
+  const body = UpdateWorkspaceUserProfileImageBody.safeParse(req.body);
+  const imageFile = body.success ? profileImageBlob(body.data.imageData) : null;
+  if (!params.success || !body.success || !imageFile) {
+    res.status(400).json({ error: "Choose a valid JPEG, PNG, or WebP image up to 8 MB." });
+    return;
+  }
+
+  try {
+    const scope = workspaceId(req);
+    const actorRole = await ensureRole(client, req.userId!, scope);
+    const target = await client.users.getUser(params.data.userId);
+    if (!await userHasWorkspaceMembership(client, target, scope)) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    if (params.data.userId !== req.userId && actorRole !== "Admin") {
+      res.status(403).json({ error: "Administrator access required to update another user" });
+      return;
+    }
+    const updated = await client.users.updateUserProfileImage(target.id, { file: imageFile });
+    res.json(UpdateWorkspaceUserResponse.parse(serializeUser(updated, scope)));
+  } catch (error) {
+    const normalized = clerkErrorResponse(error, "Clerk could not update this profile image");
+    req.log.warn({ status: normalized.status }, "Clerk profile image update failed");
+    res.status(normalized.status).json({ error: normalized.error });
+  }
 });
 
 router.get("/users/project-managers", async (req: AuthenticatedRequest, res): Promise<void> => {
