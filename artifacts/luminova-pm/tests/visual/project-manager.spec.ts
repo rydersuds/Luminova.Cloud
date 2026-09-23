@@ -44,26 +44,28 @@ async function installIdentity(page: Page, role: 'Admin' | 'Project Manager' = '
 
 test('selects a workspace Project Manager while creating a project', async ({ page }) => {
   await installIdentity(page);
+  let createdProject: Record<string, unknown> | null = null;
   await page.route('**/api/projects', async route => {
     if (route.request().method() === 'POST') {
       const body = route.request().postDataJSON();
       expect(body.projectManagerId).toBe('user-sam');
       expect(body.startDate).toBe('2026-09-01');
       expect(body).not.toHaveProperty('pmName');
+      createdProject = {
+        ...body,
+        id: 'new-project',
+        progress: 0,
+        invoiced: 0,
+        pmName: 'Sam Carter',
+        exteriorImage: '',
+      };
       await route.fulfill({
         status: 201,
-        json: {
-          ...body,
-          id: 'new-project',
-          progress: 0,
-          invoiced: 0,
-          pmName: 'Sam Carter',
-          exteriorImage: '',
-        },
+        json: createdProject,
       });
       return;
     }
-    await route.fulfill({ json: [] });
+    await route.fulfill({ json: createdProject ? [createdProject] : [] });
   });
   await page.route('**/api/dashboard/summary', route => route.fulfill({
     json: {
@@ -78,7 +80,6 @@ test('selects a workspace Project Manager while creating a project', async ({ pa
   }));
 
   await page.goto('/__visual/dashboard-cards');
-  await expect(page.getByText(/\d+ days remaining/, { exact: true }).first()).toBeVisible();
   await page.getByRole('button', { name: 'INITIALIZE PROJECT' }).click();
   const dialog = page.getByRole('dialog', { name: 'Initialize New Project' });
   await dialog.locator('input[name="name"]').fill('Prairie House');
@@ -94,6 +95,7 @@ test('selects a workspace Project Manager while creating a project', async ({ pa
   await dialog.getByRole('button', { name: 'Initialize', exact: true }).click();
 
   await expect(dialog).toBeHidden();
+  await expect(page.getByText(/\d+ days remaining/, { exact: true }).first()).toBeVisible();
 });
 
 test('changes and displays a saved Project Manager across project surfaces', async ({ page }) => {
