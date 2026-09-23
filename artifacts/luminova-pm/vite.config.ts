@@ -27,6 +27,56 @@ if (!basePath) {
   );
 }
 
+const vendorChunkGroups = [
+  {
+    name: 'vendor-clerk',
+    matches: ['/@clerk/'],
+  },
+  {
+    name: 'vendor-react',
+    matches: ['/react/', '/react-dom/', '/scheduler/'],
+  },
+  {
+    name: 'vendor-query',
+    matches: ['/@tanstack/'],
+  },
+  {
+    name: 'vendor-ui',
+    matches: [
+      '/@radix-ui/',
+      '/lucide-react/',
+      '/cmdk/',
+      '/next-themes/',
+      '/sonner/',
+    ],
+  },
+  {
+    name: 'vendor-forms',
+    matches: ['/react-hook-form/', '/@hookform/', '/zod/'],
+  },
+  {
+    name: 'vendor-data',
+    matches: [
+      '/recharts/',
+      '/date-fns/',
+      '/react-day-picker/',
+      '/embla-carousel-react/',
+      '/vaul/',
+    ],
+  },
+];
+
+function manualChunks(id: string) {
+  if (!id.includes('node_modules')) return undefined;
+
+  const normalizedId = id.replaceAll(path.sep, '/');
+  const group = vendorChunkGroups.find(({ matches }) =>
+    matches.some((match) => normalizedId.includes(match)),
+  );
+
+  return group?.name ?? 'vendor-react';
+}
+
 export default defineConfig({
   base: basePath,
   plugins: [
@@ -63,6 +113,12 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, 'dist/public'),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks,
+        onlyExplicitManualChunks: true,
+      },
+    },
   },
   server: {
     port,
