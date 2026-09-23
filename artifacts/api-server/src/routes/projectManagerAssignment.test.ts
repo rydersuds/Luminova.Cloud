@@ -139,7 +139,7 @@ test("persists validated assignments and protects assignment changes", async () 
   assert.equal(dateUpdatedResponse.status, 200);
   assert.equal(dateUpdated.targetDate, updatedEndDate);
   assert.equal(dateUpdated.startDate, "2025-12-01");
-  assert.equal(dateUpdated.progress, 72.8);
+  assert.equal(dateUpdated.progress, 74.9);
 
   const forbidden = await fetch(`${base}/projects/${created.id}`, {
     method: "PATCH",

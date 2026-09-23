@@ -280,6 +280,7 @@ export const UpdateProjectParams = zod.object({
   "projectId": zod.coerce.string()
 })
 
+export const updateProjectBodyStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const updateProjectBodyTargetDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 
 
@@ -287,6 +288,7 @@ export const updateProjectBodyTargetDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{
 export const UpdateProjectBody = zod.object({
   "name": zod.string().optional(),
   "status": zod.string().optional(),
+  "startDate": zod.string().regex(updateProjectBodyStartDateRegExp).optional(),
   "targetDate": zod.string().regex(updateProjectBodyTargetDateRegExp).optional(),
   "description": zod.string().optional(),
   "projectManagerId": zod.string().min(1).optional(),
@@ -2481,3 +2483,5 @@ export const DeleteWorkspaceUserParams = zod.object({
 })
 
 export const DeleteWorkspaceUserResponse = zod.void()
+
+
