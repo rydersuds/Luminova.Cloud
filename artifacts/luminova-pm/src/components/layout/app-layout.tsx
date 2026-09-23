@@ -340,7 +340,7 @@ export function AppLayoutView({
           "input:not([type='button']):not([type='submit']):not([type='reset']):not([type='radio']):not([type='checkbox']):not([type='file']), textarea, [contenteditable='true']",
         )
         const isInteractive = target.closest(
-          "a, button, select, [role='button'], [tabindex], input[type='button'], input[type='submit'], input[type='reset'], input[type='radio'], input[type='checkbox'], input[type='file']",
+          "a, button, select, [role='button'], [tabindex]:not([tabindex='-1']), input[type='button'], input[type='submit'], input[type='reset'], input[type='radio'], input[type='checkbox'], input[type='file']",
         )
 
         cursor.dataset.mode = isText ? "text" : (isInteractive ? "interactive" : "default")
