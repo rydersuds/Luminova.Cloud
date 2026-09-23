@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { formatDateOnly } from "./utils.ts"
+import { formatDateOnly, formatDaysRemaining, getDaysRemaining } from "./utils.ts"
 import { boundedTextSnippet, cleanupDismissedImportErrors, collectFolderCandidates, dismissedImportStorageKey, forgetDismissedImportError, folderFileIssue, normalizeRelativePath, pendingDismissedImportStorageKey, readBatchImportResponse, rememberDismissedImportError, wasImportErrorDismissed } from "./project-folder-import.ts"
 import { LEGAL_CONSENT_LABEL, PRIVACY_PATH, TERMS_PATH, canSubmitSignIn } from "./legal-consent.ts"
 
@@ -21,6 +21,18 @@ test("formatDateOnly preserves the calendar day west of UTC", () => {
   assert.equal(formatDateOnly("2026-09-12"), "Sep 12, 2026")
   assert.equal(formatDateOnly(""), "Not set")
   assert.equal(formatDateOnly("2026-02-30"), "Not set")
+})
+
+test("calculates and formats calendar days remaining", () => {
+  const asOf = new Date("2026-09-23T18:00:00Z")
+  assert.equal(getDaysRemaining("2026-09-23", asOf), 0)
+  assert.equal(getDaysRemaining("2026-09-24", asOf), 1)
+  assert.equal(getDaysRemaining("2026-09-20", asOf), -3)
+  assert.equal(formatDaysRemaining("2026-09-23", asOf), "Due today")
+  assert.equal(formatDaysRemaining("2026-09-24", asOf), "1 day remaining")
+  assert.equal(formatDaysRemaining("2026-09-30", asOf), "7 days remaining")
+  assert.equal(formatDaysRemaining("2026-09-20", asOf), "3 days overdue")
+  assert.equal(formatDaysRemaining("", asOf), "No end date")
 })
 
 test("project folder paths remain relative and reject traversal or controls", () => {

@@ -145,6 +145,7 @@ test('edits the project start and end dates without exposing manual progress', a
   await page.goto('/__visual/project-panorama');
   await expect(page.getByText('Start: Mar 18, 2026', { exact: true })).toBeVisible();
   await expect(page.getByText('End: Feb 12, 2027', { exact: true })).toBeVisible();
+  await expect(page.getByText(/\d+ days remaining/, { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Edit Project' }).click();
   const dialog = page.getByRole('dialog', { name: 'Edit Project' });
   await expect(dialog.getByLabel('Progress (%)')).toHaveCount(0);

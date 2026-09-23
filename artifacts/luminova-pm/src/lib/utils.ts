@@ -32,6 +32,26 @@ export function formatDateOnly(dateString: string) {
   }).format(parsed)
 }
 
+export function getDaysRemaining(dateString: string, asOfDate = new Date()) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return null
+  const targetDate = new Date(`${dateString}T00:00:00Z`)
+  if (Number.isNaN(targetDate.valueOf()) || targetDate.toISOString().slice(0, 10) !== dateString) return null
+
+  const asOfDateOnly = asOfDate.toISOString().slice(0, 10)
+  const currentDate = new Date(`${asOfDateOnly}T00:00:00Z`)
+  return Math.round((targetDate.getTime() - currentDate.getTime()) / 86_400_000)
+}
+
+export function formatDaysRemaining(dateString: string, asOfDate = new Date()) {
+  const daysRemaining = getDaysRemaining(dateString, asOfDate)
+  if (daysRemaining === null) return "No end date"
+  if (daysRemaining === 0) return "Due today"
+  if (daysRemaining === 1) return "1 day remaining"
+  if (daysRemaining > 1) return `${daysRemaining} days remaining`
+  if (daysRemaining === -1) return "1 day overdue"
+  return `${Math.abs(daysRemaining)} days overdue`
+}
+
 export function getStatusColor(status: string) {
   switch (status.toLowerCase()) {
     case "active":

@@ -38,7 +38,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "@/hooks/use-toast"
 import { PanoramaViewer } from "@/components/panorama-viewer"
 import { ClientIdentity } from "@/components/client-identity"
-import { cn, formatCurrency, formatDate, formatDateOnly, getStatusColor } from "@/lib/utils"
+import { cn, formatCurrency, formatDate, formatDateOnly, formatDaysRemaining, getDaysRemaining, getStatusColor } from "@/lib/utils"
 import { readImageDataUrl, uploadToSignedUrl, validateImageFile } from "@/lib/image-upload"
 type ProjectPanorama = {
   id: string
@@ -664,6 +664,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const varianceIsPositive = budgetVariance >= 0
   const clientQuoteRemaining = project.clientQuote.total - project.invoiced
   const projectProgress = Math.min(Math.max(project.progress, 0), 100)
+  const daysRemaining = getDaysRemaining(project.targetDate)
   const renderPhotoCard = (photo: ProjectPhoto) => {
     const index = project.photos.findIndex((item) => item.id === photo.id)
     return (
@@ -758,6 +759,10 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                   <div className="flex items-center gap-1.5">
                     <Calendar className="h-4 w-4 text-primary" />
                     End: {formatDateOnly(project.targetDate)}
+                  </div>
+                  <div className={cn("flex items-center gap-1.5", daysRemaining !== null && daysRemaining < 0 && "text-destructive")}>
+                    <Clock className="h-4 w-4 text-primary" />
+                    {formatDaysRemaining(project.targetDate)}
                   </div>
                   <div className="flex items-center gap-1.5">
                     <ClientIdentity name={project.clientName} logoUrl={project.clientLogoUrl} size="sm" />
