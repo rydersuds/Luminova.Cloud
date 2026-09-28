@@ -7,7 +7,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Building2, Grid2X2, List, Search, SlidersHorizontal, X } from "lucide-react"
-import { cn } from "@/lib/utils"
 import { ProjectCard } from "@/components/workspace/project-card"
 
 const STATUSES = ["Pre-construction", "Planning", "Active", "In progress", "On hold", "Completed", "Rejected for bid"]
@@ -149,9 +148,9 @@ export default function Projects() {
           </div>
 
           {isLoading ? (
-            <div className={cn("grid gap-5", view === "grid" ? "md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1")}>
+            <div className={view === "grid" ? "pgrid" : "pgrid-list"}>
               {Array.from({ length: 6 }).map((_, index) => (
-                <div key={index} className="h-[30rem] skeleton-line rounded-2xl" />
+                <div key={index} className="h-[21rem] skeleton-line rounded-2xl" />
               ))}
             </div>
           ) : projects?.length === 0 ? (
@@ -161,7 +160,7 @@ export default function Projects() {
               <p className="mt-2 text-sm text-muted-foreground">Clear or adjust the filters to expand the results.</p>
             </div>
           ) : (
-            <div className={cn("grid gap-5", view === "grid" ? "md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1")}>
+            <div className={view === "grid" ? "pgrid" : "pgrid-list"}>
               {projects?.map((project) => (
                 <ProjectCard key={project.id} project={project} layout={view === "list" ? "row" : "tile"} onOpen={() => setLocation(`/projects/${project.id}`)} />
               ))}

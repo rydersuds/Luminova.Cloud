@@ -31,34 +31,34 @@ export function ProjectStage({ projects, loading }: { projects: Project[] | unde
       )}
       <div className="stage-shade" />
 
-      <div className="relative z-10 flex h-full flex-col justify-between gap-8 p-5 sm:p-8 lg:p-10">
+      <div className="relative z-10 flex h-full flex-col justify-between gap-4 p-4 sm:p-6">
         <div className="flex flex-wrap items-center gap-3">
           <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/70">In focus</span>
           <StatusPill status={featured.status} />
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
+        <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
           <div className="max-w-3xl">
-            <p className="mb-3 font-mono text-xs uppercase tracking-[0.2em] text-[hsl(var(--brand-gold))]">{featured.clientName}</p>
+            <p className="mb-1.5 font-mono text-[11px] uppercase tracking-[0.2em] text-[hsl(var(--brand-gold))]">{featured.clientName}</p>
             <h2 className="stage-title">{featured.name}</h2>
-            <p className="mt-4 flex items-start gap-2 text-sm text-white/80">
+            <p className="mt-2 flex items-start gap-2 text-xs text-white/80">
               <MapPin className="mt-0.5 h-4 w-4 shrink-0" />{featured.address}
             </p>
-            <div className="mt-6 flex flex-wrap items-center gap-x-8 gap-y-4 text-white">
+            <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-white">
               <div>
                 <p className="stage-k">Completion</p>
-                <p className="font-heading text-5xl font-extrabold tabular-nums leading-none">{featured.progress}<span className="text-2xl text-white/60">%</span></p>
+                <p className="font-heading text-3xl font-extrabold tabular-nums leading-none">{featured.progress}<span className="text-lg text-white/60">%</span></p>
               </div>
               <div>
                 <p className="stage-k">Time remaining</p>
-                <p className={cn("text-lg font-semibold", days !== null && days < 0 && "text-[hsl(var(--ember))]")}>{formatDaysRemaining(featured.targetDate)}</p>
+                <p className={cn("text-sm font-semibold", days !== null && days < 0 && "text-[hsl(var(--ember))]")}>{formatDaysRemaining(featured.targetDate)}</p>
               </div>
               <div>
                 <p className="stage-k">Project manager</p>
-                <p className="text-lg font-semibold">{featured.pmName || "Unassigned"}</p>
+                <p className="text-sm font-semibold">{featured.pmName || "Unassigned"}</p>
               </div>
             </div>
-            <div className="stage-gauge mt-6" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, featured.progress))}%` }} /></div>
+            <div className="stage-gauge mt-3" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, featured.progress))}%` }} /></div>
           </div>
 
           <Link href={`/projects/${featured.id}`} data-testid="link-stage-open-project" className="stage-cta">

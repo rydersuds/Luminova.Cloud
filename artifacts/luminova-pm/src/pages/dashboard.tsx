@@ -640,10 +640,10 @@ export default function Dashboard() {
                 <span className="hud-index">{loadingProjects ? "--" : `${projects?.length ?? 0} listed`}</span>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="pgrid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 280px), 1fr))" }}>
                 {loadingProjects ? (
                   Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="h-[26rem] skeleton-line rounded-2xl" />
+                    <div key={i} className="h-[17rem] skeleton-line rounded-2xl" />
                   ))
                 ) : projects?.length === 0 ? (
                   <div className="col-span-2 text-center py-16 glass-panel rounded-sm border border-border/50">
