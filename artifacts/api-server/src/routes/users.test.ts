@@ -10,6 +10,7 @@ import {
   clerkErrorResponse,
   createUsersRouter,
   listProjectManagers,
+  requireAuth,
   resolveProjectManager,
   revokeClientMemberships,
   workspaceChatUsers,
@@ -17,6 +18,34 @@ import {
 import { ObjectStorageService } from "../lib/objectStorage";
 
 type Role = "Admin" | "Project Manager" | "Field Team" | "Client";
+
+test("auth guard accepts a user ID from Clerk session claims", () => {
+  const auth = Object.assign(
+    () => ({
+      sessionClaims: { userId: "claims-user" },
+      tokenType: "session_token",
+    }),
+    { [Symbol.for("@clerk/express.auth")]: true },
+  );
+  const req = {
+    auth,
+    method: "GET",
+    path: "/api/storage/objects/uploads/test-object",
+    log: { warn: () => undefined },
+  } as unknown as Parameters<typeof requireAuth>[0];
+  const res = {
+    status: () => res,
+    json: () => res,
+  } as unknown as Parameters<typeof requireAuth>[1];
+  let nextCalled = false;
+
+  requireAuth(req, res, () => {
+    nextCalled = true;
+  });
+
+  assert.equal(nextCalled, true);
+  assert.equal(req.userId, "claims-user");
+});
 
 function makeUser(id: string, role: Role, email = `${id}@example.com`, workspaceIds: string[] = []): User {
   return {

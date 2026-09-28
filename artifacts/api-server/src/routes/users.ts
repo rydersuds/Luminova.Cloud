@@ -65,12 +65,14 @@ function postgresErrorCode(error: unknown): string | undefined {
 }
 export function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
   const auth = getAuth(req);
-  const userId = auth?.userId;
+  const sessionClaimUserId = auth?.sessionClaims?.userId;
+  const userId = typeof sessionClaimUserId === "string" ? sessionClaimUserId : auth?.userId;
   if (!userId) {
     if (process.env.NODE_ENV !== "production") {
       req.log.warn(
         {
           hasAuthContext: Boolean(auth),
+          hasSessionClaimUserId: typeof sessionClaimUserId === "string",
           method: req.method,
           path: req.path,
         },
