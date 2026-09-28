@@ -24,12 +24,14 @@ export type ProjectDocumentPreviewFile = {
 export function isOfficePreviewableDocument(file: Pick<ProjectDocumentPreviewFile, "name" | "contentType">) {
   const extension = file.name.toLowerCase().split(".").at(-1)
   const contentType = (file.contentType ?? "").toLowerCase()
-  return extension === "docx" ||
+  return ["doc", "docx", "docm", "dot", "dotx", "dotm"].includes(extension ?? "") ||
     contentType.includes("wordprocessingml") ||
-    extension === "xlsx" ||
-    extension === "xlsm" ||
+    contentType.includes("application/msword") ||
+    contentType.includes("vnd.ms-word") ||
+    ["xls", "xlsx", "xlsm", "xlt", "xltx", "xltm"].includes(extension ?? "") ||
     contentType.includes("spreadsheetml") ||
-    contentType.includes("sheet.macroenabled")
+    contentType.includes("sheet.macroenabled") ||
+    contentType.includes("application/vnd.ms-excel")
 }
 
 function columnLabel(index: number) {

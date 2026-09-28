@@ -582,6 +582,7 @@ export const getGetProjectDocumentPreviewUrl = (projectId: string,
 }
 
 /**
+ * Supports modern and legacy Word and Excel documents. Preview output is bounded and read-only.
  * @summary Preview a Word or Excel project document
  */
 export const getProjectDocumentPreview = async (projectId: string,

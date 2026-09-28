@@ -141,6 +141,7 @@ paths:
       operationId: getProjectDocumentPreview
       tags: [projects]
       summary: Preview a Word or Excel project document
+      description: Supports modern and legacy Word and Excel documents. Preview output is bounded and read-only.
       parameters:
         - $ref: "#/components/parameters/ProjectId"
         - name: documentId

@@ -45,6 +45,14 @@ test("Word preview extracts plain text from DOCX", async () => {
   assert.equal(preview.truncated, false);
 });
 
+test("Word OOXML templates and macro-enabled documents use the text preview", async () => {
+  for (const name of ["template.dotx", "proposal.docm"]) {
+    const preview = await createProjectDocumentPreview(makeDocx("Document preview"), name, "application/octet-stream");
+    assert.equal(preview.kind, "word");
+    assert.equal(preview.text, "Document preview");
+  }
+});
+
 test("Excel preview includes worksheet names and formatted cell values", async () => {
   const workbook = new ExcelJS.Workbook();
   const summary = workbook.addWorksheet("Summary");
@@ -72,6 +80,22 @@ test("Excel preview includes worksheet names and formatted cell values", async (
   assert.equal(preview.truncated, false);
 });
 
+test("Excel preview safely handles merged cells with empty masters", async () => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Summary");
+  sheet.mergeCells("A1:B1");
+  sheet.getCell("A1").value = "Project total";
+  sheet.mergeCells("A2:B2");
+  const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+
+  const preview = await createProjectDocumentPreview(buffer, "budget.xlsx", "");
+
+  assert.deepEqual(preview.worksheets[0]?.rows, [
+    ["Project total", ""],
+    ["", ""],
+  ]);
+});
+
 test("Excel preview bounds rows and columns and reports truncation", async () => {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Large");
@@ -87,9 +111,14 @@ test("Excel preview bounds rows and columns and reports truncation", async () =>
   assert.equal(preview.truncated, true);
 });
 
-test("preview format detection excludes unsupported legacy Office formats", () => {
-  assert.equal(getProjectDocumentPreviewKind("letter.doc", "application/msword"), null);
-  assert.equal(getProjectDocumentPreviewKind("ledger.xls", "application/vnd.ms-excel"), null);
+test("preview format detection includes common modern and legacy Word and Excel formats", () => {
+  assert.equal(getProjectDocumentPreviewKind("letter.doc", "application/msword"), "word");
   assert.equal(getProjectDocumentPreviewKind("letter.docx", "application/octet-stream"), "word");
+  assert.equal(getProjectDocumentPreviewKind("letter.dotm", "application/octet-stream"), "word");
+  assert.equal(getProjectDocumentPreviewKind("ledger.xls", "application/vnd.ms-excel"), "excel");
+  assert.equal(getProjectDocumentPreviewKind("template.xlt", "application/octet-stream"), "excel");
+  assert.equal(getProjectDocumentPreviewKind("ledger.xlsx", "application/octet-stream"), "excel");
   assert.equal(getProjectDocumentPreviewKind("ledger.xlsm", "application/octet-stream"), "excel");
+  assert.equal(getProjectDocumentPreviewKind("ledger.xltx", "application/octet-stream"), "excel");
+  assert.equal(getProjectDocumentPreviewKind("scan.pdf", "application/pdf"), null);
 });

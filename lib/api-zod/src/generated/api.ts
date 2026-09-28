@@ -327,6 +327,7 @@ export const UpdateProjectResponse = zod.object({
 
 
 /**
+ * Supports modern and legacy Word and Excel documents. Preview output is bounded and read-only.
  * @summary Preview a Word or Excel project document
  */
 

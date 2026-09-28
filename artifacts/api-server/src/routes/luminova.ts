@@ -7397,7 +7397,7 @@ router.get("/projects/:projectId/documents/:documentId/preview", async (req: Aut
   }
 
   if (!getProjectDocumentPreviewKind(document.name, document.contentType)) {
-    res.status(415).json({ error: "Only Word .docx and Excel .xlsx or .xlsm files can be previewed." });
+    res.status(415).json({ error: "This Word or Excel file format cannot be previewed." });
     return;
   }
   if (document.size > MAX_PREVIEW_SOURCE_BYTES) {

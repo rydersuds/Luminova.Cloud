@@ -112,13 +112,13 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('previews a Word entry agreement before offering the original download', async ({ page }) => {
+test('previews a legacy Word entry agreement before offering the original download', async ({ page }) => {
   const agreement = {
-    id: 'agreement-docx',
-    name: 'Signed site entry agreement.docx',
-    relativePath: 'Contracts/Signed site entry agreement.docx',
+    id: 'agreement-doc',
+    name: 'Signed site entry agreement.doc',
+    relativePath: 'Contracts/Signed site entry agreement.doc',
     url: '/api/storage/objects/uploads/entry-agreement-docx',
-    contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    contentType: 'application/msword',
     classification: 'contract',
     isEntryAgreement: true,
     collection: 'Contracts',
@@ -133,25 +133,25 @@ test('previews a Word entry agreement before offering the original download', as
     }
     await route.fallback();
   });
-  await page.route('**/api/projects/riverstone/documents/agreement-docx/preview', route => route.fulfill({
+  await page.route('**/api/projects/riverstone/documents/agreement-doc/preview', route => route.fulfill({
     json: { kind: 'word', text: 'Private entry agreement preview', worksheets: [], truncated: false },
   }));
 
   await page.goto('/__visual/project-panorama');
-  await page.getByTestId('link-open-agreement-agreement-docx').click();
+  await page.getByTestId('link-open-agreement-agreement-doc').click();
 
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByText('Private entry agreement preview')).toBeVisible();
   await expect(dialog.getByRole('link', { name: `Download original ${agreement.name}` })).toHaveAttribute('href', agreement.url);
 });
 
-test('previews an Excel source file with worksheet data before downloading it', async ({ page }) => {
+test('previews a legacy Excel source file with worksheet data before downloading it', async ({ page }) => {
   const workbookFile = {
-    id: 'invoice-xlsx',
-    name: 'Framing invoice.xlsx',
-    relativePath: 'Invoices/Framing invoice.xlsx',
+    id: 'invoice-xls',
+    name: 'Framing invoice.xls',
+    relativePath: 'Invoices/Framing invoice.xls',
     url: '/api/storage/objects/uploads/framing-invoice',
-    contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    contentType: 'application/vnd.ms-excel',
     classification: 'invoice',
     isEntryAgreement: false,
     collection: 'Invoices',
@@ -166,7 +166,7 @@ test('previews an Excel source file with worksheet data before downloading it', 
     }
     await route.fallback();
   });
-  await page.route('**/api/projects/riverstone/documents/invoice-xlsx/preview', route => route.fulfill({
+  await page.route('**/api/projects/riverstone/documents/invoice-xls/preview', route => route.fulfill({
     json: {
       kind: 'excel',
       text: null,
