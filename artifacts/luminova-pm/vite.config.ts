@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 
 import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
+import { chunkSizeWarningLimitKb } from './bundle-size.config.mjs';
 
 const rawPort = process.env.PORT;
 
@@ -113,6 +114,7 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, 'dist/public'),
     emptyOutDir: true,
+    chunkSizeWarningLimit: chunkSizeWarningLimitKb,
     rollupOptions: {
       output: {
         manualChunks,

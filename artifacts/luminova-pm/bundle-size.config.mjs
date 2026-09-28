@@ -1,0 +1,1 @@
+export const chunkSizeWarningLimitKb = 500;
