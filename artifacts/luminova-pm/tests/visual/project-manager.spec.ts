@@ -64,6 +64,42 @@ test('featured projects switch accessibly and fit mobile screens', async ({ page
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
+test('project highlights browse every project without crowding the banner', async ({ page }) => {
+  await installIdentity(page);
+  let highlights = Array.from({ length: 9 }, (_, i) => ({
+    ...project, id: `highlight-${i + 1}`, name: `Project ${i + 1}`,
+  }));
+  await page.route('**/api/projects', route => route.fulfill({ json: highlights }));
+  await page.route('**/api/dashboard/summary', route => route.fulfill({
+    json: { activeProjects: 9, awaitingApproval: 0, unreadMessages: 0, new360Photos: 0, budgeted: 0, invoiced: 0, recentActivity: [] },
+  }));
+  await page.goto('/__visual/dashboard-cards');
+  const stage = page.getByTestId('dashboard-project-stage');
+  const previous = page.getByTestId('button-stage-previous');
+  const next = page.getByTestId('button-stage-next');
+  await expect(stage.getByRole('heading', { name: 'Project 1' })).toBeVisible();
+  await expect(stage.locator('.stage-count')).toContainText('01 / 09');
+  await expect(stage.locator('.stage-thumb')).toHaveCount(5);
+
+  await previous.focus();
+  await page.keyboard.press('Enter');
+  await expect(stage.getByRole('heading', { name: 'Project 9' })).toBeVisible();
+  await expect(stage.locator('.stage-count')).toContainText('09 / 09');
+  await expect(page.getByTestId('link-stage-open-project')).toHaveAttribute('href', '/projects/highlight-9');
+  await next.click();
+  await expect(stage.getByRole('heading', { name: 'Project 1' })).toBeVisible();
+  for (let i = 0; i < 6; i++) await next.click();
+  await expect(stage.getByRole('heading', { name: 'Project 7' })).toBeVisible();
+  await expect(stage.locator('.stage-thumb')).toHaveCount(5);
+  await expect(stage.getByTestId('button-stage-select-highlight-9')).toBeVisible();
+
+  highlights = highlights.slice(0, 1);
+  await page.reload();
+  await expect(stage.getByRole('heading', { name: 'Project 1' })).toBeVisible();
+  await expect(previous).toHaveCount(0);
+  await expect(next).toHaveCount(0);
+});
+
 test('selects a workspace Project Manager while creating a project', async ({ page }) => {
   await installIdentity(page);
   let createdProject: Record<string, unknown> | null = null;

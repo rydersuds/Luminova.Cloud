@@ -1,29 +1,35 @@
 import { useMemo, useState } from "react"
 import { Link } from "wouter"
 import type { Project } from "@workspace/api-client-react"
-import { ArrowRight, Building2, MapPin } from "lucide-react"
+import { ArrowLeft, ArrowRight, Building2, MapPin } from "lucide-react"
 import { cn, formatDaysRemaining, getDaysRemaining } from "@/lib/utils"
 import { StatusPill } from "./status-pill"
 
 const LIVE = new Set(["Active", "In progress"])
 
-/** Featured-project stage. Uses only the projects the user can already see. */
+/** Project highlights carousel. Uses only the projects the user can already see. */
 export function ProjectStage({ projects, loading }: { projects: Project[] | undefined; loading: boolean }) {
   const ordered = useMemo(() => {
     const list = [...(projects ?? [])]
     const score = (p: Project) => (p.exteriorImage ? 2 : 0) + (LIVE.has(p.status) ? 1 : 0)
-    return list.sort((a, b) => score(b) - score(a)).slice(0, 5)
+    return list.sort((a, b) => score(b) - score(a))
   }, [projects])
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const featured = ordered.find((p) => p.id === selectedId) ?? ordered[0]
+  const selectedIndex = Math.max(0, ordered.findIndex((p) => p.id === selectedId))
+  const featured = ordered[selectedIndex]
+  const visibleStart = Math.min(Math.max(selectedIndex - 2, 0), Math.max(ordered.length - 5, 0))
+  const visibleProjects = ordered.slice(visibleStart, visibleStart + 5)
+  const selectOffset = (offset: number) => {
+    setSelectedId(ordered[(selectedIndex + offset + ordered.length) % ordered.length].id)
+  }
 
-  if (loading) return <div className="stage stage-loading skeleton-line" aria-busy="true" aria-label="Loading featured project" />
+  if (loading) return <div className="stage stage-loading skeleton-line" aria-busy="true" aria-label="Loading project highlights" />
   if (!featured) return null
 
   const days = getDaysRemaining(featured.targetDate)
 
   return (
-    <section aria-label="Featured project" className="stage" data-testid="dashboard-project-stage">
+    <section aria-label="Project highlights" className="stage" data-testid="dashboard-project-stage">
       {featured.exteriorImage ? (
         <img key={featured.id} src={featured.exteriorImage} alt="" className="stage-img" />
       ) : (
@@ -32,10 +38,26 @@ export function ProjectStage({ projects, loading }: { projects: Project[] | unde
       <div className="stage-shade" />
 
       <div className="relative z-10 flex h-full flex-col justify-between gap-4 p-4 sm:p-6">
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/70">In focus</span>
-          <StatusPill status={featured.status} />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/70">Project highlights</span>
+            <StatusPill status={featured.status} />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="stage-count" aria-hidden="true">{String(selectedIndex + 1).padStart(2, "0")} <span className="text-white/45">/ {String(ordered.length).padStart(2, "0")}</span></span>
+            {ordered.length > 1 && (
+              <div role="group" aria-label="Browse project highlights" className="flex items-center gap-1">
+                <button type="button" className="stage-nav" aria-label="Previous project highlight" data-testid="button-stage-previous" onClick={() => selectOffset(-1)}>
+                  <ArrowLeft className="h-4 w-4" />
+                </button>
+                <button type="button" className="stage-nav" aria-label="Next project highlight" data-testid="button-stage-next" onClick={() => selectOffset(1)}>
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
+        <span className="sr-only" aria-live="polite">Project {selectedIndex + 1} of {ordered.length}: {featured.name}</span>
 
         <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
           <div className="max-w-3xl">
@@ -68,7 +90,7 @@ export function ProjectStage({ projects, loading }: { projects: Project[] | unde
 
         {ordered.length > 1 && (
           <div role="group" aria-label="Choose featured project" className="flex gap-2 overflow-x-auto pb-1">
-            {ordered.map((p) => (
+            {visibleProjects.map((p) => (
               <button
                 key={p.id}
                 type="button"
