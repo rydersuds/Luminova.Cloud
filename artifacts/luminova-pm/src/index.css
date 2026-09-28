@@ -722,3 +722,105 @@
     }
   }
 }
+
+/* Survey Instrument HUD layer — authenticated workspace */
+@layer utilities {
+  .hud-frame { position: relative; }
+  .hud-frame::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 2; border-radius: inherit;
+    background:
+      linear-gradient(hsl(var(--primary)) 0 0) top left / 14px 1.5px no-repeat,
+      linear-gradient(hsl(var(--primary)) 0 0) top left / 1.5px 14px no-repeat,
+      linear-gradient(hsl(var(--primary)) 0 0) bottom right / 14px 1.5px no-repeat,
+      linear-gradient(hsl(var(--primary)) 0 0) bottom right / 1.5px 14px no-repeat;
+    opacity: .85;
+  }
+  .hud-rule {
+    height: 1px;
+    background: repeating-linear-gradient(90deg, hsl(var(--foreground) / .28) 0 1px, transparent 1px 8px);
+  }
+  .hud-kicker {
+    @apply inline-flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.24em];
+    color: hsl(var(--signal));
+  }
+  .hud-kicker::before { content: ''; width: 18px; height: 1px; background: currentColor; }
+  .hud-index {
+    @apply font-mono text-[10px] tabular-nums tracking-[0.18em];
+    color: hsl(var(--muted-foreground));
+  }
+  .hud-header {
+    @apply relative overflow-hidden rounded-2xl border p-5 sm:p-7;
+    background:
+      linear-gradient(90deg, hsl(var(--signal) / .07), transparent 40%),
+      linear-gradient(hsl(var(--card) / .86), hsl(var(--card) / .72));
+    border-color: hsl(var(--border) / .8);
+  }
+  .hud-header::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .5;
+    background-image:
+      linear-gradient(to right, hsl(var(--border) / .35) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / .35) 1px, transparent 1px);
+    background-size: 24px 24px;
+    mask-image: linear-gradient(100deg, transparent 35%, #000 100%);
+  }
+  .hud-header > * { position: relative; z-index: 1; }
+  .hud-segment { @apply inline-flex rounded-lg border p-1; border-color: hsl(var(--border)); background: hsl(var(--muted) / .6); }
+  .hud-segment > button { @apply inline-flex h-8 items-center gap-1.5 rounded-md px-3 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground transition-colors; }
+  .hud-segment > button[aria-pressed='true'] { background: hsl(var(--foreground)); color: hsl(var(--background)); }
+  .hud-select { @apply h-10 rounded-lg border bg-background/70 px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring; border-color: hsl(var(--border)); }
+  .hud-card { transition: transform .25s cubic-bezier(.16,1,.3,1), border-color .2s; }
+  .hud-card:hover { transform: translateY(-2px); border-color: hsl(var(--primary) / .6); }
+  .hud-card:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce) { .hud-card:hover { transform: none; } }
+}
+
+@layer utilities {
+  .workspace-field::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(180deg, hsl(var(--signal) / .05), transparent 30%);
+  }
+  .sidebar-instrument::after {
+    content: ''; position: absolute; top: 5rem; bottom: 5rem; right: 0; width: 1px; pointer-events: none;
+    background: repeating-linear-gradient(180deg, hsl(var(--sidebar-primary) / .5) 0 1px, transparent 1px 10px);
+  }
+  .sidebar-instrument nav a[aria-current='page']::before {
+    content: ''; position: absolute; left: 0; top: 22%; bottom: 22%; width: 3px; z-index: 11;
+    background: hsl(var(--sidebar-primary-foreground)); border-radius: 0 2px 2px 0;
+  }
+  .hud-readout {
+    border: 1px solid hsl(var(--border) / .9); border-radius: 1rem; overflow: hidden;
+    background: hsl(var(--border) / .9); gap: 1px;
+  }
+  .hud-readout-cell {
+    display: block; padding: 1.1rem 1.25rem; background: hsl(var(--card));
+    position: relative; transition: background-color .2s;
+  }
+  .hud-readout-cell::after {
+    content: ''; position: absolute; left: 1.25rem; bottom: 0; width: 2rem; height: 2px;
+    background: hsl(var(--primary)); transform-origin: left; transition: transform .3s cubic-bezier(.16,1,.3,1);
+  }
+  .hud-readout-cell:hover { background: hsl(var(--muted) / .6); }
+  .hud-readout-cell:hover::after { transform: scaleX(2.5); }
+  .hud-section-head { @apply mb-3 flex items-center gap-3; }
+  .hud-section-head h2 { @apply font-mono text-sm font-bold uppercase tracking-[0.2em] text-foreground; }
+  .hud-gauge {
+    background:
+      repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), hsl(var(--background)) calc(10% - 1px) 10%),
+      hsl(var(--muted));
+    position: relative;
+  }
+  .hud-timeline { position: relative; }
+  .hud-timeline::before {
+    content: ''; position: absolute; left: 1.5rem; top: 1.25rem; bottom: 3.5rem; width: 1px;
+    background: hsl(var(--border));
+  }
+  .hud-timeline-item { position: relative; padding: 1rem 1.25rem 1rem 3rem; transition: background-color .2s; }
+  .hud-timeline-item:hover { background: hsl(var(--muted) / .45); }
+  .hud-timeline-item > div { gap: 0; }
+  .hud-timeline-node {
+    position: absolute; left: calc(1.5rem - 4px); top: 1.4rem; width: 9px; height: 9px;
+    background: hsl(var(--card)); border: 2px solid hsl(var(--signal)); transform: rotate(45deg);
+  }
+  .hud-timeline-item:hover .hud-timeline-node { background: hsl(var(--signal)); }
+  @media (prefers-reduced-motion: reduce) { .hud-readout-cell::after { transition: none; } }
+}

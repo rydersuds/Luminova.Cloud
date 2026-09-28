@@ -100,14 +100,14 @@ function Home() {
         <div className="relative hidden lg:block">
           <div className="surface-3d tech-clip border-sidebar-border bg-sidebar-accent/45 p-5 shadow-2xl" style={{ "--surface-light-color": "hsl(var(--primary) / 0.10)" } as CSSProperties}>
             <div className="flex items-center justify-between border-b border-sidebar-border/70 pb-4">
-              <span className="font-mono text-[10px] uppercase tracking-[.18em] text-sidebar-foreground/55">Operations telemetry</span>
-              <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[.16em] text-primary"><span className="h-1.5 w-1.5 rounded-full bg-primary" />Secure</span>
+              <span className="font-mono text-[10px] uppercase tracking-[.18em] text-sidebar-foreground/55">Workspace modules (illustrative)</span>
+              <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[.16em] text-primary"><span className="h-1.5 w-1.5 rounded-full bg-primary" />Preview</span>
             </div>
             <div className="grid grid-cols-2 gap-px overflow-hidden border border-sidebar-border/60 bg-sidebar-border/60">
-              {["Live projects", "Field records", "Financials", "Team channels"].map((label, index) => (
+              {["Projects", "Field records", "Financials", "Team channels"].map((label, index) => (
                 <div key={label} className="bg-sidebar/75 p-5">
                   <p className="font-mono text-[10px] uppercase tracking-[.14em] text-sidebar-foreground/45">{label}</p>
-                  <p className="mt-3 font-heading text-2xl font-bold text-sidebar-foreground">{["01", "360°", "USD", "SYNC"][index]}</p>
+                  <p className="mt-3 font-heading text-2xl font-bold text-sidebar-foreground">{["Sites", "360° photos", "Budgets", "Messages"][index]}</p>
                 </div>
               ))}
             </div>
@@ -117,7 +117,7 @@ function Home() {
                 <div className="mb-2 h-2 w-4/5 rounded-full bg-sidebar-foreground/20" />
                 <div className="h-1.5 w-3/5 rounded-full bg-primary/55" />
               </div>
-              <span className="font-mono text-[10px] text-primary">READY</span>
+              <span className="font-mono text-[10px] text-primary">SAMPLE</span>
             </div>
           </div>
           <div className="absolute -bottom-8 -left-8 h-24 w-24 border-l border-b border-primary/50" />

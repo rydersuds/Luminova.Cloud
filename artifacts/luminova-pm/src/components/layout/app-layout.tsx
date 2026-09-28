@@ -373,7 +373,7 @@ export function AppLayoutView({
       >
         Skip to main content
       </a>
-      <div data-testid="app-background" aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-tech-grid">
+      <div data-testid="app-background" aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-tech-grid workspace-field">
         <div className="absolute top-[-20%] left-[-10%] h-[60%] w-[60%] rounded-full bg-[radial-gradient(circle,hsl(var(--accent)/0.12),transparent_68%)] opacity-45" />
         <div className="absolute bottom-[-20%] right-[-10%] h-[50%] w-[50%] rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.08),transparent_68%)] opacity-35" />
         <div className="absolute inset-0 bg-gradient-to-br from-background/40 via-background/80 to-background/95" />
@@ -415,7 +415,7 @@ export function AppLayoutView({
         aria-hidden={isMobile && !sidebarOpen ? true : undefined}
         tabIndex={isMobile ? -1 : undefined}
         className={cn(
-        "sidebar-chrome fixed md:sticky md:top-4 md:self-start inset-y-0 left-0 w-72 glass-panel-dark text-sidebar-foreground flex flex-col z-30 shrink-0 transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] md:transition-[width,transform] md:m-4 md:rounded-2xl md:h-[calc(100dvh-2rem)] motion-reduce:transition-none",
+        "sidebar-chrome sidebar-instrument fixed md:sticky md:top-4 md:self-start inset-y-0 left-0 w-72 glass-panel-dark text-sidebar-foreground flex flex-col z-30 shrink-0 transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] md:transition-[width,transform] md:m-4 md:rounded-2xl md:h-[calc(100dvh-2rem)] motion-reduce:transition-none",
         sidebarCollapsed ? "md:w-[4.5rem]" : "md:w-72",
         sidebarOpen ? "translate-x-0 shadow-[0_0_50px_rgba(0,0,0,0.8)]" : "-translate-x-full md:translate-x-0",
       )}>
@@ -486,7 +486,7 @@ export function AppLayoutView({
           <div
             data-contrast-label="navigation section label"
             className={cn(
-              "relative z-10 text-[10px] font-mono uppercase tracking-widest text-sidebar-foreground/60 mb-4 px-2",
+              "relative z-10 mb-4 flex items-center gap-2 px-2 text-[10px] font-mono uppercase tracking-[0.24em] text-sidebar-foreground/70 before:h-px before:w-4 before:bg-[hsl(var(--signal))]",
               sidebarCollapsed && "sr-only",
             )}
           >
@@ -629,7 +629,7 @@ export function AppLayoutView({
         </div>
       </aside>
 
-      <main id="main-content" tabIndex={-1} className="relative z-10 flex-1 flex min-w-0 max-w-full flex-col overflow-x-hidden outline-none md:overflow-hidden">
+      <main id="main-content" tabIndex={-1} className="workspace-main relative z-10 flex-1 flex min-w-0 max-w-full flex-col overflow-x-hidden outline-none md:overflow-hidden">
         <div className="relative z-10 flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-x-hidden md:h-full md:overflow-hidden">
           {children}
         </div>

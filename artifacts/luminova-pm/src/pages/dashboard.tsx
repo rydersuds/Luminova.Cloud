@@ -294,16 +294,13 @@ export default function Dashboard() {
         <div className="p-4 sm:p-6 md:p-8 max-w-[1600px] mx-auto space-y-8">
           
           {/* Header */}
-          <div className="flex flex-col gap-6 pb-6 border-b border-border/50">
+          <div className="hud-header hud-frame flex flex-col gap-6">
             <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="h-px w-6 bg-primary"></span>
-                <span className="text-xs font-mono uppercase tracking-widest text-primary">Global Overview</span>
-              </div>
-              <h1 className="text-4xl font-heading font-extrabold text-foreground tracking-tight drop-shadow-sm">Command Center</h1>
+              <div className="mb-3 flex items-center gap-4"><span className="hud-kicker">Global overview</span><span className="hud-index">MOD/01</span></div>
+              <h1 className="text-4xl sm:text-5xl font-heading font-extrabold text-foreground tracking-[-0.03em]">Command Center</h1>
               <p className="text-muted-foreground mt-2 text-sm max-w-xl">
-                Real-time telemetry across all active sites. Monitor progress, financials, and communications through encrypted channels.
+                Projects, financials and team activity from every site you can access, in one read.
               </p>
             </div>
             
@@ -589,14 +586,31 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* Operational readout — values straight from the dashboard summary */}
+          <section aria-label="Operational summary" className="hud-readout grid grid-cols-2 lg:grid-cols-4">
+            {[
+              { label: "Active projects", value: summary?.activeProjects, href: "/projects" },
+              { label: "Awaiting approval", value: summary?.awaitingApproval, href: "/invoices" },
+              { label: "Unread messages", value: summary?.unreadMessages, href: "/messages" },
+              { label: "New 360° photos", value: summary?.new360Photos, href: "/projects" },
+            ].map((item) => (
+              <Link key={item.label} href={item.href} data-testid={`readout-${item.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} className="hud-readout-cell group">
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{item.label}</span>
+                <span className="mt-2 block font-heading text-3xl font-extrabold tabular-nums tracking-tight text-foreground group-hover:text-primary sm:text-4xl">
+                  {loadingSummary ? <span className="skeleton-line inline-block h-8 w-12 align-middle" /> : item.value ?? "—"}
+                </span>
+              </Link>
+            ))}
+          </section>
+
           {/* Financial overview */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 md:gap-6">
-            {financialCards.map(({ label, value, icon: Icon, accent, loading }) => (
-              <Card key={label} className="surface-3d bg-card hover:bg-card/80 transition-all group">
+            {financialCards.map(({ label, value, icon: Icon, accent, loading }, index) => (
+              <Card key={label} className="hud-frame surface-3d bg-card hover:bg-card/80 transition-all group">
                 <CardContent className="p-6">
                   <div className="flex min-h-24 flex-col justify-between">
                     <div className="mb-4 flex items-center justify-between gap-4">
-                      <p className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground drop-shadow-sm">{label}</p>
+                      <div><span className="hud-index">F{String(index + 1).padStart(2, "0")}</span><p className="mt-1 text-[11px] font-mono uppercase tracking-widest text-muted-foreground">{label}</p></div>
                       <div className={cn("h-10 w-10 shrink-0 rounded-full surface-3d flex items-center justify-center group-hover:scale-110 transition-transform", accent)}>
                         <Icon className="h-5 w-5 drop-shadow-sm" />
                       </div>
@@ -615,15 +629,17 @@ export default function Dashboard() {
             
             {/* Active Projects List */}
             <div className="lg:col-span-2 space-y-4">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="hud-section-head">
                 <ShieldAlert className="h-4 w-4 text-primary" />
-                <h2 className="text-lg font-mono uppercase tracking-widest font-semibold">Active Deployments</h2>
+                <h2>Active Deployments</h2>
+                <span aria-hidden="true" className="hud-rule flex-1" />
+                <span className="hud-index">{loadingProjects ? "--" : `${projects?.length ?? 0} listed`}</span>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {loadingProjects ? (
                   Array.from({ length: 4 }).map((_, i) => (
-                    <Card key={i} className="h-64 animate-pulse bg-card/50 glass-panel" />
+                    <Card key={i} className="h-64 skeleton-line border-border/50" />
                   ))
                 ) : projects?.length === 0 ? (
                   <div className="col-span-2 text-center py-16 glass-panel rounded-sm border border-border/50">
@@ -634,10 +650,14 @@ export default function Dashboard() {
                 ) : projects?.map((project) => (
                   <Card 
                     key={project.id} 
-                    className="glass-panel overflow-hidden hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 cursor-pointer group flex flex-col border-border/50 hover:border-primary/30" 
+                    className="hud-card hud-frame overflow-hidden cursor-pointer group flex flex-col border-border/60 bg-card"
                     onClick={() => setLocation(`/projects/${project.id}`)}
+                    tabIndex={0}
+                    role="link"
+                    aria-label={`Open ${project.name}`}
+                    onKeyDown={(event) => { if (event.key === "Enter") setLocation(`/projects/${project.id}`) }}
                   >
-                    <div className="h-32 bg-black/40 relative overflow-hidden group-hover:bg-black/20 transition-colors">
+                    <div className="h-32 bg-muted relative overflow-hidden">
                       {project.exteriorImage ? (
                         <div className="w-full h-full relative">
                           <img src={project.exteriorImage} alt={project.name} className="w-full h-full object-cover saturate-110 group-hover:scale-105 transition-transform duration-700" />
@@ -687,13 +707,11 @@ export default function Dashboard() {
                             <span className="text-muted-foreground">Completion</span>
                             <span className="font-bold text-primary">{project.progress}%</span>
                           </div>
-                          <div className="h-1 w-full bg-black/40 rounded-none overflow-hidden border border-border/30">
+                          <div className="hud-gauge h-2 w-full overflow-hidden rounded-sm">
                             <div 
                               className="h-full bg-primary relative transition-all duration-1000 ease-[cubic-bezier(0.23,1,0.32,1)]"
                               style={{ width: `${project.progress}%` }}
-                            >
-                              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent w-full -translate-x-full animate-[shimmer_2s_infinite]"></div>
-                            </div>
+                            />
                           </div>
                         </div>
                       </div>
@@ -705,38 +723,37 @@ export default function Dashboard() {
 
             {/* System Activity Stream */}
             <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Activity className="h-4 w-4 text-secondary" />
-                <h2 className="text-lg font-mono uppercase tracking-widest font-semibold">Activity Stream</h2>
+              <div className="hud-section-head">
+                <Activity className="h-4 w-4 text-[hsl(var(--signal))]" />
+                <h2>Activity Stream</h2>
+                <span aria-hidden="true" className="hud-rule flex-1" />
               </div>
-              <Card className="glass-panel border-border/50 bg-card/60">
-                <CardContent className="p-0 divide-y divide-border/30">
+              <Card className="hud-frame overflow-hidden border-border/60 bg-card">
+                <CardContent className="hud-timeline p-0">
                   {loadingSummary ? (
-                    <div className="p-8 text-center text-muted-foreground font-mono text-sm uppercase animate-pulse">Syncing logs...</div>
+                    <div className="space-y-4 p-5">{[0,1,2].map((i) => <div key={i} className="skeleton-line h-12" />)}</div>
                   ) : summary?.recentActivity.length === 0 ? (
                     <div className="p-8 text-center text-muted-foreground font-mono text-sm uppercase">Stream Empty</div>
                   ) : summary?.recentActivity.map((activity) => (
-                    <div key={activity.id} className="p-4 hover:bg-muted/20 transition-colors group">
+                    <div key={activity.id} className="hud-timeline-item group">
                       <div className="flex gap-4">
-                        <div className="h-8 w-8 rounded-none bg-secondary/10 border border-secondary/30 flex items-center justify-center shrink-0 group-hover:bg-secondary/20 transition-colors">
-                          <Activity className="h-4 w-4 text-secondary group-hover:text-secondary-foreground transition-colors" />
-                        </div>
+                        <span aria-hidden="true" className="hud-timeline-node" />
                         <div className="space-y-1.5 flex-1 min-w-0">
                           <p className="text-sm font-medium leading-snug text-foreground/90 group-hover:text-foreground">
                             {activity.title}
                           </p>
-                          <p className="text-xs text-muted-foreground/70 line-clamp-2">
+                          <p className="text-xs text-muted-foreground line-clamp-2">
                             {activity.description}
                           </p>
                           <div className="flex items-center justify-between pt-1">
-                            <span className="text-[10px] font-mono uppercase tracking-widest text-primary/70">{activity.author}</span>
-                            <span className="text-[10px] font-mono text-muted-foreground/50">{formatDate(activity.date)}</span>
+                            <span className="text-[10px] font-mono uppercase tracking-widest text-[hsl(var(--signal))]">{activity.author}</span>
+                            <span className="text-[10px] font-mono text-muted-foreground">{formatDate(activity.date)}</span>
                           </div>
                         </div>
                       </div>
                     </div>
                   ))}
-                  <Link href="/messages" className="block p-4 text-center text-xs font-mono uppercase tracking-widest text-primary hover:bg-primary/10 hover:text-primary-foreground transition-colors">
+                  <Link href="/messages" className="block p-4 text-center text-xs font-mono uppercase tracking-widest text-primary border-t border-border/60 hover:bg-primary hover:text-primary-foreground transition-colors">
                     Access Full Archive
                   </Link>
                 </CardContent>

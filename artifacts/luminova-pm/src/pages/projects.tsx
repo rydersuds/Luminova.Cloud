@@ -78,36 +78,17 @@ export default function Projects() {
     <>
       <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto bg-transparent">
         <div className="mx-auto max-w-[1600px] space-y-7 p-4 sm:p-6 md:p-8">
-          <header className="flex flex-col gap-5 border-b border-border/60 pb-7 lg:flex-row lg:items-end lg:justify-between">
+          <header className="hud-header hud-frame flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <div className="mb-2 flex items-center gap-2">
-                <span className="h-px w-6 bg-primary" />
-                <span className="font-mono text-xs uppercase tracking-[0.22em] text-primary">Project network</span>
-              </div>
-              <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">All Projects</h1>
+              <div className="mb-3 flex items-center gap-4"><span className="hud-kicker">Project network</span><span className="hud-index">MOD/02</span></div>
+              <h1 className="text-3xl font-extrabold tracking-[-0.03em] sm:text-5xl">All Projects</h1>
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
                 Review every active, planned, paused, and completed build from one workspace.
               </p>
             </div>
-            <div className="flex items-center gap-2 self-start lg:self-auto">
-              <Button
-                type="button"
-                size="icon"
-                variant={view === "grid" ? "default" : "outline"}
-                onClick={() => setView("grid")}
-                aria-label="Grid view"
-              >
-                <Grid2X2 className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant={view === "list" ? "default" : "outline"}
-                onClick={() => setView("list")}
-                aria-label="List view"
-              >
-                <List className="h-4 w-4" />
-              </Button>
+            <div role="group" aria-label="Layout" className="hud-segment self-start lg:self-auto">
+              <button type="button" aria-pressed={view === "grid"} onClick={() => setView("grid")} aria-label="Grid view"><Grid2X2 className="h-3.5 w-3.5" />Grid</button>
+              <button type="button" aria-pressed={view === "list"} onClick={() => setView("list")} aria-label="List view"><List className="h-3.5 w-3.5" />List</button>
             </div>
           </header>
 
@@ -130,7 +111,7 @@ export default function Projects() {
                 value={status}
                 onChange={(event) => setStatus(event.target.value)}
                 aria-label="Project status"
-                className="h-10 border border-border bg-background/70 px-3 text-sm outline-none focus:border-primary"
+                className="hud-select"
               >
                 <option value="">All statuses</option>
                 {STATUSES.map((item) => <option key={item} value={item}>{item}</option>)}
@@ -140,7 +121,7 @@ export default function Projects() {
                 onChange={(event) => setRegion(event.target.value)}
                 aria-label="Project region"
                 disabled={areRegionsLoading && regionOptions.length === 0}
-                className="h-10 border border-border bg-background/70 px-3 text-sm outline-none focus:border-primary"
+                className="hud-select"
               >
                 <option value="">All regions</option>
                 {regionOptions.map((item) => <option key={item} value={item}>{item}</option>)}
@@ -150,7 +131,7 @@ export default function Projects() {
                 onChange={(event) => setClient(event.target.value)}
                 aria-label="Project client"
                 disabled={areRegionsLoading && clientOptions.length === 0}
-                className="h-10 border border-border bg-background/70 px-3 text-sm outline-none focus:border-primary"
+                className="hud-select"
               >
                 <option value="">All clients</option>
                 {clientOptions.map((item) => <option key={item} value={item}>{item}</option>)}
@@ -162,10 +143,11 @@ export default function Projects() {
             </div>
           </section>
 
-          <div className="flex items-center justify-between">
-            <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
+          <div className="flex items-center gap-4">
+            <p className="shrink-0 font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
               {isLoading ? "Scanning projects" : `${projects?.length ?? 0} projects found`}
             </p>
+            <div aria-hidden="true" className="hud-rule flex-1" />
           </div>
 
           {isLoading ? (
@@ -182,12 +164,16 @@ export default function Projects() {
             </div>
           ) : (
             <div className={cn("grid gap-5", view === "grid" ? "md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1")}>
-              {projects?.map((project) => (
+              {projects?.map((project, index) => (
                 <Card
                   key={project.id}
                   onClick={() => setLocation(`/projects/${project.id}`)}
+                  tabIndex={0}
+                  role="link"
+                  aria-label={`Open ${project.name}`}
+                  onKeyDown={(event) => { if (event.key === "Enter") setLocation(`/projects/${project.id}`) }}
                   className={cn(
-                    "group cursor-pointer overflow-hidden border-border/60 bg-card/80 transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/5",
+                    "hud-card hud-frame group cursor-pointer overflow-hidden border-border/60 bg-card/85",
                     view === "list" && "sm:grid sm:grid-cols-[260px_1fr]",
                   )}
                 >
@@ -210,6 +196,7 @@ export default function Projects() {
                     >
                       {project.status}
                     </Badge>
+                    <span className="absolute right-4 top-4 rounded bg-background/85 px-1.5 py-0.5 hud-index">#{String(index + 1).padStart(3, "0")}</span>
                   </div>
                     <CardContent className="flex min-w-0 flex-col gap-5 p-5">
                       <div className="min-w-0">
