@@ -8,7 +8,7 @@ import { ClerkProvider, Show, useAuth, useClerk } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { ProjectFolderImportProvider, useProjectFolderImport } from '@/providers/project-folder-import-provider';
-import { pageModules, preloadPrimaryPages } from '@/lib/page-preload';
+import { canPreloadPrimaryPages, isWorkspacePath, pageModules, preloadPrimaryPages } from '@/lib/page-preload';
 
 import {
   Route,
@@ -204,17 +204,43 @@ function SessionPolicy() {
 
 function AuthenticatedPagePreloader() {
   const { isLoaded, isSignedIn } = useAuth();
+  const [location] = useLocation();
 
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
-    const preload = () => preloadPrimaryPages();
-    if ("requestIdleCallback" in window) {
-      const idleId = window.requestIdleCallback(preload, { timeout: 2000 });
-      return () => window.cancelIdleCallback(idleId);
+    if (!isLoaded || !isSignedIn || !isWorkspacePath(location) || !canPreloadPrimaryPages()) return;
+
+    let cancelled = false;
+    let idleId: number | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const preload = () => {
+      if (cancelled || !canPreloadPrimaryPages()) return;
+      preloadPrimaryPages(location);
+    };
+    const schedulePreload = () => {
+      if (cancelled) return;
+      if ("requestIdleCallback" in window) {
+        idleId = window.requestIdleCallback(preload, { timeout: 5000 });
+        return;
+      }
+      timeoutId = setTimeout(preload, 1000);
+    };
+
+    // Let the active route's module, data, and critical images win before
+    // starting speculative page chunk requests.
+    if (document.readyState === "complete") {
+      schedulePreload();
+    } else {
+      window.addEventListener("load", schedulePreload, { once: true });
     }
-    const timeoutId = setTimeout(preload, 400);
-    return () => clearTimeout(timeoutId);
-  }, [isLoaded, isSignedIn]);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("load", schedulePreload);
+      if (idleId !== undefined) window.cancelIdleCallback(idleId);
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    };
+  }, [isLoaded, isSignedIn, location]);
 
   return null;
 }

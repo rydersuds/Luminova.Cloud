@@ -11,15 +11,60 @@ export const pageModules = {
   profile: () => import("@/pages/profile"),
 }
 
+type NetworkInformationLike = {
+  saveData?: boolean
+  effectiveType?: string
+  downlink?: number
+  rtt?: number
+}
+
+export type PreloadEnvironment = {
+  onLine?: boolean
+  connection?: NetworkInformationLike
+  deviceMemory?: number
+  hardwareConcurrency?: number
+}
+
 const primaryPageLoaders = [
-  pageModules.dashboard,
-  pageModules.projects,
-  pageModules.trades,
-  pageModules.invoices,
-  pageModules.quotes,
-  pageModules.messages,
-  pageModules.users,
+  { href: "/", loader: pageModules.dashboard },
+  { href: "/projects", loader: pageModules.projects },
+  { href: "/trades", loader: pageModules.trades },
+  { href: "/invoices", loader: pageModules.invoices },
+  { href: "/quotes", loader: pageModules.quotes },
+  { href: "/messages", loader: pageModules.messages },
+  { href: "/users", loader: pageModules.users },
 ]
+
+const workspacePaths = ["/projects", "/trades", "/invoices", "/quotes", "/messages", "/users", "/profile"]
+
+function browserPreloadEnvironment(): PreloadEnvironment | undefined {
+  if (typeof navigator === "undefined") return undefined
+  return navigator as PreloadEnvironment
+}
+
+export function canPreloadPrimaryPages(
+  environment: PreloadEnvironment | undefined = browserPreloadEnvironment(),
+) {
+  if (!environment || environment.onLine === false) return false
+
+  const connection = environment.connection
+  if (connection?.saveData) return false
+  if (connection?.effectiveType === "slow-2g" || connection?.effectiveType === "2g") return false
+  if (connection?.downlink !== undefined && connection.downlink < 1.5) return false
+  if (connection?.rtt !== undefined && connection.rtt > 500) return false
+
+  // A speculative module burst is not useful on devices with very little
+  // memory or CPU available for the current page.
+  if (environment.deviceMemory !== undefined && environment.deviceMemory <= 1) return false
+  if (environment.hardwareConcurrency !== undefined && environment.hardwareConcurrency <= 2) return false
+
+  return true
+}
+
+export function isWorkspacePath(href: string) {
+  const path = href.split(/[?#]/, 1)[0] || "/"
+  return path === "/" || workspacePaths.some((basePath) => path === basePath || path.startsWith(`${basePath}/`))
+}
 
 export function preloadPage(href: string) {
   const loader =
@@ -38,6 +83,12 @@ export function preloadPage(href: string) {
   if (loader) void loader()
 }
 
-export function preloadPrimaryPages() {
-  primaryPageLoaders.forEach((loader) => void loader())
+export function preloadPrimaryPages(currentHref?: string) {
+  if (!canPreloadPrimaryPages()) return
+
+  const currentPath = currentHref?.split(/[?#]/, 1)[0] || ""
+  primaryPageLoaders.forEach(({ href, loader }) => {
+    if (currentPath === href || (href !== "/" && currentPath.startsWith(`${href}/`))) return
+    void loader()
+  })
 }
