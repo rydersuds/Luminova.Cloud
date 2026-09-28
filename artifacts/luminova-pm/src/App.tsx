@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ReactNode, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -76,12 +76,52 @@ function Protected({ children }: { children: ReactNode }) {
 
 function Home() {
   return (
-    <main className="flex min-h-[100dvh] items-center justify-center overflow-hidden bg-sidebar bg-tech-grid-soft p-6 text-sidebar-foreground">
-      <div className="relative z-10 max-w-xl text-center">
-        <img src="/luminova-logo.png" alt="Luminova Construction" className="mx-auto mb-8 h-32 w-72 object-contain" />
-        <p className="font-mono text-xs uppercase tracking-[.24em] text-primary">Secure construction operations</p>
-        <h1 className="mt-4 text-4xl font-extrabold sm:text-5xl">Build with complete visibility.</h1>
-        <Link href="/sign-in" className="tech-clip gold-glow mx-auto mt-8 inline-flex h-12 items-center justify-center bg-primary px-8 font-bold text-primary-foreground">Sign in</Link>
+    <main className="relative flex min-h-[100dvh] items-center overflow-hidden bg-sidebar bg-tech-grid-soft px-5 py-8 text-sidebar-foreground sm:px-10">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,hsl(var(--accent)/0.16),transparent_34%),radial-gradient(circle_at_86%_78%,hsl(var(--primary)/0.14),transparent_32%)]" />
+      <div className="relative z-10 mx-auto grid w-full max-w-6xl gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+        <div>
+          <div className="mb-12 flex items-center gap-3">
+            <span className="h-px w-10 bg-primary" />
+            <span className="font-mono text-[10px] uppercase tracking-[.28em] text-sidebar-foreground/60">Luminova / secure workspace</span>
+          </div>
+          <img src="/luminova-logo.png" alt="Luminova Construction" className="mb-10 h-20 w-64 object-contain object-left" />
+          <p className="font-mono text-xs uppercase tracking-[.24em] text-primary">Secure construction operations</p>
+          <h1 className="mt-5 max-w-2xl text-5xl font-extrabold leading-[0.98] tracking-[-0.04em] sm:text-7xl">Build with complete visibility.</h1>
+          <p className="mt-6 max-w-xl text-base leading-7 text-sidebar-foreground/65">A precise command center for live projects, field documentation, schedules, budgets, invoices, vendors, and communications.</p>
+          <div className="mt-9 flex flex-wrap items-center gap-4">
+            <Link href="/sign-in" className="tech-clip gold-glow inline-flex h-12 items-center justify-center bg-primary px-8 font-bold text-primary-foreground transition-transform hover:-translate-y-0.5">Sign in</Link>
+            <span className="font-mono text-[10px] uppercase tracking-[.18em] text-sidebar-foreground/45">Authorized teams only</span>
+          </div>
+          <div className="mt-16 flex flex-wrap gap-x-8 gap-y-3 border-t border-sidebar-border/70 pt-5 font-mono text-[10px] uppercase tracking-[.16em] text-sidebar-foreground/45">
+            <Link href="/terms" className="transition-colors hover:text-primary">Terms &amp; conditions</Link>
+            <Link href="/privacy" className="transition-colors hover:text-primary">Privacy policy</Link>
+          </div>
+        </div>
+        <div className="relative hidden lg:block">
+          <div className="surface-3d tech-clip border-sidebar-border bg-sidebar-accent/45 p-5 shadow-2xl" style={{ "--surface-light-color": "hsl(var(--primary) / 0.10)" } as CSSProperties}>
+            <div className="flex items-center justify-between border-b border-sidebar-border/70 pb-4">
+              <span className="font-mono text-[10px] uppercase tracking-[.18em] text-sidebar-foreground/55">Operations telemetry</span>
+              <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[.16em] text-primary"><span className="h-1.5 w-1.5 rounded-full bg-primary" />Secure</span>
+            </div>
+            <div className="grid grid-cols-2 gap-px overflow-hidden border border-sidebar-border/60 bg-sidebar-border/60">
+              {["Live projects", "Field records", "Financials", "Team channels"].map((label, index) => (
+                <div key={label} className="bg-sidebar/75 p-5">
+                  <p className="font-mono text-[10px] uppercase tracking-[.14em] text-sidebar-foreground/45">{label}</p>
+                  <p className="mt-3 font-heading text-2xl font-bold text-sidebar-foreground">{["01", "360°", "USD", "SYNC"][index]}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-5 flex items-center gap-3 border border-sidebar-border/60 bg-sidebar/55 p-4">
+              <span className="h-8 w-8 border border-primary/50 bg-primary/10" />
+              <div className="min-w-0 flex-1">
+                <div className="mb-2 h-2 w-4/5 rounded-full bg-sidebar-foreground/20" />
+                <div className="h-1.5 w-3/5 rounded-full bg-primary/55" />
+              </div>
+              <span className="font-mono text-[10px] text-primary">READY</span>
+            </div>
+          </div>
+          <div className="absolute -bottom-8 -left-8 h-24 w-24 border-l border-b border-primary/50" />
+        </div>
       </div>
     </main>
   );
@@ -387,9 +427,9 @@ function App() {
         appearance={{
           theme: shadcn,
           cssLayerName: "clerk",
-          variables: { colorPrimary: "#b59c3f", colorBackground: "#242424", colorForeground: "#ffffff", colorInput: "#303030", colorInputForeground: "#ffffff", colorMutedForeground: "#bdbdbd", colorNeutral: "#555555", fontFamily: "Plus Jakarta Sans", borderRadius: "0px" },
+          variables: { colorPrimary: "#d2aa3e", colorBackground: "#171b25", colorForeground: "#edf2f7", colorInput: "#202737", colorInputForeground: "#edf2f7", colorMutedForeground: "#9aa7b8", colorNeutral: "#344052", fontFamily: "Plus Jakarta Sans", borderRadius: "0.75rem" },
           options: { logoImageUrl: `${window.location.origin}${basePath}/luminova-logo.png`, logoPlacement: "inside" },
-          elements: { rootBox: "w-full flex justify-center", cardBox: "bg-[#242424] w-[440px] max-w-full overflow-hidden", card: "!shadow-none !border !border-[#555] !bg-transparent", footer: "!bg-transparent", formButtonPrimary: "!bg-[#b59c3f] !text-black hover:!bg-[#c8ae4b]" },
+          elements: { rootBox: "w-full flex justify-center", cardBox: "bg-[#171b25] w-[440px] max-w-full overflow-hidden", card: "!shadow-none !border !border-[#344052] !bg-transparent", footer: "!bg-transparent", formButtonPrimary: "!bg-[#d2aa3e] !text-[#171b25] hover:!bg-[#e0bb55]" },
         }}
       >
         <QueryClientProvider client={queryClient}>

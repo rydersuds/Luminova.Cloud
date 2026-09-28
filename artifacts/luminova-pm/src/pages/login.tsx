@@ -1,5 +1,5 @@
 import { SignIn, SignUp } from "@clerk/react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { Link } from "wouter"
 import { LEGAL_CONSENT_LABEL, PRIVACY_PATH, TERMS_PATH } from "@/lib/legal-consent"
 
@@ -9,7 +9,7 @@ export default function Login() {
   )
   const [consentAccepted, setConsentAccepted] = useState(false)
 
-  const continueToSignIn = (event: React.FormEvent) => {
+  const continueToSignIn = (event: FormEvent) => {
     event.preventDefault()
     if (!consentAccepted) return
     sessionStorage.setItem("luminova-legal-consent", "accepted")
@@ -31,10 +31,11 @@ export default function Login() {
 
   return (
     <AuthShell showRemember>
-      <form onSubmit={continueToSignIn} className="mx-auto w-full max-w-[440px] border border-white/15 bg-[#202020] px-8 py-8 text-white shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
+      <form onSubmit={continueToSignIn} className="surface-3d mx-auto w-full max-w-[440px] border-sidebar-border bg-sidebar-accent/55 px-7 py-8 text-sidebar-foreground shadow-2xl sm:px-8">
         <div className="mb-7 text-center">
+          <p className="mb-3 font-mono text-[10px] uppercase tracking-[.2em] text-primary">Access protocol</p>
           <h2 className="text-xl font-semibold">Continue to secure sign in</h2>
-          <p className="mt-1 text-sm text-white/55">Review and accept the workspace policies first</p>
+          <p className="mt-1 text-sm text-sidebar-foreground/55">Review and accept the workspace policies first</p>
         </div>
 
         <div className="flex items-start gap-3">
@@ -45,15 +46,15 @@ export default function Login() {
             onChange={(event) => setConsentAccepted(event.target.checked)}
             required
             aria-describedby="legal-consent-description"
-            className="mt-1 h-4 w-4 shrink-0 accent-[#b59c3f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#dac56c] focus-visible:ring-offset-2 focus-visible:ring-offset-[#202020]"
+            className="mt-1 h-4 w-4 shrink-0 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar-accent"
           />
-          <label id="legal-consent-description" htmlFor="legal-consent" className="text-sm leading-6 text-white/75">
+          <label id="legal-consent-description" htmlFor="legal-consent" className="text-sm leading-6 text-sidebar-foreground/75">
             {LEGAL_CONSENT_LABEL.split("Terms & Conditions")[0]}
-            <Link href={TERMS_PATH} target="_blank" rel="noreferrer" className="font-semibold text-[#dac56c] underline underline-offset-2 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#dac56c]">
+            <Link href={TERMS_PATH} target="_blank" rel="noreferrer" className="font-semibold text-primary underline underline-offset-2 hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
               Terms &amp; Conditions
             </Link>
             {" and acknowledge the "}
-            <Link href={PRIVACY_PATH} target="_blank" rel="noreferrer" className="font-semibold text-[#dac56c] underline underline-offset-2 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#dac56c]">
+            <Link href={PRIVACY_PATH} target="_blank" rel="noreferrer" className="font-semibold text-primary underline underline-offset-2 hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
               Privacy Policy
             </Link>
             .
@@ -63,7 +64,7 @@ export default function Login() {
         <button
           type="submit"
           disabled={!consentAccepted}
-          className="mt-6 flex h-11 w-full items-center justify-center bg-[#b59c3f] font-semibold text-black transition-colors hover:bg-[#c8ae4b] disabled:cursor-not-allowed disabled:opacity-50"
+          className="tech-clip mt-6 flex h-11 w-full items-center justify-center bg-primary font-semibold text-primary-foreground transition-[transform,background-color] hover:-translate-y-0.5 hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Continue to sign in
         </button>
@@ -105,17 +106,18 @@ function AuthShell({ children, showRemember = false }: { children: React.ReactNo
 
   return (
     <div
-      className="relative flex min-h-screen items-center justify-center overflow-hidden bg-black p-4"
+      className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-sidebar bg-tech-grid-soft p-4"
       onPointerDownCapture={warmIntro}
       onFocusCapture={warmIntro}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(181,156,63,0.10),transparent_38%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,hsl(var(--primary)/0.14),transparent_38%),radial-gradient(circle_at_10%_90%,hsl(var(--accent)/0.10),transparent_34%)]" />
 
       <div className="relative z-10 w-full max-w-md space-y-7">
         <div className="flex flex-col items-center text-center space-y-4">
           <div className="h-28 w-64 mb-2">
             <img src="/luminova-logo.png" alt="Luminova Construction" className="h-full w-full object-contain" decoding="async" />
           </div>
+          <p className="font-mono text-[10px] uppercase tracking-[.26em] text-primary">Secure construction operations</p>
           <h1 className="text-3xl font-heading font-bold text-sidebar-foreground tracking-tight">Construction Operations</h1>
           <p className="text-sidebar-foreground/60 text-sm">Project management workspace</p>
         </div>
@@ -128,7 +130,7 @@ function AuthShell({ children, showRemember = false }: { children: React.ReactNo
               type="checkbox"
               checked={remember}
               onChange={(event) => updateRemember(event.target.checked)}
-              className="h-4 w-4 accent-[#b59c3f]"
+              className="h-4 w-4 accent-primary"
             />
             <span>Remember me on this device</span>
           </label>

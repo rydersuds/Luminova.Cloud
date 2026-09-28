@@ -374,9 +374,9 @@ export function AppLayoutView({
         Skip to main content
       </a>
       <div data-testid="app-background" aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-tech-grid">
-        <div className="absolute top-[-20%] left-[-10%] h-[60%] w-[60%] rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.09),transparent_68%)] opacity-35" />
-        <div className="absolute bottom-[-20%] right-[-10%] h-[50%] w-[50%] rounded-full bg-[radial-gradient(circle,hsl(var(--accent)/0.07),transparent_68%)] opacity-25" />
-        <div className="absolute inset-0 bg-gradient-to-br from-background/50 via-background/75 to-background/95" />
+        <div className="absolute top-[-20%] left-[-10%] h-[60%] w-[60%] rounded-full bg-[radial-gradient(circle,hsl(var(--accent)/0.12),transparent_68%)] opacity-45" />
+        <div className="absolute bottom-[-20%] right-[-10%] h-[50%] w-[50%] rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.08),transparent_68%)] opacity-35" />
+        <div className="absolute inset-0 bg-gradient-to-br from-background/40 via-background/80 to-background/95" />
       </div>
       <div className="md:hidden flex items-center justify-between p-4 glass-panel-dark text-sidebar-foreground z-30 relative border-b border-sidebar-border shadow-md">
         <div className="flex items-center">
@@ -400,7 +400,7 @@ export function AppLayoutView({
           type="button"
           aria-label="Dismiss navigation"
           data-testid="sidebar-overlay"
-          className="fixed inset-0 z-20 bg-black/80 transition-opacity md:hidden"
+           className="fixed inset-0 z-20 bg-sidebar/80 backdrop-blur-sm transition-opacity md:hidden"
           onClick={closeSidebar}
         />
       )}
@@ -465,7 +465,7 @@ export function AppLayoutView({
             data-last-motion={indicator.lastMotion}
             aria-hidden="true"
             className={cn(
-              "sidebar-selection-indicator pointer-events-none absolute z-0 overflow-hidden rounded-xl border border-white/45 shadow-[inset_0_2px_4px_rgba(255,255,255,0.48),inset_0_-2px_4px_rgba(75,59,0,0.18),0_0_20px_hsl(var(--primary)/0.48),0_8px_22px_-6px_hsl(var(--primary)/0.72)] will-change-transform",
+               "sidebar-selection-indicator pointer-events-none absolute z-0 overflow-hidden rounded-lg border border-primary/60 shadow-[inset_0_1px_0_hsl(0_0%_100%/.38),0_8px_18px_-10px_hsl(var(--primary)/.55)] will-change-transform",
               sidebarCollapsed ? "left-2 right-2" : "left-4 right-4",
               !indicator.ready && "opacity-0",
             )}
@@ -506,7 +506,7 @@ export function AppLayoutView({
                 title={sidebarCollapsed ? item.label : undefined}
                 data-contrast-label={`navigation link "${item.label}"`}
                 className={cn(
-                  "group relative z-10 flex items-center py-3.5 rounded-xl text-sm font-bold transition-[color,background-color,box-shadow,transform] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden shadow-sm motion-reduce:transition-none",
+                   "group relative z-10 flex items-center py-3 rounded-lg text-sm font-bold transition-[color,background-color,box-shadow,transform] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden shadow-sm motion-reduce:transition-none",
                   sidebarCollapsed ? "justify-center gap-0 px-2" : "gap-3 px-4",
                   isVisuallyActive
                     ? "text-primary-foreground transform scale-[1.025]"

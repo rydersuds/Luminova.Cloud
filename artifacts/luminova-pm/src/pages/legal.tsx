@@ -163,18 +163,19 @@ export function PrivacyPage() {
 
 function LegalDocument({ title, summary, sections }: { title: string; summary: string; sections: LegalSection[] }) {
   return (
-    <main className="min-h-[100dvh] bg-[#f7f6f1] px-4 py-8 text-[#202020] sm:px-6 sm:py-12">
-      <article className="mx-auto max-w-3xl overflow-hidden border border-black/10 bg-white shadow-[0_18px_50px_rgba(0,0,0,0.08)]">
-        <header className="border-b border-black/10 bg-[#171717] px-5 py-7 text-white sm:px-10 sm:py-10">
+    <main className="min-h-[100dvh] bg-[hsl(214_28%_95%)] px-4 py-8 text-[hsl(222_27%_15%)] sm:px-6 sm:py-12">
+      <article className="mx-auto max-w-3xl overflow-hidden border border-[hsl(214_21%_82%)] bg-[hsl(210_35%_99%)] shadow-[0_22px_60px_hsl(222_30%_8%/0.14)]">
+        <header className="relative overflow-hidden border-b border-[hsl(220_19%_24%)] bg-[hsl(222_27%_12%)] px-5 py-7 text-[hsl(211_28%_94%)] sm:px-10 sm:py-10">
+          <div className="pointer-events-none absolute right-0 top-0 h-48 w-48 rounded-full bg-[radial-gradient(circle,hsl(188_52%_75%/.12),transparent_68%)]" />
           <img src={`${import.meta.env.BASE_URL}luminova-logo.png`} alt="Luminova Construction" className="h-16 w-44 object-contain object-left" />
-          <p className="mt-6 font-mono text-xs uppercase tracking-[.2em] text-[#c8ae4b]">Luminova Construction · Legal</p>
+          <p className="mt-6 font-mono text-xs uppercase tracking-[.2em] text-[hsl(43_76%_57%)]">Luminova Construction · Legal</p>
           <h1 className="mt-3 text-3xl font-bold sm:text-4xl">{title}</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-white/70">{summary}</p>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-[hsl(211_28%_94%/.7)]">{summary}</p>
           <p className="mt-4 text-sm font-semibold">Effective date: {effectiveDate}</p>
         </header>
 
         <div className="px-5 py-7 sm:px-10 sm:py-10">
-           <aside role="note" className="border-l-4 border-[#b59c3f] bg-[#f5f0dc] p-4 text-sm leading-6">
+           <aside role="note" className="border-l-4 border-[hsl(43_76%_51%)] bg-[hsl(43_76%_51%/.12)] p-4 text-sm leading-6">
              <strong>Important:</strong> This policy describes Luminova Construction PM and is intended to be read
              together with any written agreement that governs your organization’s construction project or service.
              If the two conflict, the written agreement controls to the extent of the conflict.
@@ -184,7 +185,7 @@ function LegalDocument({ title, summary, sections }: { title: string; summary: s
             {sections.map((section) => (
               <section key={section.title} aria-labelledby={section.title.replaceAll(" ", "-").toLowerCase()}>
                 <h2 id={section.title.replaceAll(" ", "-").toLowerCase()} className="text-xl font-bold">{section.title}</h2>
-                <div className="mt-3 space-y-3 text-[15px] leading-7 text-black/75">
+                <div className="mt-3 space-y-3 text-[15px] leading-7 text-[hsl(222_27%_15%/.74)]">
                   {section.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
                   {section.items && <ul className="list-disc space-y-2 pl-6">{section.items.map((item) => <li key={item}>{item}</li>)}</ul>}
                 </div>
@@ -192,7 +193,7 @@ function LegalDocument({ title, summary, sections }: { title: string; summary: s
             ))}
           </div>
 
-          <Link href="/sign-in" className="mt-10 inline-flex min-h-11 items-center border border-black/20 px-5 font-semibold text-black underline-offset-4 hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8a752a]">
+           <Link href="/sign-in" className="tech-clip mt-10 inline-flex min-h-11 items-center border border-[hsl(214_21%_72%)] px-5 font-semibold text-[hsl(222_27%_15%)] underline-offset-4 hover:bg-[hsl(43_76%_51%/.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(43_76%_51%)]">
             Back to sign in
           </Link>
         </div>
