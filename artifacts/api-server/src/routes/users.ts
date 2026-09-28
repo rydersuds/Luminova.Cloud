@@ -67,6 +67,16 @@ export function requireAuth(req: AuthenticatedRequest, res: Response, next: Next
   const auth = getAuth(req);
   const userId = auth?.userId;
   if (!userId) {
+    if (process.env.NODE_ENV !== "production") {
+      req.log.warn(
+        {
+          hasAuthContext: Boolean(auth),
+          method: req.method,
+          path: req.path,
+        },
+        "Clerk auth missing for protected API request",
+      );
+    }
     res.status(401).json({ error: "Authentication required" });
     return;
   }
