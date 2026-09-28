@@ -47,6 +47,7 @@ import type {
   ProjectConversation,
   ProjectConversationInput,
   ProjectDetail,
+  ProjectDocumentPreview,
   ProjectEntryAgreementInput,
   ProjectFile,
   ProjectImport,
@@ -570,6 +571,88 @@ export const useUpdateProject = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getUpdateProjectMutationOptions(options));
     }
+
+export const getGetProjectDocumentPreviewUrl = (projectId: string,
+    documentId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/documents/${documentId}/preview`
+}
+
+/**
+ * @summary Preview a Word or Excel project document
+ */
+export const getProjectDocumentPreview = async (projectId: string,
+    documentId: string, options?: Parameters<typeof customFetch>[1]): Promise<ProjectDocumentPreview> => {
+
+  return customFetch<ProjectDocumentPreview>(getGetProjectDocumentPreviewUrl(projectId,documentId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProjectDocumentPreviewQueryKey = (projectId: string,
+    documentId: string,) => {
+    return [
+    `/api/projects/${projectId}/documents/${documentId}/preview`
+    ] as const;
+    }
+
+
+export const getGetProjectDocumentPreviewQueryOptions = <TData = Awaited<ReturnType<typeof getProjectDocumentPreview>>, TError = ErrorType<void>>(projectId: string,
+    documentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectDocumentPreview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProjectDocumentPreviewQueryKey(projectId,documentId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProjectDocumentPreview>>> = ({ signal }) => getProjectDocumentPreview(projectId,documentId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined && documentId !== null && documentId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProjectDocumentPreview>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProjectDocumentPreviewQueryResult = NonNullable<Awaited<ReturnType<typeof getProjectDocumentPreview>>>
+export type GetProjectDocumentPreviewQueryError = ErrorType<void>
+
+
+/**
+ * @summary Preview a Word or Excel project document
+ */
+
+export function useGetProjectDocumentPreview<TData = Awaited<ReturnType<typeof getProjectDocumentPreview>>, TError = ErrorType<void>>(
+ projectId: string,
+    documentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectDocumentPreview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProjectDocumentPreviewQueryOptions(projectId,documentId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getCreateProjectPanoramaUrl = (projectId: string,) => {
 

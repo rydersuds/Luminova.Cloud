@@ -112,6 +112,79 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test('previews a Word entry agreement before offering the original download', async ({ page }) => {
+  const agreement = {
+    id: 'agreement-docx',
+    name: 'Signed site entry agreement.docx',
+    relativePath: 'Contracts/Signed site entry agreement.docx',
+    url: '/api/storage/objects/uploads/entry-agreement-docx',
+    contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    classification: 'contract',
+    isEntryAgreement: true,
+    collection: 'Contracts',
+    linkedEntityType: null,
+    linkedEntityId: null,
+    aiConfidence: null,
+  };
+  await page.route('**/api/projects/riverstone', async route => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ json: { ...structuredClone(project), files: [agreement] } });
+      return;
+    }
+    await route.fallback();
+  });
+  await page.route('**/api/projects/riverstone/documents/agreement-docx/preview', route => route.fulfill({
+    json: { kind: 'word', text: 'Private entry agreement preview', worksheets: [], truncated: false },
+  }));
+
+  await page.goto('/__visual/project-panorama');
+  await page.getByTestId('link-open-agreement-agreement-docx').click();
+
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByText('Private entry agreement preview')).toBeVisible();
+  await expect(dialog.getByRole('link', { name: `Download original ${agreement.name}` })).toHaveAttribute('href', agreement.url);
+});
+
+test('previews an Excel source file with worksheet data before downloading it', async ({ page }) => {
+  const workbookFile = {
+    id: 'invoice-xlsx',
+    name: 'Framing invoice.xlsx',
+    relativePath: 'Invoices/Framing invoice.xlsx',
+    url: '/api/storage/objects/uploads/framing-invoice',
+    contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    classification: 'invoice',
+    isEntryAgreement: false,
+    collection: 'Invoices',
+    linkedEntityType: null,
+    linkedEntityId: null,
+    aiConfidence: null,
+  };
+  await page.route('**/api/projects/riverstone', async route => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ json: { ...structuredClone(project), files: [workbookFile] } });
+      return;
+    }
+    await route.fallback();
+  });
+  await page.route('**/api/projects/riverstone/documents/invoice-xlsx/preview', route => route.fulfill({
+    json: {
+      kind: 'excel',
+      text: null,
+      worksheets: [{ name: 'Summary', rows: [['Trade', 'Amount'], ['Framing', '1250']] }],
+      truncated: false,
+    },
+  }));
+
+  await page.goto('/__visual/project-panorama');
+  await page.getByRole('tab', { name: 'Budget' }).click();
+  await page.getByRole('button', { name: `Preview ${workbookFile.name}` }).click();
+
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('table', { name: 'Worksheet Summary' })).toBeVisible();
+  await expect(dialog.getByText('Framing', { exact: true })).toBeVisible();
+  await expect(dialog.getByRole('link', { name: `Download original ${workbookFile.name}` })).toHaveAttribute('href', workbookFile.url);
+});
+
 test('shows only the designated entry agreement in the Overview and opens it', async ({ page, context }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const files = [

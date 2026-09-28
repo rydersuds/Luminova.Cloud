@@ -68,6 +68,8 @@ import
   GetProjectConversationParams,
   GetProjectConversationResponse,
   GetProjectConversationsResponse,
+  GetProjectDocumentPreviewParams,
+  GetProjectDocumentPreviewResponse,
   GetProjectParams,
   GetProjectResponse,
   OrganizeProjectFilesParams,
@@ -191,6 +193,11 @@ import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import { ObjectStorageService } from "../lib/objectStorage";
+import {
+  createProjectDocumentPreview,
+  getProjectDocumentPreviewKind,
+  MAX_PREVIEW_SOURCE_BYTES,
+} from "../lib/projectDocumentPreview";
 import {
   ensureSeededVendorProfiles,
   getStandaloneVendorProfile,
@@ -7360,6 +7367,67 @@ router.post("/project-import-sessions/:importId/build", async (req, res): Promis
 )
 ;
 
+
+router.get("/projects/:projectId/documents/:documentId/preview", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  const params = GetProjectDocumentPreviewParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const workspaceId = requestWorkspaceId(req);
+  const project = await findAuthorizedProject(params.data.projectId, req.userId, workspaceId);
+  if (!project) {
+    res.status(404).json({ error: "Project or document not found" });
+    return;
+  }
+
+  const [document] = await db.select().from(projectDocumentsTable).where(and(
+    eq(projectDocumentsTable.id, params.data.documentId),
+    eq(projectDocumentsTable.projectId, project.id),
+  )).limit(1);
+  if (!document) {
+    res.status(404).json({ error: "Project or document not found" });
+    return;
+  }
+
+  if (!getProjectDocumentPreviewKind(document.name, document.contentType)) {
+    res.status(415).json({ error: "Only Word .docx and Excel .xlsx or .xlsm files can be previewed." });
+    return;
+  }
+  if (document.size > MAX_PREVIEW_SOURCE_BYTES) {
+    res.status(413).json({ error: "This file is too large to preview. Download the original instead." });
+    return;
+  }
+
+  try {
+    const file = await storage.getObjectEntityFile(document.objectPath);
+    if (!await storage.canRead(req.userId, file, workspaceId)) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
+    const [buffer] = await file.download();
+    if (buffer.byteLength > MAX_PREVIEW_SOURCE_BYTES) {
+      res.status(413).json({ error: "This file is too large to preview. Download the original instead." });
+      return;
+    }
+
+    const preview = await createProjectDocumentPreview(buffer, document.name, document.contentType);
+    res.json(GetProjectDocumentPreviewResponse.parse(preview));
+  } catch (error) {
+    req.log.error(
+      { err: error, projectId: project.id, documentId: document.id },
+      "Failed to generate project document preview",
+    );
+    res.status(422).json({ error: "This file could not be previewed. Download the original instead." });
+  }
+});
 
 router.get("/projects/:projectId", async (req: AuthenticatedRequest, res): Promise<void> => 
 {

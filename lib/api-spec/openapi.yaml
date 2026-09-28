@@ -136,6 +136,34 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Project"
+  /projects/{projectId}/documents/{documentId}/preview:
+    get:
+      operationId: getProjectDocumentPreview
+      tags: [projects]
+      summary: Preview a Word or Excel project document
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - name: documentId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+      responses:
+        "200":
+          description: Bounded document preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDocumentPreview"
+        "401":
+          description: Authentication required
+        "404":
+          description: Project or document not found
+        "413":
+          description: Document is too large to preview
+        "415":
+          description: Unsupported document format
+        "422":
+          description: Document preview could not be generated
   /projects/{projectId}/panoramas:
     post:
       operationId: createProjectPanorama
@@ -2346,6 +2374,27 @@ components:
         linkedEntityType: { type: [string, "null"] }
         linkedEntityId: { type: [string, "null"] }
         aiConfidence: { type: [integer, "null"], minimum: 0, maximum: 100 }
+    ProjectDocumentPreviewWorksheet:
+      type: object
+      required: [name, rows]
+      properties:
+        name: { type: string }
+        rows:
+          type: array
+          items:
+            type: array
+            items: { type: string }
+    ProjectDocumentPreview:
+      type: object
+      required: [kind, text, worksheets, truncated]
+      properties:
+        kind: { type: string, enum: [word, excel] }
+        text: { type: ["string", "null"] }
+        worksheets:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectDocumentPreviewWorksheet"
+        truncated: { type: boolean }
     ProjectEntryAgreementInput:
       type: object
       additionalProperties: false

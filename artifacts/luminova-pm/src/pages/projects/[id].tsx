@@ -37,6 +37,11 @@ import {
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "@/hooks/use-toast"
 import { PanoramaViewer } from "@/components/panorama-viewer"
+import {
+  isOfficePreviewableDocument,
+  ProjectDocumentPreviewDialog,
+  type ProjectDocumentPreviewFile,
+} from "@/components/project-document-preview-dialog"
 import { ClientIdentity } from "@/components/client-identity"
 import { VendorIdentity } from "@/components/vendor-identity"
 import { cn, formatCurrency, formatDate, formatDateOnly, formatDaysRemaining, getDaysRemaining, getStatusColor } from "@/lib/utils"
@@ -133,6 +138,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const [entryAgreementFile, setEntryAgreementFile] = React.useState<File | null>(null)
   const [entryAgreementError, setEntryAgreementError] = React.useState("")
   const [isEntryAgreementUploading, setIsEntryAgreementUploading] = React.useState(false)
+  const [previewFile, setPreviewFile] = React.useState<ProjectDocumentPreviewFile | null>(null)
   const [photoIndex, setPhotoIndex] = React.useState<number | null>(null)
   const [activePanorama, setActivePanorama] = React.useState<ProjectPanorama | null>(null)
   const [editingPanorama, setEditingPanorama] = React.useState<ProjectPanorama | null>(null)
@@ -1240,18 +1246,32 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                               <p className="truncate text-xs text-muted-foreground" title={entryAgreement.relativePath}>{entryAgreement.relativePath}</p>
                             )}
                           </div>
-                          <a
-                            href={entryAgreement.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex shrink-0 scroll-my-1 items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                            aria-label={`Open entry agreement ${entryAgreement.name}`}
-                            title={entryAgreement.name}
-                            data-testid={`link-open-agreement-${entryAgreement.id}`}
-                          >
-                            Open
-                            <ExternalLink className="h-4 w-4" aria-hidden="true" />
-                          </a>
+                          {isOfficePreviewableDocument(entryAgreement) ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="shrink-0"
+                              aria-label={`Preview entry agreement ${entryAgreement.name}`}
+                              data-testid={`link-open-agreement-${entryAgreement.id}`}
+                              onClick={() => setPreviewFile(entryAgreement)}
+                            >
+                              Preview
+                            </Button>
+                          ) : (
+                            <a
+                              href={entryAgreement.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex shrink-0 scroll-my-1 items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                              aria-label={`Open entry agreement ${entryAgreement.name}`}
+                              title={entryAgreement.name}
+                              data-testid={`link-open-agreement-${entryAgreement.id}`}
+                            >
+                              Open
+                              <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                            </a>
+                          )}
                         </div>
                       ) : (
                         <p className="text-sm text-muted-foreground">Upload the authorized contractor and insurance access notice to make it available here.</p>
@@ -1552,14 +1572,32 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                   </CardHeader>
                   <CardContent className="grid gap-3 md:grid-cols-2">
                     {[...invoiceFiles, ...quoteFiles].map((file) => (
-                      <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-lg border p-3 hover:bg-muted">
+                      <div key={file.id} className="flex items-center gap-3 rounded-lg border p-3 hover:bg-muted">
                         <FileText className="h-5 w-5 shrink-0 text-primary" />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate font-medium">{file.name}</span>
                           <span className="block truncate text-xs text-muted-foreground">{file.collection}</span>
                         </span>
                         <Badge variant="outline">{file.classification}</Badge>
-                      </a>
+                        {isOfficePreviewableDocument(file) ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setPreviewFile(file)}
+                            aria-label={`Preview ${file.name}`}
+                          >
+                            Preview
+                          </Button>
+                        ) : (
+                          <Button asChild size="sm" variant="ghost">
+                            <a href={file.url} target="_blank" rel="noreferrer" aria-label={`Open ${file.name}`}>
+                              Open
+                              <ExternalLink className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
+                            </a>
+                          </Button>
+                        )}
+                      </div>
                     ))}
                   </CardContent>
                 </Card>
@@ -1831,9 +1869,21 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                                     .filter((file) => file.linkedEntityId === trade.id || file.relativePath.toLowerCase().includes(trade.companyName.toLowerCase()))
                                     .slice(0, 4)
                                     .map((file) => (
-                                      <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">
-                                        {file.name}
-                                      </a>
+                                      isOfficePreviewableDocument(file) ? (
+                                        <button
+                                          key={file.id}
+                                          type="button"
+                                          onClick={() => setPreviewFile(file)}
+                                          className="text-left text-xs text-primary hover:underline"
+                                          aria-label={`Preview ${file.name}`}
+                                        >
+                                          {file.name}
+                                        </button>
+                                      ) : (
+                                        <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">
+                                          {file.name}
+                                        </a>
+                                      )
                                     ))}
                                 </div>
                               </div>
@@ -1891,6 +1941,14 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
             </TabsContent>
 
           </Tabs>
+          <ProjectDocumentPreviewDialog
+            projectId={projectId}
+            file={previewFile}
+            open={previewFile !== null}
+            onOpenChange={(open) => {
+              if (!open) setPreviewFile(null)
+            }}
+          />
         </div>
       </div>
     </>

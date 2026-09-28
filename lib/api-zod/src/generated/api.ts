@@ -327,6 +327,28 @@ export const UpdateProjectResponse = zod.object({
 
 
 /**
+ * @summary Preview a Word or Excel project document
+ */
+
+
+
+export const GetProjectDocumentPreviewParams = zod.object({
+  "projectId": zod.coerce.string(),
+  "documentId": zod.coerce.string().min(1)
+})
+
+export const GetProjectDocumentPreviewResponse = zod.object({
+  "kind": zod.enum(['word', 'excel']),
+  "text": zod.string().nullable(),
+  "worksheets": zod.array(zod.object({
+  "name": zod.string(),
+  "rows": zod.array(zod.array(zod.string()))
+})),
+  "truncated": zod.boolean()
+})
+
+
+/**
  * @summary Add a panorama to a project
  */
 export const CreateProjectPanoramaParams = zod.object({

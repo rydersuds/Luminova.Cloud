@@ -821,6 +821,27 @@ export interface VendorQuoteUpdate {
   lineItems?: VendorQuoteLineItemInput[];
 }
 
+export interface ProjectDocumentPreviewWorksheet {
+  name: string;
+  rows: string[][];
+}
+
+export type ProjectDocumentPreviewKind = typeof ProjectDocumentPreviewKind[keyof typeof ProjectDocumentPreviewKind];
+
+
+export const ProjectDocumentPreviewKind = {
+  word: 'word',
+  excel: 'excel',
+} as const;
+
+export interface ProjectDocumentPreview {
+  kind: ProjectDocumentPreviewKind;
+  /** @nullable */
+  text: string | null;
+  worksheets: ProjectDocumentPreviewWorksheet[];
+  truncated: boolean;
+}
+
 export interface ProjectEntryAgreementInput {
   /**
      * @minLength 1
