@@ -84,6 +84,11 @@ test.beforeEach(async ({ page }) => {
     contentType: 'image/svg+xml',
     body: '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#c8ae4b"/></svg>',
   }));
+  await page.route('**/api/storage/objects/vendor-logo', route => route.fulfill({
+    contentType: 'image/png',
+    body: png,
+  }));
+  await page.route('**/api/storage/objects/broken-vendor-logo', route => route.fulfill({ status: 404 }));
   await page.route('**/api/projects/riverstone/activity', route => route.fulfill({ json: [] }));
   await page.route('**/api/users/me', route => route.fulfill({
     json: {
@@ -209,7 +214,7 @@ test('shows recent trade profile logos with initials as a fallback', async ({ pa
       contactName: 'Jordan Lee',
       initials: 'NE',
       accent: '#c8ae4b',
-      profilePhotoUrl: '/trade-logo.svg',
+      profilePhotoUrl: '/api/storage/objects/vendor-logo',
       profilePhotoPositionX: 50,
       profilePhotoPositionY: 50,
       profilePhotoZoom: 1,
@@ -221,18 +226,27 @@ test('shows recent trade profile logos with initials as a fallback', async ({ pa
       initials: 'RP',
       accent: '#4f86c6',
       profilePhotoUrl: null,
+    }, {
+      id: 'trade-broken',
+      companyName: 'Broken Image HVAC',
+      tradeType: 'HVAC',
+      contactName: 'Jordan Wells',
+      initials: 'BH',
+      accent: '#9b5de5',
+      profilePhotoUrl: '/api/storage/objects/broken-vendor-logo',
+      profilePhotoPositionX: 25,
+      profilePhotoPositionY: 75,
+      profilePhotoZoom: 1.4,
     }],
   };
-  await page.route('**/trade-logo.svg', route => route.fulfill({
-    contentType: 'image/svg+xml',
-    body: '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#c8ae4b"/><path d="M12 32h40" stroke="#111" stroke-width="8"/></svg>',
-  }));
   await page.unroute('**/api/projects/riverstone');
   await page.route('**/api/projects/riverstone', route => route.fulfill({ json: current }));
 
   await openOverview(page);
   await expect(page.getByRole('img', { name: 'Northline Electric profile logo' })).toBeVisible();
   await expect(page.getByText('RP', { exact: true })).toBeVisible();
+  await expect(page.getByText('BH', { exact: true })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'Broken Image HVAC profile logo' })).toHaveCount(0);
 });
 
 for (const viewport of [

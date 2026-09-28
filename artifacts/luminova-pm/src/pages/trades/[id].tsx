@@ -30,6 +30,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { uploadToSignedUrl, validateImageFile } from "@/lib/image-upload"
+import { VendorIdentity } from "@/components/vendor-identity"
 
 type Feedback = { kind: "success" | "error"; message: string } | null
 type ErrorWithData = { data?: { error?: string }; message?: string }
@@ -56,11 +57,11 @@ const errorMessage = (error: unknown, fallback: string) => {
   return typed.data?.error || typed.message || fallback
 }
 
-export default function TradeDetail() {
+export default function TradeDetail(_props: { tradeIdOverride?: string; params?: Record<string, string | undefined> } = {}) {
   const params = useParams()
   const [, setLocation] = useLocation()
   const queryClient = useQueryClient()
-  const tradeId = params.id as string
+  const tradeId = _props.tradeIdOverride ?? params.id as string
 
   const { data: trade, isLoading } = useGetTrade(tradeId, {
     query: {
@@ -385,23 +386,17 @@ export default function TradeDetail() {
             </button>
 
             <div className="flex flex-col md:flex-row gap-8 items-start md:items-center">
-              <div
-                className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl flex items-center justify-center font-heading font-bold text-3xl shadow-sm"
-                style={{ backgroundColor: `${trade.accent}15`, color: trade.accent, border: `1px solid ${trade.accent}30` }}
-              >
-                {trade.profilePhotoUrl
-                  ? <img
-                      src={trade.profilePhotoUrl}
-                      alt={`${trade.companyName} profile`}
-                      className="h-full w-full object-contain p-1"
-                      style={{
-                        objectPosition: `${trade.profilePhotoPositionX}% ${trade.profilePhotoPositionY}%`,
-                        transform: `scale(${trade.profilePhotoZoom})`,
-                        transformOrigin: `${trade.profilePhotoPositionX}% ${trade.profilePhotoPositionY}%`,
-                      }}
-                    />
-                  : trade.initials}
-              </div>
+              <VendorIdentity
+                vendorId={trade.id}
+                name={trade.companyName}
+                initials={trade.initials}
+                accent={trade.accent}
+                logoUrl={trade.profilePhotoUrl}
+                positionX={trade.profilePhotoPositionX}
+                positionY={trade.profilePhotoPositionY}
+                zoom={trade.profilePhotoZoom}
+                className="h-24 w-24 rounded-2xl text-3xl shadow-sm"
+              />
 
               <div className="flex-1 space-y-2">
                 <div className="flex min-w-0 flex-wrap items-center gap-3">
@@ -649,31 +644,32 @@ export default function TradeDetail() {
           </DialogHeader>
           <form onSubmit={(event) => void submitProfile(event)} className="space-y-5">
             <div className="flex flex-col gap-5 rounded-lg border border-border bg-muted/20 p-4 sm:flex-row sm:items-start">
-              <div className="flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted font-heading text-3xl font-bold text-muted-foreground">
-                {profilePhotoPreview
-                  ? <img
-                      src={profilePhotoPreview}
-                      alt="New vendor logo or profile image preview"
-                      className="h-full w-full object-contain p-1"
-                      style={{
-                        objectPosition: `${profileForm.profilePhotoPositionX}% ${profileForm.profilePhotoPositionY}%`,
-                        transform: `scale(${profileForm.profilePhotoZoom})`,
-                        transformOrigin: `${profileForm.profilePhotoPositionX}% ${profileForm.profilePhotoPositionY}%`,
-                      }}
-                    />
-                  : trade.profilePhotoUrl && !removeProfilePhoto
-                    ? <img
-                        src={trade.profilePhotoUrl}
-                        alt={`${trade.companyName} logo or profile image`}
-                        className="h-full w-full object-contain p-1"
-                        style={{
-                          objectPosition: `${profileForm.profilePhotoPositionX}% ${profileForm.profilePhotoPositionY}%`,
-                          transform: `scale(${profileForm.profilePhotoZoom})`,
-                          transformOrigin: `${profileForm.profilePhotoPositionX}% ${profileForm.profilePhotoPositionY}%`,
-                        }}
-                      />
-                    : trade.initials}
-              </div>
+              {profilePhotoPreview ? (
+                <div className="h-32 w-32 shrink-0 overflow-hidden rounded-xl border border-border bg-muted">
+                  <img
+                    src={profilePhotoPreview}
+                    alt="New vendor logo or profile image preview"
+                    className="h-full w-full object-contain bg-background p-1"
+                    style={{
+                      objectPosition: `${profileForm.profilePhotoPositionX}% ${profileForm.profilePhotoPositionY}%`,
+                      transform: `scale(${profileForm.profilePhotoZoom})`,
+                      transformOrigin: `${profileForm.profilePhotoPositionX}% ${profileForm.profilePhotoPositionY}%`,
+                    }}
+                  />
+                </div>
+              ) : (
+                <VendorIdentity
+                  vendorId={trade.id}
+                  name={trade.companyName}
+                  initials={trade.initials}
+                  accent={trade.accent}
+                  logoUrl={removeProfilePhoto ? null : trade.profilePhotoUrl}
+                  positionX={profileForm.profilePhotoPositionX}
+                  positionY={profileForm.profilePhotoPositionY}
+                  zoom={profileForm.profilePhotoZoom}
+                  className="h-32 w-32 rounded-xl text-3xl"
+                />
+              )}
               <div className="min-w-0 flex-1 space-y-2">
                 <Label htmlFor="vendor-profile-photo">Logo or profile image</Label>
                 <Input id="vendor-profile-photo" type="file" accept=".png,image/png,image/jpeg,image/webp" onChange={chooseProfilePhoto} />

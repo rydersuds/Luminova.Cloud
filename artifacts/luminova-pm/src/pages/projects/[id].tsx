@@ -38,6 +38,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "@/hooks/use-toast"
 import { PanoramaViewer } from "@/components/panorama-viewer"
 import { ClientIdentity } from "@/components/client-identity"
+import { VendorIdentity } from "@/components/vendor-identity"
 import { cn, formatCurrency, formatDate, formatDateOnly, formatDaysRemaining, getDaysRemaining, getStatusColor } from "@/lib/utils"
 import { readImageDataUrl, uploadToSignedUrl, validateImageFile } from "@/lib/image-upload"
 type ProjectPanorama = {
@@ -1137,23 +1138,17 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                         {project.trades.slice(0,3).map(trade => (
                           <div key={trade.id} className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/20">
                             <div className="flex items-center gap-3">
-                              <div
-                                className="h-10 w-10 shrink-0 overflow-hidden rounded-full flex items-center justify-center font-heading font-bold text-sm"
-                                style={{ backgroundColor: `${trade.accent}20`, color: trade.accent }}
-                              >
-                                {trade.profilePhotoUrl ? (
-                                  <img
-                                    src={trade.profilePhotoUrl}
-                                    alt={`${trade.companyName} profile logo`}
-                                    className="h-full w-full object-contain p-1"
-                                    style={{
-                                      objectPosition: `${trade.profilePhotoPositionX ?? 50}% ${trade.profilePhotoPositionY ?? 50}%`,
-                                      transform: `scale(${trade.profilePhotoZoom ?? 1})`,
-                                      transformOrigin: `${trade.profilePhotoPositionX ?? 50}% ${trade.profilePhotoPositionY ?? 50}%`,
-                                    }}
-                                  />
-                                ) : trade.initials}
-                              </div>
+                              <VendorIdentity
+                                vendorId={trade.id}
+                                name={trade.companyName}
+                                initials={trade.initials}
+                                accent={trade.accent}
+                                logoUrl={trade.profilePhotoUrl}
+                                positionX={trade.profilePhotoPositionX ?? 50}
+                                positionY={trade.profilePhotoPositionY ?? 50}
+                                zoom={trade.profilePhotoZoom ?? 1}
+                                className="h-10 w-10 rounded-full text-sm"
+                              />
                               <div>
                                 <p className="font-medium">{trade.companyName}</p>
                                 <p className="text-xs text-muted-foreground">{trade.tradeType}</p>

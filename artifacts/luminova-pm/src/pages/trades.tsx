@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
+import { VendorIdentity } from "@/components/vendor-identity"
 import { Search, MapPin, Star, Filter, ArrowRight } from "lucide-react"
 
 export default function TradesDirectory() {
@@ -94,23 +95,17 @@ export default function TradesDirectory() {
                 <Card key={trade.id} className="overflow-hidden hover:shadow-md transition-all group border-border cursor-pointer" onClick={() => setLocation(`/trades/${trade.id}`)}>
                   <CardContent className="p-0">
                     <div className="flex flex-col sm:flex-row sm:items-center p-4 sm:p-6 gap-4 sm:gap-6">
-                      <div 
-                        className="h-16 w-16 shrink-0 overflow-hidden rounded-xl flex items-center justify-center font-heading font-bold text-xl shadow-inner"
-                        style={{ backgroundColor: `${trade.accent}15`, color: trade.accent, border: `1px solid ${trade.accent}30` }}
-                      >
-                        {trade.profilePhotoUrl
-                            ? <img
-                                src={trade.profilePhotoUrl}
-                                alt={`${trade.companyName} profile logo`}
-                                className="h-full w-full object-contain p-1"
-                                style={{
-                                  objectPosition: `${trade.profilePhotoPositionX ?? 50}% ${trade.profilePhotoPositionY ?? 50}%`,
-                                  transform: `scale(${trade.profilePhotoZoom ?? 1})`,
-                                  transformOrigin: `${trade.profilePhotoPositionX ?? 50}% ${trade.profilePhotoPositionY ?? 50}%`,
-                                }}
-                              />
-                          : trade.initials}
-                      </div>
+                      <VendorIdentity
+                        vendorId={trade.id}
+                        name={trade.companyName}
+                        initials={trade.initials}
+                        accent={trade.accent}
+                        logoUrl={trade.profilePhotoUrl}
+                        positionX={trade.profilePhotoPositionX ?? 50}
+                        positionY={trade.profilePhotoPositionY ?? 50}
+                        zoom={trade.profilePhotoZoom ?? 1}
+                        className="h-16 w-16 text-xl"
+                      />
                       
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
