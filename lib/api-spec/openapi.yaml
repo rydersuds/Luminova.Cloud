@@ -1987,6 +1987,19 @@ components:
         budgeted: { type: number }
         invoiced: { type: number }
         variance: { type: number }
+        detailItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/BudgetLineItemDetail"
+    BudgetLineItemDetail:
+      type: object
+      required: [id, description, unit, quantity, budgeted]
+      properties:
+        id: { type: string }
+        description: { type: string }
+        unit: { type: ["string", "null"] }
+        quantity: { type: ["number", "null"] }
+        budgeted: { type: ["number", "null"] }
     Trade:
       type: object
       required: [id, companyName, contactName, tradeType, region, rating, reviewCount, completedJobs, initials, accent]

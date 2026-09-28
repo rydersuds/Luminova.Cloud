@@ -138,6 +138,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const [editingPanorama, setEditingPanorama] = React.useState<ProjectPanorama | null>(null)
   const [panoramaEditError, setPanoramaEditError] = React.useState("")
   const [collapsedPhotoCollections, setCollapsedPhotoCollections] = React.useState<Set<string>>(new Set())
+  const [expandedBudgetLineItems, setExpandedBudgetLineItems] = React.useState<Set<string>>(() => new Set())
   const initializedPhotoFoldersForProject = React.useRef<string | null>(null)
   const [photoSearch, setPhotoSearch] = React.useState("")
   const [exteriorPhotoError, setExteriorPhotoError] = React.useState("")
@@ -1664,17 +1665,107 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {project.lineItems.map(item => (
-                        <TableRow key={item.id}>
-                          <TableCell className="font-mono text-xs">{item.code}</TableCell>
-                          <TableCell className="font-medium">{item.description}</TableCell>
-                          <TableCell className="text-right tabular-nums">{formatCurrency(item.budgeted)}</TableCell>
-                          <TableCell className="text-right tabular-nums">{formatCurrency(item.invoiced)}</TableCell>
-                          <TableCell className={cn("text-right tabular-nums font-medium", item.variance >= 0 ? "text-success" : "text-destructive")}>
-                            {item.variance >= 0 ? "+" : ""}{formatCurrency(item.variance)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {project.lineItems.map(item => {
+                        const detailItems = item.detailItems ?? []
+                        const itemKey = `${projectId}:${item.id}`
+                        const isExpanded = expandedBudgetLineItems.has(itemKey)
+                        const detailPanelId = `budget-detail-${item.id}`
+
+                        return (
+                          <React.Fragment key={item.id}>
+                            <TableRow data-testid={`row-budget-line-${item.id}`}>
+                              <TableCell className="font-mono text-xs">{item.code}</TableCell>
+                              <TableCell className="font-medium">
+                                <div className="flex min-w-0 items-center gap-2">
+                                  {detailItems.length > 0 ? (
+                                    <button
+                                      type="button"
+                                      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                      aria-label={`${isExpanded ? "Hide" : "Show"} itemized details for ${item.description}`}
+                                      aria-expanded={isExpanded}
+                                      aria-controls={detailPanelId}
+                                      data-testid={`button-toggle-budget-details-${item.id}`}
+                                      onClick={() => setExpandedBudgetLineItems((current) => {
+                                        const next = new Set(current)
+                                        if (next.has(itemKey)) next.delete(itemKey)
+                                        else next.add(itemKey)
+                                        return next
+                                      })}
+                                    >
+                                      {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                    </button>
+                                  ) : (
+                                    <span aria-hidden="true" className="h-7 w-7 shrink-0" />
+                                  )}
+                                  <div className="min-w-0">
+                                    <p>{item.description}</p>
+                                    {detailItems.length > 0 && (
+                                      <p className="text-xs font-normal text-muted-foreground">
+                                        {detailItems.length} workbook item{detailItems.length === 1 ? "" : "s"}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">{formatCurrency(item.budgeted)}</TableCell>
+                              <TableCell className="text-right tabular-nums">{formatCurrency(item.invoiced)}</TableCell>
+                              <TableCell className={cn("text-right tabular-nums font-medium", item.variance >= 0 ? "text-success" : "text-destructive")}>
+                                {item.variance >= 0 ? "+" : ""}{formatCurrency(item.variance)}
+                              </TableCell>
+                            </TableRow>
+                            {detailItems.length > 0 && (
+                              <TableRow
+                                id={detailPanelId}
+                                className={isExpanded ? "bg-muted/20" : "hidden"}
+                                aria-hidden={!isExpanded}
+                                data-testid={`row-budget-details-${item.id}`}
+                              >
+                                <TableCell colSpan={5} className="p-0">
+                                  <div className="space-y-3 p-4">
+                                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Itemized details from workbook</p>
+                                      <p className="text-xs text-muted-foreground">Internal cost only</p>
+                                    </div>
+                                    <div className="overflow-x-auto rounded-md border bg-card">
+                                      <Table className="min-w-[38rem]">
+                                        <TableHeader>
+                                          <TableRow>
+                                            <TableHead>Work item</TableHead>
+                                            <TableHead className="text-right">Quantity</TableHead>
+                                            <TableHead>Unit</TableHead>
+                                            <TableHead className="text-right">Internal cost</TableHead>
+                                          </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                          {detailItems.map((detail) => (
+                                            <TableRow key={detail.id} data-testid={`row-budget-detail-${detail.id}`}>
+                                              <TableCell className="font-medium">{detail.description}</TableCell>
+                                              <TableCell className="text-right tabular-nums">
+                                                {detail.quantity === null ? "—" : detail.quantity.toLocaleString()}
+                                              </TableCell>
+                                              <TableCell>{detail.unit ?? "—"}</TableCell>
+                                              <TableCell className="text-right tabular-nums">
+                                                {detail.budgeted === null
+                                                  ? <span className="text-xs text-muted-foreground">Not provided</span>
+                                                  : formatCurrency(detail.budgeted)}
+                                              </TableCell>
+                                            </TableRow>
+                                          ))}
+                                        </TableBody>
+                                      </Table>
+                                    </div>
+                                    {detailItems.some((detail) => detail.budgeted === null) && (
+                                      <p className="text-xs text-muted-foreground">
+                                        Blank OUR COST values remain unpriced and are not added separately to the category total.
+                                      </p>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </React.Fragment>
+                        )
+                      })}
                     </TableBody>
                   </Table>
                 </CardContent>

@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { BudgetLineItemDetail } from './budgetLineItemDetail';
 
 export interface BudgetLineItem {
   id: string;
@@ -13,4 +14,5 @@ export interface BudgetLineItem {
   budgeted: number;
   invoiced: number;
   variance: number;
+  detailItems?: BudgetLineItemDetail[];
 }

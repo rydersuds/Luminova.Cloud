@@ -370,6 +370,17 @@ export interface ClientQuote {
   portions: QuotePortion[];
 }
 
+export interface BudgetLineItemDetail {
+  id: string;
+  description: string;
+  /** @nullable */
+  unit: string | null;
+  /** @nullable */
+  quantity: number | null;
+  /** @nullable */
+  budgeted: number | null;
+}
+
 export interface BudgetLineItem {
   id: string;
   code: string;
@@ -377,6 +388,7 @@ export interface BudgetLineItem {
   budgeted: number;
   invoiced: number;
   variance: number;
+  detailItems?: BudgetLineItemDetail[];
 }
 
 export type QuoteDirection = typeof QuoteDirection[keyof typeof QuoteDirection];
@@ -1122,3 +1134,4 @@ trade?: string;
 status?: VendorQuoteStatus;
 direction?: QuoteDirection;
 };
+

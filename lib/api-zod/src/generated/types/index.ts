@@ -8,6 +8,7 @@
 
 export * from './activity';
 export * from './budgetLineItem';
+export * from './budgetLineItemDetail';
 export * from './bulkClientAccessReconciliationResponse';
 export * from './bulkClientAccessReconciliationResponseFailedItem';
 export * from './chatOptions';

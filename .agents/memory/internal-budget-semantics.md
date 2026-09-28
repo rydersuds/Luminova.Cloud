@@ -14,3 +14,9 @@ Legacy imports may omit invoice direction. Reclassify those rows as client reven
 **Why:** Older imported Madison Park records stored the correct financial totals on the project but omitted direction and standalone quote rows; treating every unknown row as an expense or ignoring project-level evidence produced invalid portfolio totals.
 
 **How to apply:** Resolve legacy direction in the owner-scoped financial aggregation, and prefer project-level budget actuals over duplicate expense rows when both represent the same persisted cost.
+
+For imported budgets with itemized source rows, use internal-cost (`OUR COST`) values only. Preserve blank source amounts as unpriced, keep the parent category subtotal authoritative, and exclude client charges and profit from the detail view.
+
+**Why:** Workbook detail can be partial, so treating blanks as zero or summing child rows into the parent can change approved budget totals or expose the wrong financial basis.
+
+**How to apply:** Store source rows as optional detail under their budget category. Display missing internal costs as not provided without changing category totals.

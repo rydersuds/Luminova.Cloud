@@ -21,6 +21,14 @@ type ExtractionLog = {
   warn: (context: object, message: string) => void;
 };
 
+export type InternalBudgetLineItemDetail = {
+  id: string;
+  description: string;
+  unit: string | null;
+  quantity: number | null;
+  budgeted: number | null;
+};
+
 export type InternalBudgetLineItem = {
   id: string;
   code: string;
@@ -28,6 +36,7 @@ export type InternalBudgetLineItem = {
   budgeted: number;
   invoiced: number;
   variance: number;
+  detailItems?: InternalBudgetLineItemDetail[];
 };
 
 export type ExtractedInternalBudget = {

@@ -369,6 +369,66 @@ test('shows the project client identity on project cards and client billing deta
   await expect(page.getByRole('img', { name: 'Northline Electric logo' })).toHaveCount(0);
 });
 
+test('expands itemized budget details without changing the category total', async ({ page }) => {
+  const current = {
+    ...structuredClone(project),
+    lineItems: [
+      {
+        id: 'budget-drywall',
+        code: 'IB-02',
+        description: 'Drywall',
+        budgeted: 199240.03,
+        invoiced: 0,
+        variance: 199240.03,
+        detailItems: [
+          {
+            id: 'source-drywall-repair',
+            description: 'Repair damaged wall',
+            unit: 'SQFT',
+            quantity: 12,
+            budgeted: null,
+          },
+          {
+            id: 'source-drywall-replacement',
+            description: 'Replace drywall',
+            unit: 'SQFT',
+            quantity: 18,
+            budgeted: 1250.5,
+          },
+        ],
+      },
+    ],
+  };
+  await page.unroute('**/api/projects/riverstone');
+  await page.route('**/api/projects/riverstone', route => route.fulfill({ json: current }));
+
+  await page.goto('/__visual/project-panorama');
+  await page.getByRole('tab', { name: 'Budget' }).click();
+
+  const categoryRow = page.getByTestId('row-budget-line-budget-drywall');
+  const categoryBudget = categoryRow.locator('td').nth(2);
+  await expect(categoryBudget).toContainText('199,240.03');
+  const detailsRow = page.getByTestId('row-budget-details-budget-drywall');
+  await expect(detailsRow).toBeHidden();
+
+  const toggle = page.getByTestId('button-toggle-budget-details-budget-drywall');
+  await expect(toggle).toHaveAccessibleName('Show itemized details for Drywall');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(toggle).toHaveAccessibleName('Hide itemized details for Drywall');
+  await expect(page.getByTestId('row-budget-detail-source-drywall-repair')).toContainText('Repair damaged wall');
+  await expect(detailsRow).toBeVisible();
+  await expect(detailsRow).toContainText('Not provided');
+  await expect(detailsRow).toContainText('Blank OUR COST values remain unpriced');
+  await expect(categoryBudget).toContainText('199,240.03');
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(toggle).toHaveAccessibleName('Show itemized details for Drywall');
+  await expect(detailsRow).toBeHidden();
+});
+
 test('selects a standard photo as the exterior photo and keeps it selected after refresh', async ({ page }) => {
   let current = {
     ...structuredClone(project),

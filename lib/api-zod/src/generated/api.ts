@@ -180,7 +180,14 @@ export const GetProjectResponse = zod.object({
   "description": zod.string(),
   "budgeted": zod.number(),
   "invoiced": zod.number(),
-  "variance": zod.number()
+  "variance": zod.number(),
+  "detailItems": zod.array(zod.object({
+  "id": zod.string(),
+  "description": zod.string(),
+  "unit": zod.string().nullable(),
+  "quantity": zod.number().nullable(),
+  "budgeted": zod.number().nullable()
+})).optional()
 })),
   "invoices": zod.array(zod.object({
   "id": zod.string(),
@@ -2518,3 +2525,5 @@ export const DeleteWorkspaceUserParams = zod.object({
 })
 
 export const DeleteWorkspaceUserResponse = zod.void()
+
+
