@@ -4,13 +4,11 @@ import {
   getGetProjectsQueryKey,
   useGetProjects,
 } from "@workspace/api-client-react"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Building2, Grid2X2, List, MapPin, Search, SlidersHorizontal, X } from "lucide-react"
-import { cn, formatCurrency, formatDateOnly, formatDaysRemaining, getDaysRemaining, getStatusColor } from "@/lib/utils"
-import { ClientIdentity } from "@/components/client-identity"
+import { Building2, Grid2X2, List, Search, SlidersHorizontal, X } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { ProjectCard } from "@/components/workspace/project-card"
 
 const STATUSES = ["Pre-construction", "Planning", "Active", "In progress", "On hold", "Completed", "Rejected for bid"]
 const REGION_OPTIONS_QUERY_KEY = [...getGetProjectsQueryKey(), "region-options"] as const
@@ -92,7 +90,7 @@ export default function Projects() {
             </div>
           </header>
 
-          <section className="glass-panel tech-border p-4 sm:p-5">
+          <section className="filter-dock p-4 sm:p-5">
             <div className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
               <SlidersHorizontal className="h-4 w-4 text-primary" />
               Filter projects
@@ -153,104 +151,19 @@ export default function Projects() {
           {isLoading ? (
             <div className={cn("grid gap-5", view === "grid" ? "md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1")}>
               {Array.from({ length: 6 }).map((_, index) => (
-                <Card key={index} className="h-72 animate-pulse bg-muted/50" />
+                <div key={index} className="h-[30rem] skeleton-line rounded-2xl" />
               ))}
             </div>
           ) : projects?.length === 0 ? (
-            <div className="glass-panel py-20 text-center">
+            <div className="filter-dock py-20 text-center">
               <Building2 className="mx-auto mb-4 h-12 w-12 text-primary/50" />
               <h2 className="text-xl font-semibold">No matching projects</h2>
               <p className="mt-2 text-sm text-muted-foreground">Clear or adjust the filters to expand the results.</p>
             </div>
           ) : (
             <div className={cn("grid gap-5", view === "grid" ? "md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1")}>
-              {projects?.map((project, index) => (
-                <Card
-                  key={project.id}
-                  onClick={() => setLocation(`/projects/${project.id}`)}
-                  tabIndex={0}
-                  role="link"
-                  aria-label={`Open ${project.name}`}
-                  onKeyDown={(event) => { if (event.key === "Enter") setLocation(`/projects/${project.id}`) }}
-                  className={cn(
-                    "hud-card hud-frame group cursor-pointer overflow-hidden border-border/60 bg-card/85",
-                    view === "list" && "sm:grid sm:grid-cols-[260px_1fr]",
-                  )}
-                >
-                  <div className={cn("relative h-48 overflow-hidden bg-muted", view === "list" && "sm:h-full")}>
-                    {project.exteriorImage ? (
-                      <img
-                        src={project.exteriorImage}
-                        alt={project.name}
-                        className="h-full w-full object-cover saturate-110 transition-transform duration-700 group-hover:scale-105"
-                      />
-                    ) : (
-                        <div className="flex h-full items-center justify-center bg-muted/50">
-                        <Building2 className="h-12 w-12 text-primary/45" />
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
-                    <Badge
-                      variant={getStatusColor(project.status) as any}
-                      className="absolute left-4 top-4 rounded-none bg-background font-mono text-[10px] uppercase tracking-wider"
-                    >
-                      {project.status}
-                    </Badge>
-                    <span className="absolute right-4 top-4 rounded bg-background/85 px-1.5 py-0.5 hud-index">#{String(index + 1).padStart(3, "0")}</span>
-                  </div>
-                    <CardContent className="flex min-w-0 flex-col gap-5 p-5">
-                      <div className="min-w-0">
-                        <h2 className="break-words text-xl font-bold">{project.name}</h2>
-                        <div className="mt-2 flex min-w-0 items-start gap-2 text-sm text-muted-foreground">
-                        <MapPin className="h-4 w-4 shrink-0 text-primary" />
-                          <span className="min-w-0 break-words">{project.address}</span>
-                      </div>
-                    </div>
-                      <div className="grid grid-cols-1 gap-4 border-y border-border/50 py-4 text-sm min-[420px]:grid-cols-2">
-                        <div className="min-w-0">
-                        <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Project manager</p>
-                          <p className="mt-1 break-words font-medium">{project.pmName || "Unassigned"}</p>
-                      </div>
-                        <div className="min-w-0">
-                         <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">End date</p>
-                          <p className="mt-1 break-words font-medium">{formatDateOnly(project.targetDate)}</p>
-                      </div>
-                         <div className="min-w-0">
-                           <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Time remaining</p>
-                           <p className={cn(
-                             "mt-1 break-words font-medium",
-                             getDaysRemaining(project.targetDate) !== null && getDaysRemaining(project.targetDate)! < 0 && "text-destructive",
-                           )}>
-                             {formatDaysRemaining(project.targetDate)}
-                           </p>
-                         </div>
-                        <div className="min-w-0">
-                        <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Budget</p>
-                          <p className="mt-1 break-words font-semibold tabular-nums">{formatCurrency(project.budgeted)}</p>
-                      </div>
-                        <div className="min-w-0">
-                        <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Region</p>
-                          <p className="mt-1 break-words font-medium">{project.region}</p>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="mb-2 flex items-center justify-between font-mono text-[10px] uppercase tracking-wider">
-                        <span className="text-muted-foreground">Completion</span>
-                        <span className="text-primary">{project.progress}%</span>
-                      </div>
-                      <div className="h-1.5 overflow-hidden bg-muted">
-                        <div className="h-full bg-primary transition-all duration-700" style={{ width: `${project.progress}%` }} />
-                      </div>
-                    </div>
-                    <div className="flex min-w-0 items-center gap-2 border-t border-border/50 pt-4">
-                      <ClientIdentity name={project.clientName} logoUrl={project.clientLogoUrl} size="sm" />
-                      <div className="min-w-0">
-                        <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Client</p>
-                        <p className="truncate font-medium">{project.clientName}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+              {projects?.map((project) => (
+                <ProjectCard key={project.id} project={project} layout={view === "list" ? "row" : "tile"} onOpen={() => setLocation(`/projects/${project.id}`)} />
               ))}
             </div>
           )}

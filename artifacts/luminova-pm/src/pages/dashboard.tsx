@@ -15,8 +15,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { formatCurrency, formatDate, formatDaysRemaining, getDaysRemaining, getStatusColor } from "@/lib/utils"
-import { Plus, MapPin, Building, Activity, DollarSign, Clock, FileJson, FileSpreadsheet, X, CheckCircle2, AlertTriangle, ShieldAlert, FolderUp, FileText } from "lucide-react"
+import { formatCurrency, formatDate } from "@/lib/utils"
+import { Plus, Building, Activity, DollarSign, Clock, FileJson, FileSpreadsheet, X, CheckCircle2, AlertTriangle, ShieldAlert, FolderUp, FileText } from "lucide-react"
 import { Link, useLocation } from "wouter"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
@@ -29,6 +29,8 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useProjectFolderImport } from "@/providers/project-folder-import-provider"
 import { GlobalSearch } from "@/components/global-search"
 import { ClientIdentity } from "@/components/client-identity"
+import { ProjectCard } from "@/components/workspace/project-card"
+import { ProjectStage } from "@/components/workspace/project-stage"
 
 // Strict validation schema, zero defaults
 const projectSchema = z.object({
@@ -586,6 +588,8 @@ export default function Dashboard() {
             </div>
           </div>
 
+          <ProjectStage projects={projects} loading={loadingProjects} />
+
           {/* Operational readout — values straight from the dashboard summary */}
           <section aria-label="Operational summary" className="hud-readout grid grid-cols-2 lg:grid-cols-4">
             {[
@@ -604,31 +608,31 @@ export default function Dashboard() {
           </section>
 
           {/* Financial overview */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 md:gap-6">
+          <section aria-label="Financial overview" className="ledger grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
             {financialCards.map(({ label, value, icon: Icon, accent, loading }, index) => (
-              <Card key={label} className="hud-frame surface-3d bg-card hover:bg-card/80 transition-all group">
-                <CardContent className="p-6">
+              <Card key={label} className="ledger-cell group rounded-none border-0 shadow-none">
+                <CardContent className="p-5 sm:p-6">
                   <div className="flex min-h-24 flex-col justify-between">
                     <div className="mb-4 flex items-center justify-between gap-4">
                       <div><span className="hud-index">F{String(index + 1).padStart(2, "0")}</span><p className="mt-1 text-[11px] font-mono uppercase tracking-widest text-muted-foreground">{label}</p></div>
-                      <div className={cn("h-10 w-10 shrink-0 rounded-full surface-3d flex items-center justify-center group-hover:scale-110 transition-transform", accent)}>
+                      <div className={cn("h-9 w-9 shrink-0 rounded-lg flex items-center justify-center", accent)}>
                         <Icon className="h-5 w-5 drop-shadow-sm" />
                       </div>
                     </div>
-                    <p className="break-words text-2xl font-mono font-bold tracking-tighter text-foreground sm:text-3xl">
+                    <p className="break-words font-heading text-3xl font-extrabold tabular-nums tracking-[-0.03em] text-foreground sm:text-[2.1rem]">
                       {loading ? "—" : value === undefined ? "Unavailable" : formatCurrency(value)}
                     </p>
                   </div>
                 </CardContent>
               </Card>
             ))}
-          </div>
+          </section>
 
           {/* Main Panels */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] gap-6 md:gap-8">
             
             {/* Active Projects List */}
-            <div className="lg:col-span-2 space-y-4">
+            <div className="min-w-0 space-y-4">
               <div className="hud-section-head">
                 <ShieldAlert className="h-4 w-4 text-primary" />
                 <h2>Active Deployments</h2>
@@ -639,84 +643,16 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {loadingProjects ? (
                   Array.from({ length: 4 }).map((_, i) => (
-                    <Card key={i} className="h-64 skeleton-line border-border/50" />
+                    <div key={i} className="h-[26rem] skeleton-line rounded-2xl" />
                   ))
                 ) : projects?.length === 0 ? (
                   <div className="col-span-2 text-center py-16 glass-panel rounded-sm border border-border/50">
                     <Building className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-                    <h3 className="text-lg font-mono tracking-widest text-foreground uppercase">No Telemetry Found</h3>
-                    <p className="text-muted-foreground font-mono text-xs mt-2">Awaiting initialization of new project nodes.</p>
+                    <h3 className="text-lg font-mono tracking-widest text-foreground uppercase">No projects yet</h3>
+                    <p className="text-muted-foreground font-mono text-xs mt-2">Initialize a project to see it here.</p>
                   </div>
                 ) : projects?.map((project) => (
-                  <Card 
-                    key={project.id} 
-                    className="hud-card hud-frame overflow-hidden cursor-pointer group flex flex-col border-border/60 bg-card"
-                    onClick={() => setLocation(`/projects/${project.id}`)}
-                    tabIndex={0}
-                    role="link"
-                    aria-label={`Open ${project.name}`}
-                    onKeyDown={(event) => { if (event.key === "Enter") setLocation(`/projects/${project.id}`) }}
-                  >
-                    <div className="h-32 bg-muted relative overflow-hidden">
-                      {project.exteriorImage ? (
-                        <div className="w-full h-full relative">
-                          <img src={project.exteriorImage} alt={project.name} className="w-full h-full object-cover saturate-110 group-hover:scale-105 transition-transform duration-700" />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent"></div>
-                        </div>
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center tech-grid opacity-30">
-                          <Building className="h-12 w-12 text-primary/40" />
-                        </div>
-                      )}
-                      
-                      {/* Technical Overlays */}
-                      <div className="absolute top-0 left-0 w-full h-full pointer-events-none border-[0.5px] border-primary/20 scale-[0.98] group-hover:scale-[0.96] transition-transform duration-500"></div>
-                      
-                      <div className="absolute top-3 left-3 flex gap-2">
-                        <Badge variant={getStatusColor(project.status) as any} className="uppercase font-mono text-[10px] tracking-widest rounded-none border-primary/30 bg-background/90">
-                          {project.status}
-                        </Badge>
-                      </div>
-                      <div className="absolute top-3 right-3 text-[10px] font-mono text-primary/70 tracking-widest">
-                        ID:{project.id.split('-')[0].toUpperCase()}
-                      </div>
-                    </div>
-                    <CardContent className="p-5 flex-1 flex flex-col relative bg-card/85 z-10">
-                      <div className="flex justify-between items-start mb-4">
-                        <h3 className="font-heading font-bold text-xl tracking-tight leading-tight line-clamp-1 group-hover:text-primary transition-colors">{project.name}</h3>
-                      </div>
-                      <div className="space-y-4 mt-auto">
-                        <div className="flex items-start gap-2 text-sm text-muted-foreground/80 font-mono">
-                          <MapPin className="h-4 w-4 shrink-0 text-primary/50" />
-                          <span className="truncate text-xs">{project.address}</span>
-                        </div>
-                        <div className="flex items-center justify-between border-t border-border/30 pt-2 text-xs font-mono uppercase tracking-wider">
-                          <span className="text-muted-foreground">Time remaining</span>
-                          <span className={cn(
-                            "font-bold",
-                            getDaysRemaining(project.targetDate) !== null && getDaysRemaining(project.targetDate)! < 0
-                              ? "text-destructive"
-                              : "text-primary",
-                          )}>
-                            {formatDaysRemaining(project.targetDate)}
-                          </span>
-                        </div>
-                        
-                        <div className="pt-2 border-t border-border/30">
-                          <div className="flex items-center justify-between text-xs font-mono mb-1.5 uppercase tracking-wider">
-                            <span className="text-muted-foreground">Completion</span>
-                            <span className="font-bold text-primary">{project.progress}%</span>
-                          </div>
-                          <div className="hud-gauge h-2 w-full overflow-hidden rounded-sm">
-                            <div 
-                              className="h-full bg-primary relative transition-all duration-1000 ease-[cubic-bezier(0.23,1,0.32,1)]"
-                              style={{ width: `${project.progress}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <ProjectCard key={project.id} project={project} layout="compact" onOpen={() => setLocation(`/projects/${project.id}`)} />
                 ))}
               </div>
             </div>

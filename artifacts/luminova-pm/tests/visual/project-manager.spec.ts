@@ -42,6 +42,28 @@ async function installIdentity(page: Page, role: 'Admin' | 'Project Manager' = '
   await page.route('**/api/users/project-managers', route => route.fulfill({ json: managers }));
 }
 
+test('featured projects switch accessibly and fit mobile screens', async ({ page }) => {
+  await installIdentity(page);
+  await page.route('**/api/projects', route => route.fulfill({
+    json: [project, { ...project, id: 'prairie', name: 'Prairie House', pmName: 'Sam Carter' }],
+  }));
+  await page.route('**/api/dashboard/summary', route => route.fulfill({
+    json: { activeProjects: 2, awaitingApproval: 0, unreadMessages: 0, new360Photos: 0, budgeted: 0, invoiced: 0, recentActivity: [] },
+  }));
+  await page.goto('/__visual/dashboard-cards');
+  const stage = page.getByTestId('dashboard-project-stage');
+  await expect(stage.getByRole('heading', { name: project.name })).toBeVisible();
+  const alternate = page.getByTestId('button-stage-select-prairie');
+  await alternate.focus();
+  await page.keyboard.press('Enter');
+  await expect(alternate).toHaveAttribute('aria-pressed', 'true');
+  await expect(stage.getByRole('heading', { name: 'Prairie House' })).toBeVisible();
+  await expect(page.getByTestId('link-stage-open-project')).toHaveAttribute('href', '/projects/prairie');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(stage.getByRole('heading', { name: 'Prairie House' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
 test('selects a workspace Project Manager while creating a project', async ({ page }) => {
   await installIdentity(page);
   let createdProject: Record<string, unknown> | null = null;
