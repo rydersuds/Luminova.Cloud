@@ -10,7 +10,8 @@ import type { Activity } from './activity';
 export interface DashboardSummary {
   activeProjects: number;
   awaitingApproval: number;
-  unreadMessages: number;
+  /** @nullable */
+  unreadMessages: number | null;
   new360Photos: number;
   budgeted: number;
   invoiced: number;

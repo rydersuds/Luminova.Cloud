@@ -20,6 +20,7 @@ import {
   MADISON_PARK_CLIENT_QUOTE_TOTAL,
 } from "./madisonParkRevenueCorrection";
 import luminovaRouter from "../routes/luminova";
+import { calculateProjectProgress } from "./projectProgress";
 
 const sourceText = `
   MADISON PARK – REBUILD PROPOSAL
@@ -305,7 +306,7 @@ test("corrects the first project response once, scopes it to the owner, and pres
   };
   assert.equal(firstProject.invoiced, 446070.71);
   assert.equal(firstProject.clientQuote.total, MADISON_PARK_CLIENT_QUOTE_TOTAL);
-  assert.equal(firstProject.progress, 32.2);
+  assert.equal(firstProject.progress, calculateProjectProgress("2026-08-07", "2026-12-31"));
   assert.deepEqual(
     firstProject.invoices
       .filter((invoice) => invoice.invoiceNumber === "MADISON-PARK-REV-2026-06-18")
@@ -321,7 +322,7 @@ test("corrects the first project response once, scopes it to the owner, and pres
   }>;
   const listedProject = listedProjects.find((item) => item.id === projectId);
   assert.equal(listedProject?.invoiced, 446070.71);
-  assert.equal(listedProject?.progress, 32.2);
+  assert.equal(listedProject?.progress, calculateProjectProgress("2026-08-07", "2026-12-31"));
 
   const dashboardResponse = await fetch(`http://127.0.0.1:${port}/dashboard/summary`);
   assert.equal(dashboardResponse.status, 200);

@@ -6,6 +6,7 @@ import type { ClerkClient, User } from "@clerk/backend";
 import { db, importedProjectsTable, projectImportBatchesTable } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import luminovaRouter from "./luminova";
+import { calculateProjectProgress } from "../lib/projectProgress";
 
 type Role = "Admin" | "Project Manager" | "Field Team";
 
@@ -139,7 +140,7 @@ test("persists validated assignments and protects assignment changes", async () 
   assert.equal(dateUpdatedResponse.status, 200);
   assert.equal(dateUpdated.targetDate, updatedEndDate);
   assert.equal(dateUpdated.startDate, "2025-12-01");
-  assert.equal(dateUpdated.progress, 74.9);
+  assert.equal(dateUpdated.progress, calculateProjectProgress(dateUpdated.startDate, dateUpdated.targetDate));
 
   const forbidden = await fetch(`${base}/projects/${created.id}`, {
     method: "PATCH",

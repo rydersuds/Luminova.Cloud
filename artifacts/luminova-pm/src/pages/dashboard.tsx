@@ -75,17 +75,21 @@ export default function Dashboard() {
     query: { enabled: isAdmin, queryKey: getGetProjectManagersQueryKey() },
   })
   
-  const { data: summary, isLoading: loadingSummary } = useGetDashboardSummary({
-    query: { queryKey: getGetDashboardSummaryQueryKey() }
+  const dashboardSummary = useGetDashboardSummary({
+    query: { queryKey: getGetDashboardSummaryQueryKey(), retry: false, refetchInterval: 60_000 }
   })
+  const summary = dashboardSummary.isError ? undefined : dashboardSummary.data
+  const loadingSummary = dashboardSummary.isLoading
   const financialSummary = useGetFinancialSummary({
-    query: { queryKey: getGetFinancialSummaryQueryKey(), retry: false }
+    query: { queryKey: getGetFinancialSummaryQueryKey(), retry: false, refetchInterval: 60_000 }
   })
   
-  const { data: projects, isLoading: loadingProjects } = useGetProjects(
+  const projectQuery = useGetProjects(
     {},
-    { query: { queryKey: getGetProjectsQueryKey({}) } }
+    { query: { queryKey: getGetProjectsQueryKey({}), refetchInterval: 60_000 } }
   )
+  const projects = projectQuery.isError ? undefined : projectQuery.data
+  const loadingProjects = projectQuery.isLoading
 
   const createProject = useCreateProject()
   const { folderFiles, skippedFolderFiles, folderStatus, folderProgress, folderError, collectFolderFiles, startFolderImport, clearFolderImport, isActive: isFolderImportActive } = useProjectFolderImport()
@@ -238,52 +242,57 @@ export default function Dashboard() {
 
   const validCount = parsedRows.filter(r => r.valid).length
   const invalidCount = parsedRows.filter(r => !r.valid).length
-  const financials = financialSummary.data
-  const totalProfit = financials
-    ? financials.invoicedRevenue - financials.invoicedExpenses
-    : undefined
-  const projectedProfit = financials && summary
-    ? financials.acceptedClientQuoteValue - summary.budgeted
-    : undefined
+  const financials = financialSummary.isError ? undefined : financialSummary.data
+  const finiteAmount = (value: number | null | undefined) =>
+    typeof value === "number" && Number.isFinite(value) ? value : undefined
+  const revenue = finiteAmount(financials?.invoicedRevenue)
+  const expenses = finiteAmount(financials?.invoicedExpenses)
+  const recordedMargin = revenue !== undefined && expenses !== undefined ? revenue - expenses : undefined
   const financialCards = [
     {
       label: "Invoiced Revenue",
-      value: financials?.invoicedRevenue,
+      description: "Client invoices issued; not payments received.",
+      value: revenue,
       icon: FileText,
       accent: "text-success bg-success/10",
       loading: financialSummary.isLoading,
     },
     {
-      label: "Invoiced Expenses",
-      value: financials?.invoicedExpenses,
+      label: "Recorded Internal Costs",
+      description: "Vendor invoices or imported internal actuals, without double-counting.",
+      value: expenses,
       icon: Activity,
       accent: "text-warning bg-warning/10",
       loading: financialSummary.isLoading,
     },
     {
-      label: "Total Profit",
-      value: totalProfit,
+      label: "Recorded Margin",
+      description: "Invoiced revenue minus recorded internal costs; not cash profit.",
+      value: recordedMargin,
       icon: DollarSign,
-      accent: (totalProfit ?? 0) >= 0 ? "text-success bg-success/10" : "text-destructive bg-destructive/10",
+      accent: (recordedMargin ?? 0) >= 0 ? "text-success bg-success/10" : "text-destructive bg-destructive/10",
       loading: financialSummary.isLoading,
     },
     {
-      label: "Projected Profit",
-      value: projectedProfit,
+      label: "Internal Cost Budget",
+      description: "Allocated internal budgets across your visible projects.",
+      value: finiteAmount(summary?.budgeted),
       icon: DollarSign,
-      accent: (projectedProfit ?? 0) >= 0 ? "text-success bg-success/10" : "text-destructive bg-destructive/10",
-      loading: financialSummary.isLoading || loadingSummary,
+      accent: "text-info bg-info/10",
+      loading: loadingSummary,
     },
     {
-      label: "Accepted Client Work",
-      value: financials?.acceptedClientQuoteValue,
+      label: "Client Quote Value",
+      description: "Accepted client quotes, with imported project quote totals as fallback.",
+      value: finiteAmount(financials?.acceptedClientQuoteValue),
       icon: CheckCircle2,
       accent: "text-info bg-info/10",
       loading: financialSummary.isLoading,
     },
     {
-      label: "Upcoming Client Payments",
-      value: financials?.upcomingClientPayments,
+      label: "Unbilled Client Work",
+      description: "Client quote value not yet invoiced, floored at zero per project.",
+      value: finiteAmount(financials?.upcomingClientPayments),
       icon: Clock,
       accent: "text-primary bg-primary/10",
       loading: financialSummary.isLoading,
@@ -591,25 +600,40 @@ export default function Dashboard() {
           <ProjectStage projects={projects} loading={loadingProjects} />
 
           {/* Operational readout — values straight from the dashboard summary */}
+          {dashboardSummary.isError && (
+            <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
+              <span>Dashboard metrics and activity are unavailable.</span>
+              <Button variant="outline" size="sm" disabled={dashboardSummary.isFetching} onClick={() => void dashboardSummary.refetch()}>Retry dashboard metrics</Button>
+            </div>
+          )}
           <section aria-label="Operational summary" className="hud-readout grid grid-cols-2 lg:grid-cols-4">
             {[
-              { label: "Active projects", value: summary?.activeProjects, href: "/projects" },
-              { label: "Awaiting approval", value: summary?.awaitingApproval, href: "/invoices" },
-              { label: "Unread messages", value: summary?.unreadMessages, href: "/messages" },
-              { label: "New 360° photos", value: summary?.new360Photos, href: "/projects" },
+              { id: "active-projects", label: "Active projects", description: "Projects marked Active or In progress.", value: summary?.activeProjects, href: "/projects" },
+              { id: "awaiting-approval", label: "Awaiting approval", description: "Invoices pending approval in your visible projects.", value: summary?.awaitingApproval, href: "/invoices" },
+              { id: "unread-messages", label: "Unread messages", description: "Read receipts are not tracked yet; this is not a zero count.", value: summary?.unreadMessages, href: "/messages", unsupported: summary?.unreadMessages === null },
+              { id: "new-360-photos", label: "360° uploads · 7 days", description: "Panoramas uploaded in the last seven days, regardless of capture date.", value: summary?.new360Photos, href: "/projects" },
             ].map((item) => (
-              <Link key={item.label} href={item.href} data-testid={`readout-${item.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} className="hud-readout-cell group">
+              <Link key={item.id} href={item.href} title={item.description} data-testid={`readout-${item.id}`} className="hud-readout-cell group">
                 <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{item.label}</span>
-                <span className="mt-2 block font-heading text-3xl font-extrabold tabular-nums tracking-tight text-foreground group-hover:text-primary sm:text-4xl">
-                  {loadingSummary ? <span className="skeleton-line inline-block h-8 w-12 align-middle" /> : item.value ?? "—"}
+                <span className={cn("mt-2 block font-heading font-extrabold tabular-nums tracking-tight text-foreground group-hover:text-primary", item.unsupported || dashboardSummary.isError ? "text-lg" : "text-3xl sm:text-4xl")}>
+                  {loadingSummary ? <span className="skeleton-line inline-block h-8 w-12 align-middle" /> : dashboardSummary.isError ? "Unavailable" : item.unsupported ? "Not tracked" : finiteAmount(item.value) ?? "Unavailable"}
                 </span>
               </Link>
             ))}
           </section>
 
           {/* Financial overview */}
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+            <p>All-time totals for projects you can access. Refreshes every minute.</p>
+            {financialSummary.isError && (
+              <div role="alert" className="flex flex-wrap items-center gap-3">
+                <span>Financial totals are unavailable.</span>
+                <Button variant="outline" size="sm" disabled={financialSummary.isFetching} onClick={() => void financialSummary.refetch()}>Retry financial totals</Button>
+              </div>
+            )}
+          </div>
           <section aria-label="Financial overview" className="ledger grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
-            {financialCards.map(({ label, value, icon: Icon, accent, loading }, index) => (
+            {financialCards.map(({ label, description, value, icon: Icon, accent, loading }, index) => (
               <Card key={label} className="ledger-cell group rounded-none border-0 shadow-none">
                 <CardContent className="p-5 sm:p-6">
                   <div className="flex min-h-24 flex-col justify-between">
@@ -622,6 +646,7 @@ export default function Dashboard() {
                     <p className="break-words font-heading text-3xl font-extrabold tabular-nums tracking-[-0.03em] text-foreground sm:text-[2.1rem]">
                       {loading ? "—" : value === undefined ? "Unavailable" : formatCurrency(value)}
                     </p>
+                    <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{description}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -635,9 +660,9 @@ export default function Dashboard() {
             <div className="min-w-0 space-y-4">
               <div className="hud-section-head">
                 <ShieldAlert className="h-4 w-4 text-primary" />
-                <h2>Active Deployments</h2>
+                <h2>Project Portfolio</h2>
                 <span aria-hidden="true" className="hud-rule flex-1" />
-                <span className="hud-index">{loadingProjects ? "--" : `${projects?.length ?? 0} listed`}</span>
+                <span className="hud-index">{loadingProjects ? "--" : projectQuery.isError ? "Unavailable" : `${projects?.length ?? 0} listed`}</span>
               </div>
               
               <div className="pgrid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 280px), 1fr))" }}>
@@ -645,6 +670,11 @@ export default function Dashboard() {
                   Array.from({ length: 4 }).map((_, i) => (
                     <div key={i} className="h-[17rem] skeleton-line rounded-2xl" />
                   ))
+                ) : projectQuery.isError ? (
+                  <div role="alert" className="col-span-full rounded-xl border border-destructive/30 p-5 text-sm">
+                    <p>Projects are unavailable. Their count is not zero.</p>
+                    <Button className="mt-3" variant="outline" size="sm" onClick={() => void projectQuery.refetch()} disabled={projectQuery.isFetching}>Retry projects</Button>
+                  </div>
                 ) : projects?.length === 0 ? (
                   <div className="col-span-2 text-center py-16 glass-panel rounded-sm border border-border/50">
                     <Building className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
@@ -668,8 +698,10 @@ export default function Dashboard() {
                 <CardContent className="hud-timeline p-0">
                   {loadingSummary ? (
                     <div className="space-y-4 p-5">{[0,1,2].map((i) => <div key={i} className="skeleton-line h-12" />)}</div>
+                  ) : dashboardSummary.isError ? (
+                    <div className="p-8 text-center text-muted-foreground text-sm">Activity is unavailable. Retry dashboard metrics above.</div>
                   ) : summary?.recentActivity.length === 0 ? (
-                    <div className="p-8 text-center text-muted-foreground font-mono text-sm uppercase">Stream Empty</div>
+                    <div className="p-8 text-center text-muted-foreground text-sm">No recorded project activity yet.</div>
                   ) : summary?.recentActivity.map((activity) => (
                     <div key={activity.id} className="hud-timeline-item group">
                       <div className="flex gap-4">
@@ -689,8 +721,8 @@ export default function Dashboard() {
                       </div>
                     </div>
                   ))}
-                  <Link href="/messages" className="block p-4 text-center text-xs font-mono uppercase tracking-widest text-primary border-t border-border/60 hover:bg-primary hover:text-primary-foreground transition-colors">
-                    Access Full Archive
+                  <Link href="/projects" className="block p-4 text-center text-xs font-mono uppercase tracking-widest text-primary border-t border-border/60 hover:bg-primary hover:text-primary-foreground transition-colors">
+                    View projects
                   </Link>
                 </CardContent>
               </Card>

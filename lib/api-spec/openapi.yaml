@@ -1890,7 +1890,7 @@ components:
         awaitingApproval:
           type: integer
         unreadMessages:
-          type: integer
+          type: ["integer", "null"]
         new360Photos:
           type: integer
         budgeted:

@@ -23,7 +23,7 @@ export const HealthCheckResponse = zod.object({
 export const GetDashboardSummaryResponse = zod.object({
   "activeProjects": zod.number().int(),
   "awaitingApproval": zod.number().int(),
-  "unreadMessages": zod.number().int(),
+  "unreadMessages": zod.number().int().nullable(),
   "new360Photos": zod.number().int(),
   "budgeted": zod.number(),
   "invoiced": zod.number(),

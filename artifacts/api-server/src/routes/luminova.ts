@@ -179,6 +179,7 @@ import
   projectMessagesTable,
   projectScheduleMetadataTable,
   projectActivitiesTable,
+  projectPanoramasTable,
   vendorJobHistoryTable,
   vendorReviewTable,
   standaloneVendorProfilesTable,
@@ -186,7 +187,7 @@ import
   clientsTable,
   clientMembersTable,
 } from "@workspace/db";
-import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import OpenAI from "openai";
@@ -1927,6 +1928,10 @@ type Project = (typeof projects)[number] &
 ;
 
 
+  budgetAmountUnit?: "cents" | "dollars"
+;
+
+
   internalBudgetSource?: string
 ;
 
@@ -2710,44 +2715,43 @@ const financialRecordsForOwner = async (ownerId: string, scope = "default") =>
   if (scope === "default") {
     await applyMadisonParkRevenueCorrection(ownerId, undefined, undefined, scope);
   }
-  const [invoiceRows, quoteRows, projectRows, quoteDocuments] = await Promise.all([
-    db.select(
-{
-
- data: importedInvoicesTable.data 
-}
-
-)
-      .from(importedInvoicesTable)
-      .where(eq(importedInvoicesTable.ownerId, ownerId)),
-    db.select(
-{
-
- data: importedVendorQuotesTable.data 
-}
-
-)
-      .from(importedVendorQuotesTable)
-      .where(eq(importedVendorQuotesTable.ownerId, ownerId)),
-    db.select(
-{
-
- data: importedProjectsTable.data,
- importBatchId: importedProjectsTable.importBatchId
-}
-
-)
-      .from(importedProjectsTable)
-      .where(and(
-        eq(importedProjectsTable.ownerId, ownerId),
-        eq(importedProjectsTable.workspaceId, scope),
+  const projectRows = await db.select({
+    data: importedProjectsTable.data,
+    importBatchId: importedProjectsTable.importBatchId,
+  })
+    .from(importedProjectsTable)
+    .where(and(
+      eq(importedProjectsTable.ownerId, ownerId),
+      eq(importedProjectsTable.workspaceId, scope),
+    ));
+  const accessibleBatchIds = [...new Set(projectRows.map((row) => row.importBatchId))];
+  const [invoiceRows, quoteRows, quoteDocuments] = accessibleBatchIds.length
+    ? await Promise.all([
+      db.select({
+        data: importedInvoicesTable.data,
+        importBatchId: importedInvoicesTable.importBatchId,
+      })
+        .from(importedInvoicesTable)
+        .where(and(
+          eq(importedInvoicesTable.ownerId, ownerId),
+          inArray(importedInvoicesTable.importBatchId, accessibleBatchIds),
+        )),
+      db.select({
+        data: importedVendorQuotesTable.data,
+        importBatchId: importedVendorQuotesTable.importBatchId,
+      })
+        .from(importedVendorQuotesTable)
+        .where(and(
+          eq(importedVendorQuotesTable.ownerId, ownerId),
+          inArray(importedVendorQuotesTable.importBatchId, accessibleBatchIds),
+        )),
+      db.select().from(projectDocumentsTable).where(and(
+        eq(projectDocumentsTable.ownerId, ownerId),
+        eq(projectDocumentsTable.linkedEntityType, "quote"),
+        inArray(projectDocumentsTable.importBatchId, accessibleBatchIds),
       )),
-    db.select().from(projectDocumentsTable).where(and(
-      eq(projectDocumentsTable.ownerId, ownerId),
-      eq(projectDocumentsTable.linkedEntityType, "quote"),
-    )),
-  ])
-;
+    ])
+    : [[], [], []];
 
 
   const ownedProjects = projectRows.map((row) => row.data as Project)
@@ -2760,14 +2764,16 @@ const financialRecordsForOwner = async (ownerId: string, scope = "default") =>
     (row.data as Project).id,
     row.importBatchId,
   ]));
+  const projectForImportedRecord = (projectId: string, importBatchId: string) =>
+    importBatchByProjectId.get(projectId) === importBatchId ? projectById.get(projectId) : undefined;
 
 
   const ownedInvoices = [
     ...invoiceRows
-      .map((row) => row.data as Invoice)
-      .filter((invoice) => projectById.has(invoice.projectId)),
+      .filter((row) => projectForImportedRecord((row.data as Invoice).projectId, row.importBatchId))
+      .map((row) => row.data as Invoice),
     ...(scope === "default"
-      ? (invoices as Invoice[]).filter((invoice) => invoice.ownerId === ownerId)
+      ? (invoices as Invoice[]).filter((invoice) => invoice.ownerId === ownerId && projectById.has(invoice.projectId))
       : []),
   ]
 ;
@@ -2896,7 +2902,7 @@ const financialRecordsForOwner = async (ownerId: string, scope = "default") =>
     invoices: brandedInvoices,
     quotes: [
       ...quoteRows
-        .filter((row) => projectById.has((row.data as VendorQuote).projectId))
+        .filter((row) => projectForImportedRecord((row.data as VendorQuote).projectId, row.importBatchId))
         .map((row) =>
 {
 
@@ -2960,7 +2966,7 @@ const financialRecordsForOwner = async (ownerId: string, scope = "default") =>
 
 ),
       ...(scope === "default"
-        ? (vendorQuotes as VendorQuote[]).filter((quote) => quote.ownerId === ownerId)
+        ? (vendorQuotes as VendorQuote[]).filter((quote) => quote.ownerId === ownerId && projectById.has(quote.projectId))
         : []).map((quote) => (
 {
 
@@ -2988,7 +2994,10 @@ const projectsForOwner = async (ownerId: string, workspaceId: string) => {
     await applyMadisonParkRevenueCorrection(ownerId, undefined, undefined, workspaceId);
   }
   const [projectRows, exteriorPhotos, financialRecords] = await Promise.all([
-    db.select({ data: importedProjectsTable.data })
+    db.select({
+      data: importedProjectsTable.data,
+      importBatchId: importedProjectsTable.importBatchId,
+    })
       .from(importedProjectsTable)
       .where(and(
         eq(importedProjectsTable.ownerId, ownerId),
@@ -3007,6 +3016,8 @@ const projectsForOwner = async (ownerId: string, workspaceId: string) => {
       : persistedProject.clientQuote?.total ?? 0;
     const project = withCalculatedProjectProgress({
       ...persistedProject,
+      budgetAmountUnit: persistedProject.budgetAmountUnit ??
+        (row.importBatchId.startsWith("manual-") ? "cents" : "dollars"),
       invoiced: invoicedRevenueForProject(financialRecords.invoices, persistedProject.id),
       clientQuote: {
         total: quoteTotal,
@@ -3018,7 +3029,10 @@ const projectsForOwner = async (ownerId: string, workspaceId: string) => {
     return exteriorPhoto?.ownerId === ownerId ? { ...project, exteriorImage: exteriorPhoto.exteriorImage } : project;
   });
   const seededProjects = workspaceId === "default" ? projects.map((project) => {
-    const normalizedProject = withCalculatedProjectProgress(project);
+    const normalizedProject = withCalculatedProjectProgress({
+      ...project,
+      budgetAmountUnit: "cents" as const,
+    });
     const exteriorPhoto = exteriorPhotoByProject.get(normalizedProject.id);
     return exteriorPhoto?.ownerId === "seeded-project"
       ? { ...normalizedProject, exteriorImage: exteriorPhoto.exteriorImage }
@@ -4408,19 +4422,61 @@ router.get("/dashboard/summary", async (req: AuthenticatedRequest, res) =>
 ;
     const invoiceRecords = financialRecords.invoices
 ;
+    const portfolioFinancialSummary = calculatePortfolioFinancialSummary(
+      financialRecords.invoices,
+      financialRecords.quotes,
+      financialRecords.projects,
+    );
+    const accessibleProjectIds = projectRecords.map((project) => project.id);
+    const recentActivityRows = accessibleProjectIds.length
+      ? await db.select().from(projectActivitiesTable)
+        .where(and(
+          eq(projectActivitiesTable.ownerId, req.userId),
+          inArray(projectActivitiesTable.projectId, accessibleProjectIds),
+        ))
+        .orderBy(desc(projectActivitiesTable.createdAt))
+        .limit(10)
+      : [];
+    const summaryNow = new Date();
+    const sevenDaysAgo = new Date(summaryNow.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const recent360Photos = accessibleProjectIds.length
+      ? await db.select({ id: projectPanoramasTable.id }).from(projectPanoramasTable)
+        .where(and(
+          inArray(projectPanoramasTable.projectId, accessibleProjectIds),
+          // The capture date describes when a panorama was taken; createdAt is the actual upload timestamp.
+          sql`${projectPanoramasTable.createdAt} >= ${sevenDaysAgo}`,
+          lte(projectPanoramasTable.createdAt, summaryNow),
+        ))
+      : [];
+    const activeStatus = (status: string) => ["active", "in progress"].includes(status.trim().toLowerCase());
+    const budgetInDollars = (project: Project) => {
+      // projectsForOwner resolves legacy units from the source batch; newly written records carry
+      // their unit explicitly. Unknown imported/source values remain in dollars, never inferred by size.
+      const unit = project.budgetAmountUnit ?? "dollars";
+      return unit === "cents" ? project.budgeted / 100 : project.budgeted;
+    };
 
 
     res.json(GetDashboardSummaryResponse.parse(
 {
 
 
-      activeProjects: projectRecords.filter((project) => project.status === "In progress").length,
-      awaitingApproval: invoiceRecords.filter((invoice) => invoice.status === "Pending approval").length,
-      unreadMessages: 7,
-      new360Photos: 3,
-      budgeted: projectRecords.reduce((sum, project) => sum + project.budgeted, 0),
-      invoiced: projectRecords.reduce((sum, project) => sum + project.invoiced, 0),
-      recentActivity: activities,
+      activeProjects: projectRecords.filter((project) => activeStatus(project.status)).length,
+      awaitingApproval: invoiceRecords.filter((invoice) =>
+        ["pending", "pending approval"].includes(invoice.status.trim().toLowerCase()),
+      ).length,
+      unreadMessages: null,
+      new360Photos: recent360Photos.length,
+      budgeted: projectRecords.reduce((sum, project) => sum + budgetInDollars(project), 0),
+      invoiced: portfolioFinancialSummary.invoicedRevenue,
+      recentActivity: recentActivityRows.map((activity) => ({
+        id: activity.id,
+        type: activity.type,
+        title: activity.title,
+        description: activity.description,
+        author: activity.author,
+        date: activity.createdAt.toISOString(),
+      })),
     
 }
 
@@ -5707,6 +5763,7 @@ router.post("/projects", async (req, res): Promise<void> =>
 
     const project = withCalculatedProjectProgress({
       ...parsed.data,
+      budgetAmountUnit: "cents" as const,
       pmName: manager.profile.name,
       projectManagerId: manager.profile.id,
       id: projectId,
@@ -6575,6 +6632,7 @@ const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: R
     }),
     targetDate: analysis.project.targetDate && isValidCalendarDate(analysis.project.targetDate) ? analysis.project.targetDate : "",
     budgeted: internalBudget?.total ?? Math.round((analysis.project.budgetDollars ?? 0) * 100) / 100,
+    budgetAmountUnit: "dollars",
     invoiced: 0,
     exteriorImage: "",
     description: analysis.project.description,

@@ -15,13 +15,14 @@ import {
   projectImportBatchesTable,
 } from "@workspace/db";
 import luminovaRouter from "./luminova";
+import { calculateProjectProgress } from "../lib/projectProgress";
 
 test("portfolio financial summary only includes the authenticated owner's records", async (t) => {
   const suffix = randomUUID();
   const ownerId = `financial-owner-${suffix}`;
   const otherOwnerId = `financial-other-${suffix}`;
   const managerId = `financial-manager-${suffix}`;
-  const batchIds = [`financial-batch-a-${suffix}`, `financial-batch-b-${suffix}`];
+  const batchIds = [`financial-batch-a-${suffix}`, `financial-batch-b-${suffix}`, `financial-batch-private-${suffix}`];
   const clientIds = [`financial-client-a-${suffix}`, `financial-client-b-${suffix}`];
 
   await db.insert(clientsTable).values([
@@ -44,6 +45,10 @@ test("portfolio financial summary only includes the authenticated owner's record
   await db.insert(projectImportBatchesTable).values([
     { id: batchIds[0], projectId: `project-a-${suffix}`, ownerId, status: "completed", manifest: [] },
     { id: batchIds[1], projectId: `project-b-${suffix}`, ownerId: otherOwnerId, status: "completed", manifest: [] },
+    {
+      id: batchIds[2], projectId: `project-private-${suffix}`, ownerId,
+      workspaceId: `private-workspace-${suffix}`, status: "completed", manifest: [],
+    },
   ]);
   await db.insert(importedProjectsTable).values([
     {
@@ -66,6 +71,17 @@ test("portfolio financial summary only includes the authenticated owner's record
         id: `project-b-${suffix}`, name: "Other project", address: "2 Test Street", region: "Edmonton",
         status: "Planning", progress: 0, pmName: "Other PM", clientName: "Other Client",
         targetDate: "2027-01-31", budgeted: 20000, invoiced: 9000, exteriorImage: "", description: "Other project",
+      },
+    },
+    {
+      id: `project-private-${suffix}`,
+      importBatchId: batchIds[2],
+      ownerId,
+      workspaceId: `private-workspace-${suffix}`,
+      data: {
+        id: `project-private-${suffix}`, name: "Private project", address: "4 Test Street", region: "Calgary",
+        status: "Planning", progress: 0, pmName: "Other PM", clientName: "Other Client",
+        targetDate: "2027-01-31", budgeted: 20000, invoiced: 0, exteriorImage: "", description: "Private workspace project.",
       },
     },
   ]);
@@ -160,6 +176,16 @@ test("portfolio financial summary only includes the authenticated owner's record
         id: `invoice-b-${suffix}`, invoiceNumber: "CLIENT-B", projectId: `project-b-${suffix}`,
         projectName: "Other project", vendor: "Other client", direction: "luminova_to_client",
         amount: 9000, date: "2026-09-01", status: "Approved", lineItem: "Progress", overage: 0,
+      },
+    },
+    {
+      id: `invoice-cross-workspace-batch-${suffix}`,
+      importBatchId: batchIds[2],
+      ownerId,
+      data: {
+        id: `invoice-cross-workspace-batch-${suffix}`, invoiceNumber: "PRIVATE-BATCH", projectId: `project-a-${suffix}`,
+        projectName: "Owned project", vendor: "Other workspace", direction: "company_to_luminova",
+        amount: 9999, date: "2026-09-03", status: "Pending approval", lineItem: "Private", overage: 0,
       },
     },
   ]);
@@ -259,7 +285,10 @@ test("portfolio financial summary only includes the authenticated owner's record
   });
   assert.equal(projectsResponse.status, 200);
   const projects = await projectsResponse.json() as Array<{ id: string; progress: number; clientLogoUrl?: string | null }>;
-  assert.equal(projects.find((project) => project.id === `project-a-${suffix}`)?.progress, 37.3);
+  assert.equal(
+    projects.find((project) => project.id === `project-a-${suffix}`)?.progress,
+    calculateProjectProgress("2026-07-26", "2026-12-31"),
+  );
   assert.equal(projects.some((project) => project.id === `project-b-${suffix}`), false);
   assert.equal(
     projects.find((project) => project.id === `project-a-${suffix}`)?.clientLogoUrl,

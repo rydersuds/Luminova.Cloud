@@ -20,3 +20,9 @@ For imported budgets with itemized source rows, use internal-cost (`OUR COST`) v
 **Why:** Workbook detail can be partial, so treating blanks as zero or summing child rows into the parent can change approved budget totals or expose the wrong financial basis.
 
 **How to apply:** Store source rows as optional detail under their budget category. Display missing internal costs as not provided without changing category totals.
+
+Portfolio budgets historically mix manual-entry cents and imported dollars. Normalize by source provenance, never by numeric magnitude or the presence of itemized details.
+
+**Why:** Older imports can have valid dollar totals without source/detail metadata; assuming all budgets are cents introduces a hundredfold error.
+
+**How to apply:** Preserve explicit monetary units on new budget records and use known legacy source provenance for old records. Normalize when aggregating without rewriting the original evidence.
