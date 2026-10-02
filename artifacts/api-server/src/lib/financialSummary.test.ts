@@ -10,6 +10,14 @@ import {
   type FinancialProject,
 } from "./financialSummary";
 
+test("new purchase submissions add to imported internal actuals without duplicating legacy invoices", () => {
+  const summary = calculatePortfolioFinancialSummary([
+    { projectId: "purchase-project", amount: 2000, direction: "company_to_luminova" },
+    { projectId: "purchase-project", amount: 1000, direction: "company_to_luminova", submittedById: "pm" },
+  ], [], [{ projectId: "purchase-project", internalExpenseTotal: 5000 }]);
+  assert.equal(summary.invoicedExpenses, 6000);
+});
+
 const quote = (overrides: Partial<FinancialQuote> = {}): FinancialQuote => ({
   id: "quote-1",
   quoteNumber: "Q-1",

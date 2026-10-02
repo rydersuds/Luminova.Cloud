@@ -132,6 +132,11 @@ export const GetProjectParams = zod.object({
 
 export const getProjectResponseOneStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const getProjectResponseOneTargetDateRegExp = new RegExp('^$|^\\d{4}-\\d{2}-\\d{2}$');
+export const getProjectResponseTwoInvoicesItemAttachmentOneObjectPathRegExp = new RegExp('^/objects');
+export const getProjectResponseTwoInvoicesItemAttachmentOneNameMax = 255;
+
+export const getProjectResponseTwoInvoicesItemAttachmentOneSizeMax = 20971520;
+
 export const getProjectResponseTwoTradesItemProfilePhotoPositionXMin = 0;
 export const getProjectResponseTwoTradesItemProfilePhotoPositionXMax = 100;
 
@@ -202,7 +207,20 @@ export const GetProjectResponse = zod.object({
   "date": zod.string(),
   "status": zod.string(),
   "lineItem": zod.string(),
-  "overage": zod.number()
+  "overage": zod.number(),
+  "budgetLineItemId": zod.string().nullish(),
+  "budgetRemainingBefore": zod.number().nullish(),
+  "budgetRemainingAfter": zod.number().nullish(),
+  "approvalReason": zod.enum(['within_budget', 'over_budget', 'budget_unavailable']).optional(),
+  "submittedById": zod.string().optional(),
+  "attachment": zod.object({
+  "objectPath": zod.string().regex(getProjectResponseTwoInvoicesItemAttachmentOneObjectPathRegExp),
+  "name": zod.string().min(1).max(getProjectResponseTwoInvoicesItemAttachmentOneNameMax),
+  "size": zod.number().int().min(1).max(getProjectResponseTwoInvoicesItemAttachmentOneSizeMax),
+  "contentType": zod.enum(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
+}).and(zod.object({
+  "url": zod.string()
+})).optional()
 })),
   "trades": zod.array(zod.object({
   "id": zod.string(),
@@ -1440,6 +1458,119 @@ export const DeleteTradeReviewResponse = zod.void()
 
 
 /**
+ * @summary List projects and remaining trade budgets available for invoice submission
+ */
+export const GetInvoiceProjectsResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "categories": zod.array(zod.object({
+  "id": zod.string(),
+  "code": zod.string(),
+  "description": zod.string(),
+  "budgeted": zod.number().nullable(),
+  "used": zod.number(),
+  "remaining": zod.number().nullable(),
+  "canAutoApprove": zod.boolean()
+}))
+})
+export const GetInvoiceProjectsResponse = zod.array(GetInvoiceProjectsResponseItem)
+
+
+/**
+ * @summary Reserve a private invoice attachment for an eligible project
+ */
+
+export const requestInvoiceUploadBodyNameMax = 255;
+
+export const requestInvoiceUploadBodySizeMax = 20971520;
+
+
+
+export const RequestInvoiceUploadBody = zod.object({
+  "projectId": zod.string().min(1),
+  "name": zod.string().min(1).max(requestInvoiceUploadBodyNameMax),
+  "size": zod.number().int().min(1).max(requestInvoiceUploadBodySizeMax),
+  "contentType": zod.enum(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
+})
+
+
+
+export const requestInvoiceUploadResponseMetadataNameMax = 255;
+
+
+export const requestInvoiceUploadResponseMetadataContentTypeMax = 255;
+
+export const requestInvoiceUploadResponseMetadataRelativePathMax = 1024;
+
+
+
+export const RequestInvoiceUploadResponse = zod.object({
+  "uploadURL": zod.string().url(),
+  "objectPath": zod.string(),
+  "metadata": zod.object({
+  "importId": zod.string().min(1).optional(),
+  "purpose": zod.enum(['schedule-image']).optional(),
+  "projectId": zod.string().min(1).optional(),
+  "name": zod.string().min(1).max(requestInvoiceUploadResponseMetadataNameMax),
+  "size": zod.number().int().min(1),
+  "contentType": zod.string().max(requestInvoiceUploadResponseMetadataContentTypeMax),
+  "relativePath": zod.string().min(1).max(requestInvoiceUploadResponseMetadataRelativePathMax).optional()
+}).optional()
+})
+
+
+/**
+ * @summary List persistent purchase invoices for accessible projects
+ */
+export const getInvoiceSubmissionsResponseAttachmentOneObjectPathRegExp = new RegExp('^/objects');
+export const getInvoiceSubmissionsResponseAttachmentOneNameMax = 255;
+
+export const getInvoiceSubmissionsResponseAttachmentOneSizeMax = 20971520;
+
+
+
+export const GetInvoiceSubmissionsResponseItem = zod.object({
+  "id": zod.string(),
+  "invoiceNumber": zod.string(),
+  "projectId": zod.string(),
+  "projectName": zod.string(),
+  "vendor": zod.string(),
+  "direction": zod.enum(['luminova_to_client', 'company_to_luminova']).optional(),
+  "clientName": zod.string().nullish(),
+  "clientLogoUrl": zod.string().nullish(),
+  "amount": zod.number(),
+  "date": zod.string(),
+  "status": zod.string(),
+  "lineItem": zod.string(),
+  "overage": zod.number(),
+  "budgetLineItemId": zod.string().nullish(),
+  "budgetRemainingBefore": zod.number().nullish(),
+  "budgetRemainingAfter": zod.number().nullish(),
+  "approvalReason": zod.enum(['within_budget', 'over_budget', 'budget_unavailable']).optional(),
+  "submittedById": zod.string().optional(),
+  "attachment": zod.object({
+  "objectPath": zod.string().regex(getInvoiceSubmissionsResponseAttachmentOneObjectPathRegExp),
+  "name": zod.string().min(1).max(getInvoiceSubmissionsResponseAttachmentOneNameMax),
+  "size": zod.number().int().min(1).max(getInvoiceSubmissionsResponseAttachmentOneSizeMax),
+  "contentType": zod.enum(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
+}).and(zod.object({
+  "url": zod.string()
+})).optional()
+})
+export const GetInvoiceSubmissionsResponse = zod.array(GetInvoiceSubmissionsResponseItem)
+
+
+/**
+ * @summary Download a private invoice attachment after project authorization
+ */
+export const DownloadInvoiceAttachmentParams = zod.object({
+  "invoiceId": zod.coerce.string()
+})
+
+export const DownloadInvoiceAttachmentResponse = zod.unknown()
+
+
+/**
  * @summary List invoices
  */
 export const getInvoicesQuerySearchMax = 100;
@@ -1450,6 +1581,13 @@ export const GetInvoicesQueryParams = zod.object({
   "status": zod.coerce.string().optional(),
   "search": zod.coerce.string().max(getInvoicesQuerySearchMax).optional()
 })
+
+export const getInvoicesResponseAttachmentOneObjectPathRegExp = new RegExp('^/objects');
+export const getInvoicesResponseAttachmentOneNameMax = 255;
+
+export const getInvoicesResponseAttachmentOneSizeMax = 20971520;
+
+
 
 export const GetInvoicesResponseItem = zod.object({
   "id": zod.string(),
@@ -1464,7 +1602,20 @@ export const GetInvoicesResponseItem = zod.object({
   "date": zod.string(),
   "status": zod.string(),
   "lineItem": zod.string(),
-  "overage": zod.number()
+  "overage": zod.number(),
+  "budgetLineItemId": zod.string().nullish(),
+  "budgetRemainingBefore": zod.number().nullish(),
+  "budgetRemainingAfter": zod.number().nullish(),
+  "approvalReason": zod.enum(['within_budget', 'over_budget', 'budget_unavailable']).optional(),
+  "submittedById": zod.string().optional(),
+  "attachment": zod.object({
+  "objectPath": zod.string().regex(getInvoicesResponseAttachmentOneObjectPathRegExp),
+  "name": zod.string().min(1).max(getInvoicesResponseAttachmentOneNameMax),
+  "size": zod.number().int().min(1).max(getInvoicesResponseAttachmentOneSizeMax),
+  "contentType": zod.enum(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
+}).and(zod.object({
+  "url": zod.string()
+})).optional()
 })
 export const GetInvoicesResponse = zod.array(GetInvoicesResponseItem)
 
@@ -1472,14 +1623,47 @@ export const GetInvoicesResponse = zod.array(GetInvoicesResponseItem)
 /**
  * @summary Submit an invoice
  */
+export const createInvoiceBodyInvoiceNumberMax = 100;
+
+
+export const createInvoiceBodyVendorMax = 200;
+
+export const createInvoiceBodyAmountExclusiveMin = 0;
+export const createInvoiceBodyAmountMax = 1000000000;
+
+export const createInvoiceBodyDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createInvoiceBodyLineItemMax = 300;
+
+export const createInvoiceBodyAttachmentObjectPathRegExp = new RegExp('^/objects');
+export const createInvoiceBodyAttachmentNameMax = 255;
+
+export const createInvoiceBodyAttachmentSizeMax = 20971520;
+
+
+
 export const CreateInvoiceBody = zod.object({
-  "invoiceNumber": zod.string(),
-  "projectId": zod.string(),
-  "vendor": zod.string(),
-  "amount": zod.number(),
-  "date": zod.string(),
-  "lineItem": zod.string()
+  "invoiceNumber": zod.string().min(1).max(createInvoiceBodyInvoiceNumberMax),
+  "projectId": zod.string().min(1),
+  "vendor": zod.string().min(1).max(createInvoiceBodyVendorMax),
+  "amount": zod.number().gt(createInvoiceBodyAmountExclusiveMin).max(createInvoiceBodyAmountMax),
+  "date": zod.string().regex(createInvoiceBodyDateRegExp),
+  "lineItem": zod.string().min(1).max(createInvoiceBodyLineItemMax),
+  "budgetLineItemId": zod.string().nullable(),
+  "submissionId": zod.string().uuid(),
+  "attachment": zod.object({
+  "objectPath": zod.string().regex(createInvoiceBodyAttachmentObjectPathRegExp),
+  "name": zod.string().min(1).max(createInvoiceBodyAttachmentNameMax),
+  "size": zod.number().int().min(1).max(createInvoiceBodyAttachmentSizeMax),
+  "contentType": zod.enum(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
 })
+})
+
+export const createInvoiceResponseAttachmentOneObjectPathRegExp = new RegExp('^/objects');
+export const createInvoiceResponseAttachmentOneNameMax = 255;
+
+export const createInvoiceResponseAttachmentOneSizeMax = 20971520;
+
+
 
 export const CreateInvoiceResponse = zod.object({
   "id": zod.string(),
@@ -1494,7 +1678,20 @@ export const CreateInvoiceResponse = zod.object({
   "date": zod.string(),
   "status": zod.string(),
   "lineItem": zod.string(),
-  "overage": zod.number()
+  "overage": zod.number(),
+  "budgetLineItemId": zod.string().nullish(),
+  "budgetRemainingBefore": zod.number().nullish(),
+  "budgetRemainingAfter": zod.number().nullish(),
+  "approvalReason": zod.enum(['within_budget', 'over_budget', 'budget_unavailable']).optional(),
+  "submittedById": zod.string().optional(),
+  "attachment": zod.object({
+  "objectPath": zod.string().regex(createInvoiceResponseAttachmentOneObjectPathRegExp),
+  "name": zod.string().min(1).max(createInvoiceResponseAttachmentOneNameMax),
+  "size": zod.number().int().min(1).max(createInvoiceResponseAttachmentOneSizeMax),
+  "contentType": zod.enum(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
+}).and(zod.object({
+  "url": zod.string()
+})).optional()
 })
 
 

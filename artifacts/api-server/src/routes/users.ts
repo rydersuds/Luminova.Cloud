@@ -397,6 +397,11 @@ async function userHasOtherWorkspaceIdentity(
 }
 let resolveWorkspaceRole = (userId: string, scope = "default") => ensureRole(clerk, userId, scope);
 
+export async function getRequestWorkspaceRole(req: AuthenticatedRequest) {
+  if (!req.userId) return null;
+  return resolveWorkspaceRole(req.userId, workspaceId(req));
+}
+
 export async function requireWorkspaceRole(
   req: AuthenticatedRequest,
   res: Response,

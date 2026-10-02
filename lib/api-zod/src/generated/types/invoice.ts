@@ -5,6 +5,8 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { InvoiceApprovalReason } from './invoiceApprovalReason';
+import type { InvoiceAttachment } from './invoiceAttachment';
 import type { QuoteDirection } from './quoteDirection';
 
 export interface Invoice {
@@ -23,4 +25,13 @@ export interface Invoice {
   status: string;
   lineItem: string;
   overage: number;
+  /** @nullable */
+  budgetLineItemId?: string | null;
+  /** @nullable */
+  budgetRemainingBefore?: number | null;
+  /** @nullable */
+  budgetRemainingAfter?: number | null;
+  approvalReason?: InvoiceApprovalReason;
+  submittedById?: string;
+  attachment?: InvoiceAttachment;
 }

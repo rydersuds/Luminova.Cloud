@@ -5,12 +5,35 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { InvoiceFileInput } from './invoiceFileInput';
 
 export interface InvoiceInput {
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
   invoiceNumber: string;
+  /** @minLength 1 */
   projectId: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
   vendor: string;
+  /**
+     * @maximum 1000000000
+     * @exclusiveMinimum 0
+     */
   amount: number;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   date: string;
+  /**
+     * @minLength 1
+     * @maxLength 300
+     */
   lineItem: string;
+  /** @nullable */
+  budgetLineItemId: string | null;
+  submissionId: string;
+  attachment: InvoiceFileInput;
 }

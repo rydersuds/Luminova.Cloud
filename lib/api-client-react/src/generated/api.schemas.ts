@@ -400,6 +400,45 @@ export const QuoteDirection = {
   company_to_luminova: 'company_to_luminova',
 } as const;
 
+export type InvoiceApprovalReason = typeof InvoiceApprovalReason[keyof typeof InvoiceApprovalReason];
+
+
+export const InvoiceApprovalReason = {
+  within_budget: 'within_budget',
+  over_budget: 'over_budget',
+  budget_unavailable: 'budget_unavailable',
+} as const;
+
+export type InvoiceFileInputContentType = typeof InvoiceFileInputContentType[keyof typeof InvoiceFileInputContentType];
+
+
+export const InvoiceFileInputContentType = {
+  'application/pdf': 'application/pdf',
+  'image/jpeg': 'image/jpeg',
+  'image/png': 'image/png',
+  'image/webp': 'image/webp',
+} as const;
+
+export interface InvoiceFileInput {
+  /** @pattern ^/objects/ */
+  objectPath: string;
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  name: string;
+  /**
+     * @minimum 1
+     * @maximum 20971520
+     */
+  size: number;
+  contentType: InvoiceFileInputContentType;
+}
+
+export type InvoiceAttachment = InvoiceFileInput & {
+  url: string;
+};
+
 export interface Invoice {
   id: string;
   invoiceNumber: string;
@@ -416,6 +455,15 @@ export interface Invoice {
   status: string;
   lineItem: string;
   overage: number;
+  /** @nullable */
+  budgetLineItemId?: string | null;
+  /** @nullable */
+  budgetRemainingBefore?: number | null;
+  /** @nullable */
+  budgetRemainingAfter?: number | null;
+  approvalReason?: InvoiceApprovalReason;
+  submittedById?: string;
+  attachment?: InvoiceAttachment;
 }
 
 export interface Trade {
@@ -678,12 +726,78 @@ export interface VendorReviewUpdateInput {
 }
 
 export interface InvoiceInput {
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
   invoiceNumber: string;
+  /** @minLength 1 */
   projectId: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
   vendor: string;
+  /**
+     * @maximum 1000000000
+     * @exclusiveMinimum 0
+     */
   amount: number;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   date: string;
+  /**
+     * @minLength 1
+     * @maxLength 300
+     */
   lineItem: string;
+  /** @nullable */
+  budgetLineItemId: string | null;
+  submissionId: string;
+  attachment: InvoiceFileInput;
+}
+
+export type InvoiceUploadInputContentType = typeof InvoiceUploadInputContentType[keyof typeof InvoiceUploadInputContentType];
+
+
+export const InvoiceUploadInputContentType = {
+  'application/pdf': 'application/pdf',
+  'image/jpeg': 'image/jpeg',
+  'image/png': 'image/png',
+  'image/webp': 'image/webp',
+} as const;
+
+export interface InvoiceUploadInput {
+  /** @minLength 1 */
+  projectId: string;
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  name: string;
+  /**
+     * @minimum 1
+     * @maximum 20971520
+     */
+  size: number;
+  contentType: InvoiceUploadInputContentType;
+}
+
+export interface InvoiceBudgetCategory {
+  id: string;
+  code: string;
+  description: string;
+  /** @nullable */
+  budgeted: number | null;
+  used: number;
+  /** @nullable */
+  remaining: number | null;
+  canAutoApprove: boolean;
+}
+
+export interface InvoiceProject {
+  id: string;
+  name: string;
+  categories: InvoiceBudgetCategory[];
 }
 
 export interface FinancialSummary {

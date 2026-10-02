@@ -39,6 +39,8 @@ import type {
   HealthStatus,
   Invoice,
   InvoiceInput,
+  InvoiceProject,
+  InvoiceUploadInput,
   OrganizeProjectFilesResult,
   Panorama,
   PanoramaInput,
@@ -2772,6 +2774,308 @@ export const useDeleteTradeReview = <TError = ErrorType<void>,
       > => {
       return useMutation(getDeleteTradeReviewMutationOptions(options));
     }
+
+export const getGetInvoiceProjectsUrl = () => {
+
+
+
+
+  return `/api/invoice-projects`
+}
+
+/**
+ * @summary List projects and remaining trade budgets available for invoice submission
+ */
+export const getInvoiceProjects = async ( options?: Parameters<typeof customFetch>[1]): Promise<InvoiceProject[]> => {
+
+  return customFetch<InvoiceProject[]>(getGetInvoiceProjectsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetInvoiceProjectsQueryKey = () => {
+    return [
+    `/api/invoice-projects`
+    ] as const;
+    }
+
+
+export const getGetInvoiceProjectsQueryOptions = <TData = Awaited<ReturnType<typeof getInvoiceProjects>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInvoiceProjects>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetInvoiceProjectsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getInvoiceProjects>>> = ({ signal }) => getInvoiceProjects({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getInvoiceProjects>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetInvoiceProjectsQueryResult = NonNullable<Awaited<ReturnType<typeof getInvoiceProjects>>>
+export type GetInvoiceProjectsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List projects and remaining trade budgets available for invoice submission
+ */
+
+export function useGetInvoiceProjects<TData = Awaited<ReturnType<typeof getInvoiceProjects>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInvoiceProjects>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetInvoiceProjectsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRequestInvoiceUploadUrl = () => {
+
+
+
+
+  return `/api/invoice-uploads`
+}
+
+/**
+ * @summary Reserve a private invoice attachment for an eligible project
+ */
+export const requestInvoiceUpload = async (invoiceUploadInput: InvoiceUploadInput, options?: Parameters<typeof customFetch>[1]): Promise<UploadUrlResponse> => {
+
+  return customFetch<UploadUrlResponse>(getRequestInvoiceUploadUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(invoiceUploadInput)
+  }
+);}
+
+
+
+
+
+export const getRequestInvoiceUploadMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestInvoiceUpload>>, TError,{data: BodyType<InvoiceUploadInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestInvoiceUpload>>, TError,{data: BodyType<InvoiceUploadInput>}, TContext> => {
+
+const mutationKey = ['requestInvoiceUpload'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestInvoiceUpload>>, {data: BodyType<InvoiceUploadInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  requestInvoiceUpload(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestInvoiceUploadMutationResult = NonNullable<Awaited<ReturnType<typeof requestInvoiceUpload>>>
+    export type RequestInvoiceUploadMutationBody = BodyType<InvoiceUploadInput>
+    export type RequestInvoiceUploadMutationError = ErrorType<void>
+
+    /**
+ * @summary Reserve a private invoice attachment for an eligible project
+ */
+export const useRequestInvoiceUpload = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestInvoiceUpload>>, TError,{data: BodyType<InvoiceUploadInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestInvoiceUpload>>,
+        TError,
+        {data: BodyType<InvoiceUploadInput>},
+        TContext
+      > => {
+      return useMutation(getRequestInvoiceUploadMutationOptions(options));
+    }
+
+export const getGetInvoiceSubmissionsUrl = () => {
+
+
+
+
+  return `/api/invoice-submissions`
+}
+
+/**
+ * @summary List persistent purchase invoices for accessible projects
+ */
+export const getInvoiceSubmissions = async ( options?: Parameters<typeof customFetch>[1]): Promise<Invoice[]> => {
+
+  return customFetch<Invoice[]>(getGetInvoiceSubmissionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetInvoiceSubmissionsQueryKey = () => {
+    return [
+    `/api/invoice-submissions`
+    ] as const;
+    }
+
+
+export const getGetInvoiceSubmissionsQueryOptions = <TData = Awaited<ReturnType<typeof getInvoiceSubmissions>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInvoiceSubmissions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetInvoiceSubmissionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getInvoiceSubmissions>>> = ({ signal }) => getInvoiceSubmissions({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getInvoiceSubmissions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetInvoiceSubmissionsQueryResult = NonNullable<Awaited<ReturnType<typeof getInvoiceSubmissions>>>
+export type GetInvoiceSubmissionsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List persistent purchase invoices for accessible projects
+ */
+
+export function useGetInvoiceSubmissions<TData = Awaited<ReturnType<typeof getInvoiceSubmissions>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInvoiceSubmissions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetInvoiceSubmissionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getDownloadInvoiceAttachmentUrl = (invoiceId: string,) => {
+
+
+
+
+  return `/api/invoice-submissions/${invoiceId}/file`
+}
+
+/**
+ * @summary Download a private invoice attachment after project authorization
+ */
+export const downloadInvoiceAttachment = async (invoiceId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getDownloadInvoiceAttachmentUrl(invoiceId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDownloadInvoiceAttachmentQueryKey = (invoiceId: string,) => {
+    return [
+    `/api/invoice-submissions/${invoiceId}/file`
+    ] as const;
+    }
+
+
+export const getDownloadInvoiceAttachmentQueryOptions = <TData = Awaited<ReturnType<typeof downloadInvoiceAttachment>>, TError = ErrorType<void>>(invoiceId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadInvoiceAttachment>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadInvoiceAttachmentQueryKey(invoiceId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadInvoiceAttachment>>> = ({ signal }) => downloadInvoiceAttachment(invoiceId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: invoiceId !== null && invoiceId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadInvoiceAttachment>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DownloadInvoiceAttachmentQueryResult = NonNullable<Awaited<ReturnType<typeof downloadInvoiceAttachment>>>
+export type DownloadInvoiceAttachmentQueryError = ErrorType<void>
+
+
+/**
+ * @summary Download a private invoice attachment after project authorization
+ */
+
+export function useDownloadInvoiceAttachment<TData = Awaited<ReturnType<typeof downloadInvoiceAttachment>>, TError = ErrorType<void>>(
+ invoiceId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadInvoiceAttachment>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDownloadInvoiceAttachmentQueryOptions(invoiceId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetInvoicesUrl = (params?: GetInvoicesParams,) => {
   const normalizedParams = new URLSearchParams();

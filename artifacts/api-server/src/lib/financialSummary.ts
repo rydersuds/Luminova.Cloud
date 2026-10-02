@@ -2,6 +2,7 @@ export type FinancialInvoice = {
   projectId: string;
   amount: number;
   direction?: "luminova_to_client" | "company_to_luminova";
+  submittedById?: string;
 };
 
 export type FinancialProject = {
@@ -110,11 +111,13 @@ export function calculatePortfolioFinancialSummary(
     0,
   );
   const expenseInvoicesByProject = new Map<string, number>();
+  const submittedExpensesByProject = new Map<string, number>();
   for (const invoice of invoices) {
     if (invoice.direction === "luminova_to_client") continue;
-    expenseInvoicesByProject.set(
+    const expenseMap = invoice.submittedById ? submittedExpensesByProject : expenseInvoicesByProject;
+    expenseMap.set(
       invoice.projectId,
-      (expenseInvoicesByProject.get(invoice.projectId) ?? 0) + invoice.amount,
+      (expenseMap.get(invoice.projectId) ?? 0) + invoice.amount,
     );
   }
 
@@ -139,7 +142,7 @@ export function calculatePortfolioFinancialSummary(
     const projectRevenue = invoicedRevenueForProject(invoices, projectId);
     const invoiceExpenses = expenseInvoicesByProject.get(projectId) ?? 0;
     const internalExpenses = projectsById.get(projectId)?.internalExpenseTotal ?? 0;
-    invoicedExpenses += Math.max(invoiceExpenses, internalExpenses);
+    invoicedExpenses += Math.max(invoiceExpenses, internalExpenses) + (submittedExpensesByProject.get(projectId) ?? 0);
     acceptedClientQuoteValue += acceptedValue;
     upcomingClientPayments += Math.max(acceptedValue - projectRevenue, 0);
   }

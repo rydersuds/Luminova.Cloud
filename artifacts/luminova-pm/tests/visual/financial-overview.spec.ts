@@ -34,6 +34,7 @@ const invoices = [
 ];
 
 async function loadFinancials(page: Page, summary: object) {
+  await installIdentity(page);
   await page.route('**/api/invoices/summary', (route) => route.fulfill({ json: summary }));
   await page.route('**/api/invoices**', (route) => {
     if (route.request().url().endsWith('/summary')) return route.fallback();
@@ -59,6 +60,12 @@ test('renders portfolio totals above the existing invoice intake workflow', asyn
   await expect(page.getByRole('heading', { name: 'Invoice intake queue' })).toBeVisible();
   await expect(page.getByText('CLIENT-100').last()).toBeVisible();
 });
+
+async function installIdentity(page: Page) {
+  await page.route('**/api/users/me', route => route.fulfill({ json: { userId: 'user-admin', role: 'Admin' } }));
+  await page.route('**/api/invoice-submissions', route => route.fulfill({ json: [] }));
+  await page.route('**/api/invoice-projects', route => route.fulfill({ json: [] }));
+}
 
 test('keeps client and vendor invoice identities distinct across responsive layouts', async ({ page }) => {
   await page.route('**/broken-client-logo.svg', (route) => route.fulfill({ status: 404, body: '' }));
@@ -95,6 +102,7 @@ test('renders real zero totals without treating them as unavailable', async ({ p
 });
 
 test('keeps invoice intake available when the summary fails and retries it', async ({ page }) => {
+  await installIdentity(page);
   let available = false;
   await page.route('**/api/invoices/summary', (route) => {
     if (!available) return route.fulfill({ status: 503, json: { error: 'Unavailable' } });

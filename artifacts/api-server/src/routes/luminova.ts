@@ -247,6 +247,8 @@ import
  from "./users"
 ;
 
+import { remainingTradeBudgets } from "../lib/invoiceBudget";
+
 
 type AuthenticatedRequest = Request & 
 {
@@ -4228,6 +4230,8 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
 ;
     const projectInvoices = financialRecords.invoices.filter((invoice) => invoice.projectId === project.id)
 ;
+    const currentBudgetCategories = remainingTradeBudgets(project.budgetLineItems ?? [], projectInvoices);
+    const currentBudgetById = new Map(currentBudgetCategories.map(category => [category.id, category]));
     const acceptedQuote = acceptedClientQuoteForProject(financialRecords.quotes, project.id)
 ;
     const clientQuote = acceptedQuote
@@ -4310,7 +4314,10 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
       ...project,
       startDate: resolveProjectStartDate(project),
       clientQuote,
-      lineItems: project.budgetLineItems ?? [],
+      lineItems: (project.budgetLineItems ?? []).map(line => {
+        const current = currentBudgetById.get(line.id);
+        return current ? { ...line, invoiced: current.used, variance: Math.round((line.budgeted - current.used) * 100) / 100 } : line;
+      }),
       invoices: projectInvoices,
        trades: vendorRows
          .map((row) => row.data as Trade)
@@ -12108,119 +12115,6 @@ router.get("/invoices/summary", async (req: AuthenticatedRequest, res) =>
   res.json(GetFinancialSummaryResponse.parse(
     calculatePortfolioFinancialSummary(invoiceRecords, quoteRecords, projectRecords),
   ))
-;
-
-
-}
-
-)
-;
-
-
-router.post("/invoices", async (req: AuthenticatedRequest, res) => 
-{
-
-
-  if (!req.userId) 
-{
-
-
-    res.status(401).json(
-{
-
- error: "Authentication required" 
-}
-
-)
-;
-
-
-    return
-;
-
-
-}
-
-
-  const parsed = CreateInvoiceBody.safeParse(req.body)
-;
-
-
-  if (!parsed.success) 
-{
-
-
-    res.status(400).json(
-{
-
- error: parsed.error.message 
-}
-
-)
-;
-
-
-    return
-;
-
-
-}
-
-
-  const project = await findOwnedProject(parsed.data.projectId, req.userId, requestWorkspaceId(req))
-;
-
-
-  if (!project) 
-{
-
-
-    res.status(404).json(
-{
-
- error: "Project not found" 
-}
-
-)
-;
-
-
-    return
-;
-
-
-}
-
-
-  const remaining = Math.max(project.budgeted - project.invoiced, 0)
-;
-
-
-  const overage = Math.max(parsed.data.amount - remaining, 0)
-;
-
-
-  const invoice = 
-{
-
-
-    ...parsed.data,
-    ownerId: req.userId,
-    id: `inv-${Date.now()}`,
-    projectName: project.name,
-    status: overage > 0 ? "Pending approval" : "Auto-approved",
-    overage,
-  
-}
-
-;
-
-
-  invoices = [invoice, ...invoices]
-;
-
-
-  res.status(201).json(CreateInvoiceResponse.parse(invoice))
 ;
 
 

@@ -793,6 +793,76 @@ paths:
           description: Administrator access required
         "404":
           description: Review or trade not found
+  /invoice-projects:
+    get:
+      operationId: getInvoiceProjects
+      tags: [invoices]
+      summary: List projects and remaining trade budgets available for invoice submission
+      responses:
+        "200":
+          description: Eligible projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/InvoiceProject" }
+        "403":
+          description: Project management access required
+  /invoice-uploads:
+    post:
+      operationId: requestInvoiceUpload
+      tags: [invoices]
+      summary: Reserve a private invoice attachment for an eligible project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InvoiceUploadInput" }
+      responses:
+        "200":
+          description: Reserved upload
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UploadUrlResponse" }
+        "400":
+          description: Invalid invoice file
+        "403":
+          description: Project management access required
+        "404":
+          description: Project not accessible
+  /invoice-submissions:
+    get:
+      operationId: getInvoiceSubmissions
+      tags: [invoices]
+      summary: List persistent purchase invoices for accessible projects
+      responses:
+        "200":
+          description: Submitted invoices
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Invoice" }
+        "403":
+          description: Project management access required
+  /invoice-submissions/{invoiceId}/file:
+    get:
+      operationId: downloadInvoiceAttachment
+      tags: [invoices]
+      summary: Download a private invoice attachment after project authorization
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Private invoice file
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "404":
+          description: Invoice not accessible
   /invoices:
     get:
       operationId: getInvoices
@@ -2219,16 +2289,74 @@ components:
         status: { type: string }
         lineItem: { type: string }
         overage: { type: number }
+        budgetLineItemId: { type: ["string", "null"] }
+        budgetRemainingBefore: { type: ["number", "null"] }
+        budgetRemainingAfter: { type: ["number", "null"] }
+        approvalReason:
+          type: string
+          enum: [within_budget, over_budget, budget_unavailable]
+        submittedById: { type: string }
+        attachment: { $ref: "#/components/schemas/InvoiceAttachment" }
     InvoiceInput:
       type: object
-      required: [invoiceNumber, projectId, vendor, amount, date, lineItem]
+      required: [invoiceNumber, projectId, vendor, amount, date, lineItem, budgetLineItemId, attachment, submissionId]
       properties:
-        invoiceNumber: { type: string }
-        projectId: { type: string }
-        vendor: { type: string }
-        amount: { type: number }
-        date: { type: string }
-        lineItem: { type: string }
+        invoiceNumber: { type: string, minLength: 1, maxLength: 100 }
+        projectId: { type: string, minLength: 1 }
+        vendor: { type: string, minLength: 1, maxLength: 200 }
+        amount: { type: number, exclusiveMinimum: 0, maximum: 1000000000 }
+        date: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
+        lineItem: { type: string, minLength: 1, maxLength: 300 }
+        budgetLineItemId: { type: ["string", "null"] }
+        submissionId: { type: string, format: uuid }
+        attachment: { $ref: "#/components/schemas/InvoiceFileInput" }
+    InvoiceFileInput:
+      type: object
+      required: [objectPath, name, size, contentType]
+      properties:
+        objectPath: { type: string, pattern: '^/objects/' }
+        name: { type: string, minLength: 1, maxLength: 255 }
+        size: { type: integer, minimum: 1, maximum: 20971520 }
+        contentType:
+          type: string
+          enum: [application/pdf, image/jpeg, image/png, image/webp]
+    InvoiceAttachment:
+      allOf:
+        - $ref: "#/components/schemas/InvoiceFileInput"
+        - type: object
+          required: [url]
+          properties:
+            url: { type: string }
+    InvoiceUploadInput:
+      type: object
+      required: [projectId, name, size, contentType]
+      properties:
+        projectId: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1, maxLength: 255 }
+        size: { type: integer, minimum: 1, maximum: 20971520 }
+        contentType:
+          type: string
+          enum: [application/pdf, image/jpeg, image/png, image/webp]
+    InvoiceProject:
+      type: object
+      required: [id, name, categories]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        categories:
+          type: array
+          items: { $ref: "#/components/schemas/InvoiceBudgetCategory" }
+    InvoiceBudgetCategory:
+      type: object
+      required: [id, code, description, budgeted, used, remaining, canAutoApprove]
+      properties:
+        id: { type: string }
+        code: { type: string }
+        description: { type: string }
+        budgeted: { type: ["number", "null"] }
+        used: { type: number }
+        remaining: { type: ["number", "null"] }
+        canAutoApprove: { type: boolean }
     FinancialSummary:
       type: object
       required: [invoicedRevenue, invoicedExpenses, acceptedClientQuoteValue, upcomingClientPayments]
