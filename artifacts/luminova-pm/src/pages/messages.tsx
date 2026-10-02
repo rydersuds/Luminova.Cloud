@@ -1,4 +1,5 @@
 import * as React from "react"
+import { Link, useLocation, useSearch } from "wouter"
 import { z } from "zod"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -59,10 +60,11 @@ const conversationSchema = z.object({
 
 export default function Messages() {
   const queryClient = useQueryClient()
-  const requestedId = React.useMemo(
-    () => new URLSearchParams(window.location.search).get("conversation"),
-    [],
-  )
+  const [, setLocation] = useLocation()
+  const routeSearch = useSearch()
+  const routeQuery = React.useMemo(() => new URLSearchParams(routeSearch), [routeSearch])
+  const requestedId = routeQuery.get("conversation")
+  const requestedProjectId = routeQuery.get("projectId")
 
   const { data: conversations = [], isLoading, isError } = useGetProjectConversations()
   const { data: chatOptions, isLoading: areOptionsLoading, isError: areOptionsUnavailable } = useGetChatOptions()
@@ -71,8 +73,7 @@ export default function Messages() {
   const createMessage = useCreateProjectMessage()
   const createConversation = useCreateProjectConversation()
 
-  const [activeId, setActiveId] = React.useState<string | null>(requestedId)
-  const [message, setMessage] = React.useState("")
+  const [drafts, setDrafts] = React.useState<Record<string, string>>({})
   const [isMobileListOpen, setIsMobileListOpen] = React.useState(!requestedId)
   const [searchQuery, setSearchQuery] = React.useState("")
   const [isNewChatOpen, setIsNewChatOpen] = React.useState(false)
@@ -80,7 +81,15 @@ export default function Messages() {
   const [projectSearch, setProjectSearch] = React.useState("")
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
-  const activeChat = conversations.find((chat) => chat.id === activeId) ?? conversations[0]
+  const scopedConversations = requestedProjectId ? conversations.filter(chat => chat.projectId === requestedProjectId) : conversations
+  // A directed link must never silently open an unrelated conversation.
+  const activeChat = requestedId ? scopedConversations.find(chat => chat.id === requestedId)
+    : requestedProjectId ? scopedConversations.find(chat => chat.type === "project") ?? scopedConversations[0] : scopedConversations[0]
+  const activeId = activeChat?.id
+  const message = activeId ? drafts[activeId] ?? "" : ""
+  const setMessage = (value: string) => {
+    if (activeId) setDrafts(current => ({ ...current, [activeId]: value }))
+  }
   const activeMessages = activeChat?.messages ?? []
 
   const form = useForm<z.infer<typeof conversationSchema>>({
@@ -113,25 +122,33 @@ export default function Messages() {
   }, [form, selectedProject, selectedType])
 
   React.useEffect(() => {
-    if (activeChat && activeChat.id !== activeId) setActiveId(activeChat.id)
-  }, [activeChat, activeId])
+    if (requestedId) setIsMobileListOpen(false)
+    else if (requestedProjectId && !isLoading) setIsMobileListOpen(scopedConversations.length === 0)
+  }, [requestedId, requestedProjectId, isLoading, scopedConversations.length])
 
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [activeChat?.id, activeMessages.length])
 
   const selectChat = (chat: ProjectConversation) => {
-    setActiveId(chat.id)
     setIsMobileListOpen(false)
-    window.history.replaceState(null, "", `/messages?conversation=${encodeURIComponent(chat.id)}`)
+    const query = new URLSearchParams(routeSearch)
+    query.set("conversation", chat.id)
+    setLocation(`/messages?${query}`)
+  }
+  const openNewChat = () => {
+    const project = chatOptions?.projects.find(project => project.id === requestedProjectId)
+    if (project) form.reset({ type: "project", projectId: project.id, participantIds: [], title: `${project.name} updates` })
+    setIsNewChatOpen(true)
   }
 
   const handleSend = () => {
     const text = message.trim()
     if (!activeChat || !text || createMessage.isPending) return
-    createMessage.mutate({ conversationId: activeChat.id, data: { text } }, {
+    const conversationId = activeChat.id
+    createMessage.mutate({ conversationId, data: { text } }, {
       onSuccess: async () => {
-        setMessage("")
+        setDrafts(current => current[conversationId]?.trim() === text ? { ...current, [conversationId]: "" } : current)
         await queryClient.invalidateQueries({ queryKey: getGetProjectConversationsQueryKey() })
       },
     })
@@ -151,9 +168,14 @@ export default function Messages() {
           getGetProjectConversationsQueryKey(),
           (current = []) => [newChat, ...current.filter((chat) => chat.id !== newChat.id)],
         )
-        setActiveId(newChat.id)
         setIsMobileListOpen(false)
-        window.history.replaceState(null, "", `/messages?conversation=${encodeURIComponent(newChat.id)}`)
+        const query = new URLSearchParams(routeSearch)
+        query.set("conversation", newChat.id)
+        if (requestedProjectId) {
+          if (newChat.projectId) query.set("projectId", newChat.projectId)
+          else query.delete("projectId")
+        }
+        setLocation(`/messages?${query}`)
         setIsNewChatOpen(false)
         form.reset()
         setProjectSearch("")
@@ -163,7 +185,7 @@ export default function Messages() {
   }
 
   const normalizedSearch = searchQuery.trim().toLowerCase()
-  const filteredChats = conversations.filter((chat) =>
+  const filteredChats = scopedConversations.filter((chat) =>
     `${chat.title} ${chat.context} ${chat.projectName}`.toLowerCase().includes(normalizedSearch),
   )
 
@@ -184,11 +206,23 @@ export default function Messages() {
               <div className="shrink-0 border-b border-sidebar-border/50 bg-sidebar p-4 md:p-6">
                 <div className="flex items-center justify-between">
                   <h2 className="font-heading text-2xl font-bold tracking-tight">Messages</h2>
-                  <Button size="icon" variant="outline" onClick={() => setIsNewChatOpen(true)} className="h-8 w-8 rounded-full border-sidebar-border" data-testid="button-new-conversation">
+                  <Button size="icon" variant="outline" onClick={openNewChat} className="h-8 w-8 rounded-full border-sidebar-border" data-testid="button-new-conversation">
                     <Plus className="h-4 w-4" />
                     <span className="sr-only">New Conversation</span>
                   </Button>
                 </div>
+                {requestedProjectId && (
+                  <div className="mt-3 space-y-2 text-xs" data-testid="messages-project-context">
+                    <p>Project channels: {chatOptions?.projects.find(project => project.id === requestedProjectId)?.name ?? "selected project"}</p>
+                    <div className="flex flex-wrap gap-3">
+                      <Link className="underline" href={`/projects/${encodeURIComponent(requestedProjectId)}`}>Back to project</Link>
+                      <Link className="underline" href="/messages">All messages</Link>
+                    </div>
+                  </div>
+                )}
+                {requestedId && !isLoading && !activeChat && (
+                  <p role="alert" className="mt-3 text-xs text-destructive">This conversation is unavailable. Choose an available channel instead.</p>
+                )}
                 <div className="relative mt-4">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -331,7 +365,13 @@ export default function Messages() {
               </div>
             </div>
           ) : !isLoading ? (
-            <div className="hidden flex-1 items-center justify-center text-sm text-muted-foreground md:flex">Select a conversation or start a new one</div>
+            <div className={cn("flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center text-sm text-muted-foreground", isMobileListOpen && "hidden md:flex")}>
+              <p role={requestedId ? "alert" : undefined}>
+                {requestedId ? "This conversation is unavailable. Choose an available channel instead." : requestedProjectId ? "No channels are available for this project yet." : "Select a conversation or start a new one"}
+              </p>
+              <Button variant="outline" onClick={() => setIsMobileListOpen(true)} className="md:hidden">Choose a conversation</Button>
+              <Button variant="outline" onClick={openNewChat}>New conversation</Button>
+            </div>
           ) : null}
         </div>
       </div>

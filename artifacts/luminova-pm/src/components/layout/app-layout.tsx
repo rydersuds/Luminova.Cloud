@@ -10,6 +10,7 @@ import {
   Menu,
   X,
   ChevronDown,
+  ChevronRight,
   PanelLeftClose,
   PanelLeftOpen,
   LogOut,
@@ -21,20 +22,50 @@ import { cn } from "@/lib/utils"
 import { preloadPage } from "@/lib/page-preload"
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useClerk, useUser } from "@clerk/react"
+import { useGetCurrentWorkspaceUser } from "@workspace/api-client-react"
 import { useTheme } from "@/hooks/use-theme"
 import { CookieConsentBanner } from "@/components/cookie-consent-banner"
 
 type IndicatorPhase = "idle" | "travel" | "settle"
 
-const NAV_ITEMS = [
-  { href: "/", label: "Command Center", icon: Building2 },
-  { href: "/projects", label: "All Projects", icon: FolderKanban },
-  { href: "/trades", label: "Trades & Vendors", icon: Users },
-  { href: "/quotes", label: "Vendor Quotes", icon: ClipboardList },
-  { href: "/invoices", label: "Financials", icon: FileText },
-  { href: "/messages", label: "Communications", icon: MessageSquare },
-  { href: "/users", label: "Users & Roles", icon: UserCog },
+type NavItem = { href: string; label: string; icon: typeof Building2; hint: string; adminOnly?: boolean }
+const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+  {
+    label: "Daily work",
+    items: [
+      { href: "/", label: "Command Center", icon: Building2, hint: "Today across all sites" },
+      { href: "/projects", label: "All Projects", icon: FolderKanban, hint: "Job sites and progress" },
+      { href: "/messages", label: "Communications", icon: MessageSquare, hint: "Team messages" },
+    ],
+  },
+  {
+    label: "Purchasing",
+    items: [
+      { href: "/trades", label: "Trades & Vendors", icon: Users, hint: "Vendors and trade budgets" },
+      { href: "/quotes", label: "Vendor Quotes", icon: ClipboardList, hint: "Compare and award" },
+      { href: "/invoices", label: "Financials", icon: FileText, hint: "Vendor invoices" },
+    ],
+  },
+  {
+    label: "Admin",
+    items: [{ href: "/users", label: "Users & Roles", icon: UserCog, hint: "Access and invitations", adminOnly: true }],
+  },
 ]
+const NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items)
+
+export function getBreadcrumbs(location: string): { label: string; href?: string }[] {
+  if (location === "/") return []
+  const parts = location.split("/").filter(Boolean)
+  const section = NAV_ITEMS.find((i) => i.href === `/${parts[0]}`)
+  const label = section?.label ?? (parts[0] === "profile" ? "Profile" : null)
+  if (!label) return []
+  const crumbs: { label: string; href?: string }[] = [{ label: "Command Center", href: "/" }]
+  if (parts.length > 1 && section) {
+    crumbs.push({ label: parts[0] === "projects" ? "Projects" : label, href: section.href })
+    crumbs.push({ label: parts[0] === "projects" ? "Project details" : parts[0] === "trades" ? "Vendor details" : "Details" })
+  } else crumbs.push({ label })
+  return crumbs
+}
 
 type AppLayoutViewProps = {
   children: React.ReactNode
@@ -48,6 +79,7 @@ type AppLayoutViewProps = {
   hoveredHref?: string
   onNavigate?: (href: string) => void
   showCookieConsent?: boolean
+  role?: string | null
 }
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "luminova-sidebar-collapsed"
@@ -76,7 +108,10 @@ export function AppLayoutView({
   hoveredHref,
   onNavigate,
   showCookieConsent = true,
+  role = "Admin",
 }: AppLayoutViewProps) {
+  const isAdmin = role === "Admin"
+  const crumbs = getBreadcrumbs(location)
   const { theme, toggleTheme } = useTheme()
   const [sidebarOpen, setSidebarOpen] = useState(initialSidebarOpen)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
@@ -108,6 +143,23 @@ export function AppLayoutView({
   })
   const [visuallyActiveLocation, setVisuallyActiveLocation] = useState(location)
   const initials = displayName.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()
+
+  useEffect(() => {
+    if (!sidebarOpen || !isMobile) return
+    const original = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.body.style.overflow = original
+    }
+  }, [sidebarOpen, isMobile])
+
+  const lastSidebarLocation = useRef(location)
+  useEffect(() => {
+    if (lastSidebarLocation.current !== location) {
+      setSidebarOpen(false)
+      lastSidebarLocation.current = location
+    }
+  }, [location])
 
   const closeSidebar = useCallback(() => {
     setSidebarOpen(false)
@@ -177,7 +229,10 @@ export function AppLayoutView({
   useLayoutEffect(() => {
     const nav = navRef.current
     const activeLink = activeLinkRef.current
-    if (!nav || !activeLink) return
+    if (!nav || !activeLink) {
+      setIndicator(current => ({ ...current, ready: false }))
+      return
+    }
     const shouldAnimate = hasPositionedIndicator.current && previousIndicatorLocation.current !== location
 
     const measureIndicator = () => {
@@ -322,7 +377,7 @@ export function AppLayoutView({
       observer.disconnect()
       window.removeEventListener("resize", positionAfterLayoutChange)
     }
-  }, [location, sidebarCollapsed, sidebarOpen])
+  }, [location, sidebarCollapsed, sidebarOpen, role])
 
   return (
     <div
@@ -409,10 +464,11 @@ export function AppLayoutView({
         ref={sidebarRef}
         id="mobile-navigation"
         data-sidebar-collapsed={sidebarCollapsed}
-        role={isMobile ? "dialog" : undefined}
-        aria-modal={isMobile ? true : undefined}
-        aria-label={isMobile ? "Main navigation" : undefined}
+        role={isMobile && sidebarOpen ? "dialog" : undefined}
+        aria-modal={isMobile && sidebarOpen ? true : undefined}
         aria-hidden={isMobile && !sidebarOpen ? true : undefined}
+        inert={isMobile && !sidebarOpen}
+        aria-label={isMobile ? "Main navigation" : undefined}
         tabIndex={isMobile ? -1 : undefined}
         className={cn(
         "sidebar-chrome sidebar-instrument fixed md:sticky md:top-4 md:self-start inset-y-0 left-0 w-72 glass-panel-dark text-sidebar-foreground flex flex-col z-30 shrink-0 transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] md:transition-[width,transform] md:m-4 md:rounded-2xl md:h-[calc(100dvh-2rem)] motion-reduce:transition-none",
@@ -483,18 +539,20 @@ export function AppLayoutView({
             <div className="absolute inset-x-3 top-[2px] h-px rounded-full bg-white/70 opacity-90" />
             <div className="absolute inset-x-5 bottom-[3px] h-px rounded-full bg-white/25" />
           </div>
-          <div
-            data-contrast-label="navigation section label"
-            className={cn(
-              "relative z-10 mb-4 flex items-center gap-2 px-2 text-[10px] font-mono uppercase tracking-[0.24em] text-sidebar-foreground/70 before:h-px before:w-4 before:bg-[hsl(var(--signal))]",
-              sidebarCollapsed && "sr-only",
-            )}
-          >
-            Operations Center
-          </div>
-          {NAV_ITEMS.map((item) => {
-            const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href))
-            const isVisuallyActive = visuallyActiveLocation === item.href || (item.href !== "/" && visuallyActiveLocation.startsWith(item.href))
+          {NAV_GROUPS.filter((g) => g.items.some((i) => !i.adminOnly || isAdmin)).map((group) => (
+            <div key={group.label} role="group" aria-label={group.label} className="space-y-1.5">
+              <div
+                data-contrast-label="navigation section label"
+                className={cn(
+                  "relative z-10 mb-2 mt-3 flex items-center gap-2 px-2 text-[10px] font-mono uppercase tracking-[0.24em] text-sidebar-foreground/70 before:h-px before:w-4 before:bg-[hsl(var(--signal))]",
+                  sidebarCollapsed && "sr-only",
+                )}
+              >
+                {group.label}
+              </div>
+          {group.items.filter((item) => !item.adminOnly || isAdmin).map((item) => {
+            const isActive = location === item.href || (item.href !== "/" && location.startsWith(`${item.href}/`))
+            const isVisuallyActive = visuallyActiveLocation === item.href || (item.href !== "/" && visuallyActiveLocation.startsWith(`${item.href}/`))
             const isForcedHover = hoveredHref === item.href && !isActive
             return (
               <Link
@@ -503,7 +561,7 @@ export function AppLayoutView({
                 ref={isActive ? activeLinkRef : undefined}
                 aria-current={isActive ? "page" : undefined}
                 aria-label={item.label}
-                title={sidebarCollapsed ? item.label : undefined}
+                title={sidebarCollapsed ? item.label : item.hint}
                 data-contrast-label={`navigation link "${item.label}"`}
                 className={cn(
                    "group relative z-10 flex items-center py-3 rounded-lg text-sm font-bold transition-[color,background-color,box-shadow,transform] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden shadow-sm motion-reduce:transition-none",
@@ -517,7 +575,6 @@ export function AppLayoutView({
                   if (onNavigate) {
                     event.preventDefault()
                     onNavigate(item.href)
-                    return
                   }
                   closeSidebar()
                 }}
@@ -545,6 +602,8 @@ export function AppLayoutView({
               </Link>
             )
           })}
+            </div>
+          ))}
         </nav>
 
         <div className={cn("mt-auto", sidebarCollapsed ? "p-2" : "p-4")}>
@@ -629,8 +688,24 @@ export function AppLayoutView({
         </div>
       </aside>
 
-      <main id="main-content" tabIndex={-1} className="workspace-main relative z-10 flex-1 flex min-w-0 max-w-full flex-col overflow-x-hidden outline-none md:overflow-hidden">
+      <main id="main-content" tabIndex={-1} inert={isMobile && sidebarOpen} aria-hidden={isMobile && sidebarOpen ? true : undefined} className="workspace-main relative z-10 flex-1 flex min-w-0 max-w-full flex-col overflow-x-hidden outline-none md:overflow-hidden">
         <div className="relative z-10 flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-x-hidden md:h-full md:overflow-hidden">
+          {crumbs.length > 0 && (
+            <nav aria-label="Breadcrumb" data-testid="breadcrumb" className="shrink-0 px-4 pt-3 md:px-8">
+              <ol className="flex flex-wrap items-center gap-1.5 text-xs text-foreground/70">
+                {crumbs.map((c, i) => (
+                  <li key={`${c.label}-${i}`} className="flex items-center gap-1.5">
+                    {i > 0 && <ChevronRight className="h-3 w-3" aria-hidden="true" />}
+                    {c.href ? (
+                      <Link href={c.href} className="rounded font-medium hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{c.label}</Link>
+                    ) : (
+                      <span aria-current="page" className="font-bold text-foreground">{c.label}</span>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </nav>
+          )}
           {children}
         </div>
       </main>
@@ -652,9 +727,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation()
   const { signOut } = useClerk()
   const { user } = useUser()
+  const { data: workspaceUser } = useGetCurrentWorkspaceUser()
 
   return (
     <AppLayoutView
+      role={workspaceUser?.role ?? null}
       location={location}
       displayName={user?.fullName || user?.firstName || "Project Manager"}
       email={user?.primaryEmailAddress?.emailAddress || "Signed in"}

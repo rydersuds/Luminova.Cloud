@@ -29,14 +29,16 @@ export function InvoiceUploadForm({
   projects,
   onSubmitted,
   onLockChange,
+  initialProjectId = "",
 }: {
   projects: InvoiceProject[]
   onSubmitted: (invoice: Invoice) => void
   onLockChange?: (locked: boolean) => void
+  initialProjectId?: string
 }) {
   const requestUpload = useRequestInvoiceUpload()
   const createInvoice = useCreateInvoice()
-  const [projectId, setProjectId] = React.useState("")
+  const [projectId, setProjectId] = React.useState(() => projects.some(project => project.id === initialProjectId) ? initialProjectId : "")
   const [categoryId, setCategoryId] = React.useState("")
   const [file, setFile] = React.useState<File | null>(null)
   const [invoiceNumber, setInvoiceNumber] = React.useState("")

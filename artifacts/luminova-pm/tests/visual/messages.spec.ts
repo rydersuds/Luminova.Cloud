@@ -57,6 +57,7 @@ const conversations = [
 
 test.describe('Messages Interface', () => {
   test.beforeEach(async ({ page }) => {
+    await page.route('**/api/users/me', route => route.fulfill({ json: { userId: 'me', role: 'Project Manager' } }));
     await page.addInitScript(() => {
       window.localStorage.setItem('luminova-cookie-consent-v1', 'accepted');
     });
@@ -96,6 +97,37 @@ test.describe('Messages Interface', () => {
       conversation.updatedAt = created.createdAt;
       await route.fulfill({ status: 201, json: created });
     });
+  });
+
+  test('project context opens only the matching channels and keeps drafts with their conversation', async ({ page }) => {
+    await page.goto('/__visual/messages?projectId=downtown');
+    await expect(page.getByTestId('messages-project-context')).toContainText('Downtown Office Reno');
+    await expect(page.getByRole('button', { name: 'Open channel for Sarah Jenkins' })).toHaveCount(0);
+    await page.getByTestId('button-new-conversation').click();
+    await expect(page.getByTestId('input-channel-title')).toHaveValue('Downtown Office Reno updates');
+    await page.keyboard.press('Escape');
+    await page.goto('/__visual/messages');
+    await page.getByRole('button', { name: 'Open channel for Downtown Office Reno' }).click();
+    await page.getByTestId('input-message').fill('Draft for Downtown only');
+    await page.getByRole('button', { name: 'Open channel for Sarah Jenkins' }).click();
+    await expect(page.getByTestId('input-message')).toHaveValue('');
+    await page.getByTestId('input-message').fill('Draft for Sarah only');
+    await page.getByRole('button', { name: 'Open channel for Downtown Office Reno' }).click();
+    await expect(page.getByTestId('input-message')).toHaveValue('Draft for Downtown only');
+    await page.getByRole('button', { name: 'Open channel for Sarah Jenkins' }).click();
+    await expect(page.getByTestId('input-message')).toHaveValue('Draft for Sarah only');
+    await page.goBack();
+    await expect(page.getByTestId('input-message')).toHaveValue('Draft for Downtown only');
+  });
+
+  test('an unavailable directed conversation never selects another recipient, including on phones', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/__visual/messages?conversation=not-accessible');
+    await expect(page.getByRole('alert').filter({ hasText: 'This conversation is unavailable' }).last()).toBeVisible();
+    await expect(page.getByTestId('input-message')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Choose a conversation' }).click();
+    await page.getByRole('button', { name: 'Open channel for Sarah Jenkins' }).click();
+    await expect(page.getByTestId('input-message')).toBeVisible();
   });
 
   test('creates direct and project conversations with accessible controls', async ({ page }) => {

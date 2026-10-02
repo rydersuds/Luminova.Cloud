@@ -5,7 +5,7 @@ const projects = [{ id: 'purchase-project', name: 'Drywall Budget Project', cate
 ] }];
 const file = { name: 'vendor-invoice.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\nInvoice\n%%EOF') };
 
-async function fixture(page: Page, options: { role?: string; uncertain?: boolean; rejected?: boolean } = {}) {
+async function fixture(page: Page, options: { role?: string; uncertain?: boolean; rejected?: boolean; search?: string } = {}) {
   const records: Record<string, any>[] = [];
   const requests: Record<string, any>[] = [];
   let uploads = 0, puts = 0;
@@ -54,7 +54,7 @@ async function fixture(page: Page, options: { role?: string; uncertain?: boolean
     if (options.uncertain && requests.length === 1) return route.fulfill({ status: 503, json: { error: 'Temporary response failure' } });
     return route.fulfill({ status: 201, json: invoice });
   });
-  await page.goto('/__visual/financials');
+  await page.goto(`/__visual/financials${options.search ?? ''}`);
   return { records, requests, counts: () => ({ uploads, puts }) };
 }
 
@@ -146,4 +146,27 @@ test('Field Team does not receive invoice submission controls', async ({ page })
   await fixture(page, { role: 'Field Team' });
   await expect(page.getByRole('heading', { name: 'Invoices & Purchases' })).toBeVisible();
   await expect(page.getByTestId('button-open-submit-invoice')).toHaveCount(0);
+});
+
+test('project shortcut opens a preselected upload, limits records, and returns to the project budget', async ({ page }) => {
+  const state = await fixture(page, { search: '?projectId=purchase-project&submit=1' });
+  await expect(page.getByTestId('form-invoice-upload')).toBeVisible();
+  await expect(page.getByTestId('select-invoice-project')).toHaveValue('purchase-project');
+  await expect(page).not.toHaveURL(/submit=1/);
+  await page.getByTestId('select-invoice-category').selectOption('drywall');
+  await page.getByTestId('input-invoice-file').setInputFiles(file);
+  await page.getByTestId('input-invoice-number').fill('PROJECT-001');
+  await page.getByTestId('input-invoice-date').fill('2026-10-02');
+  await page.getByTestId('input-invoice-vendor').fill('Drywall Vendor');
+  await page.getByTestId('input-invoice-amount').fill('100');
+  await page.getByTestId('button-submit-invoice').click();
+  await expect(page.getByTestId('panel-submit-result')).toContainText('Auto-approved');
+  expect(state.requests[0].projectId).toBe('purchase-project');
+  state.records.push({ ...state.records[0], id: 'other-invoice', projectId: 'other-project', projectName: 'Other Project', invoiceNumber: 'OTHER-PROJECT-001' });
+  await page.reload();
+  await expect(page.getByText('PROJECT-001', { exact: true }).last()).toBeVisible();
+  await expect(page.getByText('OTHER-PROJECT-001', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Back to project budget' })).toHaveAttribute('href', '/projects/purchase-project?tab=budget');
+  await page.getByRole('button', { name: 'View all projects' }).click();
+  await expect(page.getByText('OTHER-PROJECT-001', { exact: true }).last()).toBeVisible();
 });

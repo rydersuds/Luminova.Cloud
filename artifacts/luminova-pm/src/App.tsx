@@ -468,6 +468,7 @@ function FolderImportVisualHarness() {
 function SidebarVisualHarness() {
   const params = new URLSearchParams(window.location.search);
   const [activeLocation, setActiveLocation] = useState(`/${params.get('active') || 'projects'}`);
+  const [initialDrawerOpen, setInitialDrawerOpen] = useState(params.get('drawer') === 'open');
 
   return (
     <WouterRouter base={basePath}>
@@ -477,8 +478,11 @@ function SidebarVisualHarness() {
         displayName="Morgan Reyes"
         email="morgan@luminova.test"
         onSignOut={() => undefined}
-        onNavigate={setActiveLocation}
-        initialSidebarOpen={params.get('drawer') === 'open'}
+        onNavigate={(destination) => {
+          setInitialDrawerOpen(false);
+          setActiveLocation(destination);
+        }}
+        initialSidebarOpen={initialDrawerOpen}
         initialSidebarCollapsed={
           params.get('sidebar') === 'compact'
             ? true

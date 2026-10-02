@@ -42,6 +42,29 @@ async function installIdentity(page: Page, role: 'Admin' | 'Project Manager' = '
   await page.route('**/api/users/project-managers', route => route.fulfill({ json: managers }));
 }
 
+test('project workflow links keep context and project tabs survive reload on mobile', async ({ page }) => {
+  await installIdentity(page, 'Project Manager');
+  await page.route('**/api/projects/riverstone', route => route.fulfill({ json: project }));
+  await page.route('**/api/projects/riverstone/activity', route => route.fulfill({ json: [] }));
+  await page.route('**/api/projects/riverstone/panoramas', route => route.fulfill({ json: [] }));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/__visual/project-panorama?tab=budget');
+  await expect(page.getByRole('tab', { name: 'Budget', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Trades', exact: true })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Activity', exact: true })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Project workflow' }).getByRole('link', { name: 'Submit invoice', exact: true }))
+    .toHaveAttribute('href', '/invoices?projectId=riverstone&submit=1');
+  await expect(page.getByRole('navigation', { name: 'Project workflow' }).getByRole('link', { name: 'Project messages', exact: true }))
+    .toHaveAttribute('href', '/messages?projectId=riverstone');
+  await page.getByRole('tab', { name: 'Activity', exact: true }).click();
+  await expect(page).toHaveURL(/tab=activity/);
+  await page.reload();
+  await expect(page.getByRole('tab', { name: 'Activity', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Users & Roles' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Back to Projects', exact: true }).click();
+  await expect(page).toHaveURL(/\/projects$/);
+});
+
 test('featured projects switch accessibly and fit mobile screens', async ({ page }) => {
   await installIdentity(page);
   await page.route('**/api/projects', route => route.fulfill({

@@ -1,5 +1,6 @@
 import * as React from "react"
-import { useLocation, useParams } from "wouter"
+import { Link, useLocation, useParams, useSearch } from "wouter"
+import { projectTabFromSearch, projectWorkflowHref } from "@/lib/project-workflow"
 import { 
   useGetProject, 
   getGetProjectQueryKey,
@@ -115,7 +116,14 @@ function countFolderPhotos(folder: PhotoFolderNode): number {
 
 export default function ProjectDetail({ projectIdOverride }: { projectIdOverride?: string } = {}) {
   const params = useParams()
-  const [, setLocation] = useLocation()
+  const [location, setLocation] = useLocation()
+  const search = useSearch()
+  const activeTab = projectTabFromSearch(search)
+  const selectTab = (tab: string) => {
+    const query = new URLSearchParams(search)
+    query.set("tab", tab)
+    setLocation(`${location}?${query}`)
+  }
   const projectId = projectIdOverride ?? params.id as string
   const queryClient = useQueryClient()
   const [isEditOpen, setIsEditOpen] = React.useState(false)
@@ -739,7 +747,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
         <div className="bg-transparent text-foreground shrink-0 border-b border-border/60">
           <div className="max-w-[1400px] mx-auto p-6 md:p-8 space-y-6">
             <button 
-              onClick={() => setLocation("/")}
+              onClick={() => setLocation("/projects")}
               className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-sm font-medium w-fit"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -904,13 +912,26 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
 
         {/* Project Content */}
         <div className="flex-1 p-6 md:p-8 max-w-[1400px] w-full mx-auto">
-          <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="mb-6 grid w-full grid-cols-3 md:flex md:justify-start h-auto bg-transparent gap-2 p-0">
+          <nav aria-label="Project workflow" className="mb-5 flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href={projectWorkflowHref("/invoices", project.id)}>Project invoices</Link>
+            </Button>
+            {(isAdmin || currentUser?.role === "Project Manager") && (
+              <Button size="sm" asChild>
+                <Link href={projectWorkflowHref("/invoices", project.id, { submit: "1" })}>Submit invoice</Link>
+              </Button>
+            )}
+            <Button variant="outline" size="sm" asChild>
+              <Link href={projectWorkflowHref("/messages", project.id)}>Project messages</Link>
+            </Button>
+          </nav>
+          <Tabs value={activeTab} onValueChange={selectTab} className="w-full">
+            <TabsList className="mb-6 grid w-full grid-cols-2 md:flex md:justify-start h-auto bg-transparent gap-2 p-0">
               <TabsTrigger value="overview" className="data-[state=active]:bg-card data-[state=active]:shadow border border-transparent data-[state=active]:border-border px-4 py-2">Overview</TabsTrigger>
               <TabsTrigger value="photos" className="data-[state=active]:bg-card data-[state=active]:shadow border border-transparent data-[state=active]:border-border px-4 py-2">Photos & 360s</TabsTrigger>
               <TabsTrigger value="budget" className="data-[state=active]:bg-card data-[state=active]:shadow border border-transparent data-[state=active]:border-border px-4 py-2">Budget</TabsTrigger>
-              <TabsTrigger value="trades" className="data-[state=active]:bg-card data-[state=active]:shadow border border-transparent data-[state=active]:border-border px-4 py-2 hidden md:flex">Trades</TabsTrigger>
-              <TabsTrigger value="activity" className="data-[state=active]:bg-card data-[state=active]:shadow border border-transparent data-[state=active]:border-border px-4 py-2 hidden md:flex">Activity</TabsTrigger>
+              <TabsTrigger value="trades" className="data-[state=active]:bg-card data-[state=active]:shadow border border-transparent data-[state=active]:border-border px-4 py-2">Trades</TabsTrigger>
+              <TabsTrigger value="activity" className="data-[state=active]:bg-card data-[state=active]:shadow border border-transparent data-[state=active]:border-border px-4 py-2">Activity</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="space-y-6">

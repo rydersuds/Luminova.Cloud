@@ -385,21 +385,29 @@ test.describe('navigation selection motion', () => {
     await expectStagedLanding(indicator, projects, 'up');
   });
 
-  test('uses the same staged motion in both directions in the open mobile drawer', async ({ page }) => {
+  test('closes the mobile drawer after navigation and aligns selection when reopened', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/__visual/sidebar?drawer=open');
     await expect(page.getByRole('dialog', { name: 'Main navigation' })).toBeVisible();
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe('hidden');
 
     const indicator = page.getByTestId('sidebar-selection-indicator');
     await expect(indicator).toHaveAttribute('data-animate', 'false');
     const quotes = page.getByRole('link', { name: 'Vendor Quotes' });
     await quotes.click();
-    await expectStagedLanding(indicator, quotes, 'down');
+    await expect(page.getByRole('dialog', { name: 'Main navigation' })).toHaveCount(0);
+    expect(await page.evaluate(() => document.body.style.overflow)).not.toBe('hidden');
+    await page.getByRole('button', { name: 'Open navigation' }).click();
+    await expect(quotes).toHaveAttribute('aria-current', 'page');
+    await expectIndicatorAligned(indicator, quotes);
 
     const projects = page.getByRole('link', { name: 'All Projects' });
     await projects.click();
-    await expectStagedLanding(indicator, projects, 'up');
+    await expect(page.getByRole('dialog', { name: 'Main navigation' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Open navigation' }).click();
+    await expect(projects).toHaveAttribute('aria-current', 'page');
+    await expectIndicatorAligned(indicator, projects);
     await expect(page.getByRole('dialog', { name: 'Main navigation' })).toBeVisible();
   });
 

@@ -1,4 +1,5 @@
 import * as React from "react"
+import { Link, useLocation, useSearch } from "wouter"
 import {
   useGetInvoices,
   getGetInvoicesQueryKey,
@@ -73,6 +74,10 @@ function InvoiceDetail({ invoice }: { invoice: Invoice }) {
 }
 
 export default function Invoices() {
+  const [location, setLocation] = useLocation()
+  const routeSearch = useSearch()
+  const routeQuery = React.useMemo(() => new URLSearchParams(routeSearch), [routeSearch])
+  const projectFilter = routeQuery.get("projectId") ?? ""
   const [statusFilter, setStatusFilter] = React.useState("")
   const [search, setSearch] = React.useState(() => new URLSearchParams(window.location.search).get("search") ?? "")
   const [isSubmitOpen, setIsSubmitOpen] = React.useState(false)
@@ -85,6 +90,14 @@ export default function Invoices() {
   const isAdmin = role === "Admin"
   const canSubmit = isAdmin || role === "Project Manager"
   const showLegacyInvoices = role !== undefined && role !== "Project Manager"
+
+  React.useEffect(() => {
+    if (!canSubmit || routeQuery.get("submit") !== "1") return
+    setIsSubmitOpen(true)
+    const query = new URLSearchParams(routeSearch)
+    query.delete("submit")
+    setLocation(`${location}${query.size ? `?${query}` : ""}`, { replace: true })
+  }, [canSubmit, routeQuery, routeSearch, location, setLocation])
 
   const invoicesQuery = useGetInvoices(undefined, {
     query: { queryKey: getGetInvoicesQueryKey(), enabled: showLegacyInvoices },
@@ -107,11 +120,25 @@ export default function Invoices() {
     if (canSubmit) for (const i of submissions.data ?? []) map.set(i.id, i)
     const q = search.trim().toLowerCase()
     return Array.from(map.values()).filter((i) => {
+      if (projectFilter && i.projectId !== projectFilter) return false
       if (statusFilter === "Pending" ? !isPending(i.status) : statusFilter && i.status !== statusFilter) return false
       return !q || [i.invoiceNumber, i.vendor, i.projectName, i.lineItem].some((v) => v?.toLowerCase().includes(q))
     })
-  }, [showLegacyInvoices, canSubmit, invoicesQuery.data, submissions.data, search, statusFilter])
+  }, [showLegacyInvoices, canSubmit, invoicesQuery.data, submissions.data, search, statusFilter, projectFilter])
   const invoices = rows
+  const projectOptions = React.useMemo(() => {
+    const options = new Map<string, string>()
+    if (showLegacyInvoices) for (const invoice of invoicesQuery.data ?? []) options.set(invoice.projectId, invoice.projectName)
+    for (const project of projectsQuery.data ?? []) options.set(project.id, project.name)
+    if (projectFilter && !options.has(projectFilter)) options.set(projectFilter, "Selected project")
+    return Array.from(options, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+  }, [showLegacyInvoices, invoicesQuery.data, projectsQuery.data, projectFilter])
+  const selectProjectFilter = (id: string) => {
+    const query = new URLSearchParams(routeSearch)
+    if (id) query.set("projectId", id)
+    else query.delete("projectId")
+    setLocation(`${location}${query.size ? `?${query}` : ""}`)
+  }
 
   const handleSubmitted = (invoice: Invoice) => {
     setResult(invoice)
@@ -173,7 +200,7 @@ export default function Invoices() {
                   ) : (projectsQuery.data ?? []).length === 0 ? (
                     <p className="py-6 text-sm text-muted-foreground">No projects are available for invoice submission.</p>
                   ) : (
-                    <InvoiceUploadForm projects={projectsQuery.data ?? []} onSubmitted={handleSubmitted} onLockChange={setFormLocked} />
+                    <InvoiceUploadForm projects={projectsQuery.data ?? []} initialProjectId={projectFilter} onSubmitted={handleSubmitted} onLockChange={setFormLocked} />
                   )}
                 </DialogContent>
               </Dialog>
@@ -210,7 +237,17 @@ export default function Invoices() {
             </section>
           )}
 
-          {isAdmin && (
+          {projectFilter && (
+            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card/60 p-3 text-sm" data-testid="invoice-project-context">
+              <span>Invoices for <strong>{projectOptions.find(project => project.id === projectFilter)?.name}</strong></span>
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/projects/${encodeURIComponent(projectFilter)}?tab=budget`}>Back to project budget</Link>
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => selectProjectFilter("")}>View all projects</Button>
+            </div>
+          )}
+
+          {isAdmin && !projectFilter && (
           <FinancialSummary
               data={financialSummary.data}
               isLoading={financialSummary.isLoading}
@@ -226,6 +263,11 @@ export default function Invoices() {
 
           <div className="flex flex-col gap-4 bg-card p-4 rounded-lg border border-border sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+              <select aria-label="Filter invoices by project" value={projectFilter} onChange={event => selectProjectFilter(event.target.value)}
+                className="h-9 w-full max-w-full rounded-md border border-input bg-background px-3 text-sm sm:w-48" data-testid="filter-invoice-project">
+                <option value="">All projects</option>
+                {projectOptions.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
+              </select>
               <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search invoice or vendor..." className="pl-9 bg-background" />
