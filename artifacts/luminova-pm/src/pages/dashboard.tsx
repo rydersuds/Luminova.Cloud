@@ -599,29 +599,13 @@ export default function Dashboard() {
 
           <ProjectStage projects={projects} loading={loadingProjects} />
 
-          {/* Operational readout — values straight from the dashboard summary */}
+          {/* Summary errors affect the internal budget and activity feed. */}
           {dashboardSummary.isError && (
             <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
               <span>Dashboard metrics and activity are unavailable.</span>
               <Button variant="outline" size="sm" disabled={dashboardSummary.isFetching} onClick={() => void dashboardSummary.refetch()}>Retry dashboard metrics</Button>
             </div>
           )}
-          <section aria-label="Operational summary" className="hud-readout grid grid-cols-2 lg:grid-cols-4">
-            {[
-              { id: "active-projects", label: "Active projects", description: "Projects marked Active or In progress.", value: summary?.activeProjects, href: "/projects" },
-              { id: "awaiting-approval", label: "Awaiting approval", description: "Invoices pending approval in your visible projects.", value: summary?.awaitingApproval, href: "/invoices" },
-              { id: "unread-messages", label: "Unread messages", description: "Read receipts are not tracked yet; this is not a zero count.", value: summary?.unreadMessages, href: "/messages", unsupported: summary?.unreadMessages === null },
-              { id: "new-360-photos", label: "360° uploads · 7 days", description: "Panoramas uploaded in the last seven days, regardless of capture date.", value: summary?.new360Photos, href: "/projects" },
-            ].map((item) => (
-              <Link key={item.id} href={item.href} title={item.description} data-testid={`readout-${item.id}`} className="hud-readout-cell group">
-                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{item.label}</span>
-                <span className={cn("mt-2 block font-heading font-extrabold tabular-nums tracking-tight text-foreground group-hover:text-primary", item.unsupported || dashboardSummary.isError ? "text-lg" : "text-3xl sm:text-4xl")}>
-                  {loadingSummary ? <span className="skeleton-line inline-block h-8 w-12 align-middle" /> : dashboardSummary.isError ? "Unavailable" : item.unsupported ? "Not tracked" : finiteAmount(item.value) ?? "Unavailable"}
-                </span>
-              </Link>
-            ))}
-          </section>
-
           {/* Financial overview */}
           <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
             <p>All-time totals for projects you can access. Refreshes every minute.</p>

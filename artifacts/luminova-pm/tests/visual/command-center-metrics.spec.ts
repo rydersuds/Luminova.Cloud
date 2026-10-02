@@ -30,11 +30,8 @@ test('Command Center labels and amounts reflect their actual financial basis', a
   await page.route('**/api/invoices/summary', route => route.fulfill({ json: financials }));
   await page.goto('/__visual/dashboard-cards');
 
-  await expect(page.getByTestId('readout-active-projects')).toContainText('3');
-  await expect(page.getByTestId('readout-awaiting-approval')).toContainText('2');
-  await expect(page.getByTestId('readout-unread-messages')).toContainText('Not tracked');
-  await expect(page.getByTestId('readout-new-360-photos')).toContainText('360° uploads · 7 days');
-  await expect(page.getByTestId('readout-new-360-photos')).toContainText('4');
+  await expect(page.getByRole('region', { name: 'Operational summary' })).toHaveCount(0);
+  await expect(page.locator('[data-testid^="readout-"]')).toHaveCount(0);
 
   const overview = page.getByRole('region', { name: 'Financial overview' });
   for (const [label, amount] of [
@@ -53,7 +50,7 @@ test('Command Center labels and amounts reflect their actual financial basis', a
   await expect(page.getByRole('link', { name: 'View projects', exact: true })).toHaveAttribute('href', '/projects');
 });
 
-test('Command Center distinguishes verified zero totals from unsupported metrics', async ({ page }) => {
+test('Command Center keeps verified zero financial totals visible', async ({ page }) => {
   await installWorkspace(page);
   await page.route('**/api/dashboard/summary', route => route.fulfill({
     json: { ...dashboard, activeProjects: 0, awaitingApproval: 0, new360Photos: 0, budgeted: 0, invoiced: 0, recentActivity: [] },
@@ -63,7 +60,6 @@ test('Command Center distinguishes verified zero totals from unsupported metrics
   }));
   await page.goto('/__visual/dashboard-cards');
   await expect(page.getByRole('region', { name: 'Financial overview' }).getByText('$0.00', { exact: true })).toHaveCount(6);
-  await expect(page.getByTestId('readout-unread-messages')).toContainText('Not tracked');
   await expect(page.getByText('No recorded project activity yet.', { exact: true })).toBeVisible();
 });
 
@@ -78,13 +74,13 @@ test('failed Command Center totals stay explicit and recover through retry', asy
   ));
   await page.goto('/__visual/dashboard-cards');
   await expect(page.getByText('Dashboard metrics and activity are unavailable.', { exact: true })).toBeVisible();
-  await expect(page.getByTestId('readout-active-projects')).toContainText('Unavailable');
+  await expect(page.getByRole('region', { name: 'Financial overview' }).locator('.ledger-cell').filter({ has: page.getByText('Internal Cost Budget', { exact: true }) })).toContainText('Unavailable');
   await expect(page.getByText('Financial totals are unavailable.', { exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Financial overview' })).not.toContainText('$NaN');
   available = true;
   await page.getByRole('button', { name: 'Retry dashboard metrics' }).click();
   await page.getByRole('button', { name: 'Retry financial totals' }).click();
-  await expect(page.getByTestId('readout-active-projects')).toContainText('3');
+  await expect(page.getByRole('region', { name: 'Financial overview' }).locator('.ledger-cell').filter({ has: page.getByText('Internal Cost Budget', { exact: true }) })).toContainText('$100,000');
   await expect(page.getByRole('region', { name: 'Financial overview' })).toContainText('$120,000');
   await expect(page.getByText('Dashboard metrics and activity are unavailable.', { exact: true })).toHaveCount(0);
 });
