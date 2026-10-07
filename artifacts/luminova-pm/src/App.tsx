@@ -427,7 +427,7 @@ function App() {
         appearance={{
           theme: shadcn,
           cssLayerName: "clerk",
-          variables: { colorPrimary: "#d2aa3e", colorBackground: "#171b25", colorForeground: "#edf2f7", colorInput: "#202737", colorInputForeground: "#edf2f7", colorMutedForeground: "#9aa7b8", colorNeutral: "#344052", fontFamily: "Plus Jakarta Sans", borderRadius: "0.75rem" },
+          variables: { colorPrimary: "#d2aa3e", colorBackground: "#171b25", colorForeground: "#edf2f7", colorInput: "#202737", colorInputForeground: "#edf2f7", colorMutedForeground: "#9aa7b8", colorNeutral: "#edf2f7", fontFamily: "Plus Jakarta Sans", borderRadius: "0.75rem" },
           options: { logoImageUrl: `${window.location.origin}${basePath}/luminova-logo.png`, logoPlacement: "inside" },
           elements: { rootBox: "w-full flex justify-center", cardBox: "bg-[#171b25] w-[440px] max-w-full overflow-hidden", card: "!shadow-none !border !border-[#344052] !bg-transparent", footer: "!bg-transparent", formButtonPrimary: "!bg-[#d2aa3e] !text-[#171b25] hover:!bg-[#e0bb55]" },
         }}

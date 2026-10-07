@@ -31,11 +31,11 @@ export default function Login() {
 
   return (
     <AuthShell showRemember>
-      <form onSubmit={continueToSignIn} className="surface-3d mx-auto w-full max-w-[440px] border-sidebar-border bg-sidebar-accent/55 px-7 py-8 text-sidebar-foreground shadow-2xl sm:px-8">
+      <form onSubmit={continueToSignIn} className="mx-auto w-full max-w-[440px] rounded-xl border border-sidebar-border bg-sidebar px-7 py-8 text-sidebar-foreground shadow-2xl sm:px-8">
         <div className="mb-7 text-center">
           <p className="mb-3 font-mono text-[10px] uppercase tracking-[.2em] text-primary">Access protocol</p>
           <h2 className="text-xl font-semibold">Continue to secure sign in</h2>
-          <p className="mt-1 text-sm text-sidebar-foreground/55">Review and accept the workspace policies first</p>
+          <p className="mt-1 text-sm text-sidebar-foreground/75">Review and accept the workspace policies first</p>
         </div>
 
         <div className="flex items-start gap-3">
@@ -64,7 +64,7 @@ export default function Login() {
         <button
           type="submit"
           disabled={!consentAccepted}
-          className="tech-clip mt-6 flex h-11 w-full items-center justify-center bg-primary font-semibold text-primary-foreground transition-[transform,background-color] hover:-translate-y-0.5 hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="tech-clip mt-6 flex h-11 w-full items-center justify-center bg-primary font-semibold text-primary-foreground transition-[transform,background-color] enabled:hover:-translate-y-0.5 enabled:hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
         >
           Continue to sign in
         </button>
@@ -106,7 +106,7 @@ function AuthShell({ children, showRemember = false }: { children: React.ReactNo
 
   return (
     <div
-      className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-sidebar bg-tech-grid-soft p-4"
+      className="dark relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-sidebar bg-tech-grid-soft p-4"
       onPointerDownCapture={warmIntro}
       onFocusCapture={warmIntro}
     >
@@ -136,7 +136,7 @@ function AuthShell({ children, showRemember = false }: { children: React.ReactNo
           </label>
         )}
 
-        <p className="text-center text-xs text-sidebar-foreground/40 font-medium">
+        <p className="text-center text-xs text-sidebar-foreground/65 font-medium">
           © {new Date().getFullYear()} Luminova Construction. All rights reserved.
         </p>
       </div>
