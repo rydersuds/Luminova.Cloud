@@ -67,6 +67,40 @@ async function installIdentity(page: Page) {
   await page.route('**/api/invoice-projects', route => route.fulfill({ json: [] }));
 }
 
+test('stacks financial totals when two cards would squeeze the amounts', async ({ page }) => {
+  await page.setViewportSize({ width: 1000, height: 900 });
+  await loadFinancials(page, {
+    invoicedRevenue: 1250000000,
+    invoicedExpenses: 485000000,
+    acceptedClientQuoteValue: 2000000000,
+    upcomingClientPayments: 750000000,
+  });
+
+  const summary = page.getByRole('region', { name: 'Portfolio financial summary' });
+  await expect(summary.getByText('$1,250,000,000.00', { exact: true })).toBeVisible();
+  for (const width of [1000, 700, 390, 1600]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect.poll(() => summary.evaluate(element => {
+      const amounts = Array.from(element.querySelectorAll('[data-financial-amount]'));
+      const minimum = Math.max(104, ...amounts.map(amount => Math.ceil(amount.getBoundingClientRect().width) + 104));
+      const canFitTwo = element.clientWidth >= minimum * 2 + 16;
+      const columns = getComputedStyle(element).gridTemplateColumns.split(' ').length;
+      return columns === (canFitTwo ? 2 : 1) && element.scrollWidth <= element.clientWidth;
+    })).toBe(true);
+    const amount = summary.getByText('$1,250,000,000.00', { exact: true });
+    expect(await amount.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  }
+  await page.route('**/api/invoices/summary', route => route.fulfill({
+    json: { invoicedRevenue: 100, invoicedExpenses: 50, acceptedClientQuoteValue: 200, upcomingClientPayments: 100 },
+  }));
+  await page.setViewportSize({ width: 1000, height: 900 });
+  await page.reload();
+  await expect(summary.getByText('$100.00', { exact: true })).toHaveCount(2);
+  await expect.poll(() => summary.evaluate(element =>
+    getComputedStyle(element).gridTemplateColumns.split(' ').length,
+  )).toBe(2);
+});
+
 test('keeps client and vendor invoice identities distinct across responsive layouts', async ({ page }) => {
   await page.route('**/broken-client-logo.svg', (route) => route.fulfill({ status: 404, body: '' }));
   await loadFinancials(page, {

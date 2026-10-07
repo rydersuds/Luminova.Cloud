@@ -109,6 +109,22 @@ test('renders approved logos and initials for missing or failed vendor photos', 
   await expect(page.getByRole('img', { name: 'Broken Image Plumbing profile logo' })).toHaveCount(0);
 });
 
+test('vendor Message action opens contact email and is disabled when none is recorded', async ({ page }) => {
+  let email = '';
+  await page.route('**/api/trades/trade-logo', route => route.fulfill({
+    json: {
+      ...trades[0], email, phone: '', website: '', licence: '', insurance: '', insuranceExpiry: '',
+      regions: ['Calgary'], sourceNotes: '', jobHistory: [], reviews: [], bids: [],
+    },
+  }));
+  await page.route('**/api/projects', route => route.fulfill({ json: [] }));
+  await page.goto('/__visual/trade-detail');
+  await expect(page.getByRole('button', { name: 'Message', exact: true })).toBeDisabled();
+  email = 'office@northline.example';
+  await page.reload();
+  await expect(page.getByRole('link', { name: 'Message', exact: true })).toHaveAttribute('href', `mailto:${email}`);
+});
+
 test('falls back to initials on the vendor detail page when a private photo fails', async ({ page }) => {
   await page.route('**/api/trades/trade-logo', route => route.fulfill({
     json: {

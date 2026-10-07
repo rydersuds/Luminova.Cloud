@@ -99,6 +99,38 @@ test.describe('Messages Interface', () => {
     });
   });
 
+  test('participant picker survives responsive resizing without browser runtime errors', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.addInitScript(() => {
+      const target = window as typeof window & { __runtimeErrors: string[] };
+      target.__runtimeErrors = [];
+      window.addEventListener('error', event => target.__runtimeErrors.push(event.message));
+      window.addEventListener('unhandledrejection', event => target.__runtimeErrors.push(String(event.reason)));
+    });
+    const participants = Array.from({ length: 80 }, (_, index) => ({
+      id: `member-${index}`, name: `Team member ${index}`, email: `member${index}@example.com`, imageUrl: '', role: 'Project Manager',
+    }));
+    await page.route('**/api/conversations/options', route => route.fulfill({ json: { currentUserId: 'me', participants, projects: [] } }));
+    await page.goto('/__visual/messages');
+    await page.getByTestId('button-new-conversation').click();
+    await page.getByTestId('button-select-participants').click();
+    for (const search of ['Team', 'Team member 1', 'nothing matches', '']) {
+      await page.getByTestId('input-search-participants').fill(search);
+      await page.waitForTimeout(250);
+    }
+    for (const width of [1000, 700, 390, 1280]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.waitForTimeout(250);
+      await expect(page.getByTestId('input-search-participants')).toBeVisible();
+    }
+    expect(await page.evaluate(() => (window as typeof window & { __runtimeErrors: string[] }).__runtimeErrors)).toEqual([]);
+    await page.getByTestId('item-participant-member-1').click();
+    await expect(page.getByTestId('tag-participant-member-1')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('input-search-participants')).toHaveCount(0);
+  });
+
   test('project context opens only the matching channels and keeps drafts with their conversation', async ({ page }) => {
     await page.goto('/__visual/messages?projectId=downtown');
     await expect(page.getByTestId('messages-project-context')).toContainText('Downtown Office Reno');

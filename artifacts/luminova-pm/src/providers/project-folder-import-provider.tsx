@@ -477,7 +477,10 @@ export function ProjectFolderImportProvider({
           if (!cancelled) await startFolderImport()
         } else {
           setFolderStatus("error")
-          setFolderError(session.error || "Select only the missing files to continue this import.")
+          const uploadedPaths = new Set(session.uploadedPaths)
+          const missingFiles = session.documents.filter((document) => !uploadedPaths.has(document.relativePath)).length
+          const missingSummary = missingFiles === 1 ? "1 file still needs to be uploaded." : `${missingFiles} files still need to be uploaded.`
+          setFolderError(session.error || `${missingFiles > 0 ? `${missingSummary} ` : ""}Select only the missing files to continue this import.`)
         }
       } catch (error) {
         if (!cancelled) {

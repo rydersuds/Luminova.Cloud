@@ -25,3 +25,6 @@
 - [Invoice purchase policy](invoice-purchase-policy.md) — approve against remaining trade budgets; excess needs external leadership contact, not in-app approval or payment.
 - [Authentication contrast](authentication-contrast.md) — auth stays dark independently of workspace theme; Clerk neutral colours affect social-button text.
 - [Filter presentation](filter-presentation.md) — browsing filters belong behind a Filters button, with search directly available and active selections apparent.
+- [Popup resize loops](popup-resize-loops.md) — frame-based popup positioning avoids native resize feedback; capture raw window errors in resizing regressions.
+- [Vendor contact actions](vendor-contact-actions.md) — contact directory vendors by recorded email; never guess a workspace chat identity from vendor details.
+- [Financial figure layouts](financial-figure-layouts.md) — use two per row when complete amounts fit; stack only when needed in Financials and Command Center.

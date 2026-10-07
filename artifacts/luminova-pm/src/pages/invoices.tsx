@@ -26,6 +26,7 @@ import { formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
 import { ClientIdentity } from "@/components/client-identity"
 import { InvoiceUploadForm } from "@/components/invoice-upload-form"
+import { FinancialFiguresGrid } from "@/components/financial-figures-grid"
 
 const isPending = (status: string) => status.toLowerCase().startsWith("pending")
 
@@ -438,7 +439,7 @@ function FinancialSummary({
 }) {
   if (isLoading) {
     return (
-      <section aria-label="Portfolio financial summary" aria-busy="true" className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <section aria-label="Portfolio financial summary" aria-busy="true" className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, max(28rem, calc(50% - 0.5rem))), 1fr))" }}>
         {Array.from({ length: 4 }).map((_, index) => (
           <Card key={index} className="h-36 animate-pulse border-border/60 bg-muted/30" />
         ))}
@@ -495,14 +496,14 @@ function FinancialSummary({
   ]
 
   return (
-    <section aria-label="Portfolio financial summary" className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <FinancialFiguresGrid aria-label="Portfolio financial summary" className="gap-4" amountAllowance={104}>
       {cards.map(({ label, value, detail, icon: Icon, accent }) => (
         <Card key={label} className="border-border/60 bg-card/80">
           <CardContent className="p-5">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0">
                 <p className="break-words font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
-                <p className="mt-3 break-words text-2xl font-extrabold tabular-nums sm:text-3xl">{formatCurrency(value)}</p>
+                <p className="mt-3 text-2xl font-extrabold tabular-nums sm:text-3xl"><span data-financial-amount className="inline-block whitespace-nowrap">{formatCurrency(value)}</span></p>
               </div>
               <div className={`flex h-10 w-10 shrink-0 items-center justify-center ${accent}`}>
                 <Icon className="h-5 w-5" />
@@ -512,6 +513,6 @@ function FinancialSummary({
           </CardContent>
         </Card>
       ))}
-    </section>
+    </FinancialFiguresGrid>
   )
 }

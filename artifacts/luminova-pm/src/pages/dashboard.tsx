@@ -31,6 +31,7 @@ import { GlobalSearch } from "@/components/global-search"
 import { ClientIdentity } from "@/components/client-identity"
 import { ProjectCard } from "@/components/workspace/project-card"
 import { ProjectStage } from "@/components/workspace/project-stage"
+import { FinancialFiguresGrid } from "@/components/financial-figures-grid"
 
 // Strict validation schema, zero defaults
 const projectSchema = z.object({
@@ -616,9 +617,9 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-          <section aria-label="Financial overview" className="ledger grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+          <FinancialFiguresGrid aria-label="Financial overview" className="ledger" amountAllowance={50}>
             {financialCards.map(({ label, description, value, icon: Icon, accent, loading }, index) => (
-              <Card key={label} className="ledger-cell group rounded-none border-0 shadow-none">
+              <Card key={label} className="ledger-cell group min-w-0 rounded-none border-0 shadow-none">
                 <CardContent className="p-5 sm:p-6">
                   <div className="flex min-h-24 flex-col justify-between">
                     <div className="mb-4 flex items-center justify-between gap-4">
@@ -627,15 +628,15 @@ export default function Dashboard() {
                         <Icon className="h-5 w-5 drop-shadow-sm" />
                       </div>
                     </div>
-                    <p className="break-words font-heading text-3xl font-extrabold tabular-nums tracking-[-0.03em] text-foreground sm:text-[2.1rem]">
-                      {loading ? "—" : value === undefined ? "Unavailable" : formatCurrency(value)}
+                    <p className="font-heading text-3xl font-extrabold tabular-nums tracking-[-0.03em] text-foreground sm:text-[2.1rem]">
+                      <span data-financial-amount className="inline-block whitespace-nowrap">{loading ? "—" : value === undefined ? "Unavailable" : formatCurrency(value)}</span>
                     </p>
                     <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{description}</p>
                   </div>
                 </CardContent>
               </Card>
             ))}
-          </section>
+          </FinancialFiguresGrid>
 
           {/* Main Panels */}
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] gap-6 md:gap-8">

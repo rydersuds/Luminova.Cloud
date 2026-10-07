@@ -50,6 +50,39 @@ test('Command Center labels and amounts reflect their actual financial basis', a
   await expect(page.getByRole('link', { name: 'View projects', exact: true })).toHaveAttribute('href', '/projects');
 });
 
+test('Command Center stacks financial figures when space is tight', async ({ page }) => {
+  await installWorkspace(page);
+  await page.route('**/api/dashboard/summary', route => route.fulfill({ json: dashboard }));
+  await page.route('**/api/invoices/summary', route => route.fulfill({
+    json: { ...financials, invoicedRevenue: 1250000000 },
+  }));
+  await page.goto('/__visual/dashboard-cards');
+
+  const overview = page.getByRole('region', { name: 'Financial overview' });
+  const amount = overview.getByText('$1,250,000,000.00', { exact: true });
+  await expect(amount).toBeVisible();
+  for (const width of [1000, 700, 390, 1600]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect.poll(() => overview.evaluate(element => {
+      const amounts = Array.from(element.querySelectorAll('[data-financial-amount]'));
+      const minimum = Math.max(50, ...amounts.map(amount => Math.ceil(amount.getBoundingClientRect().width) + 50));
+      const canFitTwo = element.clientWidth >= minimum * 2 + 1;
+      const columns = getComputedStyle(element).gridTemplateColumns.split(' ').length;
+      return columns === (canFitTwo ? 2 : 1) && element.scrollWidth <= element.clientWidth;
+    })).toBe(true);
+    expect(await amount.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  }
+  await page.route('**/api/invoices/summary', route => route.fulfill({
+    json: { ...financials, invoicedRevenue: 100, invoicedExpenses: 50, upcomingClientPayments: 100 },
+  }));
+  await page.setViewportSize({ width: 1000, height: 900 });
+  await page.reload();
+  await expect(overview.getByText('$100.00', { exact: true })).toHaveCount(2);
+  await expect.poll(() => overview.evaluate(element =>
+    getComputedStyle(element).gridTemplateColumns.split(' ').length,
+  )).toBe(2);
+});
+
 test('Command Center keeps verified zero financial totals visible', async ({ page }) => {
   await installWorkspace(page);
   await page.route('**/api/dashboard/summary', route => route.fulfill({

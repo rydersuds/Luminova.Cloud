@@ -430,10 +430,19 @@ export default function TradeDetail(_props: { tradeIdOverride?: string; params?:
                   Edit Profile
                 </Button>
                 <Button className="w-full" onClick={() => setLocation(`/quotes?vendorId=${trade.id}`)}>View Vendor Quotes</Button>
-                <Button variant="outline" className="w-full gap-2">
-                  <MessageSquare className="h-4 w-4" />
-                  Message
-                </Button>
+                {trade.email?.trim() ? (
+                  <Button variant="outline" className="w-full gap-2" asChild>
+                    <a href={`mailto:${trade.email.trim()}`} title={`Email ${trade.companyName}`}>
+                      <MessageSquare className="h-4 w-4" />
+                      Message
+                    </a>
+                  </Button>
+                ) : (
+                  <Button variant="outline" className="w-full gap-2" disabled title="Add a contact email to message this vendor.">
+                    <MessageSquare className="h-4 w-4" />
+                    Message
+                  </Button>
+                )}
               </div>
             </div>
           </div>
