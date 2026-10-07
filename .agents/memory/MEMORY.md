@@ -24,3 +24,4 @@
 - [Project visual direction](project-visual-direction.md) — approved photo-led style; prioritize compact project browsing and consistent dashboard/catalog cards.
 - [Invoice purchase policy](invoice-purchase-policy.md) — approve against remaining trade budgets; excess needs external leadership contact, not in-app approval or payment.
 - [Authentication contrast](authentication-contrast.md) — auth stays dark independently of workspace theme; Clerk neutral colours affect social-button text.
+- [Filter presentation](filter-presentation.md) — browsing filters belong behind a Filters button, with search directly available and active selections apparent.

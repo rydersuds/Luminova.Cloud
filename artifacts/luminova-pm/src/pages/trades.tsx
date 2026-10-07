@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { VendorIdentity } from "@/components/vendor-identity"
-import { Search, MapPin, Star, Filter, ArrowRight } from "lucide-react"
+import { Search, MapPin, Star, ArrowRight } from "lucide-react"
+import { FilterField, FilterMenu } from "@/components/filter-menu"
 
 export default function TradesDirectory() {
   const [, setLocation] = useLocation()
@@ -61,17 +62,18 @@ export default function TradesDirectory() {
                   className="h-12 border-input bg-card pl-10 text-foreground placeholder:text-muted-foreground dark:border-sidebar-border dark:bg-sidebar-accent dark:text-sidebar-foreground dark:placeholder:text-sidebar-foreground/50"
                 />
               </div>
-              <div className="relative w-full sm:w-64">
-                <Filter className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground dark:text-sidebar-foreground/50" />
+              <FilterMenu activeCount={tradeType ? 1 : 0} onClear={() => setTradeType("")}>
+                <FilterField label="Trade specialty">
                 <select
                   value={tradeType}
                   onChange={(e) => setTradeType(e.target.value)}
-                  className="h-12 w-full appearance-none rounded-md border border-input bg-card pl-10 pr-4 text-foreground focus:outline-none focus:ring-1 focus:ring-ring dark:border-sidebar-border dark:bg-sidebar-accent dark:text-sidebar-foreground dark:focus:ring-sidebar-primary"
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 >
                   <option value="">All Trades</option>
                   {specialtyOptions.map((specialty) => <option key={specialty} value={specialty}>{specialty}</option>)}
                 </select>
-              </div>
+                </FilterField>
+              </FilterMenu>
             </div>
             </div>
           </div>

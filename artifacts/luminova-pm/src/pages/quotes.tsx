@@ -18,11 +18,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { FilterField, FilterMenu } from "@/components/filter-menu"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
 import { cn, formatCurrency, formatDateOnly, getStatusColor } from "@/lib/utils"
-import { Building2, CalendarClock, ExternalLink, FilePenLine, FileText, FolderKanban, Layers3, Plus, RefreshCw, Search, Trash2, Users, X } from "lucide-react"
+import { Building2, CalendarClock, ExternalLink, FilePenLine, FileText, FolderKanban, Layers3, Plus, RefreshCw, Search, Trash2, Users } from "lucide-react"
 
 const STATUSES: VendorQuoteStatus[] = ["Draft", "Requested", "Received", "Under review", "Accepted", "Declined", "Expired"]
 type GroupMode = "all" | "project" | "vendor" | "trade"
@@ -76,7 +77,6 @@ export default function Quotes() {
   const dueSoon = quotes.filter((quote) => !["Accepted", "Declined", "Expired"].includes(quote.status) && quote.dueDate >= today() && quote.dueDate <= dueSoonCutoff).length
 
   const clearFilters = () => {
-    setSearch("")
     setProjectId("")
     setVendorId("")
     setTrade("")
@@ -140,22 +140,23 @@ export default function Quotes() {
           )}
 
           <section className="glass-panel tech-border space-y-4 p-4 sm:p-5">
-            <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(220px,1fr)_repeat(4,170px)_auto]">
-              <div className="relative">
+            <div className="flex items-center gap-3">
+              <div className="relative min-w-0 flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Quote, project, vendor, notes" className="bg-background/70 pl-9" />
               </div>
-              <FilterSelect value={projectId} onChange={setProjectId} label="All projects" options={projects?.map((project) => [project.id, project.name]) ?? []} />
-              <FilterSelect value={vendorId} onChange={setVendorId} label="All vendors" options={vendors?.map((vendor) => [vendor.id, vendor.companyName]) ?? []} />
-              <FilterSelect value={trade} onChange={setTrade} label="All trades" options={tradeOptions.map((item) => [item, item])} />
-              <FilterSelect value={status} onChange={(value) => setStatus(value as VendorQuoteStatus | "")} label="All statuses" options={STATUSES.map((item) => [item, item])} />
-              <Button variant="outline" onClick={clearFilters} className="gap-2"><X className="h-4 w-4" /> Clear</Button>
-            </div>
+              <FilterMenu activeCount={[projectId, vendorId, trade, status].filter(Boolean).length} onClear={clearFilters}>
+                <FilterField label="Project"><FilterSelect value={projectId} onChange={setProjectId} label="All projects" options={projects?.map((project) => [project.id, project.name]) ?? []} /></FilterField>
+                <FilterField label="Vendor"><FilterSelect value={vendorId} onChange={setVendorId} label="All vendors" options={vendors?.map((vendor) => [vendor.id, vendor.companyName]) ?? []} /></FilterField>
+                <FilterField label="Trade"><FilterSelect value={trade} onChange={setTrade} label="All trades" options={tradeOptions.map((item) => [item, item])} /></FilterField>
+                <FilterField label="Status"><FilterSelect value={status} onChange={(value) => setStatus(value as VendorQuoteStatus | "")} label="All statuses" options={STATUSES.map((item) => [item, item])} /></FilterField>
             <div className="flex flex-wrap items-center gap-2 border-t border-border/50 pt-4">
               <span className="mr-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Organize by</span>
               {(["all", "project", "vendor", "trade"] as GroupMode[]).map((mode) => (
                 <Button key={mode} size="sm" variant={groupMode === mode ? "default" : "outline"} onClick={() => setGroupMode(mode)} className="capitalize">{mode === "all" ? "Complete list" : mode}</Button>
               ))}
+            </div>
+              </FilterMenu>
             </div>
           </section>
 

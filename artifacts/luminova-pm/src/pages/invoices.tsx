@@ -20,7 +20,8 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Filter, AlertTriangle, Search, Plus, ArrowUpRight, ArrowDownRight, Clock3, RefreshCw, Paperclip, CheckCircle2 } from "lucide-react"
+import { AlertTriangle, Search, Plus, ArrowUpRight, ArrowDownRight, Clock3, RefreshCw, Paperclip, CheckCircle2 } from "lucide-react"
+import { FilterField, FilterMenu } from "@/components/filter-menu"
 import { formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
 import { ClientIdentity } from "@/components/client-identity"
@@ -263,21 +264,23 @@ export default function Invoices() {
 
           <div className="flex flex-col gap-4 bg-card p-4 rounded-lg border border-border sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
-              <select aria-label="Filter invoices by project" value={projectFilter} onChange={event => selectProjectFilter(event.target.value)}
-                className="h-9 w-full max-w-full rounded-md border border-input bg-background px-3 text-sm sm:w-48" data-testid="filter-invoice-project">
-                <option value="">All projects</option>
-                {projectOptions.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
-              </select>
               <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search invoice or vendor..." className="pl-9 bg-background" />
               </div>
-              <div className="relative w-full sm:w-auto">
-                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <FilterMenu activeCount={[projectFilter, statusFilter].filter(Boolean).length} onClear={() => { selectProjectFilter(""); setStatusFilter("") }}>
+                <FilterField label="Project">
+                  <select aria-label="Filter invoices by project" value={projectFilter} onChange={event => selectProjectFilter(event.target.value)}
+                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" data-testid="filter-invoice-project">
+                    <option value="">All projects</option>
+                    {projectOptions.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
+                  </select>
+                </FilterField>
+                <FilterField label="Status">
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="h-9 w-full appearance-none rounded-md border border-input bg-background pl-9 pr-8 text-sm focus:outline-none focus:ring-1 focus:ring-ring sm:w-auto"
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                 >
                   <option value="">All Statuses</option>
                   <option value="Pending">Pending approval</option>
@@ -285,7 +288,8 @@ export default function Invoices() {
                   <option value="Approved">Approved</option>
                   <option value="Paid">Paid</option>
                 </select>
-              </div>
+                </FilterField>
+              </FilterMenu>
             </div>
             
             {pendingCount > 0 && (

@@ -63,6 +63,8 @@ test.describe('All Projects region filter', () => {
 
     await page.goto('/__visual/project-cards');
     await expect(page.getByText(/\d+ days remaining/, { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Project region' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Filters', exact: true }).click();
 
     const regionFilter = page.getByRole('combobox', { name: 'Project region' });
     await expect(regionFilter.locator('option')).toHaveText(['All regions', 'Calgary', 'Red Deer']);
@@ -78,5 +80,19 @@ test.describe('All Projects region filter', () => {
       url.includes('status=Planning') && url.includes('region=Red+Deer')
     ))).toBe(true);
     await expect.poll(() => requestUrls.filter((url) => url === '/api/projects').length).toBeGreaterThan(0);
+    await expect(page.getByLabel('2 active filters')).toBeVisible();
+    await page.getByRole('button', { name: 'Done', exact: true }).click();
+    await expect(regionFilter).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Red Deer Civic Centre' })).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole('button', { name: 'Filters', exact: true }).click();
+    await expect(regionFilter).toHaveValue('Red Deer');
+    await expect(page.getByRole('dialog', { name: 'Filters', exact: true })).toBeInViewport();
+    await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Calgary Tower Renewal' })).toBeVisible();
+    await expect(page.getByLabel('2 active filters')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(regionFilter).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Filters', exact: true })).toBeFocused();
   });
 });

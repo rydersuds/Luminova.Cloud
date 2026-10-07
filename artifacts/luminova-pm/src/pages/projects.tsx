@@ -4,9 +4,9 @@ import {
   getGetProjectsQueryKey,
   useGetProjects,
 } from "@workspace/api-client-react"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Building2, Grid2X2, List, Search, SlidersHorizontal, X } from "lucide-react"
+import { Building2, Grid2X2, List, Search } from "lucide-react"
+import { FilterField, FilterMenu } from "@/components/filter-menu"
 import { ProjectCard } from "@/components/workspace/project-card"
 
 const STATUSES = ["Pre-construction", "Planning", "Active", "In progress", "On hold", "Completed", "Rejected for bid"]
@@ -64,12 +64,11 @@ export default function Projects() {
   }, [allProjects, client, clientOptions])
 
   const clearFilters = () => {
-    setSearch("")
     setStatus("")
     setRegion("")
     setClient("")
   }
-  const hasFilters = Boolean(search || status || region || client)
+  const activeFilterCount = [status, region, client].filter(Boolean).length
 
   return (
     <>
@@ -90,12 +89,8 @@ export default function Projects() {
           </header>
 
           <section className="filter-dock p-4 sm:p-5">
-            <div className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              <SlidersHorizontal className="h-4 w-4 text-primary" />
-              Filter projects
-            </div>
-            <div className="grid gap-3 xl:grid-cols-[minmax(220px,1fr)_200px_200px_220px_auto]">
-              <div className="relative">
+            <div className="flex items-center gap-3">
+              <div className="relative min-w-0 flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={search}
@@ -104,7 +99,8 @@ export default function Projects() {
                   className="bg-background/70 pl-9"
                 />
               </div>
-              <select
+              <FilterMenu activeCount={activeFilterCount} onClear={clearFilters}>
+              <FilterField label="Status"><select
                 value={status}
                 onChange={(event) => setStatus(event.target.value)}
                 aria-label="Project status"
@@ -112,8 +108,8 @@ export default function Projects() {
               >
                 <option value="">All statuses</option>
                 {STATUSES.map((item) => <option key={item} value={item}>{item}</option>)}
-              </select>
-              <select
+              </select></FilterField>
+              <FilterField label="Region"><select
                 value={region}
                 onChange={(event) => setRegion(event.target.value)}
                 aria-label="Project region"
@@ -122,8 +118,8 @@ export default function Projects() {
               >
                 <option value="">All regions</option>
                 {regionOptions.map((item) => <option key={item} value={item}>{item}</option>)}
-              </select>
-              <select
+              </select></FilterField>
+              <FilterField label="Client"><select
                 value={client}
                 onChange={(event) => setClient(event.target.value)}
                 aria-label="Project client"
@@ -132,11 +128,8 @@ export default function Projects() {
               >
                 <option value="">All clients</option>
                 {clientOptions.map((item) => <option key={item} value={item}>{item}</option>)}
-              </select>
-              <Button type="button" variant="outline" onClick={clearFilters} disabled={!hasFilters} className="gap-2">
-                <X className="h-4 w-4" />
-                Clear
-              </Button>
+              </select></FilterField>
+              </FilterMenu>
             </div>
           </section>
 
