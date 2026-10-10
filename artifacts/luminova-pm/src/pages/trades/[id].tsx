@@ -483,10 +483,10 @@ export default function TradeDetail(_props: { tradeIdOverride?: string; params?:
                     </div>
                   </div>
                   {trade.sourceNotes && (
-                    <div className="border-t border-border pt-4 text-sm">
-                      <p className="font-medium mb-1">Source notes</p>
-                      <p className="break-words whitespace-pre-wrap text-muted-foreground">{trade.sourceNotes}</p>
-                    </div>
+                    <details className="border-t border-border pt-4 text-sm">
+                      <summary className="cursor-pointer font-medium">Source notes</summary>
+                      <p className="mt-2 break-words whitespace-pre-wrap text-muted-foreground">{trade.sourceNotes}</p>
+                    </details>
                   )}
                 </CardContent>
               </Card>

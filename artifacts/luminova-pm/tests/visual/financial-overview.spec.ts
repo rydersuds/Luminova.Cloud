@@ -56,6 +56,7 @@ test('renders portfolio totals above the existing invoice intake workflow', asyn
   await expect(summary.getByText('$485,000')).toBeVisible();
   await expect(summary.getByText('$765,000')).toBeVisible();
   await expect(summary.getByText('$750,000')).toBeVisible();
+  await summary.getByText('Details').last().click();
   await expect(summary.getByText('$2,000,000.00 accepted client work')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Invoice intake queue' })).toBeVisible();
   await expect(page.getByText('CLIENT-100').last()).toBeVisible();

@@ -114,12 +114,15 @@ test('vendor Message action opens contact email and is disabled when none is rec
   await page.route('**/api/trades/trade-logo', route => route.fulfill({
     json: {
       ...trades[0], email, phone: '', website: '', licence: '', insurance: '', insuranceExpiry: '',
-      regions: ['Calgary'], sourceNotes: '', jobHistory: [], reviews: [], bids: [],
+      regions: ['Calgary'], sourceNotes: 'Imported from the approved vendor directory.', jobHistory: [], reviews: [], bids: [],
     },
   }));
   await page.route('**/api/projects', route => route.fulfill({ json: [] }));
   await page.goto('/__visual/trade-detail');
   await expect(page.getByRole('button', { name: 'Message', exact: true })).toBeDisabled();
+  await expect(page.getByText('Imported from the approved vendor directory.', { exact: true })).toBeHidden();
+  await page.locator('summary').filter({ hasText: 'Source notes' }).click();
+  await expect(page.getByText('Imported from the approved vendor directory.', { exact: true })).toBeVisible();
   email = 'office@northline.example';
   await page.reload();
   await expect(page.getByRole('link', { name: 'Message', exact: true })).toHaveAttribute('href', `mailto:${email}`);

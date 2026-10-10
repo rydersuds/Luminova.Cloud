@@ -105,7 +105,6 @@ export default function Quotes() {
                 <span className="font-mono text-xs uppercase tracking-[0.22em] text-primary">Vendor pricing</span>
               </div>
               <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Quote Workspace</h1>
-              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Review quotes submitted to Luminova by subcontractors, suppliers, and other vendors.</p>
             </div>
             <div className="flex flex-wrap gap-2 self-start lg:self-auto">
               <Button variant="outline" onClick={rescan} disabled={!projectId || rescanQuotes.isPending} className="gap-2">

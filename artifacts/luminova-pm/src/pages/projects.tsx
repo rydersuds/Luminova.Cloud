@@ -76,11 +76,8 @@ export default function Projects() {
         <div className="mx-auto max-w-[1600px] space-y-7 p-4 sm:p-6 md:p-8">
           <header className="hud-header hud-frame flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <div className="mb-3 flex items-center gap-4"><span className="hud-kicker">Project network</span><span className="hud-index">MOD/02</span></div>
+              <div className="mb-3 flex items-center gap-4"><span className="hud-kicker">Project network</span></div>
               <h1 className="text-3xl font-extrabold tracking-[-0.03em] sm:text-5xl">All Projects</h1>
-              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                Review every active, planned, paused, and completed build from one workspace.
-              </p>
             </div>
             <div role="group" aria-label="Layout" className="hud-segment self-start lg:self-auto">
               <button type="button" aria-pressed={view === "grid"} onClick={() => setView("grid")} aria-label="Grid view"><Grid2X2 className="h-3.5 w-3.5" />Grid</button>

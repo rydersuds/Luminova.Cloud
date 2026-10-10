@@ -760,7 +760,10 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                   <Badge variant={getStatusColor(project.status) as any} className="capitalize">
                     {project.status}
                   </Badge>
-                  <span className="text-muted-foreground text-sm font-medium">ID: {project.id}</span>
+                  <details className="text-muted-foreground text-sm">
+                    <summary className="cursor-pointer">Project reference</summary>
+                    <span className="mt-1 block break-all">ID: {project.id}</span>
+                  </details>
                 </div>
                 <h1 className="text-3xl md:text-4xl font-heading font-bold">{project.name}</h1>
                 <div className="flex flex-wrap items-center gap-4 md:gap-6 text-sm text-muted-foreground">

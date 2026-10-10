@@ -28,3 +28,4 @@
 - [Popup resize loops](popup-resize-loops.md) — frame-based popup positioning avoids native resize feedback; capture raw window errors in resizing regressions.
 - [Vendor contact actions](vendor-contact-actions.md) — contact directory vendors by recorded email; never guess a workspace chat identity from vendor details.
 - [Financial figure layouts](financial-figure-layouts.md) — use two per row when complete amounts fit; stack only when needed in Financials and Command Center.
+- [Need-to-know information](need-to-know-information.md) — app-wide presentation should avoid repetition and keep secondary explanations expandable.

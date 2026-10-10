@@ -49,6 +49,9 @@ test('project workflow links keep context and project tabs survive reload on mob
   await page.route('**/api/projects/riverstone/panoramas', route => route.fulfill({ json: [] }));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/__visual/project-panorama?tab=budget');
+  await expect(page.getByText('ID: riverstone', { exact: true })).toBeHidden();
+  await page.locator('summary').filter({ hasText: 'Project reference' }).click();
+  await expect(page.getByText('ID: riverstone', { exact: true })).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Budget', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('tab', { name: 'Trades', exact: true })).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Activity', exact: true })).toBeVisible();

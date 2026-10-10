@@ -1,9 +1,9 @@
 import { useUser } from "@clerk/react"
-import { ArrowLeft, CheckCircle2, Mail, ShieldCheck, UserRound } from "lucide-react"
+import { ArrowLeft, CheckCircle2, Mail, ShieldCheck } from "lucide-react"
 import { Link } from "wouter"
 import { useGetCurrentWorkspaceUser } from "@workspace/api-client-react"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ProfilePhotoControl } from "@/components/profile-photo-control"
 
 function DetailRow({
@@ -53,9 +53,6 @@ export default function Profile() {
               Account settings
             </p>
             <h1 className="font-heading text-3xl font-bold tracking-tight md:text-4xl">Your profile</h1>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Review the account details used across your Luminova workspace.
-            </p>
           </div>
           <Link
             href="/"
@@ -84,18 +81,14 @@ export default function Profile() {
                     <h2 className="truncate font-heading text-2xl font-bold">{displayName}</h2>
                     <Badge variant="default">{role}</Badge>
                   </div>
-                  <p className="mt-1 truncate text-sm text-muted-foreground">{email}</p>
                 </div>
               </div>
             </div>
             <CardHeader>
               <CardTitle>Account information</CardTitle>
-              <CardDescription>Your identity and workspace access details.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3 sm:grid-cols-2">
-              <DetailRow icon={UserRound} label="Display name" value={displayName} />
               <DetailRow icon={Mail} label="Email address" value={email} />
-              <DetailRow icon={ShieldCheck} label="Workspace role" value={role} />
               <DetailRow icon={CheckCircle2} label="Account status" value="Active" />
             </CardContent>
           </Card>
@@ -103,20 +96,15 @@ export default function Profile() {
           <Card className="h-fit">
             <CardHeader>
               <CardTitle>Account security</CardTitle>
-              <CardDescription>Authentication is managed securely for your workspace.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 text-sm text-muted-foreground">
-              <div className="rounded-xl border border-primary/25 bg-primary/10 p-4">
-                <div className="flex items-start gap-3">
-                  <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-                  <p>
-                    Your sign-in and identity details are protected by the workspace authentication provider.
-                  </p>
-                </div>
-              </div>
               <p>
                 Contact a workspace administrator if you need your name, email, or role updated.
               </p>
+              <details>
+                <summary className="cursor-pointer font-medium text-foreground">Sign-in details</summary>
+                <p className="mt-2">Sign-in is managed by your workspace authentication provider.</p>
+              </details>
             </CardContent>
           </Card>
         </div>

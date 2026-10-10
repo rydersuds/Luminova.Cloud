@@ -309,11 +309,8 @@ export default function Dashboard() {
           <div className="hud-header hud-frame flex flex-col gap-6">
             <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <div>
-              <div className="mb-3 flex items-center gap-4"><span className="hud-kicker">Global overview</span><span className="hud-index">MOD/01</span></div>
+              <div className="mb-3 flex items-center gap-4"><span className="hud-kicker">Global overview</span></div>
               <h1 className="text-4xl sm:text-5xl font-heading font-extrabold text-foreground tracking-[-0.03em]">Command Center</h1>
-              <p className="text-muted-foreground mt-2 text-sm max-w-xl">
-                Projects, financials and team activity from every site you can access, in one read.
-              </p>
             </div>
             
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -618,12 +615,12 @@ export default function Dashboard() {
             )}
           </div>
           <FinancialFiguresGrid aria-label="Financial overview" className="ledger" amountAllowance={50}>
-            {financialCards.map(({ label, description, value, icon: Icon, accent, loading }, index) => (
+            {financialCards.map(({ label, description, value, icon: Icon, accent, loading }) => (
               <Card key={label} className="ledger-cell group min-w-0 rounded-none border-0 shadow-none">
                 <CardContent className="p-5 sm:p-6">
                   <div className="flex min-h-24 flex-col justify-between">
                     <div className="mb-4 flex items-center justify-between gap-4">
-                      <div><span className="hud-index">F{String(index + 1).padStart(2, "0")}</span><p className="mt-1 text-[11px] font-mono uppercase tracking-widest text-muted-foreground">{label}</p></div>
+                      <div><p className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">{label}</p></div>
                       <div className={cn("h-9 w-9 shrink-0 rounded-lg flex items-center justify-center", accent)}>
                         <Icon className="h-5 w-5 drop-shadow-sm" />
                       </div>
@@ -631,7 +628,7 @@ export default function Dashboard() {
                     <p className="font-heading text-3xl font-extrabold tabular-nums tracking-[-0.03em] text-foreground sm:text-[2.1rem]">
                       <span data-financial-amount className="inline-block whitespace-nowrap">{loading ? "—" : value === undefined ? "Unavailable" : formatCurrency(value)}</span>
                     </p>
-                    <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{description}</p>
+                    <details className="mt-2 text-xs text-muted-foreground"><summary className="cursor-pointer select-none">Details</summary><p className="mt-1 leading-relaxed">{description}</p></details>
                   </div>
                 </CardContent>
               </Card>

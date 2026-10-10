@@ -169,7 +169,6 @@ export default function Invoices() {
                 <span className="font-mono text-xs uppercase tracking-[0.22em] text-primary">Portfolio financials</span>
               </div>
               <h1 className="text-3xl font-heading font-bold text-foreground">{isAdmin ? "Financial Overview" : "Invoices & Purchases"}</h1>
-              <p className="text-muted-foreground mt-1 text-sm">{isAdmin ? "Track client revenue, project expenses, and accepted work still available to invoice." : "Submit vendor invoices against remaining trade budgets and track their approval status."}</p>
             </div>
             
             {canSubmit && (
@@ -260,7 +259,6 @@ export default function Invoices() {
 
           <div className="border-t border-border/60 pt-2">
             <h2 className="text-xl font-heading font-bold">Invoice intake queue</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Track incoming and client invoices, budget checks, and approval status.</p>
           </div>
 
           <div className="flex flex-col gap-4 bg-card p-4 rounded-lg border border-border sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
@@ -509,7 +507,7 @@ function FinancialSummary({
                 <Icon className="h-5 w-5" />
               </div>
             </div>
-            <p className="mt-4 break-words border-t border-border/50 pt-3 text-xs text-muted-foreground">{detail}</p>
+            <details className="mt-4 border-t border-border/50 pt-3 text-xs text-muted-foreground"><summary className="cursor-pointer select-none">Details</summary><p className="mt-1 break-words">{detail}</p></details>
           </CardContent>
         </Card>
       ))}

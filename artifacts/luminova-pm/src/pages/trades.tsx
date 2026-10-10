@@ -48,9 +48,6 @@ export default function TradesDirectory() {
               <span className="font-mono text-xs uppercase tracking-[0.22em] text-primary">Vendor network</span>
             </div>
             <h1 className="text-3xl font-heading font-bold md:text-4xl">Trades & Vendors Directory</h1>
-            <p className="mt-2 max-w-2xl text-base text-muted-foreground dark:text-sidebar-foreground/70 md:text-lg">
-              Find, evaluate, and manage subcontractors across all regions. Review past performance before requesting bids.
-            </p>
             
             <div className="mt-8 flex max-w-3xl flex-col gap-4 sm:flex-row">
               <div className="relative flex-1">
@@ -117,7 +114,6 @@ export default function TradesDirectory() {
                           ))}
                         </div>
                         <p className="text-sm text-muted-foreground">{trade.contactName}</p>
-                        {trade.sourceNotes && <p className="break-words text-xs text-muted-foreground">{trade.sourceNotes}</p>}
                         
                         <div className="flex flex-wrap items-center gap-4 mt-2 text-sm">
                           <div className="flex items-center gap-1 text-muted-foreground">

@@ -117,3 +117,12 @@ test('failed Command Center totals stay explicit and recover through retry', asy
   await expect(page.getByRole('region', { name: 'Financial overview' })).toContainText('$120,000');
   await expect(page.getByText('Dashboard metrics and activity are unavailable.', { exact: true })).toHaveCount(0);
 });
+test('Command Center metric definitions open from Details', async ({ page }) => {
+  await installWorkspace(page);
+  await page.route('**/api/dashboard/summary', route => route.fulfill({ json: dashboard }));
+  await page.route('**/api/invoices/summary', route => route.fulfill({ json: financials }));
+  await page.goto('/__visual/dashboard-cards');
+  const grid = page.getByLabel('Financial overview');
+  await grid.getByText('Details').first().click();
+  await expect(grid.getByText('Client invoices issued; not payments received.')).toBeVisible();
+});
