@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "cnqly6XldcJwXuNjeAeN1"
+uri = "file://generated-artifacts/luminova-construction-pm-source.zip"
+type = "unspecified"
+title = "Luminova Construction PM — Source ZIP"
+description = "Download the current app source, project configuration, tests, and bundled assets. 8.6 MB. Includes setup notes; excludes secrets, dependencies, and live database/cloud-storage data."
+logical_id = "cda39a3e-f9fb-4675-aa50-983562aa1b6c"
+content_hash = "sha256:5b2f78cbc1304c87fe6622e1fba2949967402afd606b4e05c66a4c73ec00c0e8"
+size = 9020402
+mtime_ms = 1791765108034
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:db534ba7-86cf-45f0-9337-2d8b6548e1a6/cda39a3e-f9fb-4675-aa50-983562aa1b6c/283c63be-83cb-4ccb-a0eb-fc6af05cd57b"
+storage_version_token = "1791765111890998"
+content_type = "application/octet-stream"
