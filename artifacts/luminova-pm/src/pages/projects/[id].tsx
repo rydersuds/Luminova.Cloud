@@ -9,9 +9,6 @@ import {
   getGetProjectsQueryKey,
   getGetDashboardSummaryQueryKey,
   useCreateProjectPanorama,
-  useCreateProjectScheduleImage,
-  useDeleteProjectScheduleImage,
-  useUpdateProjectScheduleImage,
   useUpdateProjectPanorama,
   useUpdateProject,
   useGetProjectActivity,
@@ -28,7 +25,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -64,17 +60,6 @@ type ProjectPhoto = {
   date: string
   visualCaption?: string
   visualTags?: string[]
-}
-type ProjectScheduleImage = {
-  id: string
-  url: string
-  name: string
-  relativePath: string
-  contentType: string
-  size: number
-  revision: string | null
-  effectiveDate: string | null
-  isCurrent: boolean
 }
 type PhotoFolderNode = {
   name: string
@@ -132,18 +117,6 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const [panoramaImage, setPanoramaImage] = React.useState<{ file: File; dataUrl: string; name: string } | null>(null)
   const [panoramaError, setPanoramaError] = React.useState("")
   const [isPanoramaUploading, setIsPanoramaUploading] = React.useState(false)
-  const [isScheduleUploadOpen, setIsScheduleUploadOpen] = React.useState(false)
-  const [scheduleImage, setScheduleImage] = React.useState<{ file: File; dataUrl: string; name: string } | null>(null)
-  const [scheduleError, setScheduleError] = React.useState("")
-  const [isScheduleUploading, setIsScheduleUploading] = React.useState(false)
-  const [activeScheduleImage, setActiveScheduleImage] = React.useState<ProjectScheduleImage | null>(null)
-  const [scheduleImageToRemove, setScheduleImageToRemove] = React.useState<ProjectScheduleImage | null>(null)
-  const [scheduleRemoveError, setScheduleRemoveError] = React.useState("")
-  const [editingScheduleImage, setEditingScheduleImage] = React.useState<ProjectScheduleImage | null>(null)
-  const [scheduleRevision, setScheduleRevision] = React.useState("")
-  const [scheduleEffectiveDate, setScheduleEffectiveDate] = React.useState("")
-  const [scheduleIsCurrent, setScheduleIsCurrent] = React.useState(false)
-  const [scheduleMetadataError, setScheduleMetadataError] = React.useState("")
   const [entryAgreementFile, setEntryAgreementFile] = React.useState<File | null>(null)
   const [entryAgreementError, setEntryAgreementError] = React.useState("")
   const [isEntryAgreementUploading, setIsEntryAgreementUploading] = React.useState(false)
@@ -186,11 +159,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
 
   const updateProject = useUpdateProject()
   const createPanorama = useCreateProjectPanorama()
-  const createScheduleImage = useCreateProjectScheduleImage()
-  const deleteScheduleImage = useDeleteProjectScheduleImage()
-  const updateScheduleImage = useUpdateProjectScheduleImage()
   const updatePanorama = useUpdateProjectPanorama()
-  const canManageSchedules = currentUser?.role === "Admin" || currentUser?.role === "Project Manager"
   const projectPhotos = React.useMemo(() => Array.isArray(project?.photos) ? project.photos : [], [project])
   const projectFiles = React.useMemo(() => Array.isArray(project?.files) ? project.files : [], [project])
   const photoFolderTree = React.useMemo(() => {
@@ -380,146 +349,6 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
       setPanoramaError(error instanceof Error ? error.message : "The panorama could not be uploaded. Try again.")
     } finally {
       setIsPanoramaUploading(false)
-    }
-  }
-
-  const resetScheduleForm = () => {
-    setScheduleImage(null)
-    setScheduleError("")
-  }
-
-  const handleScheduleDialogChange = (open: boolean) => {
-    if (isScheduleUploading) return
-    setIsScheduleUploadOpen(open)
-    if (!open) resetScheduleForm()
-  }
-
-  const handleScheduleFile = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    setScheduleError("")
-    setScheduleImage(null)
-    if (!file) return
-    const validation = validateImageFile(file, {
-      messages: {
-        "unsupported-type": "Choose a JPEG, PNG, or WebP schedule image.",
-        "too-large": "Choose a schedule image that is 8 MB or smaller.",
-      },
-    })
-    if (!validation.valid) {
-      setScheduleError(validation.message)
-      event.target.value = ""
-      return
-    }
-    void readImageDataUrl(file)
-      .then((dataUrl) => setScheduleImage({ file, dataUrl, name: file.name }))
-      .catch((error) => setScheduleError(error instanceof Error ? error.message.replace("The image", "The schedule image") : "The schedule image could not be read. Choose another file."))
-  }
-
-  const handleScheduleUpload = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    setScheduleError("")
-    if (!scheduleImage) {
-      setScheduleError("Add a schedule image.")
-      return
-    }
-    setIsScheduleUploading(true)
-    try {
-      const validation = validateImageFile(scheduleImage.file)
-      if (!validation.valid) throw new Error(validation.message)
-      const request = await fetch("/api/storage/uploads/request-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          purpose: "schedule-image",
-          projectId,
-          name: scheduleImage.file.name,
-          size: scheduleImage.file.size,
-          contentType: validation.contentType,
-        }),
-      })
-      const upload = await request.json() as { uploadURL?: string; objectPath?: string; error?: string }
-      if (!request.ok || !upload.uploadURL || !upload.objectPath) {
-        throw new Error(upload.error || "The schedule upload could not be started.")
-      }
-      await uploadToSignedUrl(scheduleImage.file, upload.uploadURL, {
-        errorMessage: "The schedule image could not be stored. Try again.",
-      })
-      await createScheduleImage.mutateAsync({
-        projectId,
-        data: {
-          objectPath: upload.objectPath,
-          name: scheduleImage.file.name,
-          size: scheduleImage.file.size,
-          contentType: validation.contentType,
-        },
-      })
-      await queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) })
-      setIsScheduleUploadOpen(false)
-      resetScheduleForm()
-      toast({
-        title: "Schedule image uploaded",
-        description: `${scheduleImage.file.name} is now available in the project schedule.`,
-      })
-    } catch (error) {
-      setScheduleError(error instanceof Error ? error.message : "The schedule image could not be uploaded. Try again.")
-    } finally {
-      setIsScheduleUploading(false)
-    }
-  }
-
-  const handleScheduleRemove = async () => {
-    if (!scheduleImageToRemove) return
-    setScheduleRemoveError("")
-    try {
-      await deleteScheduleImage.mutateAsync({
-        projectId,
-        scheduleImageId: scheduleImageToRemove.id,
-      })
-      await queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) })
-      setActiveScheduleImage((current) => current?.id === scheduleImageToRemove.id ? null : current)
-      setScheduleImageToRemove(null)
-      toast({
-        title: "Schedule image removed",
-        description: `${scheduleImageToRemove.name} is no longer shown in the project schedule.`,
-      })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "The schedule image could not be removed. Try again."
-      setScheduleRemoveError(message)
-    }
-  }
-
-  const openScheduleEditor = (image: ProjectScheduleImage) => {
-    setEditingScheduleImage(image)
-    setScheduleRevision(image.revision ?? "")
-    setScheduleEffectiveDate(image.effectiveDate ?? "")
-    setScheduleIsCurrent(image.isCurrent)
-    setScheduleMetadataError("")
-  }
-
-  const handleScheduleMetadataSave = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    if (!editingScheduleImage) return
-    setScheduleMetadataError("")
-    try {
-      await updateScheduleImage.mutateAsync({
-        projectId,
-        scheduleImageId: editingScheduleImage.id,
-        data: {
-          revision: scheduleRevision.trim() || null,
-          effectiveDate: scheduleEffectiveDate || null,
-          isCurrent: scheduleIsCurrent,
-        },
-      })
-      await queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) })
-      setEditingScheduleImage(null)
-      toast({
-        title: scheduleIsCurrent ? "Current schedule updated" : "Schedule details updated",
-        description: scheduleIsCurrent
-          ? `${editingScheduleImage.name} is now the current project schedule.`
-          : `Revision details for ${editingScheduleImage.name} were saved.`,
-      })
-    } catch (error) {
-      setScheduleMetadataError(error instanceof Error ? error.message : "The schedule details could not be saved.")
     }
   }
 
@@ -950,213 +779,6 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
             )}
 
             <TabsContent value="overview" className="space-y-6">
-              <Card>
-                <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <CardTitle>Schedule</CardTitle>
-                    <CardDescription>Project schedule images uploaded by your team or imported with the project folder.</CardDescription>
-                  </div>
-                  <Dialog open={isScheduleUploadOpen} onOpenChange={handleScheduleDialogChange}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" className="w-full gap-2 sm:w-auto">
-                        <FileText className="h-4 w-4" />
-                        Upload schedule image
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Upload schedule image</DialogTitle>
-                        <DialogDescription>Add a JPEG, PNG, or WebP schedule image to {project.name}.</DialogDescription>
-                      </DialogHeader>
-                      <form onSubmit={handleScheduleUpload} className="space-y-4" noValidate>
-                        <div className="space-y-2">
-                          <Label htmlFor="schedule-image">Schedule image</Label>
-                          <Input
-                            id="schedule-image"
-                            name="schedule-image"
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            onChange={handleScheduleFile}
-                            aria-describedby="schedule-image-help"
-                          />
-                          <p id="schedule-image-help" className="text-xs text-muted-foreground">JPEG, PNG, or WebP, up to 8 MB.</p>
-                        </div>
-                        {scheduleImage && (
-                          <div className="overflow-hidden rounded-md border bg-muted">
-                            <img src={scheduleImage.dataUrl} alt="Selected schedule preview" className="max-h-48 w-full object-contain" />
-                            <p className="truncate px-3 py-2 text-xs text-muted-foreground">{scheduleImage.name}</p>
-                          </div>
-                        )}
-                        {scheduleError && <p role="alert" className="text-sm text-destructive">{scheduleError}</p>}
-                        <DialogFooter>
-                          <Button type="button" variant="outline" onClick={() => handleScheduleDialogChange(false)} disabled={isScheduleUploading}>Cancel</Button>
-                          <Button type="submit" disabled={isScheduleUploading}>
-                            {isScheduleUploading ? "Uploading…" : "Upload schedule image"}
-                          </Button>
-                        </DialogFooter>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-                </CardHeader>
-                <CardContent>
-                  {project.scheduleImages.length === 0 ? (
-                    <div className="rounded-lg border border-dashed px-6 py-10 text-center">
-                      <FileText className="mx-auto h-7 w-7 text-muted-foreground" />
-                      <p className="mt-3 font-medium">No schedule images yet</p>
-                      <p className="mt-1 text-sm text-muted-foreground">Upload a schedule image or import a project folder containing one.</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                      {project.scheduleImages.map((image) => (
-                        <article
-                          key={image.id}
-                          className={cn(
-                            "min-w-0 overflow-hidden rounded-lg border bg-card",
-                            image.isCurrent && "border-primary shadow-md ring-1 ring-primary/30 sm:col-span-2 xl:col-span-2",
-                          )}
-                        >
-                          {image.isCurrent && (
-                            <div className="flex items-center gap-2 bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground">
-                              <CheckCircle2 className="h-4 w-4" />
-                              Current schedule
-                            </div>
-                          )}
-                          <button
-                            type="button"
-                            className="group block aspect-[4/3] w-full cursor-zoom-in bg-muted text-left"
-                            onClick={() => setActiveScheduleImage(image)}
-                            aria-label={`Open schedule image ${image.name}`}
-                          >
-                            <img src={image.url} alt={image.name} loading="lazy" decoding="async" className="h-full w-full object-contain transition-transform group-hover:scale-[1.02]" />
-                          </button>
-                          <div className="min-w-0 space-y-3 border-t p-3">
-                            <div>
-                              <p className="truncate font-medium" title={image.relativePath}>{image.name}</p>
-                              {(image.revision || image.effectiveDate) && (
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                  {image.revision && <Badge variant="secondary">{image.revision}</Badge>}
-                                  {image.effectiveDate && <Badge variant="outline">Effective {formatDateOnly(image.effectiveDate)}</Badge>}
-                                </div>
-                              )}
-                            </div>
-                            <p className="truncate text-xs text-muted-foreground" title={image.relativePath}>{image.relativePath}</p>
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                              <div className="flex flex-wrap items-center gap-3">
-                                <a href={image.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-primary hover:underline">
-                                  Open full image
-                                </a>
-                                {canManageSchedules && (
-                                  <Button type="button" variant="ghost" size="sm" className="h-auto px-0 py-0 text-sm" onClick={() => openScheduleEditor(image)}>
-                                    <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                                    Edit details
-                                  </Button>
-                                )}
-                              </div>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 gap-1.5 text-destructive hover:text-destructive"
-                                onClick={() => {
-                                  setScheduleRemoveError("")
-                                  setScheduleImageToRemove(image)
-                                }}
-                                aria-label={`Remove schedule image ${image.name}`}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                                Remove
-                              </Button>
-                            </div>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Dialog open={activeScheduleImage !== null} onOpenChange={(open) => !open && setActiveScheduleImage(null)}>
-                <DialogContent className="h-[92dvh] w-[96vw] !max-w-6xl overflow-hidden p-0">
-                  {activeScheduleImage && (
-                    <div className="flex h-full min-w-0 flex-col">
-                      <div className="flex min-h-0 flex-1 items-center justify-center bg-muted p-4 sm:p-8">
-                        <img src={activeScheduleImage.url} alt={activeScheduleImage.name} className="max-h-full max-w-full object-contain" />
-                      </div>
-                      <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 border-t px-4 py-3 sm:px-8">
-                        <p className="min-w-0 truncate font-medium" title={activeScheduleImage.relativePath}>{activeScheduleImage.relativePath}</p>
-                        <a href={activeScheduleImage.url} target="_blank" rel="noreferrer" className="shrink-0 text-sm font-medium text-primary hover:underline">
-                          Open full image
-                        </a>
-                      </div>
-                    </div>
-                  )}
-                </DialogContent>
-              </Dialog>
-
-              <AlertDialog
-                open={scheduleImageToRemove !== null}
-                onOpenChange={(open) => {
-                  if (!open && !deleteScheduleImage.isPending) {
-                    setScheduleImageToRemove(null)
-                    setScheduleRemoveError("")
-                  }
-                }}
-              >
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Remove schedule image?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {scheduleImageToRemove?.name} will be removed from this schedule gallery. Imported source documents and other project media will stay in place.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  {scheduleRemoveError && <p role="alert" className="text-sm text-destructive">{scheduleRemoveError}</p>}
-                  <AlertDialogFooter>
-                    <AlertDialogCancel disabled={deleteScheduleImage.isPending}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={(event) => {
-                        event.preventDefault()
-                        void handleScheduleRemove()
-                      }}
-                      disabled={deleteScheduleImage.isPending}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      {deleteScheduleImage.isPending ? "Removing…" : "Remove image"}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-
-              <Dialog open={editingScheduleImage !== null} onOpenChange={(open) => !open && setEditingScheduleImage(null)}>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Schedule details</DialogTitle>
-                    <DialogDescription>Add revision details and choose whether this is the schedule crews should use.</DialogDescription>
-                  </DialogHeader>
-                  <form className="space-y-4" onSubmit={handleScheduleMetadataSave}>
-                    <div className="space-y-2">
-                      <Label htmlFor="schedule-revision">Revision</Label>
-                      <Input id="schedule-revision" value={scheduleRevision} onChange={(event) => setScheduleRevision(event.target.value)} placeholder="Revision 4" maxLength={100} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="schedule-effective-date">Effective date</Label>
-                      <Input id="schedule-effective-date" type="date" value={scheduleEffectiveDate} onChange={(event) => setScheduleEffectiveDate(event.target.value)} />
-                    </div>
-                    <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3">
-                      <input type="checkbox" className="mt-1 h-4 w-4 accent-primary" checked={scheduleIsCurrent} onChange={(event) => setScheduleIsCurrent(event.target.checked)} />
-                      <span>
-                        <span className="block font-medium">Mark as current schedule</span>
-                        <span className="block text-sm text-muted-foreground">This will replace any existing current selection. Prior schedules remain visible.</span>
-                      </span>
-                    </label>
-                    {scheduleMetadataError && <p role="alert" className="text-sm text-destructive">{scheduleMetadataError}</p>}
-                    <DialogFooter>
-                      <Button type="button" variant="outline" onClick={() => setEditingScheduleImage(null)} disabled={updateScheduleImage.isPending}>Cancel</Button>
-                      <Button type="submit" disabled={updateScheduleImage.isPending}>{updateScheduleImage.isPending ? "Saving…" : "Save details"}</Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
-
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="md:col-span-2 space-y-6">
                   <Card>

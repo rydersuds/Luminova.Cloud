@@ -345,7 +345,22 @@ test('does not expose the assignment control to non-administrators', async ({ pa
 
 test('shows project board groups and scheduled work', async ({ page }) => {
   await installIdentity(page, 'Project Manager');
-  await page.route('**/api/projects/riverstone', route => route.fulfill({ json: project }));
+  await page.route('**/api/projects/riverstone', route => route.fulfill({
+    json: {
+      ...project,
+      scheduleImages: [{
+        id: 'legacy-schedule',
+        url: '/legacy-schedule.png',
+        name: 'legacy-schedule.png',
+        relativePath: 'Schedules/legacy-schedule.png',
+        contentType: 'image/png',
+        size: 2048,
+        revision: 'Revision 2',
+        effectiveDate: '2026-08-20',
+        isCurrent: true,
+      }],
+    },
+  }));
   await page.route('**/api/projects/riverstone/activity', route => route.fulfill({ json: [] }));
   await page.route('**/api/projects/riverstone/panoramas', route => route.fulfill({ json: [] }));
   await page.route('**/api/projects/riverstone/board', route => route.fulfill({
@@ -372,7 +387,14 @@ test('shows project board groups and scheduled work', async ({ page }) => {
   await expect(page.getByRole('tab', { name: 'Board', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('region', { name: 'Project board' })).toBeVisible();
   await expect(page.getByText('Pre-construction', { exact: true })).toBeVisible();
-  await expect(page.getByText('Submit permit drawings', { exact: true })).toBeVisible();
+  await expect(page.getByText('Submit permit drawings', { exact: true }).first()).toBeVisible();
+
+  for (const view of ['Timeline', 'Calendar', 'Table']) {
+    const control = page.getByRole('button', { name: view, exact: true });
+    await control.click();
+    await expect(control).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByText('Submit permit drawings', { exact: true }).first()).toBeVisible();
+  }
 });
 
 test('shows portfolio schedule items and switches to calendar view', async ({ page }) => {
@@ -415,7 +437,7 @@ test('creates, edits, moves, and deletes a board item', async ({ page }) => {
   const precon = page.getByRole('region', { name: 'Pre-construction' });
   await precon.getByRole('textbox', { name: 'Add item to Pre-construction' }).fill('Order windows');
   await precon.getByRole('button', { name: 'Add', exact: true }).click();
-  await expect(precon.getByText('Order windows', { exact: true })).toBeVisible();
+  await expect(precon.getByRole('button', { name: 'Item name: Order windows. Click to edit' })).toBeVisible();
   expect(state.items).toHaveLength(1);
 
   await page.getByRole('button', { name: 'Item name: Order windows. Click to edit' }).click();
@@ -428,13 +450,13 @@ test('creates, edits, moves, and deletes a board item', async ({ page }) => {
   await page.getByRole('button', { name: 'Order windows and doors options' }).click();
   await page.getByRole('menuitem', { name: 'Installation' }).click();
   const installation = page.getByRole('region', { name: 'Installation' });
-  await expect(installation.getByText('Order windows and doors', { exact: true })).toBeVisible();
+  await expect(installation.getByRole('button', { name: 'Item name: Order windows and doors. Click to edit' })).toBeVisible();
   expect(state.items[0].groupId).toBe('group-install');
 
   await page.getByRole('button', { name: 'Order windows and doors options' }).click();
   await page.getByRole('menuitem', { name: 'Delete item' }).click();
   await page.getByRole('menuitem', { name: 'Click again to delete' }).click();
-  await expect(installation.getByText('Order windows and doors', { exact: true })).toBeHidden();
+  await expect(installation.getByRole('button', { name: 'Item name: Order windows and doors. Click to edit' })).toBeHidden();
   expect(state.items).toHaveLength(0);
 });
 
