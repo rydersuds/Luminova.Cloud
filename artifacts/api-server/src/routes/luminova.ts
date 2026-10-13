@@ -78,6 +78,9 @@ import
   GetProjectsResponse,
   GetTradeParams,
   GetTradeResponse,
+  DeleteTradeBody,
+  DeleteTradeParams,
+  DeleteTradeResponse,
   GetTradesQueryParams,
   GetTradesResponse,
   UpdateTradeBody,
@@ -3066,7 +3069,10 @@ const tradesForOwner = async (ownerId: string, workspaceId = "default") =>
       .from(importedVendorsTable)
       .where(eq(importedVendorsTable.ownerId, ownerId)),
     db.select().from(standaloneVendorProfilesTable)
-      .where(eq(standaloneVendorProfilesTable.workspaceId, workspaceId)),
+      .where(and(
+        eq(standaloneVendorProfilesTable.workspaceId, workspaceId),
+        isNull(standaloneVendorProfilesTable.deletedAt),
+      )),
     db.select(
 {
 
@@ -10232,6 +10238,132 @@ router.get("/trades", async (req: AuthenticatedRequest, res) =>
 )
 ;
 
+
+router.delete("/trades/:tradeId", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!await requireWorkspaceRole(req, res, ["Admin"], "Administrator access required")) return;
+
+  const params = DeleteTradeParams.safeParse(req.params);
+  const body = DeleteTradeBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: "Choose whether to keep or delete the vendor’s related records." });
+    return;
+  }
+
+  const workspaceId = requestWorkspaceId(req);
+
+  try {
+    await ensureSeededVendorProfiles(workspaceId);
+    const deleted = await db.transaction(async (tx) => {
+      const [standalone] = await tx.select()
+        .from(standaloneVendorProfilesTable)
+        .where(and(
+          eq(standaloneVendorProfilesTable.id, params.data.tradeId),
+          eq(standaloneVendorProfilesTable.workspaceId, workspaceId),
+          isNull(standaloneVendorProfilesTable.deletedAt),
+        ))
+        .limit(1);
+      const [imported] = standalone ? [] : await tx.select({
+        id: importedVendorsTable.id,
+        ownerId: importedVendorsTable.ownerId,
+        importBatchId: importedVendorsTable.importBatchId,
+        data: importedVendorsTable.data,
+      })
+        .from(importedVendorsTable)
+        .innerJoin(
+          projectImportBatchesTable,
+          eq(projectImportBatchesTable.id, importedVendorsTable.importBatchId),
+        )
+        .innerJoin(
+          importedProjectsTable,
+          eq(importedProjectsTable.importBatchId, importedVendorsTable.importBatchId),
+        )
+        .where(and(
+          eq(importedVendorsTable.id, params.data.tradeId),
+          eq(projectImportBatchesTable.workspaceId, workspaceId),
+          eq(importedProjectsTable.workspaceId, workspaceId),
+        ))
+        .limit(1);
+
+      const trade = standalone
+        ? tradeFromStandaloneProfile(standalone)
+        : imported?.data as Trade | undefined;
+      if (!trade || !isDirectoryTrade(trade)) return false;
+
+      if (body.data.deletionMode === "profile_and_related_records") {
+        const projectRows = await tx.select({
+          id: importedProjectsTable.id,
+          importBatchId: importedProjectsTable.importBatchId,
+        })
+          .from(importedProjectsTable)
+          .where(eq(importedProjectsTable.workspaceId, workspaceId));
+        const projectIds = projectRows.map((project) => project.id);
+        const importBatchIds = [...new Set(projectRows.map((project) => project.importBatchId))];
+
+        if (importBatchIds.length) {
+          const quoteRows = await tx.select({
+            id: importedVendorQuotesTable.id,
+            ownerId: importedVendorQuotesTable.ownerId,
+            importBatchId: importedVendorQuotesTable.importBatchId,
+            data: importedVendorQuotesTable.data,
+          })
+            .from(importedVendorQuotesTable)
+            .where(inArray(importedVendorQuotesTable.importBatchId, importBatchIds));
+          const relatedQuoteRows = quoteRows.filter((row) =>
+            (row.data as VendorQuote).vendorId === params.data.tradeId,
+          );
+          for (const quote of relatedQuoteRows) {
+            await tx.delete(importedVendorQuotesTable).where(and(
+              eq(importedVendorQuotesTable.id, quote.id),
+              eq(importedVendorQuotesTable.ownerId, quote.ownerId),
+              eq(importedVendorQuotesTable.importBatchId, quote.importBatchId),
+            ));
+          }
+        }
+
+        if (projectIds.length) {
+          await tx.delete(vendorReviewTable).where(and(
+            eq(vendorReviewTable.vendorId, params.data.tradeId),
+            inArray(vendorReviewTable.projectId, projectIds),
+          ));
+          await tx.delete(vendorJobHistoryTable).where(and(
+            eq(vendorJobHistoryTable.vendorId, params.data.tradeId),
+            inArray(vendorJobHistoryTable.projectId, projectIds),
+          ));
+        }
+      }
+
+      if (standalone) {
+        await tx.update(standaloneVendorProfilesTable)
+          .set({ deletedAt: new Date(), updatedAt: new Date() })
+          .where(and(
+            eq(standaloneVendorProfilesTable.id, params.data.tradeId),
+            eq(standaloneVendorProfilesTable.workspaceId, workspaceId),
+            isNull(standaloneVendorProfilesTable.deletedAt),
+          ));
+      } else if (imported) {
+        await tx.delete(importedVendorsTable).where(and(
+          eq(importedVendorsTable.id, imported.id),
+          eq(importedVendorsTable.ownerId, imported.ownerId),
+          eq(importedVendorsTable.importBatchId, imported.importBatchId),
+        ));
+      }
+
+      return true;
+    });
+
+    if (!deleted) {
+      res.status(404).json({ error: "Vendor not found in this workspace." });
+      return;
+    }
+    res.json(DeleteTradeResponse.parse({
+      deleted: true,
+      relatedRecordsDeleted: body.data.deletionMode === "profile_and_related_records",
+    }));
+  } catch (error) {
+    req.log.error({ err: error, tradeId: params.data.tradeId }, "Vendor profile deletion failed");
+    res.status(500).json({ error: "The vendor profile could not be deleted. No changes were saved." });
+  }
+});
 
 router.post("/trades/:tradeId/job-history", async (req: AuthenticatedRequest, res): Promise<void> => 
 {

@@ -628,6 +628,23 @@ export type TradeDetail = Trade & {
   bids: TradeBid[];
 };
 
+export type DeleteTradeInputDeletionMode = typeof DeleteTradeInputDeletionMode[keyof typeof DeleteTradeInputDeletionMode];
+
+
+export const DeleteTradeInputDeletionMode = {
+  profile_only: 'profile_only',
+  profile_and_related_records: 'profile_and_related_records',
+} as const;
+
+export interface DeleteTradeInput {
+  deletionMode: DeleteTradeInputDeletionMode;
+}
+
+export interface TradeDeletionResult {
+  deleted: boolean;
+  relatedRecordsDeleted: boolean;
+}
+
 export interface UpdateTradeProfileInput {
   /** @maxLength 40 */
   phone: string;
@@ -1549,3 +1566,4 @@ trade?: string;
 status?: VendorQuoteStatus;
 direction?: QuoteDirection;
 };
+

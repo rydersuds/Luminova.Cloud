@@ -1589,6 +1589,23 @@ export const UpdateTradeResponse = zod.object({
 
 
 /**
+ * @summary Remove a vendor profile, optionally deleting its related records
+ */
+export const DeleteTradeParams = zod.object({
+  "tradeId": zod.coerce.string()
+})
+
+export const DeleteTradeBody = zod.object({
+  "deletionMode": zod.enum(['profile_only', 'profile_and_related_records'])
+})
+
+export const DeleteTradeResponse = zod.object({
+  "deleted": zod.boolean(),
+  "relatedRecordsDeleted": zod.boolean()
+})
+
+
+/**
  * @summary Request a private vendor logo or profile image upload
  */
 export const RequestTradeProfilePhotoUploadParams = zod.object({
@@ -3110,3 +3127,5 @@ export const DeleteWorkspaceUserParams = zod.object({
 })
 
 export const DeleteWorkspaceUserResponse = zod.void()
+
+

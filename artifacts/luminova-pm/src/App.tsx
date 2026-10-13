@@ -372,7 +372,14 @@ function App() {
         <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl}>
           <QueryClientProvider client={queryClient}>
             <TooltipProvider>
-              <AppLayout><Suspense fallback={<WorkspacePageFallback />}><TradeDetail tradeIdOverride="trade-logo" /></Suspense></AppLayout>
+              <Switch>
+                <Route path="/__visual/trade-detail">
+                  <AppLayout><Suspense fallback={<WorkspacePageFallback />}><TradeDetail tradeIdOverride="trade-logo" /></Suspense></AppLayout>
+                </Route>
+                <Route path="/trades">
+                  <AppLayout><Suspense fallback={<WorkspacePageFallback />}><TradesDirectory /></Suspense></AppLayout>
+                </Route>
+              </Switch>
             </TooltipProvider>
           </QueryClientProvider>
         </ClerkProvider>

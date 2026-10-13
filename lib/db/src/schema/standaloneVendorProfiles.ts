@@ -31,6 +31,7 @@ export const standaloneVendorProfilesTable = pgTable("standalone_vendor_profiles
   workspaceId: text("workspace_id").notNull(),
   seedKey: text("seed_key").notNull(),
   data: jsonb("data").$type<StandaloneVendorProfileData>().notNull(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 }, (table) => [

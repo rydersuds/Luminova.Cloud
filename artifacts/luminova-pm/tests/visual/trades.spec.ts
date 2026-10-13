@@ -151,6 +151,106 @@ test('falls back to initials on the vendor detail page when a private photo fail
   await page.goto('/__visual/trade-detail');
 
   await expect(page.getByRole('heading', { name: 'Northline Electric' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Delete Vendor' })).toHaveCount(0);
   await expect(page.getByText('NE', { exact: true })).toBeVisible();
   await expect(page.getByRole('img', { name: 'Northline Electric profile logo' })).toHaveCount(0);
+});
+
+test('administrator can remove only the vendor profile and gets directory feedback', async ({ page }) => {
+  await page.route('**/api/users/me', route => route.fulfill({
+    json: {
+      id: 'admin-1', firstName: 'Maya', lastName: 'Chen', name: 'Maya Chen', email: 'maya@example.com',
+      role: 'Admin', createdAt: 0, lastSignInAt: 0, imageUrl: '',
+    },
+  }));
+  await page.route('**/api/trades/trade-logo', route => {
+    if (route.request().method() === 'DELETE') {
+      expect(route.request().postDataJSON()).toEqual({ deletionMode: 'profile_only' });
+      return route.fulfill({ json: { deleted: true, relatedRecordsDeleted: false } });
+    }
+    return route.fulfill({
+      json: {
+        ...trades[0], phone: '', email: '', website: '', licence: '', insurance: '', insuranceExpiry: '',
+        regions: ['Calgary'], sourceNotes: '', jobHistory: [], reviews: [], bids: [],
+      },
+    });
+  });
+  await page.route('**/api/projects', route => route.fulfill({ json: [] }));
+
+  await page.goto('/__visual/trade-detail');
+  await page.getByRole('button', { name: 'Delete Vendor' }).click();
+  await expect(page.getByRole('dialog')).toContainText('Keep this vendor’s quotes, job history, and reviews as historical records.');
+  await page.getByRole('button', { name: 'Remove profile' }).click();
+
+  await expect(page).toHaveURL(/\/trades$/);
+  await expect(page.getByRole('status')).toContainText('Related quotes and work history were kept.');
+});
+
+test('administrator sees a clear error when vendor deletion fails', async ({ page }) => {
+  await page.route('**/api/users/me', route => route.fulfill({
+    json: {
+      id: 'admin-1', firstName: 'Maya', lastName: 'Chen', name: 'Maya Chen', email: 'maya@example.com',
+      role: 'Admin', createdAt: 0, lastSignInAt: 0, imageUrl: '',
+    },
+  }));
+  await page.route('**/api/trades/trade-logo', route => {
+    if (route.request().method() === 'DELETE') {
+      return route.fulfill({ status: 500, json: { error: 'The vendor profile could not be deleted. No changes were saved.' } });
+    }
+    return route.fulfill({
+      json: {
+        ...trades[0], phone: '', email: '', website: '', licence: '', insurance: '', insuranceExpiry: '',
+        regions: ['Calgary'], sourceNotes: '', jobHistory: [], reviews: [], bids: [],
+      },
+    });
+  });
+  await page.route('**/api/projects', route => route.fulfill({ json: [] }));
+
+  await page.goto('/__visual/trade-detail');
+  await page.getByRole('button', { name: 'Delete Vendor' }).click();
+  await page.getByRole('button', { name: 'Remove profile' }).click();
+  await expect(page.getByRole('dialog').getByRole('alert')).toHaveText(
+    'The vendor profile could not be deleted. No changes were saved.',
+  );
+  await expect(page).toHaveURL(/\/__visual\/trade-detail$/);
+});
+
+test('administrator must confirm permanent deletion of vendor records', async ({ page }) => {
+  let deletionMode = '';
+  await page.route('**/api/users/me', route => route.fulfill({
+    json: {
+      id: 'admin-1', firstName: 'Maya', lastName: 'Chen', name: 'Maya Chen', email: 'maya@example.com',
+      role: 'Admin', createdAt: 0, lastSignInAt: 0, imageUrl: '',
+    },
+  }));
+  await page.route('**/api/trades/trade-logo', route => {
+    if (route.request().method() === 'DELETE') {
+      deletionMode = route.request().postDataJSON().deletionMode;
+      return route.fulfill({ json: { deleted: true, relatedRecordsDeleted: true } });
+    }
+    return route.fulfill({
+      json: {
+        ...trades[0], phone: '', email: '', website: '', licence: '', insurance: '', insuranceExpiry: '',
+        regions: ['Calgary'], sourceNotes: '', jobHistory: [], reviews: [], bids: [],
+      },
+    });
+  });
+  await page.route('**/api/projects', route => route.fulfill({ json: [] }));
+
+  await page.goto('/__visual/trade-detail');
+  await page.getByRole('button', { name: 'Delete Vendor' }).click();
+  await page.getByRole('radio', { name: /Delete profile and related records/ }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  const confirmation = page.getByRole('alertdialog');
+  await expect(confirmation.getByRole('heading', { name: 'Delete related vendor records permanently?' })).toBeVisible();
+  await expect(confirmation).toContainText('Projects, import batches, project files, invoices, and other vendors will remain.');
+  await confirmation.getByRole('button', { name: 'Cancel' }).click();
+  await expect(confirmation).toBeHidden();
+  expect(deletionMode).toBe('');
+
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Delete profile and records' }).click();
+  await expect.poll(() => deletionMode).toBe('profile_and_related_records');
+  await expect(page).toHaveURL(/\/trades$/);
+  await expect(page.getByRole('status')).toContainText('related quotes, job history, and reviews were deleted.');
 });

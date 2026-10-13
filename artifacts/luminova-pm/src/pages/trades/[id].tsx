@@ -15,6 +15,8 @@ import {
   useCreateTradeReview,
   useUpdateTradeReview,
   useDeleteTradeReview,
+  useDeleteTrade,
+  getGetVendorQuotesQueryKey,
 } from "@workspace/api-client-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -26,6 +28,17 @@ import {
 } from "lucide-react"
 import { cn, formatCurrency, formatDate } from "@/lib/utils"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
@@ -79,6 +92,7 @@ export default function TradeDetail(_props: { tradeIdOverride?: string; params?:
   const createReview = useCreateTradeReview()
   const updateReview = useUpdateTradeReview()
   const deleteReview = useDeleteTradeReview()
+  const deleteVendor = useDeleteTrade()
   const [historyDialog, setHistoryDialog] = React.useState<"create" | "edit" | null>(null)
   const [editingHistoryId, setEditingHistoryId] = React.useState<string | null>(null)
   const [reviewDialog, setReviewDialog] = React.useState(false)
@@ -86,6 +100,10 @@ export default function TradeDetail(_props: { tradeIdOverride?: string; params?:
   const [editingReviewId, setEditingReviewId] = React.useState<string | null>(null)
   const [feedback, setFeedback] = React.useState<Feedback>(null)
   const [profileDialog, setProfileDialog] = React.useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
+  const [confirmRelatedDelete, setConfirmRelatedDelete] = React.useState(false)
+  const [deletionMode, setDeletionMode] = React.useState<"profile_only" | "profile_and_related_records">("profile_only")
+  const [deleteError, setDeleteError] = React.useState("")
   const [profileError, setProfileError] = React.useState("")
   const [profilePhoto, setProfilePhoto] = React.useState<File | null>(null)
   const [removeProfilePhoto, setRemoveProfilePhoto] = React.useState(false)
@@ -120,6 +138,34 @@ export default function TradeDetail(_props: { tradeIdOverride?: string; params?:
     queryClient.invalidateQueries({ queryKey: getGetTradeQueryKey(tradeId) }),
     queryClient.invalidateQueries({ queryKey: getGetTradesQueryKey() }),
   ])
+
+  const deleteVendorProfile = async (mode: "profile_only" | "profile_and_related_records") => {
+    setDeleteError("")
+    try {
+      await deleteVendor.mutateAsync({ tradeId, data: { deletionMode: mode } })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: getGetTradesQueryKey() }),
+        queryClient.invalidateQueries({ queryKey: getGetVendorQuotesQueryKey() }),
+      ])
+      window.sessionStorage.setItem(
+        "luminova-trade-directory-feedback-v1",
+        mode === "profile_only"
+          ? "Vendor profile removed. Related quotes and work history were kept."
+          : "Vendor profile and related quotes, job history, and reviews were deleted.",
+      )
+      setLocation("/trades")
+    } catch (error) {
+      setDeleteError(errorMessage(error, "Unable to delete the vendor profile."))
+    }
+  }
+
+  const continueDeletion = () => {
+    if (deletionMode === "profile_and_related_records") {
+      setConfirmRelatedDelete(true)
+      return
+    }
+    void deleteVendorProfile("profile_only")
+  }
 
   const openProfileEditor = () => {
     if (!trade) return
@@ -425,6 +471,20 @@ export default function TradeDetail(_props: { tradeIdOverride?: string; params?:
               </div>
 
               <div className="flex flex-col w-full md:w-auto gap-3">
+                {isAdmin && (
+                  <Button
+                    variant="destructive"
+                    className="w-full gap-2"
+                    onClick={() => {
+                      setDeleteError("")
+                      setDeletionMode("profile_only")
+                      setDeleteDialogOpen(true)
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete Vendor
+                  </Button>
+                )}
                 <Button variant="outline" className="w-full gap-2" onClick={openProfileEditor}>
                   <Pencil className="h-4 w-4" />
                   Edit Profile
@@ -870,6 +930,95 @@ export default function TradeDetail(_props: { tradeIdOverride?: string; params?:
           </form>
         </DialogContent>
       </Dialog>
+      {isAdmin && (
+        <>
+          <Dialog
+            open={deleteDialogOpen}
+            onOpenChange={(open) => {
+              if (deleteVendor.isPending) return
+              setDeleteDialogOpen(open)
+              if (!open) setDeleteError("")
+            }}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete {trade.companyName}?</DialogTitle>
+                <DialogDescription>
+                  Choose what to remove. The containing project, import batch, and project files are never deleted.
+                </DialogDescription>
+              </DialogHeader>
+              <RadioGroup
+                value={deletionMode}
+                onValueChange={(value) => setDeletionMode(value as typeof deletionMode)}
+                className="gap-3"
+              >
+                <label htmlFor="delete-vendor-profile-only" className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3">
+                  <RadioGroupItem id="delete-vendor-profile-only" value="profile_only" className="mt-1" />
+                  <span>
+                    <span className="block font-medium">Remove profile only</span>
+                    <span className="mt-1 block text-sm text-muted-foreground">
+                      Keep this vendor’s quotes, job history, and reviews as historical records.
+                    </span>
+                  </span>
+                </label>
+                <label htmlFor="delete-vendor-with-records" className="flex cursor-pointer items-start gap-3 rounded-md border border-destructive/50 bg-destructive/5 p-3">
+                  <RadioGroupItem id="delete-vendor-with-records" value="profile_and_related_records" className="mt-1" />
+                  <span>
+                    <span className="block font-medium text-destructive">Delete profile and related records</span>
+                    <span className="mt-1 block text-sm text-muted-foreground">
+                      Permanently delete this vendor’s quotes, job history, and reviews too.
+                    </span>
+                  </span>
+                </label>
+              </RadioGroup>
+              {deleteError && <p role="alert" className="text-sm text-destructive">{deleteError}</p>}
+              <DialogFooter>
+                <Button type="button" variant="outline" disabled={deleteVendor.isPending} onClick={() => setDeleteDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={deleteVendor.isPending}
+                  onClick={continueDeletion}
+                >
+                  {deletionMode === "profile_only" ? "Remove profile" : "Continue"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <AlertDialog
+            open={confirmRelatedDelete}
+            onOpenChange={(open) => {
+              if (!deleteVendor.isPending) setConfirmRelatedDelete(open)
+            }}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete related vendor records permanently?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This removes {trade.companyName}’s directory profile, quotes, job history, and reviews from this workspace. This cannot be undone. Projects, import batches, project files, invoices, and other vendors will remain.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              {deleteError && <p role="alert" className="text-sm text-destructive">{deleteError}</p>}
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={deleteVendor.isPending}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  disabled={deleteVendor.isPending}
+                  onClick={(event) => {
+                    event.preventDefault()
+                    setConfirmRelatedDelete(false)
+                    void deleteVendorProfile("profile_and_related_records")
+                  }}
+                >
+                  {deleteVendor.isPending ? "Deleting…" : "Delete profile and records"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
+      )}
     </>
   )
 }

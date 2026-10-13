@@ -8,10 +8,13 @@ import {
   db,
   importedProjectsTable,
   importedVendorsTable,
+  importedVendorQuotesTable,
   projectImportBatchesTable,
+  standaloneVendorProfilesTable,
   vendorJobHistoryTable,
   vendorReviewTable,
 } from "@workspace/db";
+import { ensureSeededVendorProfiles } from "../lib/standaloneVendorProfiles";
 
 const originalFetch = globalThis.fetch;
 const originalNodeEnv = process.env.NODE_ENV;
@@ -57,6 +60,7 @@ after(() => {
 
 type Fixture = {
   suffix: string;
+  workspaceId: string;
   batchId: string;
   ownerId: string;
   vendorId: string;
@@ -64,10 +68,11 @@ type Fixture = {
   incompleteProjectId: string;
 };
 
-async function createFixture(): Promise<Fixture> {
+async function createFixture(workspaceId = "default"): Promise<Fixture> {
   const suffix = randomUUID();
   const fixture: Fixture = {
     suffix,
+    workspaceId,
     batchId: `vendor-records-batch-${suffix}`,
     ownerId: `owner-${suffix}`,
     vendorId: `vendor-records-vendor-${suffix}`,
@@ -94,6 +99,7 @@ async function createFixture(): Promise<Fixture> {
     id: fixture.batchId,
     projectId: fixture.completedProjectId,
     ownerId: fixture.ownerId,
+    workspaceId: fixture.workspaceId,
     status: "completed",
     manifest: [],
   });
@@ -102,12 +108,14 @@ async function createFixture(): Promise<Fixture> {
       id: fixture.completedProjectId,
       importBatchId: fixture.batchId,
       ownerId: fixture.ownerId,
+      workspaceId: fixture.workspaceId,
       data: project(fixture.completedProjectId, "Completed vendor project", "Completed"),
     },
     {
       id: fixture.incompleteProjectId,
       importBatchId: fixture.batchId,
       ownerId: fixture.ownerId,
+      workspaceId: fixture.workspaceId,
       data: project(fixture.incompleteProjectId, "Incomplete vendor project", "In progress"),
     },
   ]);
@@ -132,9 +140,10 @@ async function createFixture(): Promise<Fixture> {
 }
 
 async function removeFixture(fixture: Fixture) {
+  await db.delete(importedVendorQuotesTable).where(eq(importedVendorQuotesTable.importBatchId, fixture.batchId));
   await db.delete(vendorReviewTable).where(eq(vendorReviewTable.vendorId, fixture.vendorId));
   await db.delete(vendorJobHistoryTable).where(eq(vendorJobHistoryTable.vendorId, fixture.vendorId));
-  await db.delete(importedVendorsTable).where(eq(importedVendorsTable.id, fixture.vendorId));
+  await db.delete(importedVendorsTable).where(eq(importedVendorsTable.importBatchId, fixture.batchId));
   await db.delete(importedProjectsTable).where(and(
     eq(importedProjectsTable.importBatchId, fixture.batchId),
     eq(importedProjectsTable.ownerId, fixture.ownerId),
@@ -295,6 +304,194 @@ async function createHistoryWithReview(base: string, fixture: Fixture) {
   assert.ok(savedReview);
   return { history: savedHistory, review: savedReview };
 }
+
+async function createQuote(fixture: Fixture, vendorId: string, id: string) {
+  await db.insert(importedVendorQuotesTable).values({
+    id,
+    importBatchId: fixture.batchId,
+    ownerId: fixture.ownerId,
+    data: {
+      id,
+      vendorId,
+      vendorName: vendorId === fixture.vendorId ? "Persistent Test Electric" : "Unrelated Test Vendor",
+      projectId: fixture.completedProjectId,
+      projectName: "Completed vendor project",
+      quoteNumber: id,
+      direction: "company_to_luminova",
+      trade: "Electrical",
+      total: 12500,
+      issueDate: "2026-08-20",
+      dueDate: "2026-09-01",
+      status: "Under review",
+    },
+  });
+}
+
+test("profile-only deletion preserves quotes, job history, reviews, project and import batch", async (t) => {
+  const fixture = await createFixture();
+  t.after(() => removeFixture(fixture));
+  const base = await startApi(t);
+  const { history, review } = await createHistoryWithReview(base, fixture);
+  await createQuote(fixture, fixture.vendorId, `profile-only-quote-${fixture.suffix}`);
+
+  const response = await fetch(base + `/trades/${fixture.vendorId}`, {
+    method: "DELETE",
+    headers: jsonHeaders("admin"),
+    body: JSON.stringify({ deletionMode: "profile_only" }),
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { deleted: true, relatedRecordsDeleted: false });
+
+  assert.equal((await db.select().from(importedVendorsTable).where(eq(importedVendorsTable.id, fixture.vendorId))).length, 0);
+  assert.equal((await db.select().from(importedVendorQuotesTable).where(eq(importedVendorQuotesTable.importBatchId, fixture.batchId))).length, 1);
+  assert.equal((await db.select().from(vendorJobHistoryTable).where(eq(vendorJobHistoryTable.id, history.id))).length, 1);
+  assert.equal((await db.select().from(vendorReviewTable).where(eq(vendorReviewTable.id, review.id))).length, 1);
+  assert.equal((await db.select().from(importedProjectsTable).where(eq(importedProjectsTable.importBatchId, fixture.batchId))).length, 2);
+  assert.equal((await db.select().from(projectImportBatchesTable).where(eq(projectImportBatchesTable.id, fixture.batchId))).length, 1);
+});
+
+test("full vendor deletion removes only that vendor's related records and keeps project data intact", async (t) => {
+  const fixture = await createFixture();
+  const unrelatedVendorId = `unrelated-vendor-${fixture.suffix}`;
+  const unrelatedQuoteId = `unrelated-quote-${fixture.suffix}`;
+  const unrelatedHistoryId = `unrelated-history-${fixture.suffix}`;
+  const unrelatedReviewId = `unrelated-review-${fixture.suffix}`;
+  t.after(async () => {
+    await db.delete(vendorReviewTable).where(eq(vendorReviewTable.id, unrelatedReviewId));
+    await db.delete(vendorJobHistoryTable).where(eq(vendorJobHistoryTable.id, unrelatedHistoryId));
+    await removeFixture(fixture);
+  });
+  const base = await startApi(t);
+  const { history, review } = await createHistoryWithReview(base, fixture);
+
+  await db.insert(importedVendorsTable).values({
+    id: unrelatedVendorId,
+    importBatchId: fixture.batchId,
+    ownerId: fixture.ownerId,
+    data: {
+      id: unrelatedVendorId,
+      companyName: "Unrelated Test Vendor",
+      contactName: "Avery",
+      tradeType: "Plumbing",
+      region: "Calgary",
+      rating: 0,
+      reviewCount: 0,
+      completedJobs: 0,
+      initials: "UT",
+      accent: "#64748B",
+    },
+  });
+  await createQuote(fixture, fixture.vendorId, `selected-quote-${fixture.suffix}`);
+  await createQuote(fixture, unrelatedVendorId, unrelatedQuoteId);
+  await db.insert(vendorJobHistoryTable).values({
+    id: unrelatedHistoryId,
+    vendorId: unrelatedVendorId,
+    projectId: fixture.completedProjectId,
+    completedDate: "2026-08-20",
+    amount: 10000,
+    source: "Unrelated vendor closeout",
+    recordedBy: "admin",
+  });
+  await db.insert(vendorReviewTable).values({
+    id: unrelatedReviewId,
+    vendorId: unrelatedVendorId,
+    projectId: fixture.completedProjectId,
+    reviewerId: "pm",
+    reviewerName: "Morgan Builder",
+    reviewedDate: "2026-08-25",
+    rating: 4,
+    comment: "Unrelated vendor review.",
+    source: "Project closeout review",
+  });
+
+  const response = await fetch(base + `/trades/${fixture.vendorId}`, {
+    method: "DELETE",
+    headers: jsonHeaders("admin"),
+    body: JSON.stringify({ deletionMode: "profile_and_related_records" }),
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { deleted: true, relatedRecordsDeleted: true });
+
+  assert.equal((await db.select().from(importedVendorsTable).where(eq(importedVendorsTable.id, fixture.vendorId))).length, 0);
+  assert.equal((await db.select().from(importedVendorsTable).where(eq(importedVendorsTable.id, unrelatedVendorId))).length, 1);
+  assert.equal((await db.select().from(importedVendorQuotesTable).where(eq(importedVendorQuotesTable.id, `selected-quote-${fixture.suffix}`))).length, 0);
+  assert.equal((await db.select().from(importedVendorQuotesTable).where(eq(importedVendorQuotesTable.id, unrelatedQuoteId))).length, 1);
+  assert.equal((await db.select().from(vendorJobHistoryTable).where(eq(vendorJobHistoryTable.id, history.id))).length, 0);
+  assert.equal((await db.select().from(vendorReviewTable).where(eq(vendorReviewTable.id, review.id))).length, 0);
+  assert.equal((await db.select().from(vendorJobHistoryTable).where(eq(vendorJobHistoryTable.id, unrelatedHistoryId))).length, 1);
+  assert.equal((await db.select().from(vendorReviewTable).where(eq(vendorReviewTable.id, unrelatedReviewId))).length, 1);
+  assert.equal((await db.select().from(importedProjectsTable).where(eq(importedProjectsTable.importBatchId, fixture.batchId))).length, 2);
+  assert.equal((await db.select().from(projectImportBatchesTable).where(eq(projectImportBatchesTable.id, fixture.batchId))).length, 1);
+});
+
+test("vendor deletion requires an administrator, a valid choice, and a profile in the workspace", async (t) => {
+  const fixture = await createFixture();
+  const otherWorkspaceFixture = await createFixture(`org-deletion-boundary-${fixture.suffix}`);
+  t.after(async () => {
+    await removeFixture(fixture);
+    await removeFixture(otherWorkspaceFixture);
+  });
+  const base = await startApi(t);
+  const path = `/trades/${fixture.vendorId}`;
+  assert.equal((await fetch(base + path, {
+    method: "DELETE",
+    headers: jsonHeaders("pm"),
+    body: JSON.stringify({ deletionMode: "profile_only" }),
+  })).status, 403);
+  assert.equal((await fetch(base + path, {
+    method: "DELETE",
+    headers: jsonHeaders("admin"),
+    body: JSON.stringify({ deletionMode: "unknown" }),
+  })).status, 400);
+  assert.equal((await fetch(base + `/trades/missing-${fixture.suffix}`, {
+    method: "DELETE",
+    headers: jsonHeaders("admin"),
+    body: JSON.stringify({ deletionMode: "profile_only" }),
+  })).status, 404);
+  assert.equal((await fetch(base + `/trades/${otherWorkspaceFixture.vendorId}`, {
+    method: "DELETE",
+    headers: jsonHeaders("admin"),
+    body: JSON.stringify({ deletionMode: "profile_only" }),
+  })).status, 404);
+});
+
+test("deleted seeded vendor profiles stay excluded after directory seeding runs again", async (t) => {
+  const workspaceId = "default";
+  await ensureSeededVendorProfiles(workspaceId);
+  const profiles = await db.select().from(standaloneVendorProfilesTable)
+    .where(eq(standaloneVendorProfilesTable.workspaceId, workspaceId));
+  const seededProfile = profiles.find((profile) => profile.deletedAt === null);
+  assert.ok(seededProfile);
+  t.after(async () => {
+    await db.update(standaloneVendorProfilesTable)
+      .set({ deletedAt: seededProfile.deletedAt, updatedAt: seededProfile.updatedAt })
+      .where(and(
+        eq(standaloneVendorProfilesTable.id, seededProfile.id),
+        eq(standaloneVendorProfilesTable.workspaceId, workspaceId),
+      ));
+  });
+
+  const base = await startApi(t);
+  const response = await fetch(base + `/trades/${seededProfile.id}`, {
+    method: "DELETE",
+    headers: jsonHeaders("admin"),
+    body: JSON.stringify({ deletionMode: "profile_only" }),
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { deleted: true, relatedRecordsDeleted: false });
+
+  await ensureSeededVendorProfiles(workspaceId);
+  const directoryResponse = await fetch(base + "/trades", { headers: jsonHeaders("admin") });
+  assert.equal(directoryResponse.status, 200);
+  const directory = await directoryResponse.json() as Array<{ id: string }>;
+  assert.equal(directory.some((trade) => trade.id === seededProfile.id), false);
+  const [tombstone] = await db.select().from(standaloneVendorProfilesTable)
+    .where(and(
+      eq(standaloneVendorProfilesTable.id, seededProfile.id),
+      eq(standaloneVendorProfilesTable.workspaceId, workspaceId),
+    ));
+  assert.ok(tombstone?.deletedAt);
+});
 
 test("history mutations require administrators and remain durable across list/detail reads", async (t) => {
   const fixture = await createFixture();

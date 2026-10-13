@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import {
   db,
   standaloneVendorProfilesTable,
@@ -167,6 +167,7 @@ export async function getStandaloneVendorProfile(
     .where(and(
       eq(standaloneVendorProfilesTable.id, tradeId),
       eq(standaloneVendorProfilesTable.workspaceId, workspaceId),
+      isNull(standaloneVendorProfilesTable.deletedAt),
     ))
     .limit(1);
   return row;

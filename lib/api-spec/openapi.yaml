@@ -865,6 +865,33 @@ paths:
           description: Authentication required
         "404":
           description: Vendor not found
+    delete:
+      operationId: deleteTrade
+      tags: [trades]
+      summary: Remove a vendor profile, optionally deleting its related records
+      parameters:
+        - $ref: "#/components/parameters/TradeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteTradeInput"
+      responses:
+        "200":
+          description: Vendor profile removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TradeDeletionResult"
+        "400":
+          description: Invalid deletion choice
+        "401":
+          description: Authentication required
+        "403":
+          description: Administrator access required
+        "404":
+          description: Vendor not found
   /trades/{tradeId}/profile-photo-upload:
     post:
       operationId: requestTradeProfilePhotoUpload
@@ -2425,6 +2452,19 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/TradeBid"
+    DeleteTradeInput:
+      type: object
+      required: [deletionMode]
+      properties:
+        deletionMode:
+          type: string
+          enum: [profile_only, profile_and_related_records]
+    TradeDeletionResult:
+      type: object
+      required: [deleted, relatedRecordsDeleted]
+      properties:
+        deleted: { type: boolean }
+        relatedRecordsDeleted: { type: boolean }
     UpdateTradeProfileInput:
       type: object
       required: [phone, email, website, regions, licence, insurance, insuranceExpiry, profilePhotoPositionX, profilePhotoPositionY, profilePhotoZoom]

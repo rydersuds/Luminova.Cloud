@@ -139,4 +139,5 @@ test("seeded vendor profiles are idempotent, searchable, editable, and workspace
 
   const unauthorizedDetail = await fetch(base + `/trades/${otherWorkspace[0]?.id}`, { headers: headers() });
   assert.equal(unauthorizedDetail.status, 404);
+
 });

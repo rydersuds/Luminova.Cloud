@@ -16,6 +16,14 @@ export default function TradesDirectory() {
   const [, setLocation] = useLocation()
   const [search, setSearch] = React.useState("")
   const [tradeType, setTradeType] = React.useState("")
+  const [feedback, setFeedback] = React.useState("")
+
+  React.useEffect(() => {
+    const message = window.sessionStorage.getItem("luminova-trade-directory-feedback-v1")
+    if (!message) return
+    window.sessionStorage.removeItem("luminova-trade-directory-feedback-v1")
+    setFeedback(message)
+  }, [])
 
   const { data: availableTrades } = useGetTrades({}, {
     query: {
@@ -77,6 +85,11 @@ export default function TradesDirectory() {
         </div>
 
         <div className="p-6 md:p-8 max-w-5xl mx-auto">
+          {feedback && (
+            <div role="status" className="mb-6 rounded-md border border-primary/40 bg-primary/10 p-3 text-sm">
+              {feedback}
+            </div>
+          )}
           {isLoading ? (
             <div className="space-y-4">
               {Array.from({ length: 5 }).map((_, i) => (

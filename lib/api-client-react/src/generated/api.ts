@@ -38,6 +38,7 @@ import type {
   ClientMemberInput,
   CurrentWorkspaceUser,
   DashboardSummary,
+  DeleteTradeInput,
   FinancialSummary,
   GetInvoicesParams,
   GetProjectsParams,
@@ -79,6 +80,7 @@ import type {
   ScheduleImageUpdate,
   SearchWorkspaceParams,
   Trade,
+  TradeDeletionResult,
   TradeDetail,
   UpdateTradeProfileInput,
   UploadUrlRequest,
@@ -3086,6 +3088,78 @@ export const useUpdateTrade = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateTradeMutationOptions(options));
+    }
+
+export const getDeleteTradeUrl = (tradeId: string,) => {
+
+
+
+
+  return `/api/trades/${tradeId}`
+}
+
+/**
+ * @summary Remove a vendor profile, optionally deleting its related records
+ */
+export const deleteTrade = async (tradeId: string,
+    deleteTradeInput: DeleteTradeInput, options?: Parameters<typeof customFetch>[1]): Promise<TradeDeletionResult> => {
+
+  return customFetch<TradeDeletionResult>(getDeleteTradeUrl(tradeId),
+  {
+    ...options,
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(deleteTradeInput)
+  }
+);}
+
+
+
+
+
+export const getDeleteTradeMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTrade>>, TError,{tradeId: string;data: BodyType<DeleteTradeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteTrade>>, TError,{tradeId: string;data: BodyType<DeleteTradeInput>}, TContext> => {
+
+const mutationKey = ['deleteTrade'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTrade>>, {tradeId: string;data: BodyType<DeleteTradeInput>}> = (props) => {
+          const {tradeId,data} = props ?? {};
+
+          return  deleteTrade(tradeId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteTradeMutationResult = NonNullable<Awaited<ReturnType<typeof deleteTrade>>>
+    export type DeleteTradeMutationBody = BodyType<DeleteTradeInput>
+    export type DeleteTradeMutationError = ErrorType<void>
+
+    /**
+ * @summary Remove a vendor profile, optionally deleting its related records
+ */
+export const useDeleteTrade = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTrade>>, TError,{tradeId: string;data: BodyType<DeleteTradeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteTrade>>,
+        TError,
+        {tradeId: string;data: BodyType<DeleteTradeInput>},
+        TContext
+      > => {
+      return useMutation(getDeleteTradeMutationOptions(options));
     }
 
 export const getRequestTradeProfilePhotoUploadUrl = (tradeId: string,) => {
@@ -6423,3 +6497,4 @@ export const useDeleteWorkspaceUser = <TError = ErrorType<void>,
       > => {
       return useMutation(getDeleteWorkspaceUserMutationOptions(options));
     }
+
