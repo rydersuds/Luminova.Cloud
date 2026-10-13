@@ -31,7 +31,7 @@ export function TextCell({
   value: string
   placeholder: string
   label: string
-  onSave: (next: string) => void
+  onSave: (next: string) => unknown
   className?: string
   format?: (text: string) => string
   inputMode?: "text" | "decimal"
@@ -39,17 +39,31 @@ export function TextCell({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
   const inputRef = useRef<HTMLInputElement>(null)
+  const committing = useRef(false)
 
   useEffect(() => {
     if (editing) inputRef.current?.select()
   }, [editing])
 
-  const commit = () => {
-    setEditing(false)
-    if (draft.trim() !== value.trim()) onSave(draft)
+  const commit = async () => {
+    if (committing.current) return
+    if (draft.trim() === value.trim()) {
+      setEditing(false)
+      return
+    }
+
+    committing.current = true
+    try {
+      // Board actions return false after showing an error toast and restoring the
+      // previous value. Keep the editor and its draft available for another try.
+      const saved = await onSave(draft)
+      if (saved !== false) setEditing(false)
+    } finally {
+      committing.current = false
+    }
   }
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter") commit()
+    if (event.key === "Enter") void commit()
     if (event.key === "Escape") {
       setDraft(value)
       setEditing(false)
@@ -64,7 +78,7 @@ export function TextCell({
         value={draft}
         inputMode={inputMode}
         onChange={(event) => setDraft(event.target.value)}
-        onBlur={commit}
+        onBlur={() => void commit()}
         onKeyDown={onKeyDown}
         className={cn("board-input", className)}
       />
