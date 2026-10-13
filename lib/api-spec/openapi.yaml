@@ -26,6 +26,10 @@ tags:
     description: Persistent object upload and serving
   - name: project-imports
     description: AI-assisted project folder initialization
+  - name: boards
+    description: Monday-style project boards, timeline and calendar
+  - name: approvals
+    description: Budget checks and Admin approval of over-budget spending
 paths:
   /healthz:
     get:
@@ -352,6 +356,244 @@ paths:
           description: Project not found
         "422":
           description: Uploaded object could not be verified
+  /projects/{projectId}/board:
+    get:
+      operationId: getProjectBoard
+      tags: [boards]
+      summary: Get the project's board (groups and items). Creates the default phase groups on first use.
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Project board
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectBoard"
+        "403":
+          description: Project team access required
+        "404":
+          description: Project not found
+  /projects/{projectId}/board/groups:
+    post:
+      operationId: createBoardGroup
+      tags: [boards]
+      summary: Add a group (phase) to the project board
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BoardGroupInput"
+      responses:
+        "201":
+          description: Created group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BoardGroup"
+        "400":
+          description: Invalid group
+        "403":
+          description: Project team access required
+        "404":
+          description: Project not found
+  /projects/{projectId}/board/groups/{groupId}:
+    patch:
+      operationId: updateBoardGroup
+      tags: [boards]
+      summary: Rename, recolor, or move a board group
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/BoardGroupId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BoardGroupUpdate"
+      responses:
+        "200":
+          description: Updated group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BoardGroup"
+        "400":
+          description: Invalid group update
+        "403":
+          description: Project team access required
+        "404":
+          description: Project or group not found
+    delete:
+      operationId: deleteBoardGroup
+      tags: [boards]
+      summary: Delete a board group and its items
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/BoardGroupId"
+      responses:
+        "204":
+          description: Group deleted
+        "403":
+          description: Project team access required
+        "404":
+          description: Project or group not found
+  /projects/{projectId}/board/items:
+    post:
+      operationId: createBoardItem
+      tags: [boards]
+      summary: Add an item (task) to a board group
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BoardItemInput"
+      responses:
+        "201":
+          description: Created item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BoardItem"
+        "400":
+          description: Invalid item
+        "403":
+          description: Project team access required
+        "404":
+          description: Project or group not found
+  /projects/{projectId}/board/items/{itemId}:
+    patch:
+      operationId: updateBoardItem
+      tags: [boards]
+      summary: Update any column of a board item, or move it
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/BoardItemId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BoardItemUpdate"
+      responses:
+        "200":
+          description: Updated item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BoardItem"
+        "400":
+          description: Invalid item update
+        "403":
+          description: Project team access required
+        "404":
+          description: Project or item not found
+    delete:
+      operationId: deleteBoardItem
+      tags: [boards]
+      summary: Delete a board item
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/BoardItemId"
+      responses:
+        "204":
+          description: Item deleted
+        "403":
+          description: Project team access required
+        "404":
+          description: Project or item not found
+  /board-items:
+    get:
+      operationId: getBoardSchedule
+      tags: [boards]
+      summary: Dated board items across every project the user can open, for the portfolio timeline and calendar
+      responses:
+        "200":
+          description: Board items with project names
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BoardScheduleItem"
+        "403":
+          description: Project team access required
+  /purchase-approvals:
+    get:
+      operationId: getPurchaseApprovals
+      tags: [approvals]
+      summary: Budget approvals for the projects the user manages, newest first
+      responses:
+        "200":
+          description: Purchase and invoice approvals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PurchaseApproval"
+        "403":
+          description: Project management access required
+    post:
+      operationId: createPurchaseApproval
+      tags: [approvals]
+      summary: Check a purchase against its trade budget. Within budget it is approved and reserved; over budget it waits for an Admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PurchaseApprovalInput"
+      responses:
+        "201":
+          description: The recorded purchase, auto-approved or pending approval
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseApproval"
+        "400":
+          description: Invalid purchase
+        "403":
+          description: Project management access required
+        "404":
+          description: Project not accessible
+  /purchase-approvals/{approvalId}/decision:
+    post:
+      operationId: decidePurchaseApproval
+      tags: [approvals]
+      summary: Approve or decline a pending over-budget purchase or invoice (Admins only)
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PurchaseApprovalDecision"
+      responses:
+        "200":
+          description: The decided approval
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseApproval"
+        "400":
+          description: Invalid decision
+        "403":
+          description: Administrator access required
+        "404":
+          description: Approval not found
+        "409":
+          description: Already decided
   /storage/uploads/request-url:
     post:
       operationId: requestUploadUrl
@@ -1620,6 +1862,16 @@ paths:
           description: Identity provider rejected the deletion
 components:
   parameters:
+    BoardGroupId:
+      name: groupId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    BoardItemId:
+      name: itemId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
     ImportId:
       name: importId
       in: path
@@ -2294,7 +2546,8 @@ components:
         budgetRemainingAfter: { type: ["number", "null"] }
         approvalReason:
           type: string
-          enum: [within_budget, over_budget, budget_unavailable]
+          enum: [within_budget, over_budget, budget_unavailable, pre_approved]
+        purchaseApprovalId: { type: ["string", "null"] }
         submittedById: { type: string }
         attachment: { $ref: "#/components/schemas/InvoiceAttachment" }
     InvoiceInput:
@@ -2625,6 +2878,150 @@ components:
         contentType:
           type: string
           enum: [image/jpeg, image/png, image/webp]
+    BoardGroupColor:
+      type: string
+      enum: [gold, amber, orange, red, pink, violet, indigo, blue, sky, teal, green, lime, slate]
+    BoardItemStatus:
+      type: string
+      enum: ["Not started", "Working on it", "Stuck", "Done"]
+    BoardItemPriority:
+      type: string
+      enum: [Low, Medium, High, Critical]
+    BoardGroup:
+      type: object
+      required: [id, projectId, name, color, position]
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        name: { type: string }
+        color: { $ref: "#/components/schemas/BoardGroupColor" }
+        position: { type: integer }
+    BoardItem:
+      type: object
+      required: [id, projectId, groupId, name, status, priority, assignee, startDate, endDate, costCents, dependsOnId, position]
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        groupId: { type: string }
+        name: { type: string }
+        status: { $ref: "#/components/schemas/BoardItemStatus" }
+        priority:
+          anyOf:
+            - $ref: "#/components/schemas/BoardItemPriority"
+            - type: "null"
+        assignee: { type: [string, "null"] }
+        startDate: { type: [string, "null"], description: "YYYY-MM-DD" }
+        endDate: { type: [string, "null"], description: "YYYY-MM-DD" }
+        costCents: { type: [integer, "null"] }
+        dependsOnId: { type: [string, "null"] }
+        position: { type: integer }
+    BoardScheduleItem:
+      allOf:
+        - $ref: "#/components/schemas/BoardItem"
+        - type: object
+          required: [projectName, groupName, groupColor]
+          properties:
+            projectName: { type: string }
+            groupName: { type: string }
+            groupColor: { $ref: "#/components/schemas/BoardGroupColor" }
+    ProjectBoard:
+      type: object
+      required: [projectId, groups, items]
+      properties:
+        projectId: { type: string }
+        groups:
+          type: array
+          items: { $ref: "#/components/schemas/BoardGroup" }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/BoardItem" }
+    BoardGroupInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        color: { $ref: "#/components/schemas/BoardGroupColor" }
+    BoardGroupUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        color: { $ref: "#/components/schemas/BoardGroupColor" }
+        position: { type: integer, minimum: 0 }
+    BoardItemInput:
+      type: object
+      required: [groupId, name]
+      properties:
+        groupId: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        status: { $ref: "#/components/schemas/BoardItemStatus" }
+        priority:
+          anyOf:
+            - $ref: "#/components/schemas/BoardItemPriority"
+            - type: "null"
+        assignee: { type: [string, "null"], maxLength: 120 }
+        startDate: { type: [string, "null"], pattern: "^\\d{4}-\\d{2}-\\d{2}$" }
+        endDate: { type: [string, "null"], pattern: "^\\d{4}-\\d{2}-\\d{2}$" }
+        costCents: { type: [integer, "null"], minimum: 0 }
+    BoardItemUpdate:
+      type: object
+      properties:
+        groupId: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        status: { $ref: "#/components/schemas/BoardItemStatus" }
+        priority:
+          anyOf:
+            - $ref: "#/components/schemas/BoardItemPriority"
+            - type: "null"
+        assignee: { type: [string, "null"], maxLength: 120 }
+        startDate: { type: [string, "null"], pattern: "^\\d{4}-\\d{2}-\\d{2}$" }
+        endDate: { type: [string, "null"], pattern: "^\\d{4}-\\d{2}-\\d{2}$" }
+        costCents: { type: [integer, "null"], minimum: 0 }
+        dependsOnId: { type: [string, "null"] }
+        position: { type: integer, minimum: 0 }
+    PurchaseApprovalStatus:
+      type: string
+      enum: ["Auto-approved", "Pending approval", "Approved", "Declined"]
+    PurchaseApproval:
+      type: object
+      required: [id, projectId, projectName, kind, invoiceId, budgetLineItemId, tradeLabel, vendor, description, amount, remainingBefore, overage, status, approvalReason, requestedById, requestedByName, requestedAt, decidedByName, decidedAt, decisionNote, budgetIncrease]
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        projectName: { type: string }
+        kind: { type: string, enum: [purchase, invoice] }
+        invoiceId: { type: [string, "null"] }
+        budgetLineItemId: { type: [string, "null"] }
+        tradeLabel: { type: string }
+        vendor: { type: [string, "null"] }
+        description: { type: string }
+        amount: { type: number }
+        remainingBefore: { type: [number, "null"], description: "Trade budget left before this spend; null when the trade has no reliable budget" }
+        overage: { type: number }
+        status: { $ref: "#/components/schemas/PurchaseApprovalStatus" }
+        approvalReason: { type: string, enum: [within_budget, over_budget, budget_unavailable] }
+        requestedById: { type: string }
+        requestedByName: { type: string }
+        requestedAt: { type: string }
+        decidedByName: { type: [string, "null"] }
+        decidedAt: { type: [string, "null"] }
+        decisionNote: { type: [string, "null"] }
+        budgetIncrease: { type: [number, "null"] }
+    PurchaseApprovalInput:
+      type: object
+      required: [projectId, budgetLineItemId, amount, description]
+      properties:
+        projectId: { type: string, minLength: 1 }
+        budgetLineItemId: { type: string, minLength: 1 }
+        amount: { type: number, exclusiveMinimum: 0, maximum: 1000000000 }
+        vendor: { type: [string, "null"], maxLength: 200 }
+        description: { type: string, minLength: 1, maxLength: 500 }
+    PurchaseApprovalDecision:
+      type: object
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [approve, decline] }
+        note: { type: [string, "null"], maxLength: 500 }
+        raiseBudget: { type: boolean, description: "When approving, add the overage to the trade's budget" }
     ScheduleImageUpdate:
       type: object
       required: [revision, effectiveDate, isCurrent]

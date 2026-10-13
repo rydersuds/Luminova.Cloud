@@ -1,6 +1,8 @@
 import * as React from "react"
 import { Link, useLocation, useParams, useSearch } from "wouter"
 import { projectTabFromSearch, projectWorkflowHref } from "@/lib/project-workflow"
+import { ProjectBoard } from "@/components/board/project-board"
+import { TradeBudgets } from "@/components/approvals/trade-budgets"
 import { 
   useGetProject, 
   getGetProjectQueryKey,
@@ -118,7 +120,6 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const params = useParams()
   const [location, setLocation] = useLocation()
   const search = useSearch()
-  const activeTab = projectTabFromSearch(search)
   const selectTab = (tab: string) => {
     const query = new URLSearchParams(search)
     query.set("tab", tab)
@@ -162,6 +163,8 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const uploadEntryAgreement = useUploadProjectEntryAgreement()
   const panoramaName = (label: string | null) => label || "Untitled panorama"
   const { data: currentUser } = useGetCurrentWorkspaceUser()
+  const canUseBoard = currentUser?.role !== "Client"
+  const activeTab = projectTabFromSearch(search, canUseBoard)
   const isAdmin = currentUser?.role === "Admin"
   const { data: projectManagers, isLoading: loadingProjectManagers, isError: projectManagersError } = useGetProjectManagers({
     query: { enabled: isAdmin, queryKey: getGetProjectManagersQueryKey() },
@@ -188,16 +191,18 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const updateScheduleImage = useUpdateProjectScheduleImage()
   const updatePanorama = useUpdateProjectPanorama()
   const canManageSchedules = currentUser?.role === "Admin" || currentUser?.role === "Project Manager"
+  const projectPhotos = React.useMemo(() => Array.isArray(project?.photos) ? project.photos : [], [project])
+  const projectFiles = React.useMemo(() => Array.isArray(project?.files) ? project.files : [], [project])
   const photoFolderTree = React.useMemo(() => {
     if (!project) return []
-    const photoPaths = project.photos.map((photo) => photo.caption.split("/").filter(Boolean))
+    const photoPaths = projectPhotos.map((photo) => photo.caption.split("/").filter(Boolean))
     const rootFolder = photoPaths[0]?.length > 1 &&
       photoPaths.every((parts) => parts.length > 1 && parts[0] === photoPaths[0][0])
       ? photoPaths[0][0]
       : undefined
     const query = photoSearch.trim().toLowerCase()
     const photos = query
-      ? project.photos.filter((photo) =>
+      ? projectPhotos.filter((photo) =>
           [
             photo.caption,
             photo.phase,
@@ -206,9 +211,9 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
           ]
             .some((value) => value.toLowerCase().includes(query))
         )
-      : project.photos
+      : projectPhotos
     return buildPhotoFolderTree(photos, rootFolder)
-  }, [project, photoSearch])
+  }, [project, projectPhotos, photoSearch])
   React.useEffect(() => {
     if (!project || photoSearch || initializedPhotoFoldersForProject.current === projectId) return
     const paths: string[] = []
@@ -222,9 +227,9 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
     setCollapsedPhotoCollections(new Set(paths))
     initializedPhotoFoldersForProject.current = projectId
   }, [photoFolderTree, photoSearch, project, projectId])
-  const invoiceFiles = project?.files.filter((file) => file.classification === "invoice") || []
-  const quoteFiles = project?.files.filter((file) => file.classification === "quote") || []
-  const entryAgreement = project?.files.find(
+  const invoiceFiles = projectFiles.filter((file) => file.classification === "invoice")
+  const quoteFiles = projectFiles.filter((file) => file.classification === "quote")
+  const entryAgreement = projectFiles.find(
     (file) => file.classification === "contract" && file.isEntryAgreement,
   )
 
@@ -682,7 +687,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const projectProgress = Math.min(Math.max(project.progress, 0), 100)
   const daysRemaining = getDaysRemaining(project.targetDate)
   const renderPhotoCard = (photo: ProjectPhoto) => {
-    const index = project.photos.findIndex((item) => item.id === photo.id)
+    const index = projectPhotos.findIndex((item) => item.id === photo.id)
     return (
       <div key={photo.id} className={cn("group overflow-hidden rounded-lg border bg-card text-left", project.exteriorImage === photo.url ? "border-primary ring-2 ring-primary/30" : "border-border")}>
         <button type="button" onClick={() => setPhotoIndex(index)} className="block w-full cursor-zoom-in text-left" aria-label={`View ${photo.caption}`}>
@@ -930,12 +935,19 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
           </nav>
           <Tabs value={activeTab} onValueChange={selectTab} className="w-full">
             <TabsList className="mb-6 grid w-full grid-cols-2 md:flex md:justify-start h-auto bg-transparent gap-2 p-0">
+              {canUseBoard && <TabsTrigger value="board" className="data-[state=active]:bg-card data-[state=active]:shadow border border-transparent data-[state=active]:border-border px-4 py-2">Board</TabsTrigger>}
               <TabsTrigger value="overview" className="data-[state=active]:bg-card data-[state=active]:shadow border border-transparent data-[state=active]:border-border px-4 py-2">Overview</TabsTrigger>
               <TabsTrigger value="photos" className="data-[state=active]:bg-card data-[state=active]:shadow border border-transparent data-[state=active]:border-border px-4 py-2">Photos & 360s</TabsTrigger>
               <TabsTrigger value="budget" className="data-[state=active]:bg-card data-[state=active]:shadow border border-transparent data-[state=active]:border-border px-4 py-2">Budget</TabsTrigger>
               <TabsTrigger value="trades" className="data-[state=active]:bg-card data-[state=active]:shadow border border-transparent data-[state=active]:border-border px-4 py-2">Trades</TabsTrigger>
               <TabsTrigger value="activity" className="data-[state=active]:bg-card data-[state=active]:shadow border border-transparent data-[state=active]:border-border px-4 py-2">Activity</TabsTrigger>
             </TabsList>
+
+            {canUseBoard && (
+              <TabsContent value="board">
+                <ProjectBoard projectId={project.id} />
+              </TabsContent>
+            )}
 
             <TabsContent value="overview" className="space-y-6">
               <Card>
@@ -1483,12 +1495,12 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
 
               <Dialog open={photoIndex !== null} onOpenChange={(open) => !open && setPhotoIndex(null)}>
                 <DialogContent className="h-[92dvh] w-[96vw] !max-w-6xl overflow-hidden border-white/15 bg-black p-0 text-white">
-                  {photoIndex !== null && project.photos[photoIndex] && (
+                  {photoIndex !== null && projectPhotos[photoIndex] && (
                     <div className="flex h-full flex-col">
                       <div className="flex-1 min-h-0 p-4 sm:p-8">
                         <img
-                          src={project.photos[photoIndex].url}
-                          alt={project.photos[photoIndex].caption}
+                          src={projectPhotos[photoIndex].url}
+                          alt={projectPhotos[photoIndex].caption}
                           className="h-full w-full object-contain"
                         />
                       </div>
@@ -1497,20 +1509,20 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                           variant="outline"
                           size="icon"
                           className="border-white/20 bg-white/5 text-white hover:bg-white/15 hover:text-white"
-                          onClick={() => setPhotoIndex((photoIndex - 1 + project.photos.length) % project.photos.length)}
+                          onClick={() => setPhotoIndex((photoIndex - 1 + projectPhotos.length) % projectPhotos.length)}
                           aria-label="Previous photo"
                         >
                           <ChevronLeft className="h-5 w-5" />
                         </Button>
                         <div className="min-w-0 text-center">
-                          <p className="truncate font-medium">{project.photos[photoIndex].caption}</p>
-                          <p className="mt-1 text-xs text-white/55">{photoIndex + 1} of {project.photos.length}</p>
+                          <p className="truncate font-medium">{projectPhotos[photoIndex].caption}</p>
+                          <p className="mt-1 text-xs text-white/55">{photoIndex + 1} of {projectPhotos.length}</p>
                         </div>
                         <Button
                           variant="outline"
                           size="icon"
                           className="border-white/20 bg-white/5 text-white hover:bg-white/15 hover:text-white"
-                          onClick={() => setPhotoIndex((photoIndex + 1) % project.photos.length)}
+                          onClick={() => setPhotoIndex((photoIndex + 1) % projectPhotos.length)}
                           aria-label="Next photo"
                         >
                           <ChevronRight className="h-5 w-5" />
@@ -1588,6 +1600,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
             </TabsContent>
 
             <TabsContent value="budget" className="space-y-6">
+              <TradeBudgets projectId={project.id} />
               {(invoiceFiles.length > 0 || quoteFiles.length > 0) && (
                 <Card>
                   <CardHeader>
@@ -1889,7 +1902,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                                 <p className="font-medium">{trade.companyName}</p>
                                 <p className="text-xs text-muted-foreground">{trade.contactName}</p>
                                 <div className="mt-1 flex flex-wrap gap-1">
-                                  {project.files
+                                  {projectFiles
                                     .filter((file) => file.linkedEntityId === trade.id || file.relativePath.toLowerCase().includes(trade.companyName.toLowerCase()))
                                     .slice(0, 4)
                                     .map((file) => (

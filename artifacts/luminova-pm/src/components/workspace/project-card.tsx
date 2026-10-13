@@ -3,6 +3,7 @@ import { Building2, MapPin, ArrowUpRight } from "lucide-react"
 import { cn, formatCurrency, formatDateOnly, formatDaysRemaining, getDaysRemaining } from "@/lib/utils"
 import { ClientIdentity } from "@/components/client-identity"
 import { StatusPill } from "./status-pill"
+import { WireframeBuilding } from "./wireframe-building"
 
 type Props = {
   project: Project
@@ -28,7 +29,7 @@ export function ProjectCard({ project, onOpen, layout = "tile" }: Props) {
         {project.exteriorImage ? (
           <img src={project.exteriorImage} alt={project.name} loading="lazy" className="pcard-img" />
         ) : (
-          <div className="pcard-blank"><Building2 className="h-12 w-12" /></div>
+          <div className="pcard-blank"><WireframeBuilding seed={project.id} progress={project.progress} className="pcard-wireframe" /></div>
         )}
         <div className="pcard-shade" />
         <div className="absolute left-3 right-3 top-3 flex items-start justify-between gap-3">

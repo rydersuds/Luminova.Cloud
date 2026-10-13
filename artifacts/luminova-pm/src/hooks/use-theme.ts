@@ -2,15 +2,17 @@ import { useEffect, useState } from "react"
 
 export type Theme = "light" | "dark"
 
-const THEME_STORAGE_KEY = "luminova-theme"
+// v2: the old key stored "light" for everyone, which would hide the new dark default.
+const THEME_STORAGE_KEY = "luminova-theme-v2"
 
 function readTheme(): Theme {
-  if (typeof window === "undefined") return "light"
+  // Dark is the default look; light mode stays one tap away for bright sites.
+  if (typeof window === "undefined") return "dark"
 
   try {
-    return window.localStorage.getItem(THEME_STORAGE_KEY) === "dark" ? "dark" : "light"
+    return window.localStorage.getItem(THEME_STORAGE_KEY) === "light" ? "light" : "dark"
   } catch {
-    return "light"
+    return "dark"
   }
 }
 

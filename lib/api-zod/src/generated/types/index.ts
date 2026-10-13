@@ -7,6 +7,16 @@
  */
 
 export * from './activity';
+export * from './boardGroup';
+export * from './boardGroupColor';
+export * from './boardGroupInput';
+export * from './boardGroupUpdate';
+export * from './boardItem';
+export * from './boardItemInput';
+export * from './boardItemPriority';
+export * from './boardItemStatus';
+export * from './boardItemUpdate';
+export * from './boardScheduleItem';
 export * from './budgetLineItem';
 export * from './budgetLineItemDetail';
 export * from './bulkClientAccessReconciliationResponse';
@@ -48,6 +58,7 @@ export * from './panoramaInput';
 export * from './panoramaUpdate';
 export * from './photo';
 export * from './project';
+export * from './projectBoard';
 export * from './projectConversation';
 export * from './projectConversationInput';
 export * from './projectConversationInputType';
@@ -70,6 +81,13 @@ export * from './projectManager';
 export * from './projectMessage';
 export * from './projectMessageInput';
 export * from './projectUpdate';
+export * from './purchaseApproval';
+export * from './purchaseApprovalApprovalReason';
+export * from './purchaseApprovalDecision';
+export * from './purchaseApprovalDecisionDecision';
+export * from './purchaseApprovalInput';
+export * from './purchaseApprovalKind';
+export * from './purchaseApprovalStatus';
 export * from './quoteDirection';
 export * from './quotePortion';
 export * from './review';

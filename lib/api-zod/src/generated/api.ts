@@ -211,7 +211,8 @@ export const GetProjectResponse = zod.object({
   "budgetLineItemId": zod.string().nullish(),
   "budgetRemainingBefore": zod.number().nullish(),
   "budgetRemainingAfter": zod.number().nullish(),
-  "approvalReason": zod.enum(['within_budget', 'over_budget', 'budget_unavailable']).optional(),
+  "approvalReason": zod.enum(['within_budget', 'over_budget', 'budget_unavailable', 'pre_approved']).optional(),
+  "purchaseApprovalId": zod.string().nullish(),
   "submittedById": zod.string().optional(),
   "attachment": zod.object({
   "objectPath": zod.string().regex(getProjectResponseTwoInvoicesItemAttachmentOneObjectPathRegExp),
@@ -590,6 +591,367 @@ export const UploadProjectEntryAgreementResponse = zod.object({
   "linkedEntityType": zod.string().nullish(),
   "linkedEntityId": zod.string().nullish(),
   "aiConfidence": zod.number().int().min(uploadProjectEntryAgreementResponseAiConfidenceMin).max(uploadProjectEntryAgreementResponseAiConfidenceMax).nullish()
+})
+
+
+/**
+ * @summary Get the project's board (groups and items). Creates the default phase groups on first use.
+ */
+export const GetProjectBoardParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+export const GetProjectBoardResponse = zod.object({
+  "projectId": zod.string(),
+  "groups": zod.array(zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "name": zod.string(),
+  "color": zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']),
+  "position": zod.number().int()
+})),
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "groupId": zod.string(),
+  "name": zod.string(),
+  "status": zod.enum(['Not started', 'Working on it', 'Stuck', 'Done']),
+  "priority": zod.union([zod.enum(['Low', 'Medium', 'High', 'Critical']),zod.null()]),
+  "assignee": zod.string().nullable(),
+  "startDate": zod.string().nullable().describe('YYYY-MM-DD'),
+  "endDate": zod.string().nullable().describe('YYYY-MM-DD'),
+  "costCents": zod.number().int().nullable(),
+  "dependsOnId": zod.string().nullable(),
+  "position": zod.number().int()
+}))
+})
+
+
+/**
+ * @summary Add a group (phase) to the project board
+ */
+export const CreateBoardGroupParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+export const createBoardGroupBodyNameMax = 80;
+
+
+
+export const CreateBoardGroupBody = zod.object({
+  "name": zod.string().min(1).max(createBoardGroupBodyNameMax),
+  "color": zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']).optional()
+})
+
+export const CreateBoardGroupResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "name": zod.string(),
+  "color": zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']),
+  "position": zod.number().int()
+})
+
+
+/**
+ * @summary Rename, recolor, or move a board group
+ */
+
+
+
+export const UpdateBoardGroupParams = zod.object({
+  "projectId": zod.coerce.string(),
+  "groupId": zod.coerce.string().min(1)
+})
+
+export const updateBoardGroupBodyNameMax = 80;
+
+export const updateBoardGroupBodyPositionMin = 0;
+
+
+
+export const UpdateBoardGroupBody = zod.object({
+  "name": zod.string().min(1).max(updateBoardGroupBodyNameMax).optional(),
+  "color": zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']).optional(),
+  "position": zod.number().int().min(updateBoardGroupBodyPositionMin).optional()
+})
+
+export const UpdateBoardGroupResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "name": zod.string(),
+  "color": zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']),
+  "position": zod.number().int()
+})
+
+
+/**
+ * @summary Delete a board group and its items
+ */
+
+
+
+export const DeleteBoardGroupParams = zod.object({
+  "projectId": zod.coerce.string(),
+  "groupId": zod.coerce.string().min(1)
+})
+
+export const DeleteBoardGroupResponse = zod.void()
+
+
+/**
+ * @summary Add an item (task) to a board group
+ */
+export const CreateBoardItemParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+
+export const createBoardItemBodyNameMax = 200;
+
+export const createBoardItemBodyAssigneeMax = 120;
+
+export const createBoardItemBodyStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createBoardItemBodyEndDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createBoardItemBodyCostCentsMin = 0;
+
+
+
+export const CreateBoardItemBody = zod.object({
+  "groupId": zod.string().min(1),
+  "name": zod.string().min(1).max(createBoardItemBodyNameMax),
+  "status": zod.enum(['Not started', 'Working on it', 'Stuck', 'Done']).optional(),
+  "priority": zod.union([zod.enum(['Low', 'Medium', 'High', 'Critical']),zod.null()]).optional(),
+  "assignee": zod.string().max(createBoardItemBodyAssigneeMax).nullish(),
+  "startDate": zod.string().regex(createBoardItemBodyStartDateRegExp).nullish(),
+  "endDate": zod.string().regex(createBoardItemBodyEndDateRegExp).nullish(),
+  "costCents": zod.number().int().min(createBoardItemBodyCostCentsMin).nullish()
+})
+
+export const CreateBoardItemResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "groupId": zod.string(),
+  "name": zod.string(),
+  "status": zod.enum(['Not started', 'Working on it', 'Stuck', 'Done']),
+  "priority": zod.union([zod.enum(['Low', 'Medium', 'High', 'Critical']),zod.null()]),
+  "assignee": zod.string().nullable(),
+  "startDate": zod.string().nullable().describe('YYYY-MM-DD'),
+  "endDate": zod.string().nullable().describe('YYYY-MM-DD'),
+  "costCents": zod.number().int().nullable(),
+  "dependsOnId": zod.string().nullable(),
+  "position": zod.number().int()
+})
+
+
+/**
+ * @summary Update any column of a board item, or move it
+ */
+
+
+
+export const UpdateBoardItemParams = zod.object({
+  "projectId": zod.coerce.string(),
+  "itemId": zod.coerce.string().min(1)
+})
+
+
+export const updateBoardItemBodyNameMax = 200;
+
+export const updateBoardItemBodyAssigneeMax = 120;
+
+export const updateBoardItemBodyStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateBoardItemBodyEndDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateBoardItemBodyCostCentsMin = 0;
+
+export const updateBoardItemBodyPositionMin = 0;
+
+
+
+export const UpdateBoardItemBody = zod.object({
+  "groupId": zod.string().min(1).optional(),
+  "name": zod.string().min(1).max(updateBoardItemBodyNameMax).optional(),
+  "status": zod.enum(['Not started', 'Working on it', 'Stuck', 'Done']).optional(),
+  "priority": zod.union([zod.enum(['Low', 'Medium', 'High', 'Critical']),zod.null()]).optional(),
+  "assignee": zod.string().max(updateBoardItemBodyAssigneeMax).nullish(),
+  "startDate": zod.string().regex(updateBoardItemBodyStartDateRegExp).nullish(),
+  "endDate": zod.string().regex(updateBoardItemBodyEndDateRegExp).nullish(),
+  "costCents": zod.number().int().min(updateBoardItemBodyCostCentsMin).nullish(),
+  "dependsOnId": zod.string().nullish(),
+  "position": zod.number().int().min(updateBoardItemBodyPositionMin).optional()
+})
+
+export const UpdateBoardItemResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "groupId": zod.string(),
+  "name": zod.string(),
+  "status": zod.enum(['Not started', 'Working on it', 'Stuck', 'Done']),
+  "priority": zod.union([zod.enum(['Low', 'Medium', 'High', 'Critical']),zod.null()]),
+  "assignee": zod.string().nullable(),
+  "startDate": zod.string().nullable().describe('YYYY-MM-DD'),
+  "endDate": zod.string().nullable().describe('YYYY-MM-DD'),
+  "costCents": zod.number().int().nullable(),
+  "dependsOnId": zod.string().nullable(),
+  "position": zod.number().int()
+})
+
+
+/**
+ * @summary Delete a board item
+ */
+
+
+
+export const DeleteBoardItemParams = zod.object({
+  "projectId": zod.coerce.string(),
+  "itemId": zod.coerce.string().min(1)
+})
+
+export const DeleteBoardItemResponse = zod.void()
+
+
+/**
+ * @summary Dated board items across every project the user can open, for the portfolio timeline and calendar
+ */
+export const GetBoardScheduleResponseItem = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "groupId": zod.string(),
+  "name": zod.string(),
+  "status": zod.enum(['Not started', 'Working on it', 'Stuck', 'Done']),
+  "priority": zod.union([zod.enum(['Low', 'Medium', 'High', 'Critical']),zod.null()]),
+  "assignee": zod.string().nullable(),
+  "startDate": zod.string().nullable().describe('YYYY-MM-DD'),
+  "endDate": zod.string().nullable().describe('YYYY-MM-DD'),
+  "costCents": zod.number().int().nullable(),
+  "dependsOnId": zod.string().nullable(),
+  "position": zod.number().int()
+}).and(zod.object({
+  "projectName": zod.string(),
+  "groupName": zod.string(),
+  "groupColor": zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate'])
+}))
+export const GetBoardScheduleResponse = zod.array(GetBoardScheduleResponseItem)
+
+
+/**
+ * @summary Budget approvals for the projects the user manages, newest first
+ */
+export const GetPurchaseApprovalsResponseItem = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "projectName": zod.string(),
+  "kind": zod.enum(['purchase', 'invoice']),
+  "invoiceId": zod.string().nullable(),
+  "budgetLineItemId": zod.string().nullable(),
+  "tradeLabel": zod.string(),
+  "vendor": zod.string().nullable(),
+  "description": zod.string(),
+  "amount": zod.number(),
+  "remainingBefore": zod.number().nullable().describe('Trade budget left before this spend; null when the trade has no reliable budget'),
+  "overage": zod.number(),
+  "status": zod.enum(['Auto-approved', 'Pending approval', 'Approved', 'Declined']),
+  "approvalReason": zod.enum(['within_budget', 'over_budget', 'budget_unavailable']),
+  "requestedById": zod.string(),
+  "requestedByName": zod.string(),
+  "requestedAt": zod.string(),
+  "decidedByName": zod.string().nullable(),
+  "decidedAt": zod.string().nullable(),
+  "decisionNote": zod.string().nullable(),
+  "budgetIncrease": zod.number().nullable()
+})
+export const GetPurchaseApprovalsResponse = zod.array(GetPurchaseApprovalsResponseItem)
+
+
+/**
+ * @summary Check a purchase against its trade budget. Within budget it is approved and reserved; over budget it waits for an Admin.
+ */
+
+
+export const createPurchaseApprovalBodyAmountExclusiveMin = 0;
+export const createPurchaseApprovalBodyAmountMax = 1000000000;
+
+export const createPurchaseApprovalBodyVendorMax = 200;
+
+export const createPurchaseApprovalBodyDescriptionMax = 500;
+
+
+
+export const CreatePurchaseApprovalBody = zod.object({
+  "projectId": zod.string().min(1),
+  "budgetLineItemId": zod.string().min(1),
+  "amount": zod.number().gt(createPurchaseApprovalBodyAmountExclusiveMin).max(createPurchaseApprovalBodyAmountMax),
+  "vendor": zod.string().max(createPurchaseApprovalBodyVendorMax).nullish(),
+  "description": zod.string().min(1).max(createPurchaseApprovalBodyDescriptionMax)
+})
+
+export const CreatePurchaseApprovalResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "projectName": zod.string(),
+  "kind": zod.enum(['purchase', 'invoice']),
+  "invoiceId": zod.string().nullable(),
+  "budgetLineItemId": zod.string().nullable(),
+  "tradeLabel": zod.string(),
+  "vendor": zod.string().nullable(),
+  "description": zod.string(),
+  "amount": zod.number(),
+  "remainingBefore": zod.number().nullable().describe('Trade budget left before this spend; null when the trade has no reliable budget'),
+  "overage": zod.number(),
+  "status": zod.enum(['Auto-approved', 'Pending approval', 'Approved', 'Declined']),
+  "approvalReason": zod.enum(['within_budget', 'over_budget', 'budget_unavailable']),
+  "requestedById": zod.string(),
+  "requestedByName": zod.string(),
+  "requestedAt": zod.string(),
+  "decidedByName": zod.string().nullable(),
+  "decidedAt": zod.string().nullable(),
+  "decisionNote": zod.string().nullable(),
+  "budgetIncrease": zod.number().nullable()
+})
+
+
+/**
+ * @summary Approve or decline a pending over-budget purchase or invoice (Admins only)
+ */
+
+
+
+export const DecidePurchaseApprovalParams = zod.object({
+  "approvalId": zod.coerce.string().min(1)
+})
+
+export const decidePurchaseApprovalBodyNoteMax = 500;
+
+
+
+export const DecidePurchaseApprovalBody = zod.object({
+  "decision": zod.enum(['approve', 'decline']),
+  "note": zod.string().max(decidePurchaseApprovalBodyNoteMax).nullish(),
+  "raiseBudget": zod.boolean().optional().describe('When approving, add the overage to the trade\'s budget')
+})
+
+export const DecidePurchaseApprovalResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "projectName": zod.string(),
+  "kind": zod.enum(['purchase', 'invoice']),
+  "invoiceId": zod.string().nullable(),
+  "budgetLineItemId": zod.string().nullable(),
+  "tradeLabel": zod.string(),
+  "vendor": zod.string().nullable(),
+  "description": zod.string(),
+  "amount": zod.number(),
+  "remainingBefore": zod.number().nullable().describe('Trade budget left before this spend; null when the trade has no reliable budget'),
+  "overage": zod.number(),
+  "status": zod.enum(['Auto-approved', 'Pending approval', 'Approved', 'Declined']),
+  "approvalReason": zod.enum(['within_budget', 'over_budget', 'budget_unavailable']),
+  "requestedById": zod.string(),
+  "requestedByName": zod.string(),
+  "requestedAt": zod.string(),
+  "decidedByName": zod.string().nullable(),
+  "decidedAt": zod.string().nullable(),
+  "decisionNote": zod.string().nullable(),
+  "budgetIncrease": zod.number().nullable()
 })
 
 
@@ -1546,7 +1908,8 @@ export const GetInvoiceSubmissionsResponseItem = zod.object({
   "budgetLineItemId": zod.string().nullish(),
   "budgetRemainingBefore": zod.number().nullish(),
   "budgetRemainingAfter": zod.number().nullish(),
-  "approvalReason": zod.enum(['within_budget', 'over_budget', 'budget_unavailable']).optional(),
+  "approvalReason": zod.enum(['within_budget', 'over_budget', 'budget_unavailable', 'pre_approved']).optional(),
+  "purchaseApprovalId": zod.string().nullish(),
   "submittedById": zod.string().optional(),
   "attachment": zod.object({
   "objectPath": zod.string().regex(getInvoiceSubmissionsResponseAttachmentOneObjectPathRegExp),
@@ -1606,7 +1969,8 @@ export const GetInvoicesResponseItem = zod.object({
   "budgetLineItemId": zod.string().nullish(),
   "budgetRemainingBefore": zod.number().nullish(),
   "budgetRemainingAfter": zod.number().nullish(),
-  "approvalReason": zod.enum(['within_budget', 'over_budget', 'budget_unavailable']).optional(),
+  "approvalReason": zod.enum(['within_budget', 'over_budget', 'budget_unavailable', 'pre_approved']).optional(),
+  "purchaseApprovalId": zod.string().nullish(),
   "submittedById": zod.string().optional(),
   "attachment": zod.object({
   "objectPath": zod.string().regex(getInvoicesResponseAttachmentOneObjectPathRegExp),
@@ -1682,7 +2046,8 @@ export const CreateInvoiceResponse = zod.object({
   "budgetLineItemId": zod.string().nullish(),
   "budgetRemainingBefore": zod.number().nullish(),
   "budgetRemainingAfter": zod.number().nullish(),
-  "approvalReason": zod.enum(['within_budget', 'over_budget', 'budget_unavailable']).optional(),
+  "approvalReason": zod.enum(['within_budget', 'over_budget', 'budget_unavailable', 'pre_approved']).optional(),
+  "purchaseApprovalId": zod.string().nullish(),
   "submittedById": zod.string().optional(),
   "attachment": zod.object({
   "objectPath": zod.string().regex(createInvoiceResponseAttachmentOneObjectPathRegExp),

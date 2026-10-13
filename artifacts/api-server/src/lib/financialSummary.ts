@@ -3,6 +3,7 @@ export type FinancialInvoice = {
   amount: number;
   direction?: "luminova_to_client" | "company_to_luminova";
   submittedById?: string;
+  status?: string;
 };
 
 export type FinancialProject = {
@@ -114,6 +115,8 @@ export function calculatePortfolioFinancialSummary(
   const submittedExpensesByProject = new Map<string, number>();
   for (const invoice of invoices) {
     if (invoice.direction === "luminova_to_client") continue;
+    // An Admin declined this over-budget spend, so it is not a cost the company carries.
+    if (invoice.status === "Declined") continue;
     const expenseMap = invoice.submittedById ? submittedExpensesByProject : expenseInvoicesByProject;
     expenseMap.set(
       invoice.projectId,

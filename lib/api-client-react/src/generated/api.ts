@@ -21,6 +21,13 @@ import type {
 
 import type {
   Activity,
+  BoardGroup,
+  BoardGroupInput,
+  BoardGroupUpdate,
+  BoardItem,
+  BoardItemInput,
+  BoardItemUpdate,
+  BoardScheduleItem,
   BulkClientAccessReconciliationResponse,
   ChatOptions,
   Client,
@@ -46,6 +53,7 @@ import type {
   PanoramaInput,
   PanoramaUpdate,
   Project,
+  ProjectBoard,
   ProjectConversation,
   ProjectConversationInput,
   ProjectDetail,
@@ -62,6 +70,9 @@ import type {
   ProjectMessage,
   ProjectMessageInput,
   ProjectUpdate,
+  PurchaseApproval,
+  PurchaseApprovalDecision,
+  PurchaseApprovalInput,
   Review,
   ScheduleImage,
   ScheduleImageInput,
@@ -1165,6 +1176,818 @@ export const useUploadProjectEntryAgreement = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUploadProjectEntryAgreementMutationOptions(options));
+    }
+
+export const getGetProjectBoardUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/board`
+}
+
+/**
+ * @summary Get the project's board (groups and items). Creates the default phase groups on first use.
+ */
+export const getProjectBoard = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<ProjectBoard> => {
+
+  return customFetch<ProjectBoard>(getGetProjectBoardUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProjectBoardQueryKey = (projectId: string,) => {
+    return [
+    `/api/projects/${projectId}/board`
+    ] as const;
+    }
+
+
+export const getGetProjectBoardQueryOptions = <TData = Awaited<ReturnType<typeof getProjectBoard>>, TError = ErrorType<void>>(projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectBoard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProjectBoardQueryKey(projectId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProjectBoard>>> = ({ signal }) => getProjectBoard(projectId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProjectBoard>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProjectBoardQueryResult = NonNullable<Awaited<ReturnType<typeof getProjectBoard>>>
+export type GetProjectBoardQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the project's board (groups and items). Creates the default phase groups on first use.
+ */
+
+export function useGetProjectBoard<TData = Awaited<ReturnType<typeof getProjectBoard>>, TError = ErrorType<void>>(
+ projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectBoard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProjectBoardQueryOptions(projectId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateBoardGroupUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/board/groups`
+}
+
+/**
+ * @summary Add a group (phase) to the project board
+ */
+export const createBoardGroup = async (projectId: string,
+    boardGroupInput: BoardGroupInput, options?: Parameters<typeof customFetch>[1]): Promise<BoardGroup> => {
+
+  return customFetch<BoardGroup>(getCreateBoardGroupUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(boardGroupInput)
+  }
+);}
+
+
+
+
+
+export const getCreateBoardGroupMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBoardGroup>>, TError,{projectId: string;data: BodyType<BoardGroupInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createBoardGroup>>, TError,{projectId: string;data: BodyType<BoardGroupInput>}, TContext> => {
+
+const mutationKey = ['createBoardGroup'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createBoardGroup>>, {projectId: string;data: BodyType<BoardGroupInput>}> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  createBoardGroup(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateBoardGroupMutationResult = NonNullable<Awaited<ReturnType<typeof createBoardGroup>>>
+    export type CreateBoardGroupMutationBody = BodyType<BoardGroupInput>
+    export type CreateBoardGroupMutationError = ErrorType<void>
+
+    /**
+ * @summary Add a group (phase) to the project board
+ */
+export const useCreateBoardGroup = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBoardGroup>>, TError,{projectId: string;data: BodyType<BoardGroupInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createBoardGroup>>,
+        TError,
+        {projectId: string;data: BodyType<BoardGroupInput>},
+        TContext
+      > => {
+      return useMutation(getCreateBoardGroupMutationOptions(options));
+    }
+
+export const getUpdateBoardGroupUrl = (projectId: string,
+    groupId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/board/groups/${groupId}`
+}
+
+/**
+ * @summary Rename, recolor, or move a board group
+ */
+export const updateBoardGroup = async (projectId: string,
+    groupId: string,
+    boardGroupUpdate: BoardGroupUpdate, options?: Parameters<typeof customFetch>[1]): Promise<BoardGroup> => {
+
+  return customFetch<BoardGroup>(getUpdateBoardGroupUrl(projectId,groupId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(boardGroupUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateBoardGroupMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBoardGroup>>, TError,{projectId: string;groupId: string;data: BodyType<BoardGroupUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateBoardGroup>>, TError,{projectId: string;groupId: string;data: BodyType<BoardGroupUpdate>}, TContext> => {
+
+const mutationKey = ['updateBoardGroup'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateBoardGroup>>, {projectId: string;groupId: string;data: BodyType<BoardGroupUpdate>}> = (props) => {
+          const {projectId,groupId,data} = props ?? {};
+
+          return  updateBoardGroup(projectId,groupId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateBoardGroupMutationResult = NonNullable<Awaited<ReturnType<typeof updateBoardGroup>>>
+    export type UpdateBoardGroupMutationBody = BodyType<BoardGroupUpdate>
+    export type UpdateBoardGroupMutationError = ErrorType<void>
+
+    /**
+ * @summary Rename, recolor, or move a board group
+ */
+export const useUpdateBoardGroup = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBoardGroup>>, TError,{projectId: string;groupId: string;data: BodyType<BoardGroupUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateBoardGroup>>,
+        TError,
+        {projectId: string;groupId: string;data: BodyType<BoardGroupUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateBoardGroupMutationOptions(options));
+    }
+
+export const getDeleteBoardGroupUrl = (projectId: string,
+    groupId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/board/groups/${groupId}`
+}
+
+/**
+ * @summary Delete a board group and its items
+ */
+export const deleteBoardGroup = async (projectId: string,
+    groupId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteBoardGroupUrl(projectId,groupId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteBoardGroupMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteBoardGroup>>, TError,{projectId: string;groupId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteBoardGroup>>, TError,{projectId: string;groupId: string}, TContext> => {
+
+const mutationKey = ['deleteBoardGroup'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteBoardGroup>>, {projectId: string;groupId: string}> = (props) => {
+          const {projectId,groupId} = props ?? {};
+
+          return  deleteBoardGroup(projectId,groupId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteBoardGroupMutationResult = NonNullable<Awaited<ReturnType<typeof deleteBoardGroup>>>
+
+    export type DeleteBoardGroupMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete a board group and its items
+ */
+export const useDeleteBoardGroup = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteBoardGroup>>, TError,{projectId: string;groupId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteBoardGroup>>,
+        TError,
+        {projectId: string;groupId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteBoardGroupMutationOptions(options));
+    }
+
+export const getCreateBoardItemUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/board/items`
+}
+
+/**
+ * @summary Add an item (task) to a board group
+ */
+export const createBoardItem = async (projectId: string,
+    boardItemInput: BoardItemInput, options?: Parameters<typeof customFetch>[1]): Promise<BoardItem> => {
+
+  return customFetch<BoardItem>(getCreateBoardItemUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(boardItemInput)
+  }
+);}
+
+
+
+
+
+export const getCreateBoardItemMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBoardItem>>, TError,{projectId: string;data: BodyType<BoardItemInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createBoardItem>>, TError,{projectId: string;data: BodyType<BoardItemInput>}, TContext> => {
+
+const mutationKey = ['createBoardItem'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createBoardItem>>, {projectId: string;data: BodyType<BoardItemInput>}> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  createBoardItem(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateBoardItemMutationResult = NonNullable<Awaited<ReturnType<typeof createBoardItem>>>
+    export type CreateBoardItemMutationBody = BodyType<BoardItemInput>
+    export type CreateBoardItemMutationError = ErrorType<void>
+
+    /**
+ * @summary Add an item (task) to a board group
+ */
+export const useCreateBoardItem = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBoardItem>>, TError,{projectId: string;data: BodyType<BoardItemInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createBoardItem>>,
+        TError,
+        {projectId: string;data: BodyType<BoardItemInput>},
+        TContext
+      > => {
+      return useMutation(getCreateBoardItemMutationOptions(options));
+    }
+
+export const getUpdateBoardItemUrl = (projectId: string,
+    itemId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/board/items/${itemId}`
+}
+
+/**
+ * @summary Update any column of a board item, or move it
+ */
+export const updateBoardItem = async (projectId: string,
+    itemId: string,
+    boardItemUpdate: BoardItemUpdate, options?: Parameters<typeof customFetch>[1]): Promise<BoardItem> => {
+
+  return customFetch<BoardItem>(getUpdateBoardItemUrl(projectId,itemId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(boardItemUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateBoardItemMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBoardItem>>, TError,{projectId: string;itemId: string;data: BodyType<BoardItemUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateBoardItem>>, TError,{projectId: string;itemId: string;data: BodyType<BoardItemUpdate>}, TContext> => {
+
+const mutationKey = ['updateBoardItem'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateBoardItem>>, {projectId: string;itemId: string;data: BodyType<BoardItemUpdate>}> = (props) => {
+          const {projectId,itemId,data} = props ?? {};
+
+          return  updateBoardItem(projectId,itemId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateBoardItemMutationResult = NonNullable<Awaited<ReturnType<typeof updateBoardItem>>>
+    export type UpdateBoardItemMutationBody = BodyType<BoardItemUpdate>
+    export type UpdateBoardItemMutationError = ErrorType<void>
+
+    /**
+ * @summary Update any column of a board item, or move it
+ */
+export const useUpdateBoardItem = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBoardItem>>, TError,{projectId: string;itemId: string;data: BodyType<BoardItemUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateBoardItem>>,
+        TError,
+        {projectId: string;itemId: string;data: BodyType<BoardItemUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateBoardItemMutationOptions(options));
+    }
+
+export const getDeleteBoardItemUrl = (projectId: string,
+    itemId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/board/items/${itemId}`
+}
+
+/**
+ * @summary Delete a board item
+ */
+export const deleteBoardItem = async (projectId: string,
+    itemId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteBoardItemUrl(projectId,itemId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteBoardItemMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteBoardItem>>, TError,{projectId: string;itemId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteBoardItem>>, TError,{projectId: string;itemId: string}, TContext> => {
+
+const mutationKey = ['deleteBoardItem'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteBoardItem>>, {projectId: string;itemId: string}> = (props) => {
+          const {projectId,itemId} = props ?? {};
+
+          return  deleteBoardItem(projectId,itemId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteBoardItemMutationResult = NonNullable<Awaited<ReturnType<typeof deleteBoardItem>>>
+
+    export type DeleteBoardItemMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete a board item
+ */
+export const useDeleteBoardItem = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteBoardItem>>, TError,{projectId: string;itemId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteBoardItem>>,
+        TError,
+        {projectId: string;itemId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteBoardItemMutationOptions(options));
+    }
+
+export const getGetBoardScheduleUrl = () => {
+
+
+
+
+  return `/api/board-items`
+}
+
+/**
+ * @summary Dated board items across every project the user can open, for the portfolio timeline and calendar
+ */
+export const getBoardSchedule = async ( options?: Parameters<typeof customFetch>[1]): Promise<BoardScheduleItem[]> => {
+
+  return customFetch<BoardScheduleItem[]>(getGetBoardScheduleUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBoardScheduleQueryKey = () => {
+    return [
+    `/api/board-items`
+    ] as const;
+    }
+
+
+export const getGetBoardScheduleQueryOptions = <TData = Awaited<ReturnType<typeof getBoardSchedule>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBoardSchedule>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBoardScheduleQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBoardSchedule>>> = ({ signal }) => getBoardSchedule({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBoardSchedule>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBoardScheduleQueryResult = NonNullable<Awaited<ReturnType<typeof getBoardSchedule>>>
+export type GetBoardScheduleQueryError = ErrorType<void>
+
+
+/**
+ * @summary Dated board items across every project the user can open, for the portfolio timeline and calendar
+ */
+
+export function useGetBoardSchedule<TData = Awaited<ReturnType<typeof getBoardSchedule>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBoardSchedule>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBoardScheduleQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetPurchaseApprovalsUrl = () => {
+
+
+
+
+  return `/api/purchase-approvals`
+}
+
+/**
+ * @summary Budget approvals for the projects the user manages, newest first
+ */
+export const getPurchaseApprovals = async ( options?: Parameters<typeof customFetch>[1]): Promise<PurchaseApproval[]> => {
+
+  return customFetch<PurchaseApproval[]>(getGetPurchaseApprovalsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPurchaseApprovalsQueryKey = () => {
+    return [
+    `/api/purchase-approvals`
+    ] as const;
+    }
+
+
+export const getGetPurchaseApprovalsQueryOptions = <TData = Awaited<ReturnType<typeof getPurchaseApprovals>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPurchaseApprovals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPurchaseApprovalsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPurchaseApprovals>>> = ({ signal }) => getPurchaseApprovals({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPurchaseApprovals>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPurchaseApprovalsQueryResult = NonNullable<Awaited<ReturnType<typeof getPurchaseApprovals>>>
+export type GetPurchaseApprovalsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Budget approvals for the projects the user manages, newest first
+ */
+
+export function useGetPurchaseApprovals<TData = Awaited<ReturnType<typeof getPurchaseApprovals>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPurchaseApprovals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPurchaseApprovalsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreatePurchaseApprovalUrl = () => {
+
+
+
+
+  return `/api/purchase-approvals`
+}
+
+/**
+ * @summary Check a purchase against its trade budget. Within budget it is approved and reserved; over budget it waits for an Admin.
+ */
+export const createPurchaseApproval = async (purchaseApprovalInput: PurchaseApprovalInput, options?: Parameters<typeof customFetch>[1]): Promise<PurchaseApproval> => {
+
+  return customFetch<PurchaseApproval>(getCreatePurchaseApprovalUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(purchaseApprovalInput)
+  }
+);}
+
+
+
+
+
+export const getCreatePurchaseApprovalMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPurchaseApproval>>, TError,{data: BodyType<PurchaseApprovalInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPurchaseApproval>>, TError,{data: BodyType<PurchaseApprovalInput>}, TContext> => {
+
+const mutationKey = ['createPurchaseApproval'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPurchaseApproval>>, {data: BodyType<PurchaseApprovalInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPurchaseApproval(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePurchaseApprovalMutationResult = NonNullable<Awaited<ReturnType<typeof createPurchaseApproval>>>
+    export type CreatePurchaseApprovalMutationBody = BodyType<PurchaseApprovalInput>
+    export type CreatePurchaseApprovalMutationError = ErrorType<void>
+
+    /**
+ * @summary Check a purchase against its trade budget. Within budget it is approved and reserved; over budget it waits for an Admin.
+ */
+export const useCreatePurchaseApproval = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPurchaseApproval>>, TError,{data: BodyType<PurchaseApprovalInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPurchaseApproval>>,
+        TError,
+        {data: BodyType<PurchaseApprovalInput>},
+        TContext
+      > => {
+      return useMutation(getCreatePurchaseApprovalMutationOptions(options));
+    }
+
+export const getDecidePurchaseApprovalUrl = (approvalId: string,) => {
+
+
+
+
+  return `/api/purchase-approvals/${approvalId}/decision`
+}
+
+/**
+ * @summary Approve or decline a pending over-budget purchase or invoice (Admins only)
+ */
+export const decidePurchaseApproval = async (approvalId: string,
+    purchaseApprovalDecision: PurchaseApprovalDecision, options?: Parameters<typeof customFetch>[1]): Promise<PurchaseApproval> => {
+
+  return customFetch<PurchaseApproval>(getDecidePurchaseApprovalUrl(approvalId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(purchaseApprovalDecision)
+  }
+);}
+
+
+
+
+
+export const getDecidePurchaseApprovalMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof decidePurchaseApproval>>, TError,{approvalId: string;data: BodyType<PurchaseApprovalDecision>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof decidePurchaseApproval>>, TError,{approvalId: string;data: BodyType<PurchaseApprovalDecision>}, TContext> => {
+
+const mutationKey = ['decidePurchaseApproval'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof decidePurchaseApproval>>, {approvalId: string;data: BodyType<PurchaseApprovalDecision>}> = (props) => {
+          const {approvalId,data} = props ?? {};
+
+          return  decidePurchaseApproval(approvalId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DecidePurchaseApprovalMutationResult = NonNullable<Awaited<ReturnType<typeof decidePurchaseApproval>>>
+    export type DecidePurchaseApprovalMutationBody = BodyType<PurchaseApprovalDecision>
+    export type DecidePurchaseApprovalMutationError = ErrorType<void>
+
+    /**
+ * @summary Approve or decline a pending over-budget purchase or invoice (Admins only)
+ */
+export const useDecidePurchaseApproval = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof decidePurchaseApproval>>, TError,{approvalId: string;data: BodyType<PurchaseApprovalDecision>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof decidePurchaseApproval>>,
+        TError,
+        {approvalId: string;data: BodyType<PurchaseApprovalDecision>},
+        TContext
+      > => {
+      return useMutation(getDecidePurchaseApprovalMutationOptions(options));
     }
 
 export const getRequestUploadUrlUrl = () => {

@@ -2314,7 +2314,7 @@ const enrichInvoicesWithClientBranding = async (
 ;
 
 
-const requestWorkspaceId = (req: Request) => 
+export const requestWorkspaceId = (req: Request) => 
 {
 
 
@@ -2991,7 +2991,7 @@ const financialRecordsForOwner = async (ownerId: string, scope = "default") =>
 
 ;
 
-const projectsForOwner = async (ownerId: string, workspaceId: string) => {
+export const projectsForOwner = async (ownerId: string, workspaceId: string) => {
   if (workspaceId === "default") {
     await applyMadisonParkRevenueCorrection(ownerId, undefined, undefined, workspaceId);
   }
@@ -3288,7 +3288,7 @@ const findProject = async (projectId: string) => (await allProjects()).find((pro
 ;
 
 
-const findAuthorizedProject = async (projectId: string, ownerId: string, workspaceId: string): Promise<Project | undefined> =>
+export const findAuthorizedProject = async (projectId: string, ownerId: string, workspaceId: string): Promise<Project | undefined> =>
 {
 
 

@@ -43,6 +43,8 @@ const Messages = lazy(pageModules.messages);
 const Users = lazy(pageModules.users);
 const Quotes = lazy(pageModules.quotes);
 const Profile = lazy(pageModules.profile);
+const Schedule = lazy(pageModules.schedule);
+const Approvals = lazy(pageModules.approvals);
 const SignUpPage = lazy(() => import('@/pages/login').then(({ SignUpPage }) => ({ default: SignUpPage })));
 const PrivacyPage = lazy(() => import('@/pages/legal').then(({ PrivacyPage }) => ({ default: PrivacyPage })));
 const TermsPage = lazy(() => import('@/pages/legal').then(({ TermsPage }) => ({ default: TermsPage })));
@@ -169,6 +171,8 @@ function AuthenticatedRoutes() {
         <Route path="/" component={Dashboard} />
         <Route path="/projects/:id"><ProjectDetail /></Route>
         <Route path="/projects" component={Projects} />
+        <Route path="/schedule" component={Schedule} />
+        <Route path="/approvals" component={Approvals} />
         <Route path="/trades" component={TradesDirectory} />
         <Route path="/trades/:id" component={TradeDetail} />
         <Route path="/invoices" component={Invoices} />
@@ -183,10 +187,14 @@ function AuthenticatedRoutes() {
 }
 
 function AuthenticatedWorkspace() {
+  const [location] = useLocation();
   return (
     <AppLayout>
       <Suspense fallback={<WorkspacePageFallback />}>
-        <AuthenticatedRoutes />
+        {/* Keyed on the route so each page plays its entrance animation. */}
+        <div key={location} className="page-enter min-w-0">
+          <AuthenticatedRoutes />
+        </div>
       </Suspense>
     </AppLayout>
   );
@@ -307,6 +315,21 @@ function App() {
           <QueryClientProvider client={queryClient}>
             <TooltipProvider>
               <AppLayout><Suspense fallback={<WorkspacePageFallback />}><ProjectDetail projectIdOverride="riverstone" /></Suspense></AppLayout>
+              <Toaster />
+            </TooltipProvider>
+          </QueryClientProvider>
+        </ClerkProvider>
+      </WouterRouter>
+    );
+  }
+
+  if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/schedule')) {
+    return (
+      <WouterRouter base={basePath}>
+        <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl}>
+          <QueryClientProvider client={queryClient}>
+            <TooltipProvider>
+              <AppLayout><Suspense fallback={<WorkspacePageFallback />}><Schedule /></Suspense></AppLayout>
               <Toaster />
             </TooltipProvider>
           </QueryClientProvider>

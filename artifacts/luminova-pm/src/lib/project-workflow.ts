@@ -1,9 +1,11 @@
-export const PROJECT_TABS = ["overview", "photos", "budget", "trades", "activity"] as const
+export const PROJECT_TABS = ["board", "overview", "photos", "budget", "trades", "activity"] as const
 export type ProjectTab = (typeof PROJECT_TABS)[number]
 
-export function projectTabFromSearch(search: string): ProjectTab {
+/** Keep existing projects on Overview unless a team member explicitly opens a tab. */
+export function projectTabFromSearch(search: string, canUseBoard = true): ProjectTab {
   const value = new URLSearchParams(search).get("tab")
-  return PROJECT_TABS.find(tab => tab === value) ?? "overview"
+  const tab = PROJECT_TABS.find(candidate => candidate === value) ?? "overview"
+  return tab === "board" && !canUseBoard ? "overview" : tab
 }
 
 export function projectWorkflowHref(path: string, projectId: string, extra: Record<string, string> = {}) {

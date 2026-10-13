@@ -4,6 +4,7 @@ import luminovaRouter from "./luminova";
 import usersRouter, { requireAuth } from "./users";
 import storageRouter from "./storage";
 import invoiceSubmissionsRouter from "./invoiceSubmissions";
+import projectBoardsRouter from "./projectBoards";
 
 const router: IRouter = Router();
 
@@ -12,6 +13,7 @@ router.use(requireAuth);
 router.use(usersRouter);
 router.use(storageRouter);
 router.use(invoiceSubmissionsRouter);
+router.use(projectBoardsRouter);
 router.use(luminovaRouter);
 
 export default router;

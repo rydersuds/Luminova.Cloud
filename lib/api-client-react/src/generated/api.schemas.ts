@@ -407,6 +407,7 @@ export const InvoiceApprovalReason = {
   within_budget: 'within_budget',
   over_budget: 'over_budget',
   budget_unavailable: 'budget_unavailable',
+  pre_approved: 'pre_approved',
 } as const;
 
 export type InvoiceFileInputContentType = typeof InvoiceFileInputContentType[keyof typeof InvoiceFileInputContentType];
@@ -462,6 +463,8 @@ export interface Invoice {
   /** @nullable */
   budgetRemainingAfter?: number | null;
   approvalReason?: InvoiceApprovalReason;
+  /** @nullable */
+  purchaseApprovalId?: string | null;
   submittedById?: string;
   attachment?: InvoiceAttachment;
 }
@@ -1079,6 +1082,282 @@ export interface ScheduleImageInput {
      */
   size: number;
   contentType: ScheduleImageInputContentType;
+}
+
+export type BoardGroupColor = typeof BoardGroupColor[keyof typeof BoardGroupColor];
+
+
+export const BoardGroupColor = {
+  gold: 'gold',
+  amber: 'amber',
+  orange: 'orange',
+  red: 'red',
+  pink: 'pink',
+  violet: 'violet',
+  indigo: 'indigo',
+  blue: 'blue',
+  sky: 'sky',
+  teal: 'teal',
+  green: 'green',
+  lime: 'lime',
+  slate: 'slate',
+} as const;
+
+export type BoardItemStatus = typeof BoardItemStatus[keyof typeof BoardItemStatus];
+
+
+export const BoardItemStatus = {
+  Not_started: 'Not started',
+  Working_on_it: 'Working on it',
+  Stuck: 'Stuck',
+  Done: 'Done',
+} as const;
+
+export type BoardItemPriority = typeof BoardItemPriority[keyof typeof BoardItemPriority];
+
+
+export const BoardItemPriority = {
+  Low: 'Low',
+  Medium: 'Medium',
+  High: 'High',
+  Critical: 'Critical',
+} as const;
+
+export interface BoardGroup {
+  id: string;
+  projectId: string;
+  name: string;
+  color: BoardGroupColor;
+  position: number;
+}
+
+export interface BoardItem {
+  id: string;
+  projectId: string;
+  groupId: string;
+  name: string;
+  status: BoardItemStatus;
+  priority: BoardItemPriority | null;
+  /** @nullable */
+  assignee: string | null;
+  /**
+     * YYYY-MM-DD
+     * @nullable
+     */
+  startDate: string | null;
+  /**
+     * YYYY-MM-DD
+     * @nullable
+     */
+  endDate: string | null;
+  /** @nullable */
+  costCents: number | null;
+  /** @nullable */
+  dependsOnId: string | null;
+  position: number;
+}
+
+export type BoardScheduleItem = BoardItem & {
+  projectName: string;
+  groupName: string;
+  groupColor: BoardGroupColor;
+};
+
+export interface ProjectBoard {
+  projectId: string;
+  groups: BoardGroup[];
+  items: BoardItem[];
+}
+
+export interface BoardGroupInput {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  name: string;
+  color?: BoardGroupColor;
+}
+
+export interface BoardGroupUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  name?: string;
+  color?: BoardGroupColor;
+  /** @minimum 0 */
+  position?: number;
+}
+
+export interface BoardItemInput {
+  /** @minLength 1 */
+  groupId: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  name: string;
+  status?: BoardItemStatus;
+  priority?: BoardItemPriority | null;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  assignee?: string | null;
+  /**
+     * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  startDate?: string | null;
+  /**
+     * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  endDate?: string | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  costCents?: number | null;
+}
+
+export interface BoardItemUpdate {
+  /** @minLength 1 */
+  groupId?: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  name?: string;
+  status?: BoardItemStatus;
+  priority?: BoardItemPriority | null;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  assignee?: string | null;
+  /**
+     * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  startDate?: string | null;
+  /**
+     * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  endDate?: string | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  costCents?: number | null;
+  /** @nullable */
+  dependsOnId?: string | null;
+  /** @minimum 0 */
+  position?: number;
+}
+
+export type PurchaseApprovalStatus = typeof PurchaseApprovalStatus[keyof typeof PurchaseApprovalStatus];
+
+
+export const PurchaseApprovalStatus = {
+  'Auto-approved': 'Auto-approved',
+  Pending_approval: 'Pending approval',
+  Approved: 'Approved',
+  Declined: 'Declined',
+} as const;
+
+export type PurchaseApprovalKind = typeof PurchaseApprovalKind[keyof typeof PurchaseApprovalKind];
+
+
+export const PurchaseApprovalKind = {
+  purchase: 'purchase',
+  invoice: 'invoice',
+} as const;
+
+export type PurchaseApprovalApprovalReason = typeof PurchaseApprovalApprovalReason[keyof typeof PurchaseApprovalApprovalReason];
+
+
+export const PurchaseApprovalApprovalReason = {
+  within_budget: 'within_budget',
+  over_budget: 'over_budget',
+  budget_unavailable: 'budget_unavailable',
+} as const;
+
+export interface PurchaseApproval {
+  id: string;
+  projectId: string;
+  projectName: string;
+  kind: PurchaseApprovalKind;
+  /** @nullable */
+  invoiceId: string | null;
+  /** @nullable */
+  budgetLineItemId: string | null;
+  tradeLabel: string;
+  /** @nullable */
+  vendor: string | null;
+  description: string;
+  amount: number;
+  /**
+     * Trade budget left before this spend; null when the trade has no reliable budget
+     * @nullable
+     */
+  remainingBefore: number | null;
+  overage: number;
+  status: PurchaseApprovalStatus;
+  approvalReason: PurchaseApprovalApprovalReason;
+  requestedById: string;
+  requestedByName: string;
+  requestedAt: string;
+  /** @nullable */
+  decidedByName: string | null;
+  /** @nullable */
+  decidedAt: string | null;
+  /** @nullable */
+  decisionNote: string | null;
+  /** @nullable */
+  budgetIncrease: number | null;
+}
+
+export interface PurchaseApprovalInput {
+  /** @minLength 1 */
+  projectId: string;
+  /** @minLength 1 */
+  budgetLineItemId: string;
+  /**
+     * @maximum 1000000000
+     * @exclusiveMinimum 0
+     */
+  amount: number;
+  /**
+     * @maxLength 200
+     * @nullable
+     */
+  vendor?: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  description: string;
+}
+
+export type PurchaseApprovalDecisionDecision = typeof PurchaseApprovalDecisionDecision[keyof typeof PurchaseApprovalDecisionDecision];
+
+
+export const PurchaseApprovalDecisionDecision = {
+  approve: 'approve',
+  decline: 'decline',
+} as const;
+
+export interface PurchaseApprovalDecision {
+  decision: PurchaseApprovalDecisionDecision;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  note?: string | null;
+  /** When approving, add the overage to the trade's budget */
+  raiseBudget?: boolean;
 }
 
 export interface ScheduleImageUpdate {

@@ -32,6 +32,8 @@ export interface Invoice {
   /** @nullable */
   budgetRemainingAfter?: number | null;
   approvalReason?: InvoiceApprovalReason;
+  /** @nullable */
+  purchaseApprovalId?: string | null;
   submittedById?: string;
   attachment?: InvoiceAttachment;
 }

@@ -13,4 +13,5 @@ export const InvoiceApprovalReason = {
   within_budget: 'within_budget',
   over_budget: 'over_budget',
   budget_unavailable: 'budget_unavailable',
+  pre_approved: 'pre_approved',
 } as const;

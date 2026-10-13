@@ -62,8 +62,11 @@ function InvoiceDetail({ invoice }: { invoice: Invoice }) {
         <p className="text-destructive">Over the remaining trade/category budget{invoice.budgetRemainingBefore != null && ` (${formatCurrency(invoice.budgetRemainingBefore)} was remaining)`}{invoice.overage > 0 && ` by ${formatCurrency(invoice.overage)}`}.</p>
       )}
       {reason === "budget_unavailable" && <p className="text-warning">No matching or priced budget was available for this invoice.</p>}
+      {reason === "pre_approved" && <p>Covered by a purchase an Admin approved before it was bought.</p>}
       {pending && invoice.submittedById && (
-        <p className="font-medium text-foreground">Contact leadership outside this app for authorization. Do not proceed with this work until it is authorized.</p>
+        <p className="font-medium text-foreground">
+          Waiting for an Admin in <Link href="/approvals" className="text-primary underline-offset-2 hover:underline">Approvals</Link>. Don't proceed with this work until it's approved.
+        </p>
       )}
       {invoice.attachment && (
         <button type="button" onClick={download} className="inline-flex items-center gap-1 text-primary underline-offset-2 hover:underline" data-testid={`link-invoice-file-${invoice.id}`}>
@@ -285,6 +288,7 @@ export default function Invoices() {
                   <option value="Pending">Pending approval</option>
                   <option value="Auto-approved">Auto-approved</option>
                   <option value="Approved">Approved</option>
+                  <option value="Declined">Declined</option>
                   <option value="Paid">Paid</option>
                 </select>
                 </FilterField>

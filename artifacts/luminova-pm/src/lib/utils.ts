@@ -56,14 +56,17 @@ export function getStatusColor(status: string) {
   switch (status.toLowerCase()) {
     case "active":
     case "approved":
+    case "auto-approved":
     case "completed":
       return "success"
     case "pending":
+    case "pending approval":
     case "in progress":
     case "review":
       return "warning"
     case "delayed":
     case "rejected":
+    case "declined":
     case "rejected for bid":
     case "overdue":
       return "destructive"

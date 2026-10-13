@@ -9,6 +9,8 @@ export const pageModules = {
   users: () => import("@/pages/users"),
   quotes: () => import("@/pages/quotes"),
   profile: () => import("@/pages/profile"),
+  schedule: () => import("@/pages/schedule"),
+  approvals: () => import("@/pages/approvals"),
 }
 
 type NetworkInformationLike = {
@@ -28,6 +30,7 @@ export type PreloadEnvironment = {
 const primaryPageLoaders = [
   { href: "/", loader: pageModules.dashboard },
   { href: "/projects", loader: pageModules.projects },
+  { href: "/schedule", loader: pageModules.schedule },
   { href: "/trades", loader: pageModules.trades },
   { href: "/invoices", loader: pageModules.invoices },
   { href: "/quotes", loader: pageModules.quotes },
@@ -35,7 +38,7 @@ const primaryPageLoaders = [
   { href: "/users", loader: pageModules.users },
 ]
 
-const workspacePaths = ["/projects", "/trades", "/invoices", "/quotes", "/messages", "/users", "/profile"]
+const workspacePaths = ["/projects", "/schedule", "/approvals", "/trades", "/invoices", "/quotes", "/messages", "/users", "/profile"]
 
 function browserPreloadEnvironment(): PreloadEnvironment | undefined {
   if (typeof navigator === "undefined") return undefined

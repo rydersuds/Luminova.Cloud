@@ -1,21 +1,24 @@
 import { Router, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import {
   db, importedProjectsTable, importedInvoicesTable, projectDocumentsTable,
-  invoiceUploadReservationsTable,
+  invoiceUploadReservationsTable, purchaseApprovalsTable, type PurchaseApprovalRow,
 } from "@workspace/db";
 import {
   CreateInvoiceBody, CreateInvoiceResponse, GetInvoiceProjectsResponse,
   GetInvoiceSubmissionsResponse, RequestInvoiceUploadBody, RequestInvoiceUploadResponse,
+  CreatePurchaseApprovalBody, CreatePurchaseApprovalResponse, DecidePurchaseApprovalBody,
+  DecidePurchaseApprovalParams, DecidePurchaseApprovalResponse, GetPurchaseApprovalsResponse,
 } from "@workspace/api-zod";
 import type { InvoiceInput, Invoice } from "@workspace/api-zod";
-import { getRequestWorkspaceRole } from "./users";
+import { getRequestWorkspaceRole, workspaceUserDisplayName } from "./users";
 import { ObjectStorageService } from "../lib/objectStorage";
-import { remainingTradeBudgets, purchaseApproval, type CostCategory, type PurchaseRecord } from "../lib/invoiceBudget";
+import { commitmentRecords, remainingTradeBudgets, purchaseApproval, type CostCategory, type PurchaseRecord } from "../lib/invoiceBudget";
+import { emailApprovalNotifier, type ApprovalEmailFacts, type ApprovalNotifier } from "../lib/approvalNotifications";
 
 type Actor = { id: string; workspaceId: string; role: "Admin" | "Project Manager" };
 type ProjectData = {
@@ -29,7 +32,40 @@ type Storage = Pick<ObjectStorageService, "getObjectEntityUploadURL" | "normaliz
 export type InvoiceSubmissionDependencies = {
   storage?: Storage;
   role?: (req: AuthRequest) => Promise<string | null>;
+  displayName?: (userId: string) => Promise<string>;
+  notify?: ApprovalNotifier;
 };
+
+const PENDING = "Pending approval";
+const cents = (value: number) => Math.round(value * 100);
+
+/** Looks up a person's name for the approval record without letting a slow directory hold up the request. */
+async function nameWithin(lookup: (userId: string) => Promise<string>, userId: string) {
+  try {
+    return await Promise.race([
+      lookup(userId),
+      new Promise<string>((resolve) => setTimeout(() => resolve("Team member"), 2000)),
+    ]);
+  } catch {
+    return "Team member";
+  }
+}
+
+function serializeApproval(row: PurchaseApprovalRow, projectName: string) {
+  return {
+    id: row.id, projectId: row.projectId, projectName, kind: row.kind as "purchase" | "invoice",
+    invoiceId: row.invoiceId, budgetLineItemId: row.budgetLineItemId, tradeLabel: row.tradeLabel,
+    vendor: row.vendor, description: row.description, amount: row.amountCents / 100,
+    remainingBefore: row.remainingBeforeCents === null ? null : row.remainingBeforeCents / 100,
+    overage: row.overageCents / 100, status: row.status as "Auto-approved" | "Pending approval" | "Approved" | "Declined",
+    approvalReason: row.approvalReason as "within_budget" | "over_budget" | "budget_unavailable",
+    requestedById: row.requestedById, requestedByName: row.requestedByName, requestedAt: row.requestedAt.toISOString(),
+    decidedByName: row.decidedByName, decidedAt: row.decidedAt?.toISOString() ?? null, decisionNote: row.decisionNote,
+    budgetIncrease: row.budgetIncreaseCents === null ? null : row.budgetIncreaseCents / 100,
+  };
+}
+
+const emailFacts = (approval: ReturnType<typeof serializeApproval>): ApprovalEmailFacts => approval;
 class InvoiceError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
@@ -45,6 +81,16 @@ export function createInvoiceSubmissionRouter(dependencies: InvoiceSubmissionDep
   const router = Router();
   const storage = dependencies.storage ?? new ObjectStorageService();
   const roleFor = dependencies.role ?? getRequestWorkspaceRole;
+  const displayName = dependencies.displayName ?? workspaceUserDisplayName;
+  const notify = dependencies.notify ?? emailApprovalNotifier;
+  /** Email is best effort and happens after the response: a mail outage never blocks an approval. */
+  const notifyLater = (req: AuthRequest, event: Parameters<ApprovalNotifier>[1]) => {
+    void notify(req, event).catch((error) => req.log?.warn?.({ err: error }, "Approval notification failed"));
+  };
+  const approvalsForProjects = async (projects: ProjectRow[]) => projects.length
+    ? (await db.select().from(purchaseApprovalsTable).where(inArray(purchaseApprovalsTable.projectId, projects.map(project => project.id))))
+        .filter(row => projects.some(project => project.id === row.projectId && project.importBatchId === row.importBatchId && project.ownerId === row.ownerId))
+    : [];
   const actorFor = async (req: AuthRequest): Promise<Actor> => {
     if (!req.userId) throw new InvoiceError(401, "Authentication required");
     const role = await roleFor(req);
@@ -79,11 +125,13 @@ export function createInvoiceSubmissionRouter(dependencies: InvoiceSubmissionDep
     const projects = await projectsFor(actor);
     const records = projects.length ? await db.select().from(importedInvoicesTable)
       .where(inArray(importedInvoicesTable.importBatchId, projects.map(project => project.importBatchId))) : [];
+    const approvals = await approvalsForProjects(projects);
     res.json(GetInvoiceProjectsResponse.parse(projects.map(project => {
       const data = project.data as ProjectData;
       const invoices = records.filter(record => record.ownerId === project.ownerId &&
         record.importBatchId === project.importBatchId && (record.data as Invoice).projectId === project.id);
-      return { id: project.id, name: data.name, categories: remainingTradeBudgets(data.budgetLineItems ?? [], invoices.map(record => record.data as PurchaseRecord)) };
+      const commitments = commitmentRecords(approvals.filter(approval => approval.projectId === project.id));
+      return { id: project.id, name: data.name, categories: remainingTradeBudgets(data.budgetLineItems ?? [], [...invoices.map(record => record.data as PurchaseRecord), ...commitments]) };
     })));
   }));
 
@@ -162,6 +210,8 @@ export function createInvoiceSubmissionRouter(dependencies: InvoiceSubmissionDep
     // Owner-only ACL; assigned PMs and other admins download through the scoped feature endpoint.
     await storage.setAcl(input.attachment.objectPath, { owner: project.ownerId, visibility: "private" });
 
+    // Looked up before the project lock so a slow user directory never holds it.
+    const requestedByName = await nameWithin(displayName, actor.id);
     const invoice = await db.transaction(async tx => {
       const [locked] = await tx.select().from(importedProjectsTable)
         .where(eq(importedProjectsTable.id, project.id)).for("update");
@@ -188,20 +238,52 @@ export function createInvoiceSubmissionRouter(dependencies: InvoiceSubmissionDep
         throw new InvoiceError(409, "An invoice with this vendor and invoice number already exists for the project.");
       }
       const data = locked.data as ProjectData;
-      const categories = remainingTradeBudgets(data.budgetLineItems ?? [], costs);
+      const approvals = (await tx.select().from(purchaseApprovalsTable).where(and(
+        eq(purchaseApprovalsTable.projectId, locked.id), eq(purchaseApprovalsTable.importBatchId, locked.importBatchId),
+        eq(purchaseApprovalsTable.ownerId, locked.ownerId),
+      )).for("update"));
+      // An invoice for something already approved claims that purchase: its reservation turns into this cost.
+      // Best match: same vendor first, then the smallest approved amount that covers the invoice, then the oldest.
+      const sameVendor = (vendor: string | null) => (vendor ?? "").trim().toLowerCase() === input.vendor.toLowerCase();
+      const preApproved = input.budgetLineItemId === null ? undefined : approvals
+        .filter(approval => approval.kind === "purchase" && !approval.invoiceId && approval.budgetLineItemId === input.budgetLineItemId &&
+          (approval.status === "Auto-approved" || approval.status === "Approved") && approval.amountCents >= cents(input.amount))
+        .sort((a, b) => Number(sameVendor(b.vendor)) - Number(sameVendor(a.vendor)) ||
+          a.amountCents - b.amountCents || a.requestedAt.getTime() - b.requestedAt.getTime())[0];
+      const commitments = commitmentRecords(approvals.filter(approval => approval.id !== preApproved?.id));
+      const categories = remainingTradeBudgets(data.budgetLineItems ?? [], [...costs, ...commitments]);
       const category = categories.find(category => category.id === input.budgetLineItemId);
       if (input.budgetLineItemId !== null && !category) throw new InvoiceError(400, "Select a budget category belonging to this project.");
+      const checked = purchaseApproval(category, input.amount);
+      const decision = preApproved && checked.status === PENDING
+        ? { ...checked, status: "Approved", approvalReason: "pre_approved" as const }
+        : checked;
+      const tradeLabel = category ? `${category.code} · ${category.description}` : input.lineItem;
+      const approvalId = decision.status === PENDING ? `approval-${id}` : preApproved?.id ?? null;
       const record: StoredInvoice = {
         id, invoiceNumber: input.invoiceNumber, projectId: locked.id, projectName: data.name,
         vendor: input.vendor, amount: input.amount, date: input.date, direction: "company_to_luminova",
-        lineItem: category ? `${category.code} · ${category.description}` : input.lineItem,
+        lineItem: tradeLabel,
         budgetLineItemId: category?.id ?? null, submittedById: actor.id, submissionFingerprint: fingerprint,
-        ...purchaseApproval(category, input.amount),
+        ...decision, purchaseApprovalId: approvalId,
         attachment: { ...input.attachment, url: `/api/invoice-submissions/${encodeURIComponent(id)}/file` },
       };
       await tx.insert(importedInvoicesTable).values({
         id, importBatchId: locked.importBatchId, ownerId: locked.ownerId, data: record,
       });
+      if (preApproved) {
+        await tx.update(purchaseApprovalsTable).set({ invoiceId: id }).where(eq(purchaseApprovalsTable.id, preApproved.id));
+      }
+      if (decision.status === PENDING) {
+        await tx.insert(purchaseApprovalsTable).values({
+          id: approvalId!, workspaceId: actor.workspaceId, projectId: locked.id, importBatchId: locked.importBatchId,
+          ownerId: locked.ownerId, kind: "invoice", invoiceId: id, budgetLineItemId: category?.id ?? null, tradeLabel,
+          vendor: input.vendor, description: `Invoice ${input.invoiceNumber}`, amountCents: cents(input.amount),
+          remainingBeforeCents: decision.budgetRemainingBefore === null ? null : cents(decision.budgetRemainingBefore),
+          overageCents: cents(decision.overage), status: PENDING, approvalReason: decision.approvalReason,
+          requestedById: actor.id, requestedByName,
+        });
+      }
       await tx.insert(projectDocumentsTable).values({
         id: `document-${id}`, importBatchId: locked.importBatchId, projectId: locked.id,
         ownerId: locked.ownerId, objectPath: input.attachment.objectPath,
@@ -214,6 +296,103 @@ export function createInvoiceSubmissionRouter(dependencies: InvoiceSubmissionDep
       return record;
     });
     res.status(201).json(CreateInvoiceResponse.parse(invoice));
+    if (invoice.status === PENDING && invoice.purchaseApprovalId) {
+      const [row] = await db.select().from(purchaseApprovalsTable).where(eq(purchaseApprovalsTable.id, invoice.purchaseApprovalId)).limit(1);
+      if (row) notifyLater(req, { type: "requested", approval: emailFacts(serializeApproval(row, invoice.projectName)) });
+    }
+  }));
+
+  router.get("/purchase-approvals", safe(async (req, res) => {
+    const actor = await actorFor(req);
+    const projects = await projectsFor(actor);
+    const names = new Map(projects.map(project => [project.id, (project.data as ProjectData).name]));
+    const rows = (await approvalsForProjects(projects)).sort((a, b) => b.requestedAt.getTime() - a.requestedAt.getTime());
+    res.json(GetPurchaseApprovalsResponse.parse(rows.map(row => serializeApproval(row, names.get(row.projectId) ?? "Project"))));
+  }));
+
+  router.post("/purchase-approvals", safe(async (req, res) => {
+    const actor = await actorFor(req);
+    const parsed = CreatePurchaseApprovalBody.safeParse(req.body);
+    const description = parsed.success ? parsed.data.description.trim() : "";
+    if (!parsed.success || !description || Math.abs(Math.round(parsed.data.amount * 100) / 100 - parsed.data.amount) > 0.00000001) {
+      throw new InvoiceError(400, "Choose a trade, enter an amount with no more than two decimal places, and say what the purchase is for.");
+    }
+    const input = parsed.data;
+    const project = await projectFor(actor, input.projectId);
+    const requestedByName = await nameWithin(displayName, actor.id);
+    const created = await db.transaction(async tx => {
+      const [locked] = await tx.select().from(importedProjectsTable).where(eq(importedProjectsTable.id, project.id)).for("update");
+      if (!locked || !accessible(locked, actor)) throw new InvoiceError(404, "Project not accessible");
+      const data = locked.data as ProjectData;
+      const [invoices, approvals] = await Promise.all([
+        tx.select().from(importedInvoicesTable).where(and(eq(importedInvoicesTable.importBatchId, locked.importBatchId), eq(importedInvoicesTable.ownerId, locked.ownerId))),
+        tx.select().from(purchaseApprovalsTable).where(and(eq(purchaseApprovalsTable.projectId, locked.id), eq(purchaseApprovalsTable.importBatchId, locked.importBatchId), eq(purchaseApprovalsTable.ownerId, locked.ownerId))),
+      ]);
+      const costs = invoices.map(record => record.data as StoredInvoice).filter(record => record.projectId === locked.id);
+      const categories = remainingTradeBudgets(data.budgetLineItems ?? [], [...costs, ...commitmentRecords(approvals)]);
+      const category = categories.find(candidate => candidate.id === input.budgetLineItemId);
+      if (!category) throw new InvoiceError(400, "Select a trade from this project's budget.");
+      const decision = purchaseApproval(category, input.amount);
+      const [row] = await tx.insert(purchaseApprovalsTable).values({
+        id: `approval-${randomUUID()}`, workspaceId: actor.workspaceId, projectId: locked.id, importBatchId: locked.importBatchId,
+        ownerId: locked.ownerId, kind: "purchase", invoiceId: null, budgetLineItemId: category.id,
+        tradeLabel: `${category.code} · ${category.description}`, vendor: input.vendor?.trim() || null, description,
+        amountCents: cents(input.amount),
+        remainingBeforeCents: decision.budgetRemainingBefore === null ? null : cents(decision.budgetRemainingBefore),
+        overageCents: cents(decision.overage), status: decision.status, approvalReason: decision.approvalReason,
+        requestedById: actor.id, requestedByName,
+      }).returning();
+      return serializeApproval(row, data.name);
+    });
+    res.status(201).json(CreatePurchaseApprovalResponse.parse(created));
+    if (created.status === PENDING) notifyLater(req, { type: "requested", approval: emailFacts(created) });
+  }));
+
+  router.post("/purchase-approvals/:approvalId/decision", safe(async (req, res) => {
+    const actor = await actorFor(req);
+    if (actor.role !== "Admin") throw new InvoiceError(403, "Only an Admin can approve or decline over-budget spending.");
+    const params = DecidePurchaseApprovalParams.safeParse(req.params);
+    const parsed = DecidePurchaseApprovalBody.safeParse(req.body);
+    if (!params.success || !parsed.success) throw new InvoiceError(400, "Choose approve or decline. Notes can be up to 500 characters.");
+    const { decision, note, raiseBudget } = parsed.data;
+    const [existing] = await db.select().from(purchaseApprovalsTable).where(eq(purchaseApprovalsTable.id, params.data.approvalId)).limit(1);
+    if (!existing || existing.workspaceId !== actor.workspaceId) throw new InvoiceError(404, "Approval not found");
+    const project = await projectFor(actor, existing.projectId);
+    if (existing.importBatchId !== project.importBatchId || existing.ownerId !== project.ownerId) throw new InvoiceError(404, "Approval not found");
+    const decidedByName = await nameWithin(displayName, actor.id);
+    const decided = await db.transaction(async tx => {
+      const [locked] = await tx.select().from(importedProjectsTable).where(eq(importedProjectsTable.id, project.id)).for("update");
+      const [row] = await tx.select().from(purchaseApprovalsTable).where(eq(purchaseApprovalsTable.id, existing.id)).for("update");
+      if (!locked || !row) throw new InvoiceError(404, "Approval not found");
+      if (row.status !== PENDING) throw new InvoiceError(409, `This request was already ${row.status.toLowerCase()}.`);
+      const approve = decision === "approve";
+      let budgetIncreaseCents: number | null = null;
+      if (approve && raiseBudget && row.budgetLineItemId && row.overageCents > 0) {
+        // A change order: add exactly the overage to the trade, so later purchases are measured against the new budget.
+        const data = locked.data as ProjectData;
+        const items = (data.budgetLineItems ?? []).map(item => item.id === row.budgetLineItemId && typeof item.budgeted === "number"
+          ? { ...item, budgeted: (cents(item.budgeted) + row.overageCents) / 100 }
+          : item);
+        if (items.some(item => item.id === row.budgetLineItemId && typeof item.budgeted === "number")) {
+          await tx.update(importedProjectsTable).set({ data: { ...data, budgetLineItems: items } }).where(eq(importedProjectsTable.id, locked.id));
+          budgetIncreaseCents = row.overageCents;
+        }
+      }
+      const [updated] = await tx.update(purchaseApprovalsTable).set({
+        status: approve ? "Approved" : "Declined", decidedById: actor.id, decidedByName, decidedAt: new Date(),
+        decisionNote: note?.trim() || null, budgetIncreaseCents,
+      }).where(eq(purchaseApprovalsTable.id, row.id)).returning();
+      if (row.kind === "invoice" && row.invoiceId) {
+        const [invoiceRow] = await tx.select().from(importedInvoicesTable).where(eq(importedInvoicesTable.id, row.invoiceId)).for("update");
+        if (invoiceRow) {
+          await tx.update(importedInvoicesTable).set({ data: { ...(invoiceRow.data as StoredInvoice), status: approve ? "Approved" : "Declined" } })
+            .where(eq(importedInvoicesTable.id, invoiceRow.id));
+        }
+      }
+      return serializeApproval(updated, (locked.data as ProjectData).name);
+    });
+    res.json(DecidePurchaseApprovalResponse.parse(decided));
+    notifyLater(req, { type: "decided", approval: emailFacts(decided) });
   }));
 
   router.get("/invoice-submissions/:invoiceId/file", safe(async (req, res) => {

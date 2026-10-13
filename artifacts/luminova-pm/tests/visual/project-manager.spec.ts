@@ -256,3 +256,67 @@ test('does not expose the assignment control to non-administrators', async ({ pa
   const dialog = page.getByRole('dialog', { name: 'Edit Project' });
   await expect(dialog.getByLabel('Project Manager')).toHaveCount(0);
 });
+
+test('shows project board groups and scheduled work', async ({ page }) => {
+  await installIdentity(page, 'Project Manager');
+  await page.route('**/api/projects/riverstone', route => route.fulfill({ json: project }));
+  await page.route('**/api/projects/riverstone/activity', route => route.fulfill({ json: [] }));
+  await page.route('**/api/projects/riverstone/panoramas', route => route.fulfill({ json: [] }));
+  await page.route('**/api/projects/riverstone/board', route => route.fulfill({
+    json: {
+      groups: [{ id: 'group-precon', projectId: 'riverstone', name: 'Pre-construction', color: 'blue', position: 0 }],
+      items: [{
+        id: 'item-permit',
+        projectId: 'riverstone',
+        groupId: 'group-precon',
+        name: 'Submit permit drawings',
+        status: 'Working on it',
+        priority: 'High',
+        assignee: 'Maya Chen',
+        startDate: '2026-10-13',
+        endDate: '2026-10-15',
+        costCents: null,
+        dependsOnId: null,
+        position: 0,
+      }],
+    },
+  }));
+
+  await page.goto('/__visual/project-panorama?tab=board');
+  await expect(page.getByRole('tab', { name: 'Board', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('region', { name: 'Project board' })).toBeVisible();
+  await expect(page.getByText('Pre-construction', { exact: true })).toBeVisible();
+  await expect(page.getByText('Submit permit drawings', { exact: true })).toBeVisible();
+});
+
+test('shows portfolio schedule items and switches to calendar view', async ({ page }) => {
+  await installIdentity(page, 'Project Manager');
+  await page.route('**/api/board-items', route => route.fulfill({
+    json: [{
+      id: 'item-permit',
+      projectId: 'riverstone',
+      projectName: 'Riverstone Residence',
+      groupId: 'group-precon',
+      groupName: 'Pre-construction',
+      groupColor: 'blue',
+      name: 'Submit permit drawings',
+      status: 'Working on it',
+      priority: 'High',
+      assignee: 'Maya Chen',
+      startDate: '2026-10-13',
+      endDate: '2026-10-15',
+      costCents: null,
+      dependsOnId: null,
+      position: 0,
+    }],
+  }));
+
+  await page.goto('/__visual/schedule');
+  await expect(page.getByRole('heading', { name: 'Schedule', exact: true })).toBeVisible();
+  const weekSection = page.getByRole('region', { name: 'Happening this week' });
+  await expect(weekSection.getByText('Submit permit drawings', { exact: true })).toBeVisible();
+  const calendarButton = page.getByRole('button', { name: 'Calendar', exact: true });
+  await calendarButton.click();
+  await expect(calendarButton).toHaveAttribute('aria-pressed', 'true');
+  await expect(weekSection.getByText('Submit permit drawings', { exact: true })).toBeVisible();
+});

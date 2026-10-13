@@ -20,7 +20,7 @@ const normalize = (value: string) => value.trim().toLowerCase().replace(/\s+/g, 
 const cents = (value: number) => Math.round(value * 100);
 const isCost = (invoice: PurchaseRecord) =>
   invoice.direction !== "luminova_to_client" &&
-  !["rejected", "cancelled", "canceled", "void"].includes(normalize(invoice.status ?? "")) &&
+  !["rejected", "declined", "cancelled", "canceled", "void"].includes(normalize(invoice.status ?? "")) &&
   Number.isFinite(invoice.amount) && invoice.amount > 0;
 
 function categoryForInvoice(categories: CostCategory[], invoice: PurchaseRecord) {
@@ -81,4 +81,29 @@ export function purchaseApproval(category: InvoiceBudgetCategory | undefined, am
     budgetRemainingBefore: category.remaining,
     budgetRemainingAfter: after / 100,
   };
+}
+export type PurchaseCommitment = {
+  kind: string;
+  status: string;
+  invoiceId: string | null;
+  budgetLineItemId: string | null;
+  amountCents: number;
+  requestedById: string;
+};
+
+/**
+ * Approved purchases that no invoice has claimed yet reserve their trade budget, so two people
+ * can't both spend the same remaining money. Pending or declined requests reserve nothing, and an
+ * invoice-kind approval never counts here because its invoice already carries the cost.
+ */
+export function commitmentRecords(approvals: PurchaseCommitment[]): PurchaseRecord[] {
+  return approvals
+    .filter(approval => approval.kind === "purchase" && !approval.invoiceId &&
+      (approval.status === "Auto-approved" || approval.status === "Approved"))
+    .map(approval => ({
+      amount: approval.amountCents / 100,
+      status: approval.status,
+      budgetLineItemId: approval.budgetLineItemId,
+      submittedById: approval.requestedById,
+    }));
 }

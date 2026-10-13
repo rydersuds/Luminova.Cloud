@@ -17,27 +17,31 @@ import {
   UserRound,
   Moon,
   Sun,
+  CalendarRange,
+  BadgeCheck,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { preloadPage } from "@/lib/page-preload"
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useClerk, useUser } from "@clerk/react"
-import { useGetCurrentWorkspaceUser } from "@workspace/api-client-react"
+import { getGetPurchaseApprovalsQueryKey, useGetCurrentWorkspaceUser, useGetPurchaseApprovals } from "@workspace/api-client-react"
 import { useTheme } from "@/hooks/use-theme"
 import { CookieConsentBanner } from "@/components/cookie-consent-banner"
 
 type IndicatorPhase = "idle" | "travel" | "settle"
 
-type NavItem = { href: string; label: string; icon: typeof Building2; hint: string; adminOnly?: boolean }
-const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
-  {
-    label: "Daily work",
-    items: [
-      { href: "/", label: "Command Center", icon: Building2, hint: "Today across all sites" },
-      { href: "/projects", label: "All Projects", icon: FolderKanban, hint: "Job sites and progress" },
-      { href: "/messages", label: "Communications", icon: MessageSquare, hint: "Team messages" },
-    ],
-  },
+type NavItem = { href: string; label: string; icon: typeof Building2; hint: string; adminOnly?: boolean; managersOnly?: boolean }
+// Overview pages first, then the supporting tools. Project boards open from All Projects.
+const WORKSPACE_GROUP = {
+  label: "Workspace",
+  items: [
+    { href: "/", label: "Command Center", icon: Building2, hint: "Today across all sites" },
+    { href: "/projects", label: "All Projects", icon: FolderKanban, hint: "Every job site and its progress" },
+    { href: "/schedule", label: "Schedule", icon: CalendarRange, hint: "Timeline and calendar across projects" },
+    { href: "/approvals", label: "Approvals", icon: BadgeCheck, hint: "Budget checks and over-budget approvals", managersOnly: true },
+  ] as NavItem[],
+}
+const SUPPORT_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "Purchasing",
     items: [
@@ -47,10 +51,15 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     ],
   },
   {
-    label: "Admin",
-    items: [{ href: "/users", label: "Users & Roles", icon: UserCog, hint: "Access and invitations", adminOnly: true }],
+    label: "Team",
+    items: [
+      { href: "/messages", label: "Communications", icon: MessageSquare, hint: "Team messages" },
+      { href: "/users", label: "Users & Roles", icon: UserCog, hint: "Access and invitations", adminOnly: true },
+    ],
   },
 ]
+const NAV_GROUPS = [WORKSPACE_GROUP, ...SUPPORT_GROUPS]
+
 const NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items)
 
 export function getBreadcrumbs(location: string): { label: string; href?: string }[] {
@@ -80,6 +89,8 @@ type AppLayoutViewProps = {
   onNavigate?: (href: string) => void
   showCookieConsent?: boolean
   role?: string | null
+  /** Over-budget requests waiting for a decision, shown as a badge on Approvals. */
+  approvalsWaiting?: number
 }
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "luminova-sidebar-collapsed"
@@ -109,8 +120,13 @@ export function AppLayoutView({
   onNavigate,
   showCookieConsent = true,
   role = "Admin",
+  approvalsWaiting = 0,
 }: AppLayoutViewProps) {
   const isAdmin = role === "Admin"
+  const isManager = isAdmin || role === "Project Manager"
+  const visibleItem = (item: NavItem) => (!item.adminOnly || isAdmin) && (!item.managersOnly || isManager)
+  const matchesNav = (item: NavItem, path: string) =>
+    path === item.href || (item.href !== "/" && path.startsWith(`${item.href}/`))
   const crumbs = getBreadcrumbs(location)
   const { theme, toggleTheme } = useTheme()
   const [sidebarOpen, setSidebarOpen] = useState(initialSidebarOpen)
@@ -273,6 +289,8 @@ export function AppLayoutView({
         lastMotion: "none",
         direction: target.top > startTop ? "down" : "up",
       })
+      // Switch the label colours immediately so the item doesn't fade from light to dark under the marker.
+      setVisuallyActiveLocation(location)
 
       const indicatorElement = indicatorRef.current
       const direction = target.top > startTop ? 1 : -1
@@ -303,19 +321,6 @@ export function AppLayoutView({
         },
       )
       indicatorAnimationRef.current = travelAnimation
-      const sheenAnimation = indicatorSheenRef.current?.animate(
-        [
-          { transform: `translateX(${direction > 0 ? "-145%" : "145%"}) skewX(-12deg)`, opacity: 0 },
-          { transform: "translateX(0%) skewX(-12deg)", opacity: 0.62, offset: 0.5 },
-          { transform: `translateX(${direction > 0 ? "145%" : "-145%"}) skewX(-12deg)`, opacity: 0 },
-        ],
-        {
-          duration: travelDuration + 60,
-          easing: "cubic-bezier(0.16, 1, 0.3, 1)",
-          fill: "both",
-        },
-      )
-      if (sheenAnimation) indicatorSheenAnimationRef.current = sheenAnimation
       travelAnimation.finished.then(() => {
         if (indicatorAnimationRef.current !== travelAnimation) return
         indicatorPhaseRef.current = "settle"
@@ -432,6 +437,8 @@ export function AppLayoutView({
         <div className="absolute top-[-20%] left-[-10%] h-[60%] w-[60%] rounded-full bg-[radial-gradient(circle,hsl(var(--accent)/0.12),transparent_68%)] opacity-45" />
         <div className="absolute bottom-[-20%] right-[-10%] h-[50%] w-[50%] rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.08),transparent_68%)] opacity-35" />
         <div className="absolute inset-0 bg-gradient-to-br from-background/40 via-background/80 to-background/95" />
+        <div className="holo-aurora" />
+        <div className="holo-floor" />
       </div>
       <div className="md:hidden flex items-center justify-between p-4 glass-panel-dark text-sidebar-foreground z-30 relative border-b border-sidebar-border shadow-md">
         <div className="flex items-center">
@@ -539,7 +546,7 @@ export function AppLayoutView({
             <div className="absolute inset-x-3 top-[2px] h-px rounded-full bg-white/70 opacity-90" />
             <div className="absolute inset-x-5 bottom-[3px] h-px rounded-full bg-white/25" />
           </div>
-          {NAV_GROUPS.filter((g) => g.items.some((i) => !i.adminOnly || isAdmin)).map((group) => (
+          {NAV_GROUPS.filter((g) => g.items.some(visibleItem)).map((group) => (
             <div key={group.label} role="group" aria-label={group.label} className="space-y-1.5">
               <div
                 data-contrast-label="navigation section label"
@@ -550,9 +557,9 @@ export function AppLayoutView({
               >
                 {group.label}
               </div>
-          {group.items.filter((item) => !item.adminOnly || isAdmin).map((item) => {
-            const isActive = location === item.href || (item.href !== "/" && location.startsWith(`${item.href}/`))
-            const isVisuallyActive = visuallyActiveLocation === item.href || (item.href !== "/" && visuallyActiveLocation.startsWith(`${item.href}/`))
+          {group.items.filter(visibleItem).map((item) => {
+            const isActive = matchesNav(item, location)
+            const isVisuallyActive = matchesNav(item, visuallyActiveLocation)
             const isForcedHover = hoveredHref === item.href && !isActive
             return (
               <Link
@@ -564,12 +571,12 @@ export function AppLayoutView({
                 title={sidebarCollapsed ? item.label : item.hint}
                 data-contrast-label={`navigation link "${item.label}"`}
                 className={cn(
-                   "group relative z-10 flex items-center py-3 rounded-lg text-sm font-bold transition-[color,background-color,box-shadow,transform] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden shadow-sm motion-reduce:transition-none",
+                   "group relative z-10 flex items-center py-3 rounded-lg text-sm font-bold transition-[color,background-color,box-shadow,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden shadow-sm motion-reduce:transition-none",
                   sidebarCollapsed ? "justify-center gap-0 px-2" : "gap-3 px-4",
                   isVisuallyActive
                     ? "text-primary-foreground transform scale-[1.025]"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_2px_10px_rgba(0,0,0,0.2)]",
-                  isForcedHover && "bg-sidebar-accent text-sidebar-foreground shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_2px_10px_rgba(0,0,0,0.2)]",
+                    : "text-sidebar-foreground/70 hover:bg-primary/10 hover:text-sidebar-foreground",
+                  isForcedHover && "bg-primary/10 text-sidebar-foreground",
                 )}
                 onClick={(event) => {
                   if (onNavigate) {
@@ -599,6 +606,11 @@ export function AppLayoutView({
                 >
                   {item.label}
                 </span>
+                {item.href === "/approvals" && approvalsWaiting > 0 && (
+                  <span className={cn("nav-badge", sidebarCollapsed && "nav-badge-dot")} aria-label={`${approvalsWaiting} waiting`}>
+                    {sidebarCollapsed ? "" : approvalsWaiting}
+                  </span>
+                )}
               </Link>
             )
           })}
@@ -660,7 +672,7 @@ export function AppLayoutView({
                   type="button"
                   data-contrast-label="sign-out control"
                   onClick={onSignOut}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-3 text-xs font-bold uppercase tracking-wider text-red-400 transition-all hover:bg-destructive hover:text-destructive-foreground hover:shadow-[0_4px_10px_rgba(255,0,0,0.3)] motion-reduce:transition-none"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-3 text-xs font-bold uppercase tracking-wider text-red-400 transition-all hover:bg-red-700 hover:text-destructive-foreground hover:shadow-[0_4px_10px_rgba(255,0,0,0.3)] motion-reduce:transition-none"
                 >
                   <LogOut className="h-4 w-4" />
                   Sign out
@@ -728,10 +740,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { signOut } = useClerk()
   const { user } = useUser()
   const { data: workspaceUser } = useGetCurrentWorkspaceUser()
+  const managesProjects = workspaceUser?.role === "Admin" || workspaceUser?.role === "Project Manager"
+  const { data: approvals } = useGetPurchaseApprovals({
+    query: { enabled: managesProjects, queryKey: getGetPurchaseApprovalsQueryKey(), refetchInterval: 60_000 },
+  })
+  const approvalsWaiting = Array.isArray(approvals)
+    ? approvals.filter((approval) => approval.status === "Pending approval").length
+    : 0
 
   return (
     <AppLayoutView
       role={workspaceUser?.role ?? null}
+      approvalsWaiting={approvalsWaiting}
       location={location}
       displayName={user?.fullName || user?.firstName || "Project Manager"}
       email={user?.primaryEmailAddress?.emailAddress || "Signed in"}

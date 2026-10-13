@@ -4,6 +4,7 @@ import type { Project } from "@workspace/api-client-react"
 import { ArrowLeft, ArrowRight, Building2, MapPin } from "lucide-react"
 import { cn, formatDaysRemaining, getDaysRemaining } from "@/lib/utils"
 import { StatusPill } from "./status-pill"
+import { WireframeBuilding } from "./wireframe-building"
 
 const LIVE = new Set(["Active", "In progress"])
 
@@ -33,11 +34,11 @@ export function ProjectStage({ projects, loading }: { projects: Project[] | unde
       {featured.exteriorImage ? (
         <img key={featured.id} src={featured.exteriorImage} alt="" className="stage-img" />
       ) : (
-        <div className="stage-blank"><Building2 className="h-24 w-24" /></div>
+        <div className="stage-blank"><WireframeBuilding key={featured.id} seed={featured.id} progress={featured.progress} className="stage-wireframe" /></div>
       )}
       <div className="stage-shade" />
 
-      <div className="relative z-10 flex h-full flex-col justify-between gap-4 p-4 sm:p-6">
+      <div key={featured.id} className="stage-content-swap relative z-10 flex h-full flex-col justify-between gap-4 p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
             <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/70">Project highlights</span>

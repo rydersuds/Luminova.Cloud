@@ -6,7 +6,7 @@ import type { AddressInfo } from "node:net";
 import { eq, inArray } from "drizzle-orm";
 import {
   db, importedProjectsTable, importedInvoicesTable, projectImportBatchesTable,
-  projectDocumentsTable, invoiceUploadReservationsTable,
+  projectDocumentsTable, invoiceUploadReservationsTable, purchaseApprovalsTable,
 } from "@workspace/db";
 import type { InvoiceInput, Invoice } from "@workspace/api-zod";
 import { createInvoiceSubmissionRouter, type InvoiceSubmissionDependencies } from "./invoiceSubmissions";
@@ -64,6 +64,7 @@ test("purchase invoices persist, enforce assigned-project scope, and apply cumul
   });
   const makeRouter = () => createInvoiceSubmissionRouter({
     storage, role: async req => req.userId === admin ? "Admin" : req.userId === "field-user" ? "Field Team" : "Project Manager",
+    displayName: async () => "Test user", notify: async () => undefined,
   });
   app.use(makeRouter());
   app.use(luminovaRouter);
@@ -72,6 +73,7 @@ test("purchase invoices persist, enforce assigned-project scope, and apply cumul
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   t.after(async () => {
     server.close();
+    await db.delete(purchaseApprovalsTable).where(inArray(purchaseApprovalsTable.projectId, projectIds));
     await db.delete(projectDocumentsTable).where(inArray(projectDocumentsTable.importBatchId, batchIds));
     await db.delete(invoiceUploadReservationsTable).where(inArray(invoiceUploadReservationsTable.projectId, projectIds));
     await db.delete(importedInvoicesTable).where(inArray(importedInvoicesTable.importBatchId, batchIds));
