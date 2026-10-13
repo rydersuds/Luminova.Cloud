@@ -34,6 +34,7 @@ const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 const NotFound = lazy(() => import('@/pages/not-found'));
 const Login = lazy(() => import('@/pages/login'));
 const Dashboard = lazy(pageModules.dashboard);
+const DemoWorkspace = lazy(() => import('@/pages/demo-workspace'));
 const ProjectDetail = lazy(pageModules.projectDetail);
 const Projects = lazy(pageModules.projects);
 const TradesDirectory = lazy(pageModules.trades);
@@ -92,6 +93,7 @@ function Home() {
           <p className="mt-6 max-w-xl text-base leading-7 text-sidebar-foreground/65">A precise command center for live projects, field documentation, schedules, budgets, invoices, vendors, and communications.</p>
           <div className="mt-9 flex flex-wrap items-center gap-4">
             <Link href="/sign-in" className="tech-clip gold-glow inline-flex h-12 items-center justify-center bg-primary px-8 font-bold text-primary-foreground transition-transform hover:-translate-y-0.5">Sign in</Link>
+            <a href={`${basePath}/demo`} data-testid="link-public-demo" className="inline-flex h-12 items-center justify-center border border-primary/50 px-8 font-bold text-sidebar-foreground transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary">Explore interactive demo</a>
             <span className="font-mono text-[10px] uppercase tracking-[.18em] text-sidebar-foreground/45">Authorized teams only</span>
           </div>
           <div className="mt-16 flex flex-wrap gap-x-8 gap-y-3 border-t border-sidebar-border/70 pt-5 font-mono text-[10px] uppercase tracking-[.16em] text-sidebar-foreground/45">
@@ -294,6 +296,20 @@ function AuthenticatedPagePreloader() {
 }
 
 function App() {
+  const currentPath = basePath && window.location.pathname.startsWith(basePath)
+    ? window.location.pathname.slice(basePath.length) || "/"
+    : window.location.pathname;
+
+  // Keep the public sandbox outside Clerk and the authenticated folder-import
+  // provider so opening it cannot restore, upload, or mutate a real import.
+  if (currentPath === "/demo") {
+    return (
+      <WouterRouter base={basePath}>
+        <Suspense fallback={<PageFallback />}><DemoWorkspace /></Suspense>
+      </WouterRouter>
+    );
+  }
+
   if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/messages')) {
     return (
       <WouterRouter base={basePath}>
