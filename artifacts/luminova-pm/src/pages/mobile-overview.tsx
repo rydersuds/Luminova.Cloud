@@ -114,9 +114,36 @@ export default function MobileOverviewPage() {
     },
   });
 
-  const projects = Array.isArray(projectsQuery.data) ? projectsQuery.data : [];
-  const schedule = Array.isArray(scheduleQuery.data) ? scheduleQuery.data : [];
-  const approvals = Array.isArray(approvalsQuery.data) ? approvalsQuery.data : [];
+  const projectRows = Array.isArray(projectsQuery.data) ? projectsQuery.data : [];
+  const scheduleRows = Array.isArray(scheduleQuery.data) ? scheduleQuery.data : [];
+  const approvalRows = Array.isArray(approvalsQuery.data) ? approvalsQuery.data : [];
+  const invalidProjectsPayload = projectsQuery.data !== undefined && (
+    !Array.isArray(projectsQuery.data)
+    || !projectRows.every((project) => project && typeof project === "object" && typeof project.id === "string" && typeof project.name === "string")
+  );
+  const invalidSchedulePayload = scheduleQuery.data !== undefined && (
+    !Array.isArray(scheduleQuery.data)
+    || !scheduleRows.every((item) => item && typeof item === "object" && typeof item.id === "string" && typeof item.name === "string" && typeof item.projectId === "string")
+  );
+  const invalidApprovalsPayload = approvalsQuery.data !== undefined && (
+    !Array.isArray(approvalsQuery.data)
+    || !approvalRows.every((approval) => approval && typeof approval === "object" && typeof approval.id === "string" && typeof approval.status === "string")
+  );
+  const projects = invalidProjectsPayload ? [] : projectRows;
+  const schedule = invalidSchedulePayload ? [] : scheduleRows;
+  const approvals = invalidApprovalsPayload ? [] : approvalRows;
+  const summary = summaryQuery.data;
+  const invalidSummaryPayload = summary !== undefined && (
+    !summary
+    || typeof summary.activeProjects !== "number"
+    || typeof summary.awaitingApproval !== "number"
+    || (summary.unreadMessages !== null && typeof summary.unreadMessages !== "number")
+    || typeof summary.new360Photos !== "number"
+    || typeof summary.budgeted !== "number"
+    || typeof summary.invoiced !== "number"
+    || !Array.isArray(summary.recentActivity)
+    || !summary.recentActivity.every((entry) => entry && typeof entry.id === "string" && typeof entry.title === "string")
+  );
   const activity = Array.isArray(summaryQuery.data?.recentActivity) ? summaryQuery.data.recentActivity : [];
   const today = new Date();
   const greetingDate = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(today);
@@ -131,11 +158,16 @@ export default function MobileOverviewPage() {
   const pendingApprovals = approvals
     .filter((approval) => /pending|awaiting|requested/i.test(approval.status))
     .slice(0, 3);
-  const summary = summaryQuery.data;
   const isPageLoading = user.isLoading || projectsQuery.isLoading || summaryQuery.isLoading;
+  const signals = [
+    { label: "Active sites", value: summary?.activeProjects, icon: HardHat, href: "/projects", tone: "text-[#e4c879]" },
+    ...(canSeeApprovals ? [{ label: "For approval", value: summary?.awaitingApproval, icon: ClipboardCheck, href: "/approvals", tone: "text-[#edb978]" }] : []),
+    { label: "Unread", value: summary?.unreadMessages, icon: MessageSquare, href: "/messages", tone: "text-[#bed0c0]" },
+    { label: "New 360s", value: summary?.new360Photos, icon: CheckCircle2, href: "/projects", tone: "text-[#bdc8bf]" },
+  ];
 
   return (
-    <main className="min-h-[100dvh] bg-[#11110f] text-[#f4f0e7]" data-testid="page-mobile-overview">
+    <div className="min-h-[100dvh] bg-[#11110f] text-[#f4f0e7]" data-testid="page-mobile-overview">
       <div className="mx-auto w-full max-w-[1040px] px-4 pb-12 pt-5 sm:px-7 sm:pt-8">
         <header className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -217,12 +249,7 @@ export default function MobileOverviewPage() {
         </section>
 
         <section className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4" aria-label="Portfolio signals">
-          {[
-            { label: "Active sites", value: summary?.activeProjects, icon: HardHat, href: "/projects", tone: "text-[#e4c879]" },
-            { label: "For approval", value: summary?.awaitingApproval, icon: ClipboardCheck, href: "/approvals", tone: "text-[#edb978]" },
-            { label: "Unread", value: summary?.unreadMessages, icon: MessageSquare, href: "/messages", tone: "text-[#bed0c0]" },
-            { label: "New 360s", value: summary?.new360Photos, icon: CheckCircle2, href: "/projects", tone: "text-[#bdc8bf]" },
-          ].map(({ label, value, icon: Icon, href, tone }) => (
+          {signals.map(({ label, value, icon: Icon, href, tone }) => (
             <Link
               href={href}
               key={label}
@@ -234,7 +261,7 @@ export default function MobileOverviewPage() {
                 <Icon className={`h-3.5 w-3.5 ${tone}`} aria-hidden="true" />
               </div>
               <p className="mt-2 text-[1.65rem] font-bold leading-none tracking-[-0.05em] tabular-nums" data-testid={`value-signal-${label.toLowerCase().replaceAll(" ", "-")}`}>
-                {summaryQuery.isLoading ? <span className="skeleton-line inline-block h-7 w-10 align-middle" /> : value ?? "—"}
+                {summaryQuery.isLoading ? <span className="skeleton-line inline-block h-7 w-10 align-middle" /> : invalidSummaryPayload ? "—" : value ?? "—"}
               </p>
             </Link>
           ))}
@@ -244,7 +271,7 @@ export default function MobileOverviewPage() {
           <section aria-labelledby="schedule-heading" data-testid="section-time-sensitive">
             <SectionHeading index="01" title="Next on site" detail="7 day window" />
             {user.isError && <LoadError label="workspace access" retry={() => void user.refetch()} busy={user.isFetching} />}
-            {!user.isLoading && canSeeSchedule && scheduleQuery.isError && (
+            {!user.isLoading && canSeeSchedule && (scheduleQuery.isError || invalidSchedulePayload) && (
               <LoadError label="schedule" retry={() => void scheduleQuery.refetch()} busy={scheduleQuery.isFetching} />
             )}
             {scheduleQuery.isLoading && canSeeSchedule && (
@@ -257,7 +284,7 @@ export default function MobileOverviewPage() {
                 Schedule overview is not available for this account.
               </div>
             )}
-            {canSeeSchedule && !scheduleQuery.isLoading && !scheduleQuery.isError && (
+            {canSeeSchedule && !scheduleQuery.isLoading && !scheduleQuery.isError && !invalidSchedulePayload && (
               <div className="space-y-2">
                 {urgentItems.length === 0 ? (
                   <div className="rounded-xl border border-white/[0.08] bg-[#1b1b18] px-4 py-5" data-testid="empty-schedule-window">
@@ -286,9 +313,11 @@ export default function MobileOverviewPage() {
                 ))}
               </div>
             )}
-            <Link href="/schedule" data-testid="link-full-schedule" className="mt-2 flex min-h-10 items-center justify-between rounded-lg px-3 text-[11px] font-semibold text-white/55 transition hover:bg-white/[0.04] hover:text-[#e4c879]">
-              Portfolio schedule <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-            </Link>
+            {canSeeSchedule && (
+              <Link href="/schedule" data-testid="link-full-schedule" className="mt-2 flex min-h-10 items-center justify-between rounded-lg px-3 text-[11px] font-semibold text-white/55 transition hover:bg-white/[0.04] hover:text-[#e4c879]">
+                Portfolio schedule <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+            )}
           </section>
 
           <section aria-labelledby="exposure-heading" data-testid="section-project-exposure">
@@ -316,8 +345,8 @@ export default function MobileOverviewPage() {
             ) : canSeeApprovals ? (
               <div className="mt-2 space-y-2">
                 {approvalsQuery.isLoading && <div className="skeleton-line h-[82px] rounded-xl" data-testid="loading-approvals" />}
-                {approvalsQuery.isError && <LoadError label="approvals" retry={() => void approvalsQuery.refetch()} busy={approvalsQuery.isFetching} />}
-                {!approvalsQuery.isLoading && !approvalsQuery.isError && (pendingApprovals.length === 0 ? (
+                {(approvalsQuery.isError || invalidApprovalsPayload) && <LoadError label="approvals" retry={() => void approvalsQuery.refetch()} busy={approvalsQuery.isFetching} />}
+                {!approvalsQuery.isLoading && !approvalsQuery.isError && !invalidApprovalsPayload && (pendingApprovals.length === 0 ? (
                   <div className="rounded-xl border border-white/[0.08] bg-[#1b1b18] p-4" data-testid="empty-pending-approvals">
                     <p className="flex items-center gap-2 text-sm font-semibold text-white/80"><CheckCircle2 className="h-4 w-4 text-emerald-300" /> Nothing waiting for sign-off</p>
                   </div>
@@ -357,7 +386,7 @@ export default function MobileOverviewPage() {
 
         <section className="mt-7" data-testid="section-projects">
           <SectionHeading index="03" title="On the ground" detail={projectsQuery.isLoading ? "Loading" : `${activeProjects.length} active`} />
-          {projectsQuery.isError ? (
+          {projectsQuery.isError || invalidProjectsPayload ? (
             <LoadError label="projects" retry={() => void projectsQuery.refetch()} busy={projectsQuery.isFetching} />
           ) : projectsQuery.isLoading ? (
             <div className="grid gap-2 sm:grid-cols-2" aria-label="Loading projects" data-testid="loading-projects">
@@ -405,7 +434,7 @@ export default function MobileOverviewPage() {
 
         <section className="mt-7" data-testid="section-recent-activity">
           <SectionHeading index="04" title="Latest movement" detail="Recent" />
-          {summaryQuery.isError ? (
+          {summaryQuery.isError || invalidSummaryPayload ? (
             <LoadError label="dashboard" retry={() => void summaryQuery.refetch()} busy={summaryQuery.isFetching} />
           ) : summaryQuery.isLoading ? (
             <div className="space-y-2" aria-label="Loading activity" data-testid="loading-activity">
@@ -431,7 +460,12 @@ export default function MobileOverviewPage() {
           )}
         </section>
 
-        {(summaryQuery.isError || projectsQuery.isError || (canSeeSchedule && scheduleQuery.isError) || (canSeeApprovals && approvalsQuery.isError)) && (
+        {(summaryQuery.isError
+          || invalidSummaryPayload
+          || projectsQuery.isError
+          || invalidProjectsPayload
+          || (canSeeSchedule && (scheduleQuery.isError || invalidSchedulePayload))
+          || (canSeeApprovals && (approvalsQuery.isError || invalidApprovalsPayload))) && (
           <p className="mt-5 flex items-center gap-2 text-[10px] text-white/35" data-testid="status-partial-overview">
             <AlertTriangle className="h-3 w-3" aria-hidden="true" />
             Some field information is unavailable. Retry the affected section above.
@@ -439,6 +473,6 @@ export default function MobileOverviewPage() {
         )}
         {!isPageLoading && <div className="mt-7 border-t border-white/[0.08] pt-3 text-center font-mono text-[9px] uppercase tracking-[0.16em] text-white/25" data-testid="text-overview-footer">Luminova · field brief</div>}
       </div>
-    </main>
+    </div>
   );
 }

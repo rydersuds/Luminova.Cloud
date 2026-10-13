@@ -32,12 +32,12 @@ const project = {
   activity: [],
 };
 
-async function installIdentity(page: Page, role: 'Admin' | 'Project Manager' = 'Admin') {
+async function installIdentity(page: Page, role: 'Admin' | 'Project Manager' | 'Client' = 'Admin') {
   await page.addInitScript(() => {
     window.localStorage.setItem('luminova-cookie-consent-v1', 'accepted');
   });
   await page.route('**/api/users/me', route => route.fulfill({
-    json: { userId: role === 'Admin' ? 'user-admin' : 'user-maya', role },
+    json: { userId: role === 'Admin' ? 'user-admin' : role === 'Client' ? 'user-avery' : 'user-maya', role },
   }));
   await page.route('**/api/users/project-managers', route => route.fulfill({ json: managers }));
 }
@@ -584,4 +584,113 @@ test('keeps a failed board edit available to retry and explains the failure', as
   await expect(page.getByText('Submit revised permit drawings', { exact: true })).toBeVisible();
   expect(state.items[0].name).toBe('Submit revised permit drawings');
   expect(updateAttempts).toBe(2);
+});
+
+test('quick view keeps urgent project information readable on phones', async ({ page }) => {
+  await installIdentity(page, 'Project Manager');
+  await page.route('**/api/dashboard/summary', route => route.fulfill({
+    json: {
+      activeProjects: 1,
+      awaitingApproval: 1,
+      unreadMessages: 2,
+      new360Photos: 1,
+      budgeted: project.budgeted,
+      invoiced: project.invoiced,
+      recentActivity: [{
+        id: 'activity-permit',
+        title: 'Permit review started',
+        description: 'The city has started reviewing the revised drawings.',
+        author: 'Maya Chen',
+        date: '2026-10-13',
+      }],
+    },
+  }));
+  await page.route('**/api/projects', route => route.fulfill({ json: [project] }));
+  await page.route('**/api/board-items', route => route.fulfill({
+    json: [{
+      ...makeBoardItem(),
+      projectName: project.name,
+      groupName: 'Pre-construction',
+      groupColor: 'blue',
+    }],
+  }));
+  await page.route('**/api/purchase-approvals', route => route.fulfill({
+    json: [{
+      id: 'approval-electrical',
+      projectId: project.id,
+      projectName: project.name,
+      kind: 'invoice',
+      invoiceId: null,
+      budgetLineItemId: null,
+      tradeLabel: 'Electrical',
+      vendor: 'North Ridge Electric',
+      description: 'Panel upgrade',
+      amount: 1250,
+      remainingBefore: 1000,
+      overage: 250,
+      status: 'Pending approval',
+      approvalReason: 'over_budget',
+      requestedById: 'user-maya',
+      requestedByName: 'Maya Chen',
+      requestedAt: '2026-10-13T12:00:00.000Z',
+      decidedByName: null,
+      decidedAt: null,
+      decisionNote: null,
+      budgetIncrease: null,
+    }],
+  }));
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/__visual/mobile-overview');
+  await expect(page.getByTestId('page-mobile-overview')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'The work, at a glance.' })).toBeVisible();
+  await expect(page.getByTestId('value-signal-active-sites')).toHaveText('1');
+  await expect(page.getByTestId('link-schedule-item-item-permit')).toBeVisible();
+  await expect(page.getByTestId('link-approval-approval-electrical')).toBeVisible();
+  await expect(page.getByTestId('card-project-riverstone')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  await page.getByRole('button', { name: 'Open navigation' }).click();
+  const quickViewLink = page.getByRole('link', { name: 'Quick View' });
+  await expect(quickViewLink).toBeVisible();
+  await expect(quickViewLink).toHaveAttribute('href', '/mobile');
+  await page.getByRole('button', { name: 'Close navigation' }).click();
+
+  await page.setViewportSize({ width: 360, height: 740 });
+  await expect(page.getByRole('heading', { name: 'The work, at a glance.' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test('quick view hides internal schedule and approvals from clients', async ({ page }) => {
+  await installIdentity(page, 'Client');
+  await page.route('**/api/dashboard/summary', route => route.fulfill({
+    json: {
+      activeProjects: 1,
+      awaitingApproval: 1,
+      unreadMessages: 0,
+      new360Photos: 0,
+      budgeted: project.budgeted,
+      invoiced: project.invoiced,
+      recentActivity: [],
+    },
+  }));
+  await page.route('**/api/projects', route => route.fulfill({ json: [project] }));
+  let scheduleRequests = 0;
+  let approvalRequests = 0;
+  await page.route('**/api/board-items', route => {
+    scheduleRequests += 1;
+    return route.fulfill({ json: [] });
+  });
+  await page.route('**/api/purchase-approvals', route => {
+    approvalRequests += 1;
+    return route.fulfill({ json: [] });
+  });
+
+  await page.goto('/__visual/mobile-overview');
+  await expect(page.getByTestId('status-schedule-unavailable')).toBeVisible();
+  await expect(page.getByTestId('status-approvals-restricted')).toBeVisible();
+  await expect(page.getByTestId('link-signal-for-approval')).toHaveCount(0);
+  await expect(page.getByTestId('link-full-schedule')).toHaveCount(0);
+  expect(scheduleRequests).toBe(0);
+  expect(approvalRequests).toBe(0);
 });

@@ -34,6 +34,7 @@ const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 const NotFound = lazy(() => import('@/pages/not-found'));
 const Login = lazy(() => import('@/pages/login'));
 const Dashboard = lazy(pageModules.dashboard);
+const MobileOverview = lazy(pageModules.mobileOverview);
 const DemoWorkspace = lazy(() => import('@/pages/demo-workspace'));
 const ProjectDetail = lazy(pageModules.projectDetail);
 const Projects = lazy(pageModules.projects);
@@ -171,6 +172,7 @@ function AuthenticatedRoutes() {
     <RoutedErrorBoundary>
       <Switch>
         <Route path="/" component={Dashboard} />
+        <Route path="/mobile" component={MobileOverview} />
         <Route path="/projects/:id"><ProjectDetail /></Route>
         <Route path="/projects" component={Projects} />
         <Route path="/schedule" component={Schedule} />
@@ -346,6 +348,21 @@ function App() {
           <QueryClientProvider client={queryClient}>
             <TooltipProvider>
               <AppLayout><Suspense fallback={<WorkspacePageFallback />}><Schedule /></Suspense></AppLayout>
+              <Toaster />
+            </TooltipProvider>
+          </QueryClientProvider>
+        </ClerkProvider>
+      </WouterRouter>
+    );
+  }
+
+  if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/mobile-overview')) {
+    return (
+      <WouterRouter base={basePath}>
+        <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl}>
+          <QueryClientProvider client={queryClient}>
+            <TooltipProvider>
+              <AppLayout><Suspense fallback={<WorkspacePageFallback />}><MobileOverview /></Suspense></AppLayout>
               <Toaster />
             </TooltipProvider>
           </QueryClientProvider>

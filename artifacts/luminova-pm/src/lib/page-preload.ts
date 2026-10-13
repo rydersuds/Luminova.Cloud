@@ -1,5 +1,6 @@
 export const pageModules = {
   dashboard: () => import("@/pages/dashboard"),
+  mobileOverview: () => import("@/pages/mobile-overview"),
   projects: () => import("@/pages/projects"),
   projectDetail: () => import("@/pages/projects/[id]"),
   trades: () => import("@/pages/trades"),
@@ -29,6 +30,7 @@ export type PreloadEnvironment = {
 
 const primaryPageLoaders = [
   { href: "/", loader: pageModules.dashboard },
+  { href: "/mobile", loader: pageModules.mobileOverview },
   { href: "/projects", loader: pageModules.projects },
   { href: "/schedule", loader: pageModules.schedule },
   { href: "/trades", loader: pageModules.trades },
@@ -38,7 +40,7 @@ const primaryPageLoaders = [
   { href: "/users", loader: pageModules.users },
 ]
 
-const workspacePaths = ["/projects", "/schedule", "/approvals", "/trades", "/invoices", "/quotes", "/messages", "/users", "/profile"]
+const workspacePaths = ["/mobile", "/projects", "/schedule", "/approvals", "/trades", "/invoices", "/quotes", "/messages", "/users", "/profile"]
 
 function browserPreloadEnvironment(): PreloadEnvironment | undefined {
   if (typeof navigator === "undefined") return undefined
@@ -72,6 +74,7 @@ export function isWorkspacePath(href: string) {
 export function preloadPage(href: string) {
   const loader =
     href === "/" ? pageModules.dashboard
+      : href === "/mobile" ? pageModules.mobileOverview
       : href === "/projects" ? pageModules.projects
         : href.startsWith("/projects/") ? pageModules.projectDetail
           : href === "/trades" ? pageModules.trades

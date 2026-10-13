@@ -19,6 +19,7 @@ import {
   Sun,
   CalendarRange,
   BadgeCheck,
+  Smartphone,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { preloadPage } from "@/lib/page-preload"
@@ -36,6 +37,7 @@ const WORKSPACE_GROUP = {
   label: "Workspace",
   items: [
     { href: "/", label: "Command Center", icon: Building2, hint: "Today across all sites" },
+    { href: "/mobile", label: "Quick View", icon: Smartphone, hint: "Important work at a glance" },
     { href: "/projects", label: "All Projects", icon: FolderKanban, hint: "Every job site and its progress" },
     { href: "/schedule", label: "Schedule", icon: CalendarRange, hint: "Timeline and calendar across projects" },
     { href: "/approvals", label: "Approvals", icon: BadgeCheck, hint: "Budget checks and over-budget approvals", managersOnly: true },
