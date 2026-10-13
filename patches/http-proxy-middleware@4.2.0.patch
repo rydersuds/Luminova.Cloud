@@ -1,0 +1,41 @@
+diff --git a/dist/path-filter.js b/dist/path-filter.js
+index 575658b8cdb6223f1021c0457303eab108dea846..2601da991917d15b0dca8ff56f0447e883b5e8b0 100644
+--- a/dist/path-filter.js
++++ b/dist/path-filter.js
+@@ -1,5 +1,5 @@
+ import isGlob from 'is-glob';
+-import micromatch from 'micromatch';
++import picomatch from 'picomatch';
+ import { HttpProxyMiddlewareError } from './errors.js';
+ export function matchPathFilter(pathFilter = '/', uri, req) {
+     // single path
+@@ -38,8 +38,27 @@ function matchSingleStringPath(pathFilter, uri) {
+ }
+ function matchSingleGlobPath(pattern, uri) {
+     const pathname = getUrlPathName(uri);
+-    const matches = micromatch([pathname], pattern);
+-    return matches && matches.length > 0;
++    // Preserve micromatch's ordered include/exclude semantics for a single path
++    // without loading its unpatched braces dependency.
++    const patterns = [].concat(pattern);
++    let included = false;
++    let excluded = false;
++    let negatives = 0;
++    for (const glob of patterns) {
++        const matcher = picomatch(glob, {}, true);
++        const negated = matcher.state.negated || matcher.state.negatedExtglob;
++        if (negated) negatives++;
++        const result = matcher(pathname, true);
++        const matched = negated ? !result.isMatch : result.isMatch;
++        if (!matched) continue;
++        if (negated) {
++            excluded = true;
++        } else {
++            included = true;
++            excluded = false;
++        }
++    }
++    return (negatives === patterns.length || included) && !excluded;
+ }
+ function matchMultiGlobPath(patternList, uri) {
+     return matchSingleGlobPath(patternList, uri);
