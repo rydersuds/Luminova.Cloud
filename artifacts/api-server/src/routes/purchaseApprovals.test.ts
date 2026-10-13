@@ -19,6 +19,8 @@ test("purchases within a trade budget auto-approve; over-budget spending waits f
   const projectId = `approval-project-${suffix}`, batchId = `approval-batch-${suffix}`;
   const fileMetadata = new Map<string, { name: string; size: number; contentType: string }>();
   const events: ApprovalEvent[] = [];
+  const notificationWarnings: unknown[] = [];
+  let failNotifications = false;
   const storage: NonNullable<InvoiceSubmissionDependencies["storage"]> = {
     getObjectEntityUploadURL: async () => `https://uploads.invalid/objects/${randomUUID()}`,
     normalizeObjectEntityPath: url => new URL(url).pathname,
@@ -48,14 +50,17 @@ test("purchases within a trade budget auto-approve; over-budget spending waits f
   app.use((req, _res, next) => {
     const userId = req.header("x-test-user");
     const auth = Object.assign(() => ({ userId, orgId: workspace, tokenType: "session_token" }), { [Symbol.for("@clerk/express.auth")]: true });
-    Object.assign(req, { userId, auth, log: { error: () => undefined, warn: () => undefined } });
+    Object.assign(req, { userId, auth, log: { error: () => undefined, warn: (context: unknown) => notificationWarnings.push(context) } });
     next();
   });
   app.use(createInvoiceSubmissionRouter({
     storage,
     role: async req => (req.userId === admin ? "Admin" : "Project Manager"),
     displayName: async userId => (userId === admin ? "Ryder Suds" : "Maya Chen"),
-    notify: async (_req, event) => { events.push(event); },
+    notify: async (_req, event) => {
+      events.push(event);
+      if (failNotifications) throw new Error("email service unavailable");
+    },
   }));
   const server = app.listen(0);
   await new Promise<void>(resolve => server.once("listening", resolve));
@@ -116,6 +121,8 @@ test("purchases within a trade budget auto-approve; over-budget spending waits f
   assert.equal(afterApproval.remaining, 0, "both approved purchases are now reserved against the new budget");
   await settle();
   assert.equal(events.at(-1)?.type, "decided");
+  assert.equal(events.at(-1)?.approval.requestedById, pm, "the decision notification is addressed to the requester");
+  assert.equal(events.filter(event => event.type === "decided" && event.approval.id === overBudget.id).length, 1, "the saved decision triggers one notification");
   assert.equal((await call(`/purchase-approvals/${overBudget.id}/decision`, admin, { decision: "decline" })).status, 409, "a request is decided once");
 
   // The invoice for the approved purchase claims it instead of being flagged again.
@@ -134,9 +141,13 @@ test("purchases within a trade budget auto-approve; over-budget spending waits f
   // A declined request reserves nothing and is listed for everyone who manages the project.
   const declined = await check(900, "Upgrade to moisture-resistant board");
   assert.equal(declined.status, "Pending approval");
+  failNotifications = true;
   const declineResult = await (await call(`/purchase-approvals/${declined.id}/decision`, admin, { decision: "decline", note: "Standard board is fine" })).json() as PurchaseApproval;
   assert.equal(declineResult.status, "Declined");
+  await settle();
+  assert.equal(notificationWarnings.length, 1, "failed requester delivery is observable");
   assert.equal((await remaining()).remaining, 100);
   const listed = await (await call("/purchase-approvals")).json() as PurchaseApproval[];
   assert.deepEqual(new Set(listed.map(approval => approval.status)), new Set(["Auto-approved", "Approved", "Declined"]));
+  assert.equal(events.filter(event => event.type === "decided" && event.approval.id === declined.id).length, 1);
 });

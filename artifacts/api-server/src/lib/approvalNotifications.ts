@@ -38,7 +38,7 @@ function approvalsLink() {
   return base ? `${base}/approvals` : null;
 }
 
-/** Sends one email through Resend's HTTP API. Without credentials it logs and returns, so approvals never depend on email. */
+/** Sends one email through Resend's HTTP API. Mail failures are logged and never affect approval decisions. */
 export async function sendEmail(email: Email): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.APPROVAL_EMAIL_FROM;
@@ -47,16 +47,21 @@ export async function sendEmail(email: Email): Promise<boolean> {
     return false;
   }
   if (!email.to.length) return false;
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from, to: email.to, subject: email.subject, text: email.text, html: email.html }),
-  });
-  if (!response.ok) {
-    logger.warn({ status: response.status, subject: email.subject }, "Approval email was not accepted by the email service");
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from, to: email.to, subject: email.subject, text: email.text, html: email.html }),
+    });
+    if (!response.ok) {
+      logger.warn({ status: response.status, subject: email.subject }, "Approval email was not accepted by the email service");
+      return false;
+    }
+    return true;
+  } catch (error) {
+    logger.warn({ err: error, subject: email.subject }, "Approval email delivery failed");
     return false;
   }
-  return true;
 }
 
 export function requestEmail(approval: ApprovalEmailFacts, to: string[]): Email {
@@ -94,14 +99,43 @@ export function decisionEmail(approval: ApprovalEmailFacts, to: string[]): Email
   };
 }
 
-/** Default notifier: emails every workspace Admin about a new request, and the requester about a decision. */
-export const emailApprovalNotifier: ApprovalNotifier = async (req, event) => {
-  const users = await workspaceChatUsers(req);
-  if (event.type === "requested") {
-    const admins = users.filter((user) => user.role === "Admin" && user.email).map((user) => user.email);
-    await sendEmail(requestEmail(event.approval, admins));
-    return;
-  }
-  const requester = users.find((user) => user.id === event.approval.requestedById && user.email);
-  if (requester) await sendEmail(decisionEmail(event.approval, [requester.email]));
+type ApprovalRecipient = { id: string; email: string; role: string };
+type EmailApprovalNotifierDependencies = {
+  usersForRequest: (req: Request) => Promise<ApprovalRecipient[]>;
+  deliver: (email: Email) => Promise<boolean>;
 };
+
+/** Emails workspace Admins about new requests and only the requester about a decision. */
+export function createEmailApprovalNotifier(
+  dependencies: EmailApprovalNotifierDependencies = {
+    usersForRequest: workspaceChatUsers,
+    deliver: sendEmail,
+  },
+): ApprovalNotifier {
+  return async (req, event) => {
+    let users: ApprovalRecipient[];
+    try {
+      users = await dependencies.usersForRequest(req);
+    } catch (error) {
+      logger.warn({ err: error, approvalId: event.approval.id }, "Approval notification recipients could not be loaded");
+      return;
+    }
+    if (event.type === "requested") {
+      const admins = users.filter((user) => user.role === "Admin" && user.email).map((user) => user.email);
+      if (!admins.length) {
+        logger.info({ approvalId: event.approval.id }, "Approval request email skipped: no Admin email addresses are available");
+        return;
+      }
+      await dependencies.deliver(requestEmail(event.approval, admins));
+      return;
+    }
+    const requester = users.find((user) => user.id === event.approval.requestedById && user.email);
+    if (!requester) {
+      logger.warn({ approvalId: event.approval.id }, "Approval decision email skipped: requester email is unavailable");
+      return;
+    }
+    await dependencies.deliver(decisionEmail(event.approval, [requester.email]));
+  };
+}
+
+export const emailApprovalNotifier = createEmailApprovalNotifier();
