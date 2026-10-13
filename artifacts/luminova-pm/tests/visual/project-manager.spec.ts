@@ -268,6 +268,72 @@ test('selects a workspace Project Manager while creating a project', async ({ pa
   await expect(page.getByText(/\d+ days remaining/, { exact: true }).first()).toBeVisible();
 });
 
+test('keeps project initialization reachable on short desktop and mobile screens', async ({ page }) => {
+  await installIdentity(page);
+  await page.route('**/api/projects', route => route.fulfill({ json: [] }));
+  await page.route('**/api/dashboard/summary', route => route.fulfill({
+    json: {
+      activeProjects: 0,
+      awaitingApproval: 0,
+      unreadMessages: 0,
+      new360Photos: 0,
+      budgeted: 0,
+      invoiced: 0,
+      recentActivity: [],
+    },
+  }));
+  await page.route('**/api/financials/summary', route => route.fulfill({
+    json: {
+      invoicedRevenue: 0,
+      invoicedExpenses: 0,
+      acceptedClientQuoteValue: 0,
+      upcomingClientPayments: 0,
+    },
+  }));
+
+  await page.goto('/__visual/dashboard-cards');
+
+  for (const viewport of [{ width: 1280, height: 520 }, { width: 390, height: 480 }]) {
+    await page.setViewportSize(viewport);
+    await page.getByRole('button', { name: /INITIALIZE PROJECT|NEW PROJECT/ }).click();
+
+    const dialog = page.getByRole('dialog', { name: 'Initialize New Project' });
+    const title = dialog.getByRole('heading', { name: 'Initialize New Project' });
+    const closeButton = dialog.getByRole('button', { name: 'Close' });
+    const scrollArea = dialog.getByTestId('project-initialization-scroll-area');
+    const submitButton = dialog.getByRole('button', { name: 'Initialize', exact: true });
+
+    await expect(title).toBeVisible();
+    await expect(closeButton).toBeVisible();
+    const dialogBox = await dialog.boundingBox();
+    const titleBox = await title.boundingBox();
+    expect(dialogBox).not.toBeNull();
+    expect(titleBox).not.toBeNull();
+    expect(dialogBox!.x).toBeGreaterThanOrEqual(0);
+    expect(dialogBox!.y).toBeGreaterThanOrEqual(0);
+    expect(dialogBox!.x + dialogBox!.width).toBeLessThanOrEqual(viewport.width);
+    expect(dialogBox!.y + dialogBox!.height).toBeLessThanOrEqual(viewport.height);
+    expect(titleBox!.y).toBeGreaterThanOrEqual(0);
+    expect(titleBox!.y + titleBox!.height).toBeLessThanOrEqual(viewport.height);
+
+    const scrollMetrics = await scrollArea.evaluate(element => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+    }));
+    expect(scrollMetrics.scrollHeight).toBeGreaterThan(scrollMetrics.clientHeight);
+    await scrollArea.evaluate(element => {
+      element.scrollTop = element.scrollHeight;
+    });
+    await expect(submitButton).toBeInViewport();
+    await expect(title).toBeVisible();
+    await expect(closeButton).toBeVisible();
+    await submitButton.click();
+    await expect(dialog).toBeVisible();
+    await closeButton.click();
+    await expect(dialog).toBeHidden();
+  }
+});
+
 test('changes and displays a saved Project Manager across project surfaces', async ({ page }) => {
   await installIdentity(page);
   let current = structuredClone(project);
