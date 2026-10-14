@@ -160,7 +160,7 @@ test('featured projects switch accessibly and fit mobile screens', async ({ page
     json: [project, { ...project, id: 'prairie', name: 'Prairie House', pmName: 'Sam Carter' }],
   }));
   await page.route('**/api/dashboard/summary', route => route.fulfill({
-    json: { activeProjects: 2, awaitingApproval: 0, unreadMessages: 0, new360Photos: 0, budgeted: 0, invoiced: 0, recentActivity: [] },
+    json: { activeProjects: 2, awaitingApproval: 0, unreadMessages: 0, new360Photos: 0, budgetEnabledProjects: 0, budgeted: 0, invoiced: 0, recentActivity: [] },
   }));
   await page.goto('/__visual/dashboard-cards');
   const stage = page.getByTestId('dashboard-project-stage');
@@ -183,7 +183,7 @@ test('project highlights browse every project without crowding the banner', asyn
   }));
   await page.route('**/api/projects', route => route.fulfill({ json: highlights }));
   await page.route('**/api/dashboard/summary', route => route.fulfill({
-    json: { activeProjects: 9, awaitingApproval: 0, unreadMessages: 0, new360Photos: 0, budgeted: 0, invoiced: 0, recentActivity: [] },
+    json: { activeProjects: 9, awaitingApproval: 0, unreadMessages: 0, new360Photos: 0, budgetEnabledProjects: 0, budgeted: 0, invoiced: 0, recentActivity: [] },
   }));
   await page.goto('/__visual/dashboard-cards');
   const stage = page.getByTestId('dashboard-project-stage');
@@ -243,6 +243,7 @@ test('selects a workspace Project Manager while creating a project', async ({ pa
       awaitingApproval: 0,
       unreadMessages: 0,
       new360Photos: 0,
+      budgetEnabledProjects: 0,
       budgeted: 0,
       invoiced: 0,
       recentActivity: [],
@@ -277,6 +278,7 @@ test('keeps project initialization reachable on short desktop and mobile screens
       awaitingApproval: 0,
       unreadMessages: 0,
       new360Photos: 0,
+      budgetEnabledProjects: 0,
       budgeted: 0,
       invoiced: 0,
       recentActivity: [],
@@ -661,6 +663,7 @@ test('quick view keeps urgent project information readable on phones', async ({ 
       awaitingApproval: 1,
       unreadMessages: 2,
       new360Photos: 1,
+      budgetEnabledProjects: 1,
       budgeted: project.budgeted,
       invoiced: project.invoiced,
       recentActivity: [{
@@ -670,6 +673,14 @@ test('quick view keeps urgent project information readable on phones', async ({ 
         author: 'Maya Chen',
         date: '2026-10-13',
       }],
+    },
+  }));
+  await page.route('**/api/invoices/summary', route => route.fulfill({
+    json: {
+      invoicedRevenue: project.invoiced,
+      invoicedExpenses: 52300000,
+      upcomingClientPayments: 0,
+      acceptedClientQuoteValue: 0,
     },
   }));
   await page.route('**/api/projects', route => route.fulfill({ json: [project] }));
@@ -711,6 +722,9 @@ test('quick view keeps urgent project information readable on phones', async ({ 
   await page.goto('/__visual/mobile-overview');
   await expect(page.getByTestId('page-mobile-overview')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'The work, at a glance.' })).toBeVisible();
+  await expect(page.getByTestId('value-client-revenue')).toHaveText('$112,840,000');
+  await expect(page.getByTestId('value-budget-usage')).toContainText('$52,300,000');
+  await expect(page.getByText('Recorded internal costs / budget')).toBeVisible();
   await expect(page.getByTestId('value-signal-active-sites')).toHaveText('1');
   await expect(page.getByTestId('link-schedule-item-item-permit')).toBeVisible();
   await expect(page.getByTestId('link-approval-approval-electrical')).toBeVisible();
@@ -728,6 +742,36 @@ test('quick view keeps urgent project information readable on phones', async ({ 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
+test('quick view keeps client revenue visible when all project budgets are disabled', async ({ page }) => {
+  await installIdentity(page, 'Project Manager');
+  await page.route('**/api/dashboard/summary', route => route.fulfill({
+    json: {
+      activeProjects: 1,
+      awaitingApproval: 0,
+      unreadMessages: 0,
+      new360Photos: 0,
+      budgetEnabledProjects: 0,
+      budgeted: 0,
+      invoiced: 125000,
+      recentActivity: [],
+    },
+  }));
+  await page.route('**/api/projects', route => route.fulfill({ json: [{ ...project, budgetEnabled: false }] }));
+  await page.route('**/api/board-items', route => route.fulfill({ json: [] }));
+  await page.route('**/api/purchase-approvals', route => route.fulfill({ json: [] }));
+  let financialSummaryRequests = 0;
+  await page.route('**/api/invoices/summary', route => {
+    financialSummaryRequests += 1;
+    return route.fulfill({ json: { invoicedRevenue: project.invoiced, invoicedExpenses: 52300000, upcomingClientPayments: 0, acceptedClientQuoteValue: 0 } });
+  });
+
+  await page.goto('/__visual/mobile-overview');
+  await expect(page.getByTestId('value-client-revenue')).toHaveText('$125,000');
+  await expect(page.getByTestId('value-budget-usage')).toHaveCount(0);
+  await expect(page.getByText('Recorded internal costs / budget')).toHaveCount(0);
+  expect(financialSummaryRequests).toBe(0);
+});
+
 test('quick view hides internal schedule and approvals from clients', async ({ page }) => {
   await installIdentity(page, 'Client');
   await page.route('**/api/dashboard/summary', route => route.fulfill({
@@ -736,6 +780,7 @@ test('quick view hides internal schedule and approvals from clients', async ({ p
       awaitingApproval: 1,
       unreadMessages: 0,
       new360Photos: 0,
+      budgetEnabledProjects: 1,
       budgeted: project.budgeted,
       invoiced: project.invoiced,
       recentActivity: [],
@@ -772,7 +817,7 @@ for (const failedEntry of ['file', 'directory'] as const) {
     });
     await page.route('**/api/projects', route => route.fulfill({ json: [project] }));
     await page.route('**/api/dashboard/summary', route => route.fulfill({
-      json: { activeProjects: 1, awaitingApproval: 0, unreadMessages: 0, new360Photos: 0, budgeted: 0, invoiced: 0, recentActivity: [] },
+      json: { activeProjects: 1, awaitingApproval: 0, unreadMessages: 0, new360Photos: 0, budgetEnabledProjects: 0, budgeted: 0, invoiced: 0, recentActivity: [] },
     }));
     await page.route('**/api/invoices/summary', route => route.fulfill({
       json: { invoicedRevenue: 0, invoicedExpenses: 0, upcomingClientPayments: 0, acceptedClientQuoteValue: 0 },

@@ -56,26 +56,31 @@ function PurchaseCheckForm({ projectId: fixedProjectId, onDone }: { projectId?: 
   const project = projectList.find((candidate) => candidate.id === projectId)
   const categories = Array.isArray(project?.categories) ? project.categories : []
   const trade: InvoiceBudgetCategory | undefined = categories.find((category) => category.id === tradeId)
+  const externalAuthorization = project?.budgetEnabled === false
   const amount = Number(amountText.replace(/[$,\s]/g, ""))
   const amountValid = amountText.trim() !== "" && Number.isFinite(amount) && amount > 0 && Math.round(amount * 100) / 100 === amount
   const verdict = useMemo(() => (trade && amountValid ? verdictFor(trade, amount) : null), [trade, amount, amountValid])
-  const needsReason = verdict?.kind !== "within"
-  const canSubmit = Boolean(project && trade && amountValid && (!needsReason || description.trim())) && !submitting
+  const needsReason = externalAuthorization || verdict?.kind !== "within"
+  const canSubmit = Boolean(project && amountValid && (
+    externalAuthorization
+      ? description.trim()
+      : trade && (!needsReason || description.trim())
+  )) && !submitting
 
   if (result) return <ResultView result={result} onDone={onDone} onAnother={() => {
     setResult(null); setAmountText(""); setVendor(""); setDescription("")
   }} />
 
   const submit = async () => {
-    if (!project || !trade || !amountValid) return
+    if (!project || !amountValid || (!externalAuthorization && !trade)) return
     setSubmitting(true)
     try {
       const created = await createPurchaseApproval({
         projectId: project.id,
-        budgetLineItemId: trade.id,
+        budgetLineItemId: externalAuthorization ? null : trade!.id,
         amount,
         vendor: vendor.trim() || null,
-        description: description.trim() || `${trade.description} purchase`,
+        description: description.trim() || `${trade!.description} purchase`,
       })
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: getGetInvoiceProjectsQueryKey() }),
@@ -94,7 +99,11 @@ function PurchaseCheckForm({ projectId: fixedProjectId, onDone }: { projectId?: 
     <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); if (canSubmit) void submit() }}>
       <DialogHeader>
         <DialogTitle>Check a purchase</DialogTitle>
-        <DialogDescription>See right away whether it fits the trade's budget. Purchases that fit are approved now; anything over goes to an Admin.</DialogDescription>
+        <DialogDescription>
+          {externalAuthorization
+            ? "This project's budget is disabled. Record the purchase request and obtain authorization outside the app before proceeding."
+            : "See right away whether it fits the trade's budget. Purchases that fit are approved now; anything over goes to an Admin."}
+        </DialogDescription>
       </DialogHeader>
 
       {isLoading ? <p className="text-sm text-muted-foreground">Loading budgets…</p> : isError || invalidProjectData ? (
@@ -114,7 +123,7 @@ function PurchaseCheckForm({ projectId: fixedProjectId, onDone }: { projectId?: 
               </select>
             </div>
           )}
-          {project && (
+          {project && !externalAuthorization && (
             <div className="space-y-1.5">
               <Label htmlFor="purchase-trade">Trade</Label>
               <select id="purchase-trade" className="hud-select w-full" value={tradeId} onChange={(event) => setTradeId(event.target.value)}>
@@ -127,6 +136,11 @@ function PurchaseCheckForm({ projectId: fixedProjectId, onDone }: { projectId?: 
               </select>
               {project.categories.length === 0 && <p className="text-xs text-muted-foreground">This project has no trade budgets yet.</p>}
             </div>
+          )}
+          {project && externalAuthorization && (
+            <p role="status" className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
+              No trade limits will be checked. Leadership must authorize this purchase outside the app.
+            </p>
           )}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
@@ -143,12 +157,12 @@ function PurchaseCheckForm({ projectId: fixedProjectId, onDone }: { projectId?: 
           {verdict && trade && <Verdict verdict={verdict} trade={trade} />}
 
           <div className="space-y-1.5">
-            <Label htmlFor="purchase-description">What is it for?{needsReason && verdict ? " (the approver sees this)" : " (optional)"}</Label>
+            <Label htmlFor="purchase-description">What is it for?{needsReason ? " (required)" : " (optional)"}</Label>
             <textarea
               id="purchase-description"
               className="recessed-3d min-h-[4.5rem] w-full px-3 py-2 text-sm outline-none"
               maxLength={500}
-              placeholder={needsReason ? "Why it's needed and why it costs more than planned" : "Board and mud for level 2"}
+              placeholder={externalAuthorization ? "Describe the purchase requiring external authorization" : needsReason ? "Why it's needed and why it costs more than planned" : "Board and mud for level 2"}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
             />
@@ -159,7 +173,7 @@ function PurchaseCheckForm({ projectId: fixedProjectId, onDone }: { projectId?: 
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onDone}>Cancel</Button>
         <Button type="submit" disabled={!canSubmit}>
-          {submitting ? "Saving…" : verdict?.kind === "within" ? "Record approved purchase" : "Request approval"}
+          {submitting ? "Saving…" : externalAuthorization ? "Request external authorization" : verdict?.kind === "within" ? "Record approved purchase" : "Request approval"}
         </Button>
       </DialogFooter>
     </form>
@@ -205,12 +219,15 @@ export function BudgetBar({ budgeted, used, adding = 0 }: { budgeted: number; us
 
 function ResultView({ result, onDone, onAnother }: { result: PurchaseApproval; onDone: () => void; onAnother: () => void }) {
   const approved = result.status === "Auto-approved"
+  const externalAuthorization = result.approvalReason === "external_authorization_required"
   return (
     <div className="space-y-4">
       <DialogHeader>
         <DialogTitle>{approved ? "Purchase approved" : "Approval requested"}</DialogTitle>
         <DialogDescription>
-          {approved
+          {externalAuthorization
+            ? `${money(result.amount)} for this project is recorded as pending. Obtain authorization from leadership outside the app before proceeding.`
+            : approved
             ? `${money(result.amount)} for ${result.tradeLabel} is approved and set aside from the budget. Go ahead and buy it.`
             : `${money(result.amount)} for ${result.tradeLabel} is waiting for an Admin. Don't buy it until it's approved; check with your Project Manager for the decision.`}
         </DialogDescription>
@@ -218,7 +235,9 @@ function ResultView({ result, onDone, onAnother }: { result: PurchaseApproval; o
       <div className={cn("approval-verdict", approved ? "approval-verdict-success" : "approval-verdict-warning")}>
         {approved ? <CheckCircle2 className="h-5 w-5 shrink-0" aria-hidden="true" /> : <Clock className="h-5 w-5 shrink-0" aria-hidden="true" />}
         <p className="text-sm">
-          {approved
+          {externalAuthorization
+            ? "No trade budget was checked. This request cannot be approved in the app."
+            : approved
             ? result.remainingBefore !== null && `${money(result.remainingBefore - result.amount)} left on ${result.tradeLabel} after this purchase.`
             : result.remainingBefore === null
               ? "This trade has no reliable budget, so it always needs an Admin's approval."

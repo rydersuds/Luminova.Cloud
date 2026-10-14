@@ -19,6 +19,7 @@
 - [Workspace-scoped standalone vendor seeding](standalone-vendor-seeding.md) — seed IDs must be workspace-safe without changing imported-vendor deduplication.
 - [Profile photo control layout](profile-photo-layout.md) — keep avatar actions fixed-size so responsive user-card scroll behavior stays stable.
 - [Shared shell pointer targets](shared-shell-pointer-targets.md) — exclude programmatic focus targets from pointer-interaction classification.
+- [Shared navigation visual baselines](shared-navigation-visual-baselines.md) — shared shell changes affect route screenshots and mobile drawer keyboard order.
 - [Vite vendor chunking](vite-vendor-chunking.md) — keep unmatched dependencies with the runtime vendor group to avoid circular manual chunks.
 - [Artifact workflow port checks](artifact-workflow-port-checks.md) — confirm listener state as well as workflow status before retrying a restart.
 - [Project visual direction](project-visual-direction.md) — approved photo-led style; prioritize compact project browsing and consistent dashboard/catalog cards.

@@ -1958,6 +1958,8 @@ type Project = (typeof projects)[number] &
   budgetLineItems?: InternalBudgetLineItem[]
 ;
 
+  budgetEnabled?: boolean
+;
 
   budgetAmountUnit?: "cents" | "dollars"
 ;
@@ -3047,6 +3049,7 @@ export const projectsForOwner = async (ownerId: string, workspaceId: string) => 
       : persistedProject.clientQuote?.total ?? 0;
     const project = withCalculatedProjectProgress({
       ...persistedProject,
+      budgetEnabled: persistedProject.budgetEnabled !== false,
       budgetAmountUnit: persistedProject.budgetAmountUnit ??
         (row.importBatchId.startsWith("manual-") ? "cents" : "dollars"),
       invoiced: invoicedRevenueForProject(financialRecords.invoices, persistedProject.id),
@@ -3062,6 +3065,7 @@ export const projectsForOwner = async (ownerId: string, workspaceId: string) => 
   const seededProjects = workspaceId === "default" ? projects.map((project) => {
     const normalizedProject = withCalculatedProjectProgress({
       ...project,
+      budgetEnabled: (project as Project).budgetEnabled !== false,
       budgetAmountUnit: "cents" as const,
     });
     const exteriorPhoto = exteriorPhotoByProject.get(normalizedProject.id);
@@ -4344,6 +4348,7 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
 
 
       ...project,
+      budgetEnabled: project.budgetEnabled !== false,
       startDate: resolveProjectStartDate(project),
       clientQuote,
       lineItems: (project.budgetLineItems ?? []).map(line => {
@@ -4405,6 +4410,7 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
 
 
     ...project,
+    budgetEnabled: project.budgetEnabled !== false,
     startDate: resolveProjectStartDate(project),
     clientQuote,
     lineItems: project.budgetLineItems ?? [],
@@ -4506,7 +4512,9 @@ router.get("/dashboard/summary", async (req: AuthenticatedRequest, res) =>
       ).length,
       unreadMessages: null,
       new360Photos: recent360Photos.length,
-      budgeted: projectRecords.reduce((sum, project) => sum + budgetInDollars(project), 0),
+      budgeted: projectRecords.reduce((sum, project) =>
+        project.budgetEnabled === false ? sum : sum + budgetInDollars(project), 0),
+      budgetEnabledProjects: projectRecords.filter((project) => project.budgetEnabled !== false).length,
       invoiced: portfolioFinancialSummary.invoicedRevenue,
       recentActivity: recentActivityRows.map((activity) => ({
         id: activity.id,
@@ -5802,6 +5810,7 @@ router.post("/projects", async (req, res): Promise<void> =>
 
     const project = withCalculatedProjectProgress({
       ...parsed.data,
+      budgetEnabled: parsed.data.budgetEnabled ?? true,
       budgetAmountUnit: "cents" as const,
       pmName: manager.profile.name,
       projectManagerId: manager.profile.id,
@@ -6710,6 +6719,7 @@ const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: R
     }),
     targetDate: analysis.project.targetDate && isValidCalendarDate(analysis.project.targetDate) ? analysis.project.targetDate : "",
     budgeted: resolveImportedProjectBudget(internalBudget?.total, analysis.project.internalBudgetDollars),
+    budgetEnabled: true,
     budgetAmountUnit: "dollars",
     invoiced: 0,
     exteriorImage: "",
@@ -9017,6 +9027,7 @@ router.patch("/projects/:projectId", async (req: AuthenticatedRequest, res): Pro
 }
 
 ),
+    budgetEnabled: projectFields.budgetEnabled ?? currentProject.budgetEnabled ?? true,
   
 }
 

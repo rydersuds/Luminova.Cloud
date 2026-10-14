@@ -10,8 +10,21 @@ const makeProject = (overrides: Partial<Record<string, unknown>> = {}) => ({
   pmName: 'Morgan Reyes',
   targetDate: '2026-12-15',
   budgeted: 1_000_000,
+  budgetEnabled: true,
   progress: 35,
   ...overrides,
+});
+
+test('project cards omit budget figures when internal budgeting is disabled', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('luminova-cookie-consent-v1', 'accepted'));
+  await page.route('**/api/projects**', route => route.fulfill({
+    json: [makeProject({ id: 'disabled-budget-project', name: 'Externally Authorized Project', budgetEnabled: false })],
+  }));
+  await page.goto('/__visual/project-cards');
+  const card = page.getByRole('link', { name: 'Open Externally Authorized Project' });
+  await expect(card).toBeVisible();
+  await expect(card.getByText('Budget', { exact: true })).toHaveCount(0);
+  await expect(card).toContainText('Luminova Client');
 });
 
 test.describe('All Projects region filter', () => {

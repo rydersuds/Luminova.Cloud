@@ -16,7 +16,7 @@ test("purchase invoices persist, enforce assigned-project scope, and apply cumul
   const suffix = randomUUID();
   const admin = `admin-${suffix}`, pm = `pm-${suffix}`, outsider = `outsider-${suffix}`;
   const workspace = `purchase-workspace-${suffix}`, privateWorkspace = `private-workspace-${suffix}`;
-  const projectIds = [0, 1, 2].map(index => `purchase-project-${index}-${suffix}`);
+  const projectIds = [0, 1, 2, 3].map(index => `purchase-project-${index}-${suffix}`);
   const batchIds = projectIds.map((_, index) => `import-batch-${index}-${suffix}`);
   const fileMetadata = new Map<string, { name: string; size: number; contentType: string }>();
   const acls = new Map<string, string>();
@@ -32,19 +32,20 @@ test("purchase invoices persist, enforce assigned-project scope, and apply cumul
     canRead: async (userId, file) => acls.get(file.name) === userId,
     downloadObject: async () => new Response("test invoice bytes", { headers: { "Content-Type": "application/pdf" } }),
   };
-  const fixtureProject = (id: string, baseline: number) => ({
+  const fixtureProject = (id: string, baseline: number, budgetEnabled?: boolean) => ({
     id, name: `Invoice Test ${id}`, address: "1 Test St", region: "Calgary", status: "Active",
     progress: 0, pmName: "Assigned Manager", projectManagerId: pm, clientName: "Test Client",
     startDate: "2026-01-01", targetDate: "2027-01-01", budgeted: 10000, invoiced: 0,
     exteriorImage: "", description: "Invoice budget test", clientQuote: { total: 0, revision: "", portions: [] },
     budgetLineItems: [{ id: "drywall", code: "09 29 00", description: "Drywall", budgeted: 10000, invoiced: baseline, variance: 10000 - baseline }],
+    ...(budgetEnabled === undefined ? {} : { budgetEnabled }),
   });
   await db.insert(projectImportBatchesTable).values(projectIds.map((projectId, index) => ({
     id: batchIds[index], projectId, ownerId: admin, workspaceId: index === 2 ? privateWorkspace : workspace, status: "completed", manifest: [],
   })));
   await db.insert(importedProjectsTable).values(projectIds.map((id, index) => ({
     id, importBatchId: batchIds[index], ownerId: admin, workspaceId: index === 2 ? privateWorkspace : workspace,
-    data: fixtureProject(id, index === 0 ? 2000 : 0),
+    data: fixtureProject(id, index === 0 ? 2000 : 0, index === 3 ? false : undefined),
   })));
   await db.insert(importedInvoicesTable).values({
     id: `legacy-cost-${suffix}`, ownerId: admin, importBatchId: batchIds[0],
@@ -85,6 +86,11 @@ test("purchase invoices persist, enforce assigned-project scope, and apply cumul
     headers: { "x-test-user": user, "x-test-workspace": scope, "content-type": "application/json" },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
+  const patchProject = (projectId: string, user: string, body: unknown) => fetch(`${base}/projects/${projectId}`, {
+    method: "PATCH",
+    headers: { "x-test-user": user, "x-test-workspace": workspace, "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
   const prepare = async (projectId: string, amount: number, user = pm): Promise<InvoiceInput> => {
     const meta = { projectId, name: "invoice.pdf", size: 18, contentType: "application/pdf" as const };
     const response = await request("/invoice-uploads", user, meta);
@@ -97,9 +103,15 @@ test("purchase invoices persist, enforce assigned-project scope, and apply cumul
   };
   const submit = (input: InvoiceInput, user = pm) => request("/invoices", user, input);
 
-  const available = await (await request("/invoice-projects")).json() as Array<{ id: string; categories: Array<{ remaining: number }> }>;
-  assert.equal(available.length, 2);
+  const available = await (await request("/invoice-projects")).json() as Array<{ id: string; budgetEnabled: boolean; categories: Array<{ remaining: number }> }>;
+  assert.equal(available.length, 3);
   assert.equal(available.find(project => project.id === projectIds[0])?.categories[0].remaining, 8000);
+  assert.equal(available.find(project => project.id === projectIds[0])?.budgetEnabled, true, "omitted legacy settings default to enabled");
+  assert.deepEqual(available.find(project => project.id === projectIds[3]), {
+    id: projectIds[3], name: `Invoice Test ${projectIds[3]}`, budgetEnabled: false, categories: [],
+  }, "disabled project budgets are not exposed to invoice checks");
+  assert.equal((await patchProject(projectIds[3], pm, { budgetEnabled: true })).status, 404, "only the project owner can change this setting");
+  assert.equal((await patchProject(projectIds[3], admin, { budgetEnabled: "false" })).status, 400, "the setting must be a boolean");
   assert.deepEqual(await (await request("/invoice-projects", outsider)).json(), []);
   assert.equal((await request("/invoice-projects", "field-user")).status, 403);
   assert.equal((await fetch(`${base}/invoice-projects`)).status, 401);
@@ -180,6 +192,36 @@ test("purchase invoices persist, enforce assigned-project scope, and apply cumul
   assert.equal((await unknownResponse.json() as Invoice).approvalReason, "budget_unavailable");
   const projectBudget = await (await request("/invoice-projects")).json() as Array<{ id: string; categories: Array<{ remaining: number | null }> }>;
   assert.equal(projectBudget.find(project => project.id === projectIds[1])?.categories[0].remaining, null);
+  const reenabled = await patchProject(projectIds[3], admin, { budgetEnabled: true });
+  assert.equal(reenabled.status, 200);
+  assert.equal((await reenabled.json() as { budgetEnabled: boolean }).budgetEnabled, true);
+  const restored = await (await request("/invoice-projects")).json() as Array<{ id: string; budgetEnabled: boolean; categories: Array<{ budgeted: number | null }> }>;
+  assert.equal(restored.find(project => project.id === projectIds[3])?.categories[0].budgeted, 10000, "retained budget categories return when re-enabled");
+  const restoredPurchaseResponse = await request("/purchase-approvals", pm, {
+    projectId: projectIds[3], budgetLineItemId: "drywall", amount: 100, description: "Budget check after re-enabling",
+  });
+  assert.equal(restoredPurchaseResponse.status, 201);
+  const restoredPurchase = await restoredPurchaseResponse.json() as { status: string; approvalReason: string };
+  assert.equal(restoredPurchase.status, "Auto-approved");
+  assert.equal(restoredPurchase.approvalReason, "within_budget", "normal budget checks resume after re-enabling");
+  const disabledAgain = await patchProject(projectIds[3], admin, { budgetEnabled: false });
+  assert.equal((await disabledAgain.json() as { budgetEnabled: boolean }).budgetEnabled, false);
+  const disabledProjects = await (await request("/invoice-projects")).json() as Array<{ id: string; categories: unknown[] }>;
+  assert.deepEqual(disabledProjects.find(project => project.id === projectIds[3])?.categories, []);
+  const disabledInvoiceInput = await prepare(projectIds[3], 1234);
+  const disabledInvoiceResponse = await submit(disabledInvoiceInput);
+  assert.equal(disabledInvoiceResponse.status, 201);
+  const disabledInvoice = await disabledInvoiceResponse.json() as Invoice;
+  assert.equal(disabledInvoice.status, "Pending approval");
+  assert.equal(disabledInvoice.approvalReason, "external_authorization_required");
+  assert.equal(disabledInvoice.overage, 0);
+  assert.equal(disabledInvoice.budgetRemainingBefore, null);
+  assert.equal(disabledInvoice.budgetLineItemId, null);
+  const externalApprovalRows = await db.select().from(purchaseApprovalsTable)
+    .where(eq(purchaseApprovalsTable.projectId, projectIds[3]));
+  assert.equal(externalApprovalRows.length, 2);
+  assert.equal(externalApprovalRows.find(row => row.approvalReason === "external_authorization_required")?.status, "Pending approval");
+  assert.ok(externalApprovalRows.some(row => row.status === "Auto-approved" && row.approvalReason === "within_budget"));
   const stored = await db.select().from(importedInvoicesTable).where(eq(importedInvoicesTable.id, approved.id));
   assert.equal(stored[0].ownerId, admin);
 });

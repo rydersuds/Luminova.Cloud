@@ -64,6 +64,7 @@ export function InvoiceUploadForm({
   const project = projects.find((p) => p.id === projectId)
   const category = project?.categories.find((c) => c.id === categoryId)
   const noBudget = categoryId === NO_BUDGET
+  const externalAuthorization = project?.budgetEnabled === false
   const amountNum = Number(amount)
 
   const onFile = (f: File | null) => {
@@ -87,7 +88,8 @@ export function InvoiceUploadForm({
   const onProject = (id: string) => {
     if (locked) return
     setProjectId(id)
-    setCategoryId("")
+    const selected = projects.find((candidate) => candidate.id === id)
+    setCategoryId(selected?.budgetEnabled === false ? NO_BUDGET : "")
     setLineItem("")
     reservation.current = null
   }
@@ -198,16 +200,16 @@ export function InvoiceUploadForm({
         </select>
       </div>
       <div className={field}>
-        <Label htmlFor="inv-category">Trade / budget category</Label>
+        <Label htmlFor="inv-category">{externalAuthorization ? "Budget review" : "Trade / budget category"}</Label>
         <select id="inv-category" required disabled={!project} value={categoryId} onChange={(e) => onCategory(e.target.value)}
           className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-50" data-testid="select-invoice-category">
-          <option value="">{project ? "Select a category" : "Choose a project first"}</option>
+          <option value="">{externalAuthorization ? "External authorization required" : project ? "Select a category" : "Choose a project first"}</option>
           {project?.categories.map((c) => (
             <option key={c.id} value={c.id}>
               {c.code} {c.description} — {c.remaining === null ? "no priced budget" : `${formatCurrency(c.remaining)} remaining`}
             </option>
           ))}
-          {project && <option value={NO_BUDGET}>No matching budget category</option>}
+          {project && <option value={NO_BUDGET}>{externalAuthorization ? "External authorization required" : "No matching budget category"}</option>}
         </select>
       </div>
 
@@ -229,7 +231,9 @@ export function InvoiceUploadForm({
       )}
       {noBudget && (
         <p className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning" data-testid="text-no-budget">
-          With no matching budget, the invoice is saved as Pending approval (budget unavailable). It is never auto-approved.
+          {externalAuthorization
+            ? "Budget tracking is disabled for this project. The invoice will remain pending; obtain authorization outside the app before proceeding."
+            : "With no matching budget, the invoice is saved as Pending approval (budget unavailable). It is never auto-approved."}
         </p>
       )}
 

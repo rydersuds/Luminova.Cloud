@@ -64,7 +64,7 @@ export function ProjectCard({ project, onOpen, layout = "tile" }: Props) {
           <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
             <div className="min-w-0"><dt className="pcard-k">Project manager</dt><dd className="break-words font-medium">{project.pmName || "Unassigned"}</dd></div>
             <div className="min-w-0"><dt className="pcard-k">End date</dt><dd className="break-words font-medium">{formatDateOnly(project.targetDate)}</dd></div>
-            <div className="min-w-0"><dt className="pcard-k">Budget</dt><dd className="break-words font-semibold tabular-nums">{formatCurrency(project.budgeted)}</dd></div>
+            {project.budgetEnabled && <div className="min-w-0"><dt className="pcard-k">Budget</dt><dd className="break-words font-semibold tabular-nums">{formatCurrency(project.budgeted)}</dd></div>}
             <div className="min-w-0"><dt className="pcard-k">Region</dt><dd className="break-words font-medium">{project.region}</dd></div>
           </dl>
         )}

@@ -82,6 +82,18 @@ export function purchaseApproval(category: InvoiceBudgetCategory | undefined, am
     budgetRemainingAfter: after / 100,
   };
 }
+
+/** A disabled project budget is a policy choice, not missing or unlimited budget evidence. */
+export function externalAuthorizationDecision() {
+  return {
+    status: "Pending approval" as const,
+    approvalReason: "external_authorization_required" as const,
+    overage: 0,
+    budgetRemainingBefore: null,
+    budgetRemainingAfter: null,
+  };
+}
+
 export type PurchaseCommitment = {
   kind: string;
   status: string;

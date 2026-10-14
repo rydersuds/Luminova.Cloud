@@ -5,6 +5,7 @@ const dashboard = {
   awaitingApproval: 2,
   unreadMessages: null,
   new360Photos: 4,
+  budgetEnabledProjects: 3,
   budgeted: 100000,
   invoiced: 120000,
   recentActivity: [{
@@ -86,13 +87,13 @@ test('Command Center stacks financial figures when space is tight', async ({ pag
 test('Command Center keeps verified zero financial totals visible', async ({ page }) => {
   await installWorkspace(page);
   await page.route('**/api/dashboard/summary', route => route.fulfill({
-    json: { ...dashboard, activeProjects: 0, awaitingApproval: 0, new360Photos: 0, budgeted: 0, invoiced: 0, recentActivity: [] },
+    json: { ...dashboard, activeProjects: 0, awaitingApproval: 0, new360Photos: 0, budgetEnabledProjects: 0, budgeted: 0, invoiced: 0, recentActivity: [] },
   }));
   await page.route('**/api/invoices/summary', route => route.fulfill({
     json: { invoicedRevenue: 0, invoicedExpenses: 0, acceptedClientQuoteValue: 0, upcomingClientPayments: 0 },
   }));
   await page.goto('/__visual/dashboard-cards');
-  await expect(page.getByRole('region', { name: 'Financial overview' }).getByText('$0.00', { exact: true })).toHaveCount(6);
+  await expect(page.getByRole('region', { name: 'Financial overview' }).getByText('$0.00', { exact: true })).toHaveCount(5);
   await expect(page.getByText('No recorded project activity yet.', { exact: true })).toBeVisible();
 });
 

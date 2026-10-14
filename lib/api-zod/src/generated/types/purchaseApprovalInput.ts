@@ -9,8 +9,11 @@
 export interface PurchaseApprovalInput {
   /** @minLength 1 */
   projectId: string;
-  /** @minLength 1 */
-  budgetLineItemId: string;
+  /**
+     * @minLength 1
+     * @nullable
+     */
+  budgetLineItemId: string | null;
   /**
      * @maximum 1000000000
      * @exclusiveMinimum 0

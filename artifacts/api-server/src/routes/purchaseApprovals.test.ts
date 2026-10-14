@@ -150,4 +150,24 @@ test("purchases within a trade budget auto-approve; over-budget spending waits f
   const listed = await (await call("/purchase-approvals")).json() as PurchaseApproval[];
   assert.deepEqual(new Set(listed.map(approval => approval.status)), new Set(["Auto-approved", "Approved", "Declined"]));
   assert.equal(events.filter(event => event.type === "decided" && event.approval.id === declined.id).length, 1);
+
+  const [storedProject] = await db.select().from(importedProjectsTable).where(eq(importedProjectsTable.id, projectId));
+  await db.update(importedProjectsTable)
+    .set({ data: { ...(storedProject.data as Record<string, unknown>), budgetEnabled: false } })
+    .where(eq(importedProjectsTable.id, projectId));
+  const hiddenBudgets = await (await call("/invoice-projects")).json() as Array<{ budgetEnabled: boolean; categories: unknown[] }>;
+  assert.equal(hiddenBudgets[0].budgetEnabled, false);
+  assert.deepEqual(hiddenBudgets[0].categories, [], "disabled projects expose no trade limits");
+  const externalPurchaseResponse = await call("/purchase-approvals", pm, {
+    projectId, budgetLineItemId: null, amount: 700, vendor: "Akal Drywalling", description: "Additional materials",
+  });
+  assert.equal(externalPurchaseResponse.status, 201);
+  const externalPurchase = await externalPurchaseResponse.json() as PurchaseApproval;
+  assert.equal(externalPurchase.status, "Pending approval");
+  assert.equal(externalPurchase.approvalReason, "external_authorization_required");
+  assert.equal(externalPurchase.budgetLineItemId, null);
+  assert.equal(externalPurchase.remainingBefore, null);
+  assert.equal(externalPurchase.overage, 0);
+  const externalDecision = await call(`/purchase-approvals/${externalPurchase.id}/decision`, admin, { decision: "approve" });
+  assert.equal(externalDecision.status, 409, "externally authorized requests cannot be approved in the app");
 });

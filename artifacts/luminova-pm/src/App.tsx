@@ -450,6 +450,20 @@ function App() {
     );
   }
 
+  if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/approvals')) {
+    return (
+      <WouterRouter base={basePath}>
+        <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl}>
+          <QueryClientProvider client={queryClient}>
+            <TooltipProvider>
+               <AppLayout><Suspense fallback={<WorkspacePageFallback />}><Approvals /></Suspense></AppLayout>
+            </TooltipProvider>
+          </QueryClientProvider>
+        </ClerkProvider>
+      </WouterRouter>
+    );
+  }
+
   if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/users')) {
     return (
       <WouterRouter base={basePath}>

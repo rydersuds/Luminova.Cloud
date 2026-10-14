@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { remainingTradeBudgets, purchaseApproval } from "./invoiceBudget";
+import { externalAuthorizationDecision, remainingTradeBudgets, purchaseApproval } from "./invoiceBudget";
 
 const drywall = { id: "drywall", code: "09 29 00", description: "Drywall", budgeted: 10000, invoiced: 2000 };
 
@@ -42,4 +42,14 @@ test("zero and exceeded trade budgets stay explicit without rounding leaks", () 
   ]);
   assert.equal(category.remaining, 0.1);
   assert.equal(purchaseApproval(category, 0.1).status, "Auto-approved");
+});
+
+test("disabled budgets require external authorization and never expose a budget calculation", () => {
+  assert.deepEqual(externalAuthorizationDecision(), {
+    status: "Pending approval",
+    approvalReason: "external_authorization_required",
+    overage: 0,
+    budgetRemainingBefore: null,
+    budgetRemainingAfter: null,
+  });
 });

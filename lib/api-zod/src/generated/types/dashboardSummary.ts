@@ -13,6 +13,8 @@ export interface DashboardSummary {
   /** @nullable */
   unreadMessages: number | null;
   new360Photos: number;
+  /** Number of accessible projects included in internal budget reporting. */
+  budgetEnabledProjects: number;
   budgeted: number;
   invoiced: number;
   recentActivity: Activity[];

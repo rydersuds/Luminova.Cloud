@@ -59,7 +59,7 @@ export default function ApprovalsPage() {
           <p className="hud-kicker">Budget control</p>
           <h1 className="mt-2">Approvals</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Purchases within a trade's remaining budget are approved automatically. Anything over budget waits here for an Admin before it's bought.
+            Purchases within an enabled trade budget are approved automatically; over-budget requests wait here for an Admin. Requests for projects with budgeting disabled require external authorization.
           </p>
         </div>
         <PurchaseCheckDialog trigger={<Button><Plus className="mr-1.5 h-4 w-4" />Check a purchase</Button>} />
@@ -71,7 +71,11 @@ export default function ApprovalsPage() {
       {approvalList && (
         <section aria-labelledby="waiting-heading" className="space-y-3">
           <div className="flex items-center gap-3">
-            <h2 id="waiting-heading" className="text-lg font-bold">{isAdmin ? "Waiting for your approval" : "Waiting for an Admin"}</h2>
+            <h2 id="waiting-heading" className="text-lg font-bold">
+              {pending.some((approval) => approval.approvalReason === "external_authorization_required")
+                ? "Pending requests"
+                : isAdmin ? "Waiting for your approval" : "Waiting for an Admin"}
+            </h2>
             <span className="approval-count">{pending.length}</span>
           </div>
           {pending.length === 0 ? (
@@ -133,7 +137,9 @@ export default function ApprovalsPage() {
                             {approval.budgetIncrease ? <span className="block">Budget raised {money(approval.budgetIncrease)}</span> : null}
                             {approval.decisionNote && <span className="block">“{approval.decisionNote}”</span>}
                           </>
-                        ) : approval.status === "Auto-approved" ? "Within budget" : "—"}
+                        ) : approval.approvalReason === "external_authorization_required"
+                          ? "External authorization required"
+                          : approval.status === "Auto-approved" ? "Within budget" : "—"}
                       </td>
                     </tr>
                   ))}
@@ -154,6 +160,7 @@ function PendingCard({ approval, isAdmin }: { approval: PurchaseApproval; isAdmi
   const [raiseBudget, setRaiseBudget] = useState(true)
   const [busy, setBusy] = useState<"approve" | "decline" | null>(null)
   const canRaise = approval.overage > 0 && approval.budgetLineItemId !== null
+  const externalAuthorization = approval.approvalReason === "external_authorization_required"
 
   const decide = async (decision: "approve" | "decline") => {
     setBusy(decision)
@@ -184,12 +191,18 @@ function PendingCard({ approval, isAdmin }: { approval: PurchaseApproval; isAdmi
         <div className="text-right">
           <p className="text-2xl font-extrabold tabular-nums">{money(approval.amount)}</p>
           <p className="text-sm font-semibold text-[hsl(var(--warning))]">
-            {approval.remainingBefore === null ? "No budget set" : `${money(approval.overage)} over · ${money(approval.remainingBefore)} was left`}
+            {externalAuthorization
+              ? "External authorization required"
+              : approval.remainingBefore === null ? "No budget set" : `${money(approval.overage)} over · ${money(approval.remainingBefore)} was left`}
           </p>
         </div>
       </div>
       <p className="rounded-lg bg-muted/60 px-3 py-2 text-sm">{approval.description}</p>
-      {isAdmin ? (
+      {externalAuthorization ? (
+        <p className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
+          Budget tracking is disabled for this project. Contact leadership outside the app for authorization; this request cannot be approved here.
+        </p>
+      ) : isAdmin ? (
         <div className="space-y-3">
           <label className="block space-y-1">
             <span className="text-xs font-semibold text-muted-foreground">Note to {approval.requestedByName} (optional)</span>

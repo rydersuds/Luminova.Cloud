@@ -634,7 +634,9 @@ export default function Dashboard() {
             )}
           </div>
           <FinancialFiguresGrid aria-label="Financial overview" className="ledger" amountAllowance={50}>
-            {financialCards.map(({ label, description, value, icon: Icon, accent, loading }) => (
+            {financialCards
+              .filter((stat) => stat.label !== "Internal Cost Budget" || summary?.budgetEnabledProjects !== 0)
+              .map(({ label, description, value, icon: Icon, accent, loading }) => (
               <Card key={label} className="ledger-cell group min-w-0 rounded-none border-0 shadow-none">
                 <CardContent className="p-5 sm:p-6">
                   <div className="flex min-h-24 flex-col justify-between">

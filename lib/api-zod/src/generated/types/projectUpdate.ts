@@ -16,6 +16,7 @@ export interface ProjectUpdate {
   description?: string;
   /** @minLength 1 */
   projectManagerId?: string;
+  budgetEnabled?: boolean;
   /**
      * URL of an existing standard photo belonging to this project, or null to clear the exterior photo
      * @nullable

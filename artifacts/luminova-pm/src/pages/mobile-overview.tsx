@@ -16,11 +16,13 @@ import {
   getGetBoardScheduleQueryKey,
   getGetCurrentWorkspaceUserQueryKey,
   getGetDashboardSummaryQueryKey,
+  getGetFinancialSummaryQueryKey,
   getGetProjectsQueryKey,
   getGetPurchaseApprovalsQueryKey,
   useGetBoardSchedule,
   useGetCurrentWorkspaceUser,
   useGetDashboardSummary,
+  useGetFinancialSummary,
   useGetProjects,
   useGetPurchaseApprovals,
 } from "@workspace/api-client-react";
@@ -97,6 +99,14 @@ export default function MobileOverviewPage() {
   const role = user.data?.role;
   const canSeeSchedule = role !== "Client" && !!role;
   const canSeeApprovals = role === "Admin" || role === "Project Manager";
+  const hasEnabledBudgets = (summaryQuery.data?.budgetEnabledProjects ?? 0) > 0;
+  const financialSummaryQuery = useGetFinancialSummary({
+    query: {
+      queryKey: getGetFinancialSummaryQueryKey(),
+      enabled: canSeeApprovals && hasEnabledBudgets,
+      retry: false,
+    },
+  });
   const scheduleQuery = useGetBoardSchedule({
     query: {
       queryKey: getGetBoardScheduleQueryKey(),
@@ -139,6 +149,7 @@ export default function MobileOverviewPage() {
     || typeof summary.awaitingApproval !== "number"
     || (summary.unreadMessages !== null && typeof summary.unreadMessages !== "number")
     || typeof summary.new360Photos !== "number"
+    || typeof summary.budgetEnabledProjects !== "number"
     || typeof summary.budgeted !== "number"
     || typeof summary.invoiced !== "number"
     || !Array.isArray(summary.recentActivity)
@@ -321,21 +332,31 @@ export default function MobileOverviewPage() {
           </section>
 
           <section aria-labelledby="exposure-heading" data-testid="section-project-exposure">
-            <SectionHeading index="02" title="Budget & approvals" detail="Portfolio" />
+            <SectionHeading index="02" title={hasEnabledBudgets ? "Budget & approvals" : "Financials & approvals"} detail="Portfolio" />
             <div className="rounded-xl border border-white/[0.08] bg-[#1b1b18] p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Invoiced against budget</p>
-                  <p className="mt-1.5 text-xl font-bold tracking-[-0.04em] tabular-nums" data-testid="value-budget-usage">{money(summary?.invoiced)}<span className="px-1.5 text-xs font-medium text-white/35">/</span><span className="text-base text-white/60">{money(summary?.budgeted)}</span></p>
+                  <p className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Client invoice revenue</p>
+                  <p className="mt-1.5 text-xl font-bold tracking-[-0.04em] tabular-nums" data-testid="value-client-revenue">{money(summary?.invoiced)}</p>
                 </div>
                 <Wallet className="mt-0.5 h-4 w-4 text-[#d6b56e]" aria-hidden="true" />
               </div>
-              {typeof summary?.budgeted === "number" && summary.budgeted > 0 && typeof summary.invoiced === "number" && (
-                <div className="mt-3">
-                  <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
-                    <div className="h-full rounded-full bg-[#c6a15b]" style={{ width: `${Math.min(100, Math.max(0, (summary.invoiced / summary.budgeted) * 100))}%` }} />
-                  </div>
-                  <p className="mt-1.5 font-mono text-[9px] text-white/40">{money(moneyRemaining(summary.budgeted, summary.invoiced))} remaining</p>
+              {hasEnabledBudgets && (
+                <div className="mt-4 border-t border-white/[0.08] pt-3">
+                  <p className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Recorded internal costs / budget</p>
+                  <p className="mt-1.5 text-lg font-bold tracking-[-0.04em] tabular-nums" data-testid="value-budget-usage">
+                    {money(financialSummaryQuery.data?.invoicedExpenses)}
+                    <span className="px-1.5 text-xs font-medium text-white/35">/</span>
+                    <span className="text-base text-white/60">{money(summary?.budgeted)}</span>
+                  </p>
+                  {typeof summary?.budgeted === "number" && summary.budgeted > 0 && typeof financialSummaryQuery.data?.invoicedExpenses === "number" && (
+                    <div className="mt-3">
+                      <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+                        <div className="h-full rounded-full bg-[#c6a15b]" style={{ width: `${Math.min(100, Math.max(0, (financialSummaryQuery.data.invoicedExpenses / summary.budgeted) * 100))}%` }} />
+                      </div>
+                      <p className="mt-1.5 font-mono text-[9px] text-white/40">{money(moneyRemaining(summary.budgeted, financialSummaryQuery.data.invoicedExpenses))} remaining</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -362,7 +383,10 @@ export default function MobileOverviewPage() {
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[12px] font-semibold text-white/90">{approval.tradeLabel || approval.vendor}</span>
-                      <span className="mt-1 block truncate text-[10px] text-white/45">{approval.projectName} · {approval.kind}</span>
+                      <span className="mt-1 block truncate text-[10px] text-white/45">
+                        {approval.projectName} · {approval.kind}
+                        {approval.approvalReason === "external_authorization_required" ? " · External authorization required outside the app" : ""}
+                      </span>
                     </span>
                     <span className="shrink-0 text-right">
                       <span className="block font-mono text-[11px] text-[#e4c879]">{money(approval.amount)}</span>

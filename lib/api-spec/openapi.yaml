@@ -2300,7 +2300,7 @@ components:
           items: { type: string, minLength: 1 }
     DashboardSummary:
       type: object
-      required: [activeProjects, awaitingApproval, unreadMessages, new360Photos, budgeted, invoiced, recentActivity]
+      required: [activeProjects, awaitingApproval, unreadMessages, new360Photos, budgetEnabledProjects, budgeted, invoiced, recentActivity]
       properties:
         activeProjects:
           type: integer
@@ -2310,6 +2310,9 @@ components:
           type: ["integer", "null"]
         new360Photos:
           type: integer
+        budgetEnabledProjects:
+          type: integer
+          description: Number of accessible projects included in internal budget reporting.
         budgeted:
           type: number
         invoiced:
@@ -2320,7 +2323,7 @@ components:
             $ref: "#/components/schemas/Activity"
     Project:
       type: object
-      required: [id, name, address, region, status, progress, pmName, projectManagerId, clientName, startDate, targetDate, budgeted, invoiced, exteriorImage, description]
+      required: [id, name, address, region, status, progress, pmName, projectManagerId, clientName, startDate, targetDate, budgetEnabled, budgeted, invoiced, exteriorImage, description]
       properties:
         id: { type: string }
         name: { type: string }
@@ -2334,6 +2337,7 @@ components:
         clientLogoUrl: { type: [string, "null"] }
         startDate: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
         targetDate: { type: string, pattern: '^$|^\d{4}-\d{2}-\d{2}$' }
+        budgetEnabled: { type: boolean, description: Whether internal project budgeting and trade limits are active. }
         budgeted: { type: number }
         invoiced: { type: number }
         exteriorImage: { type: string }
@@ -2352,6 +2356,7 @@ components:
         startDate: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
         targetDate: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
         budgeted: { type: number }
+        budgetEnabled: { type: boolean, default: true, description: Defaults to enabled for new projects. }
         description: { type: string }
         exteriorImage: { type: string }
     ProjectUpdate:
@@ -2364,6 +2369,7 @@ components:
         targetDate: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
         description: { type: string }
         projectManagerId: { type: string, minLength: 1 }
+        budgetEnabled: { type: boolean }
         exteriorImage:
           type: [string, "null"]
           description: URL of an existing standard photo belonging to this project, or null to clear the exterior photo
@@ -2654,7 +2660,7 @@ components:
         budgetRemainingAfter: { type: ["number", "null"] }
         approvalReason:
           type: string
-          enum: [within_budget, over_budget, budget_unavailable, pre_approved]
+          enum: [within_budget, over_budget, budget_unavailable, external_authorization_required, pre_approved]
         purchaseApprovalId: { type: ["string", "null"] }
         submittedById: { type: string }
         attachment: { $ref: "#/components/schemas/InvoiceAttachment" }
@@ -2700,10 +2706,11 @@ components:
           enum: [application/pdf, image/jpeg, image/png, image/webp]
     InvoiceProject:
       type: object
-      required: [id, name, categories]
+      required: [id, name, budgetEnabled, categories]
       properties:
         id: { type: string }
         name: { type: string }
+        budgetEnabled: { type: boolean }
         categories:
           type: array
           items: { $ref: "#/components/schemas/InvoiceBudgetCategory" }
@@ -3186,7 +3193,7 @@ components:
         remainingBefore: { type: [number, "null"], description: "Trade budget left before this spend; null when the trade has no reliable budget" }
         overage: { type: number }
         status: { $ref: "#/components/schemas/PurchaseApprovalStatus" }
-        approvalReason: { type: string, enum: [within_budget, over_budget, budget_unavailable] }
+        approvalReason: { type: string, enum: [within_budget, over_budget, budget_unavailable, external_authorization_required] }
         requestedById: { type: string }
         requestedByName: { type: string }
         requestedAt: { type: string }
@@ -3199,7 +3206,7 @@ components:
       required: [projectId, budgetLineItemId, amount, description]
       properties:
         projectId: { type: string, minLength: 1 }
-        budgetLineItemId: { type: string, minLength: 1 }
+        budgetLineItemId: { type: ["string", "null"], minLength: 1 }
         amount: { type: number, exclusiveMinimum: 0, maximum: 1000000000 }
         vendor: { type: [string, "null"], maxLength: 200 }
         description: { type: string, minLength: 1, maxLength: 500 }

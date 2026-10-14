@@ -61,9 +61,15 @@ function InvoiceDetail({ invoice }: { invoice: Invoice }) {
       {reason === "over_budget" && (
         <p className="text-destructive">Over the remaining trade/category budget{invoice.budgetRemainingBefore != null && ` (${formatCurrency(invoice.budgetRemainingBefore)} was remaining)`}{invoice.overage > 0 && ` by ${formatCurrency(invoice.overage)}`}.</p>
       )}
+      {reason === "external_authorization_required" && (
+        <p className="text-warning">Budget tracking is disabled for this project. External authorization is required before proceeding.</p>
+      )}
       {reason === "budget_unavailable" && <p className="text-warning">No matching or priced budget was available for this invoice.</p>}
       {reason === "pre_approved" && <p>Covered by a purchase an Admin approved before it was bought.</p>}
-      {pending && invoice.submittedById && (
+      {pending && invoice.submittedById && reason === "external_authorization_required" && (
+        <p className="font-medium text-foreground">Contact leadership outside the app and do not proceed until this invoice is externally authorized.</p>
+      )}
+      {pending && invoice.submittedById && reason !== "external_authorization_required" && (
         <p className="font-medium text-foreground">
           Waiting for an Admin in <Link href="/approvals" className="text-primary underline-offset-2 hover:underline">Approvals</Link>. Don't proceed with this work until it's approved.
         </p>

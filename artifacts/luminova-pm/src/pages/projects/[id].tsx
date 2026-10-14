@@ -401,6 +401,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
         startDate: formData.get("startDate") as string,
         targetDate: formData.get("targetDate") as string,
         description: formData.get("description") as string,
+        budgetEnabled: formData.get("budgetEnabled") === "on",
         ...(isAdmin &&
           typeof projectManagerId === "string" &&
           projectManagerId !== "__legacy__" &&
@@ -708,6 +709,23 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                         <Label htmlFor="description">Description</Label>
                         <Textarea id="description" name="description" defaultValue={project.description} />
                       </div>
+                       <div className="rounded-lg border p-3">
+                         <label htmlFor="budgetEnabled" className="flex cursor-pointer items-start gap-3">
+                           <input
+                             id="budgetEnabled"
+                             name="budgetEnabled"
+                             type="checkbox"
+                             defaultChecked={project.budgetEnabled}
+                             className="mt-1 h-4 w-4 accent-[hsl(var(--primary))]"
+                           />
+                           <span>
+                             <span className="block text-sm font-medium">Enable internal budgeting</span>
+                             <span className="mt-1 block text-xs text-muted-foreground">
+                               Turn off to hide budget reporting and trade limits. Stored budgets and recorded costs remain; new invoice purchases require external authorization.
+                             </span>
+                           </span>
+                         </label>
+                       </div>
                       <DialogFooter>
                         <Button type="submit" disabled={updateProject.isPending}>
                           {updateProject.isPending ? "Saving..." : "Save Changes"}
@@ -719,21 +737,25 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
               </div>
             </div>
             
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border/50 rounded-lg overflow-hidden border border-border/70">
-              <div className="bg-card p-4 space-y-1">
-                <p className="text-sm text-muted-foreground">Internal Budget</p>
-                <p className="text-xl font-bold tabular-nums">{formatCurrency(project.budgeted)}</p>
-              </div>
+            <div className={cn("grid grid-cols-2 gap-px bg-border/50 rounded-lg overflow-hidden border border-border/70", project.budgetEnabled ? "md:grid-cols-4" : "md:grid-cols-2")}>
+              {project.budgetEnabled && (
+                <div className="bg-card p-4 space-y-1">
+                  <p className="text-sm text-muted-foreground">Internal Budget</p>
+                  <p className="text-xl font-bold tabular-nums">{formatCurrency(project.budgeted)}</p>
+                </div>
+              )}
               <div className="bg-card p-4 space-y-1">
                 <p className="text-sm text-muted-foreground">Invoiced expenses</p>
                 <p className="text-xl font-bold tabular-nums">{formatCurrency(actualCost)}</p>
               </div>
-              <div className="bg-card p-4 space-y-1">
-                <p className="text-sm text-muted-foreground">Budget Remaining</p>
-                <p className={cn("text-xl font-bold tabular-nums", varianceIsPositive ? "text-success" : "text-destructive")}>
-                  {varianceIsPositive ? "+" : ""}{formatCurrency(budgetVariance)}
-                </p>
-              </div>
+              {project.budgetEnabled && (
+                <div className="bg-card p-4 space-y-1">
+                  <p className="text-sm text-muted-foreground">Budget Remaining</p>
+                  <p className={cn("text-xl font-bold tabular-nums", varianceIsPositive ? "text-success" : "text-destructive")}>
+                    {varianceIsPositive ? "+" : ""}{formatCurrency(budgetVariance)}
+                  </p>
+                </div>
+              )}
               <div className="bg-card p-4 space-y-1">
                 <p className="text-sm text-muted-foreground">Total Progress</p>
                 <div className="flex items-center gap-2">
@@ -1222,7 +1244,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
             </TabsContent>
 
             <TabsContent value="budget" className="space-y-6">
-              <TradeBudgets projectId={project.id} />
+              {project.budgetEnabled && <TradeBudgets projectId={project.id} />}
               {(invoiceFiles.length > 0 || quoteFiles.length > 0) && (
                 <Card>
                   <CardHeader>
@@ -1261,7 +1283,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                   </CardContent>
                 </Card>
               )}
-              <Card>
+              {project.budgetEnabled && <Card>
                 <CardHeader>
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
@@ -1342,7 +1364,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                     </Table>
                   )}
                 </CardContent>
-              </Card>
+              </Card>}
               <Card>
                 <CardHeader>
                   <div>

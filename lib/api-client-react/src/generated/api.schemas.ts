@@ -297,6 +297,8 @@ export interface DashboardSummary {
   /** @nullable */
   unreadMessages: number | null;
   new360Photos: number;
+  /** Number of accessible projects included in internal budget reporting. */
+  budgetEnabledProjects: number;
   budgeted: number;
   invoiced: number;
   recentActivity: Activity[];
@@ -319,6 +321,8 @@ export interface Project {
   startDate: string;
   /** @pattern ^$|^\d{4}-\d{2}-\d{2}$ */
   targetDate: string;
+  /** Whether internal project budgeting and trade limits are active. */
+  budgetEnabled: boolean;
   budgeted: number;
   invoiced: number;
   exteriorImage: string;
@@ -338,6 +342,8 @@ export interface ProjectInput {
   /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   targetDate: string;
   budgeted: number;
+  /** Defaults to enabled for new projects. */
+  budgetEnabled?: boolean;
   description: string;
   exteriorImage?: string;
 }
@@ -352,6 +358,7 @@ export interface ProjectUpdate {
   description?: string;
   /** @minLength 1 */
   projectManagerId?: string;
+  budgetEnabled?: boolean;
   /**
      * URL of an existing standard photo belonging to this project, or null to clear the exterior photo
      * @nullable
@@ -407,6 +414,7 @@ export const InvoiceApprovalReason = {
   within_budget: 'within_budget',
   over_budget: 'over_budget',
   budget_unavailable: 'budget_unavailable',
+  external_authorization_required: 'external_authorization_required',
   pre_approved: 'pre_approved',
 } as const;
 
@@ -817,6 +825,7 @@ export interface InvoiceBudgetCategory {
 export interface InvoiceProject {
   id: string;
   name: string;
+  budgetEnabled: boolean;
   categories: InvoiceBudgetCategory[];
 }
 
@@ -1409,6 +1418,7 @@ export const PurchaseApprovalApprovalReason = {
   within_budget: 'within_budget',
   over_budget: 'over_budget',
   budget_unavailable: 'budget_unavailable',
+  external_authorization_required: 'external_authorization_required',
 } as const;
 
 export interface PurchaseApproval {
@@ -1449,8 +1459,11 @@ export interface PurchaseApproval {
 export interface PurchaseApprovalInput {
   /** @minLength 1 */
   projectId: string;
-  /** @minLength 1 */
-  budgetLineItemId: string;
+  /**
+     * @minLength 1
+     * @nullable
+     */
+  budgetLineItemId: string | null;
   /**
      * @maximum 1000000000
      * @exclusiveMinimum 0

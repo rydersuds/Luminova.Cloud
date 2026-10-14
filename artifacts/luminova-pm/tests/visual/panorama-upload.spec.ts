@@ -8,10 +8,12 @@ const project = {
   status: 'In progress',
   progress: 64,
   pmName: 'Maya Chen',
+  projectManagerId: null,
   clientName: 'Avery & Morgan Reid',
   clientLogoUrl: '/client-logo.svg',
   targetDate: '2027-02-12',
   budgeted: 186500000,
+  budgetEnabled: true,
   invoiced: 112840000,
   exteriorImage: '',
   description: 'A warm modern infill home.',
@@ -110,6 +112,35 @@ test.beforeEach(async ({ page }) => {
     }
     await route.fallback();
   });
+});
+
+test('project edit saves the accessible budget toggle and hides budget figures without removing costs', async ({ page }) => {
+  let current = structuredClone(project);
+  let savedSetting: boolean | undefined;
+  await page.unroute('**/api/projects/riverstone');
+  await page.route('**/api/projects/riverstone', async route => {
+    if (route.request().method() === 'PATCH') {
+      const body = route.request().postDataJSON();
+      savedSetting = body.budgetEnabled;
+      current = { ...current, ...body };
+      await route.fulfill({ json: current });
+      return;
+    }
+    await route.fulfill({ json: current });
+  });
+
+  await page.goto('/__visual/project-panorama');
+  await expect(page.getByText('Internal Budget', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit Project' }).click();
+  const toggle = page.getByRole('checkbox', { name: /Enable internal budgeting/ });
+  await expect(toggle).toBeChecked();
+  await toggle.uncheck();
+  await expect(page.getByText(/Stored budgets and recorded costs remain/)).toBeVisible();
+  await page.getByRole('button', { name: 'Save Changes' }).click();
+  await expect.poll(() => savedSetting).toBe(false);
+  await expect(page.getByText('Internal Budget', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Budget Remaining', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Invoiced expenses', { exact: true })).toBeVisible();
 });
 
 test('previews a legacy Word entry agreement before offering the original download', async ({ page }) => {
@@ -539,6 +570,7 @@ test('selects a standard photo as the exterior photo and keeps it selected after
       awaitingApproval: 0,
       unreadMessages: 0,
       new360Photos: 0,
+      budgetEnabledProjects: 1,
       budgeted: current.budgeted,
       invoiced: current.invoiced,
       recentActivity: [],

@@ -27,7 +27,7 @@ test("dashboard summary reports persisted, workspace-scoped metrics with explici
   ];
   const now = Date.now();
 
-  const project = (id: string, status: string, budgeted: number) => ({
+  const project = (id: string, status: string, budgeted: number, budgetEnabled?: boolean) => ({
     id,
     name: id,
     address: "1 Test Street",
@@ -41,6 +41,7 @@ test("dashboard summary reports persisted, workspace-scoped metrics with explici
     invoiced: 0,
     exteriorImage: "",
     description: "",
+    ...(budgetEnabled === undefined ? {} : { budgetEnabled }),
   });
 
   await db.insert(projectImportBatchesTable).values([
@@ -63,7 +64,7 @@ test("dashboard summary reports persisted, workspace-scoped metrics with explici
   ]);
   await db.insert(importedProjectsTable).values([
     { id: projectIds[0], importBatchId: batchIds[0], ownerId, workspaceId, data: project(projectIds[0], "Active", 100_000) },
-    { id: projectIds[1], importBatchId: batchIds[1], ownerId, workspaceId, data: project(projectIds[1], "In progress", 20_000) },
+    { id: projectIds[1], importBatchId: batchIds[1], ownerId, workspaceId, data: project(projectIds[1], "In progress", 20_000, false) },
     { id: projectIds[2], importBatchId: batchIds[2], ownerId, workspaceId, data: project(projectIds[2], "Planning", 0) },
     { id: projectIds[3], importBatchId: batchIds[3], ownerId, workspaceId, data: project(projectIds[3], "Completed", 0) },
     { id: projectIds[4], importBatchId: batchIds[4], ownerId, workspaceId, data: project(projectIds[4], "Paused", 0) },
@@ -173,7 +174,8 @@ test("dashboard summary reports persisted, workspace-scoped metrics with explici
     awaitingApproval: 2,
     unreadMessages: null,
     new360Photos: 1,
-    budgeted: 3700,
+    budgetEnabledProjects: 5,
+    budgeted: 3500,
     invoiced: 42,
     recentActivity: [{
       id: `dashboard-activity-${suffix}`,
@@ -184,4 +186,11 @@ test("dashboard summary reports persisted, workspace-scoped metrics with explici
       date: new Date(now - 60_000).toISOString(),
     }],
   });
+  const financialResponse = await fetch(`http://127.0.0.1:${port}/invoices/summary`, {
+    headers: { "x-test-user": ownerId, "x-test-workspace": workspaceId },
+  });
+  assert.equal(financialResponse.status, 200);
+  const financialSummary = await financialResponse.json() as { invoicedExpenses: number; invoicedRevenue: number };
+  assert.equal(financialSummary.invoicedExpenses, 25, "internal costs remain reportable when one project's budget is disabled");
+  assert.equal(financialSummary.invoicedRevenue, 42, "client invoice revenue remains reportable independently of budget tracking");
 });

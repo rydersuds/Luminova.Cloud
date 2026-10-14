@@ -17,12 +17,19 @@ import {
 import type { InvoiceInput, Invoice } from "@workspace/api-zod";
 import { getRequestWorkspaceRole, workspaceUserDisplayName } from "./users";
 import { ObjectStorageService } from "../lib/objectStorage";
-import { commitmentRecords, remainingTradeBudgets, purchaseApproval, type CostCategory, type PurchaseRecord } from "../lib/invoiceBudget";
+import {
+  commitmentRecords,
+  externalAuthorizationDecision,
+  remainingTradeBudgets,
+  purchaseApproval,
+  type CostCategory,
+  type PurchaseRecord,
+} from "../lib/invoiceBudget";
 import { emailApprovalNotifier, type ApprovalEmailFacts, type ApprovalNotifier } from "../lib/approvalNotifications";
 
 type Actor = { id: string; workspaceId: string; role: "Admin" | "Project Manager" };
 type ProjectData = {
-  id: string; name: string; projectManagerId?: string | null; budgetLineItems?: CostCategory[];
+  id: string; name: string; projectManagerId?: string | null; budgetEnabled?: boolean; budgetLineItems?: CostCategory[];
 };
 type ProjectRow = typeof importedProjectsTable.$inferSelect;
 type StoredInvoice = Invoice & { submissionFingerprint?: string };
@@ -131,7 +138,15 @@ export function createInvoiceSubmissionRouter(dependencies: InvoiceSubmissionDep
       const invoices = records.filter(record => record.ownerId === project.ownerId &&
         record.importBatchId === project.importBatchId && (record.data as Invoice).projectId === project.id);
       const commitments = commitmentRecords(approvals.filter(approval => approval.projectId === project.id));
-      return { id: project.id, name: data.name, categories: remainingTradeBudgets(data.budgetLineItems ?? [], [...invoices.map(record => record.data as PurchaseRecord), ...commitments]) };
+      const budgetEnabled = data.budgetEnabled !== false;
+      return {
+        id: project.id,
+        name: data.name,
+        budgetEnabled,
+        categories: budgetEnabled
+          ? remainingTradeBudgets(data.budgetLineItems ?? [], [...invoices.map(record => record.data as PurchaseRecord), ...commitments])
+          : [],
+      };
     })));
   }));
 
@@ -245,26 +260,31 @@ export function createInvoiceSubmissionRouter(dependencies: InvoiceSubmissionDep
       // An invoice for something already approved claims that purchase: its reservation turns into this cost.
       // Best match: same vendor first, then the smallest approved amount that covers the invoice, then the oldest.
       const sameVendor = (vendor: string | null) => (vendor ?? "").trim().toLowerCase() === input.vendor.toLowerCase();
-      const preApproved = input.budgetLineItemId === null ? undefined : approvals
+      const budgetEnabled = data.budgetEnabled !== false;
+      const preApproved = !budgetEnabled || input.budgetLineItemId === null ? undefined : approvals
         .filter(approval => approval.kind === "purchase" && !approval.invoiceId && approval.budgetLineItemId === input.budgetLineItemId &&
           (approval.status === "Auto-approved" || approval.status === "Approved") && approval.amountCents >= cents(input.amount))
         .sort((a, b) => Number(sameVendor(b.vendor)) - Number(sameVendor(a.vendor)) ||
           a.amountCents - b.amountCents || a.requestedAt.getTime() - b.requestedAt.getTime())[0];
       const commitments = commitmentRecords(approvals.filter(approval => approval.id !== preApproved?.id));
-      const categories = remainingTradeBudgets(data.budgetLineItems ?? [], [...costs, ...commitments]);
-      const category = categories.find(category => category.id === input.budgetLineItemId);
-      if (input.budgetLineItemId !== null && !category) throw new InvoiceError(400, "Select a budget category belonging to this project.");
-      const checked = purchaseApproval(category, input.amount);
+      const categories = budgetEnabled
+        ? remainingTradeBudgets(data.budgetLineItems ?? [], [...costs, ...commitments])
+        : [];
+      const category = budgetEnabled ? categories.find(category => category.id === input.budgetLineItemId) : undefined;
+      if (budgetEnabled && input.budgetLineItemId !== null && !category) throw new InvoiceError(400, "Select a budget category belonging to this project.");
+      const checked = budgetEnabled ? purchaseApproval(category, input.amount) : externalAuthorizationDecision();
       const decision = preApproved && checked.status === PENDING
         ? { ...checked, status: "Approved", approvalReason: "pre_approved" as const }
         : checked;
-      const tradeLabel = category ? `${category.code} · ${category.description}` : input.lineItem;
+      const tradeLabel = category
+        ? `${category.code} · ${category.description}`
+        : budgetEnabled ? input.lineItem : "External authorization required";
       const approvalId = decision.status === PENDING ? `approval-${id}` : preApproved?.id ?? null;
       const record: StoredInvoice = {
         id, invoiceNumber: input.invoiceNumber, projectId: locked.id, projectName: data.name,
         vendor: input.vendor, amount: input.amount, date: input.date, direction: "company_to_luminova",
         lineItem: tradeLabel,
-        budgetLineItemId: category?.id ?? null, submittedById: actor.id, submissionFingerprint: fingerprint,
+        budgetLineItemId: budgetEnabled ? category?.id ?? null : null, submittedById: actor.id, submissionFingerprint: fingerprint,
         ...decision, purchaseApprovalId: approvalId,
         attachment: { ...input.attachment, url: `/api/invoice-submissions/${encodeURIComponent(id)}/file` },
       };
@@ -296,7 +316,7 @@ export function createInvoiceSubmissionRouter(dependencies: InvoiceSubmissionDep
       return record;
     });
     res.status(201).json(CreateInvoiceResponse.parse(invoice));
-    if (invoice.status === PENDING && invoice.purchaseApprovalId) {
+    if (invoice.status === PENDING && invoice.approvalReason !== "external_authorization_required" && invoice.purchaseApprovalId) {
       const [row] = await db.select().from(purchaseApprovalsTable).where(eq(purchaseApprovalsTable.id, invoice.purchaseApprovalId)).limit(1);
       if (row) notifyLater(req, { type: "requested", approval: emailFacts(serializeApproval(row, invoice.projectName)) });
     }
@@ -329,14 +349,18 @@ export function createInvoiceSubmissionRouter(dependencies: InvoiceSubmissionDep
         tx.select().from(purchaseApprovalsTable).where(and(eq(purchaseApprovalsTable.projectId, locked.id), eq(purchaseApprovalsTable.importBatchId, locked.importBatchId), eq(purchaseApprovalsTable.ownerId, locked.ownerId))),
       ]);
       const costs = invoices.map(record => record.data as StoredInvoice).filter(record => record.projectId === locked.id);
-      const categories = remainingTradeBudgets(data.budgetLineItems ?? [], [...costs, ...commitmentRecords(approvals)]);
-      const category = categories.find(candidate => candidate.id === input.budgetLineItemId);
-      if (!category) throw new InvoiceError(400, "Select a trade from this project's budget.");
-      const decision = purchaseApproval(category, input.amount);
+      const budgetEnabled = data.budgetEnabled !== false;
+      const categories = budgetEnabled
+        ? remainingTradeBudgets(data.budgetLineItems ?? [], [...costs, ...commitmentRecords(approvals)])
+        : [];
+      const category = budgetEnabled ? categories.find(candidate => candidate.id === input.budgetLineItemId) : undefined;
+      if (budgetEnabled && !category) throw new InvoiceError(400, "Select a trade from this project's budget.");
+      const decision = budgetEnabled ? purchaseApproval(category, input.amount) : externalAuthorizationDecision();
+      const tradeLabel = category ? `${category.code} · ${category.description}` : "External authorization required";
       const [row] = await tx.insert(purchaseApprovalsTable).values({
         id: `approval-${randomUUID()}`, workspaceId: actor.workspaceId, projectId: locked.id, importBatchId: locked.importBatchId,
-        ownerId: locked.ownerId, kind: "purchase", invoiceId: null, budgetLineItemId: category.id,
-        tradeLabel: `${category.code} · ${category.description}`, vendor: input.vendor?.trim() || null, description,
+        ownerId: locked.ownerId, kind: "purchase", invoiceId: null, budgetLineItemId: category?.id ?? null,
+        tradeLabel, vendor: input.vendor?.trim() || null, description,
         amountCents: cents(input.amount),
         remainingBeforeCents: decision.budgetRemainingBefore === null ? null : cents(decision.budgetRemainingBefore),
         overageCents: cents(decision.overage), status: decision.status, approvalReason: decision.approvalReason,
@@ -345,7 +369,9 @@ export function createInvoiceSubmissionRouter(dependencies: InvoiceSubmissionDep
       return serializeApproval(row, data.name);
     });
     res.status(201).json(CreatePurchaseApprovalResponse.parse(created));
-    if (created.status === PENDING) notifyLater(req, { type: "requested", approval: emailFacts(created) });
+    if (created.status === PENDING && created.tradeLabel !== "External authorization required") {
+      notifyLater(req, { type: "requested", approval: emailFacts(created) });
+    }
   }));
 
   router.post("/purchase-approvals/:approvalId/decision", safe(async (req, res) => {
@@ -365,6 +391,9 @@ export function createInvoiceSubmissionRouter(dependencies: InvoiceSubmissionDep
       const [row] = await tx.select().from(purchaseApprovalsTable).where(eq(purchaseApprovalsTable.id, existing.id)).for("update");
       if (!locked || !row) throw new InvoiceError(404, "Approval not found");
       if (row.status !== PENDING) throw new InvoiceError(409, `This request was already ${row.status.toLowerCase()}.`);
+      if (row.approvalReason === "external_authorization_required") {
+        throw new InvoiceError(409, "This purchase requires external authorization and cannot be approved in the app.");
+      }
       const approve = decision === "approve";
       let budgetIncreaseCents: number | null = null;
       if (approve && raiseBudget && row.budgetLineItemId && row.overageCents > 0) {

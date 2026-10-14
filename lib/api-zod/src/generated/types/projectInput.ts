@@ -19,6 +19,8 @@ export interface ProjectInput {
   /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   targetDate: string;
   budgeted: number;
+  /** Defaults to enabled for new projects. */
+  budgetEnabled?: boolean;
   description: string;
   exteriorImage?: string;
 }

@@ -1,11 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 
-const projects = [{ id: 'purchase-project', name: 'Drywall Budget Project', categories: [
+const projects = [{ id: 'purchase-project', name: 'Drywall Budget Project', budgetEnabled: true, categories: [
   { id: 'drywall', code: '09 29 00', description: 'Drywall', budgeted: 1000, used: 200, remaining: 800, canAutoApprove: true },
 ] }];
 const file = { name: 'vendor-invoice.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\nInvoice\n%%EOF') };
 
-async function fixture(page: Page, options: { role?: string; uncertain?: boolean; rejected?: boolean; search?: string } = {}) {
+async function fixture(page: Page, options: { role?: string; uncertain?: boolean; rejected?: boolean; search?: string; disabled?: boolean } = {}) {
   const records: Record<string, any>[] = [];
   const requests: Record<string, any>[] = [];
   let uploads = 0, puts = 0;
@@ -13,9 +13,11 @@ async function fixture(page: Page, options: { role?: string; uncertain?: boolean
   await page.addInitScript(() => localStorage.setItem('luminova-cookie-consent-v1', 'accepted'));
   await page.route('**/api/users/me', route => route.fulfill({ json: { userId: 'assigned-pm', role: options.role ?? 'Project Manager' } }));
   await page.route('**/api/invoices', route => route.fulfill({ json: [] }));
-  await page.route('**/api/invoice-projects', route => route.fulfill({ json: [{ ...projects[0], categories: [
-    { ...projects[0].categories[0], remaining, used: 1000 - remaining },
-  ] }] }));
+  await page.route('**/api/invoice-projects', route => route.fulfill({ json: [{
+    ...projects[0],
+    budgetEnabled: !options.disabled,
+    categories: options.disabled ? [] : [{ ...projects[0].categories[0], remaining, used: 1000 - remaining }],
+  }] }));
   await page.route('**/api/invoice-submissions', route => route.fulfill({ json: records }));
   await page.route('**/api/invoice-submissions/*/file', route => route.fulfill({
     body: file.buffer, contentType: 'application/pdf',
@@ -38,12 +40,12 @@ async function fixture(page: Page, options: { role?: string; uncertain?: boolean
     if (options.rejected && requests.length === 1) return route.fulfill({ status: 400, json: { error: 'The invoice upload is expired. Upload it again.' } });
     let invoice = records.find(record => record.id === `purchase-${data.submissionId}`);
     if (!invoice) {
-      const known = data.budgetLineItemId === 'drywall';
+      const known = !options.disabled && data.budgetLineItemId === 'drywall';
       const fits = known && data.amount <= remaining;
       invoice = {
         ...data, id: `purchase-${data.submissionId}`, projectName: projects[0].name, direction: 'company_to_luminova',
         submittedById: 'assigned-pm', status: fits ? 'Auto-approved' : 'Pending approval',
-        approvalReason: known ? (fits ? 'within_budget' : 'over_budget') : 'budget_unavailable',
+        approvalReason: options.disabled ? 'external_authorization_required' : known ? (fits ? 'within_budget' : 'over_budget') : 'budget_unavailable',
         overage: known ? Math.max(data.amount - remaining, 0) : 0,
         budgetRemainingBefore: known ? remaining : null, budgetRemainingAfter: known ? remaining - data.amount : null,
         attachment: { ...data.attachment, url: `/api/invoice-submissions/purchase-${data.submissionId}/file` },
@@ -140,6 +142,48 @@ test('unmatched trade is not auto-approved and the upload dialog fits mobile', a
   await page.getByTestId('button-submit-invoice').click();
   await expect(page.getByTestId('panel-submit-result')).toContainText('Pending approval');
   await expect(page.getByTestId('panel-submit-result')).toContainText('Contact leadership outside this app');
+});
+
+test('disabled project invoices remain pending for external authorization without a trade check', async ({ page }) => {
+  const state = await fixture(page, { disabled: true });
+  await page.getByTestId('button-open-submit-invoice').click();
+  await page.getByTestId('select-invoice-project').selectOption('purchase-project');
+  await expect(page.getByTestId('select-invoice-category')).toHaveValue('__none__');
+  await expect(page.getByTestId('text-no-budget')).toContainText('authorization outside the app');
+  await page.getByTestId('input-invoice-line-item').fill('Specialty materials');
+  await page.getByTestId('input-invoice-file').setInputFiles(file);
+  await page.getByTestId('input-invoice-number').fill('EXTERNAL-001');
+  await page.getByTestId('input-invoice-date').fill('2026-10-02');
+  await page.getByTestId('input-invoice-vendor').fill('External Vendor');
+  await page.getByTestId('input-invoice-amount').fill('1200');
+  await page.getByTestId('button-submit-invoice').click();
+  await expect(page.getByTestId('panel-submit-result')).toContainText('Pending approval');
+  await expect(page.getByTestId('panel-submit-result')).toContainText('Contact leadership outside this app');
+  expect(state.requests[0].budgetLineItemId).toBeNull();
+  expect(state.records[0].approvalReason).toBe('external_authorization_required');
+});
+
+test('approval cards explain external authorization and have no in-app decision buttons', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('luminova-cookie-consent-v1', 'accepted'));
+  await page.route('**/api/users/me', route => route.fulfill({ json: { userId: 'admin', role: 'Admin' } }));
+  await page.route('**/api/purchase-approvals**', route => route.fulfill({ json: [{
+    id: 'external-approval', projectId: 'purchase-project', projectName: 'Drywall Budget Project',
+    kind: 'invoice', invoiceId: 'external-invoice', budgetLineItemId: null,
+    tradeLabel: 'External authorization required', vendor: 'External Vendor',
+    description: 'Specialty materials', amount: 1200, remainingBefore: null, overage: 0,
+    status: 'Pending approval', approvalReason: 'external_authorization_required',
+    requestedById: 'pm', requestedByName: 'Project Manager', requestedAt: '2026-10-14T12:00:00.000Z',
+    decidedByName: null, decidedAt: null, decisionNote: null, budgetIncrease: null,
+  }] }));
+  await page.route('**/api/invoice-projects', route => route.fulfill({ json: [{
+    id: 'purchase-project', name: 'Drywall Budget Project', budgetEnabled: false, categories: [],
+  }] }));
+  await page.goto('/__visual/approvals');
+  await expect(page.getByText('External authorization required').first()).toBeVisible();
+  const externalCard = page.getByRole('article', { name: 'External authorization required for Drywall Budget Project' });
+  await expect(externalCard).toContainText('Contact leadership outside the app for authorization');
+  await expect(externalCard.getByRole('button', { name: 'Approve' })).toHaveCount(0);
+  await expect(externalCard.getByRole('button', { name: 'Decline' })).toHaveCount(0);
 });
 
 test('Field Team does not receive invoice submission controls', async ({ page }) => {
