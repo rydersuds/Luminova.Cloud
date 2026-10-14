@@ -152,6 +152,7 @@ test.describe('navigation contrast', () => {
   test('desktop active, hover, and shared dark surface', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await stabilize(page);
+    await expect(page.getByRole('link', { name: 'Quick View' })).toHaveCount(0);
     await assertNoPageHorizontalOverflow(page);
     await assertNavigationContrast(page, 'desktop active');
     await expect(page).toHaveScreenshot('desktop-active-dark-surface.png', { animations: 'disabled' });

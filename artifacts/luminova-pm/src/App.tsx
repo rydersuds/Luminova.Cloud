@@ -9,6 +9,7 @@ import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { ProjectFolderImportProvider, useProjectFolderImport } from '@/providers/project-folder-import-provider';
 import { canPreloadPrimaryPages, isWorkspacePath, pageModules, preloadPrimaryPages } from '@/lib/page-preload';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 import {
   Route,
@@ -167,12 +168,17 @@ function Intro() {
   );
 }
 
+function MobileOnlyQuickView() {
+  const isMobile = useIsMobile();
+  return isMobile ? <MobileOverview /> : <Redirect to="/" />;
+}
+
 function AuthenticatedRoutes() {
   return (
     <RoutedErrorBoundary>
       <Switch>
         <Route path="/" component={Dashboard} />
-        <Route path="/mobile" component={MobileOverview} />
+        <Route path="/mobile" component={MobileOnlyQuickView} />
         <Route path="/projects/:id"><ProjectDetail /></Route>
         <Route path="/projects" component={Projects} />
         <Route path="/schedule" component={Schedule} />

@@ -32,3 +32,4 @@
 - [Need-to-know information](need-to-know-information.md) — app-wide presentation should avoid repetition and keep secondary explanations expandable.
 - [Shell query resilience](shell-query-resilience.md) — guard optional query payloads before they can break shared navigation; owning pages should show malformed-data errors explicitly.
 - [pnpm patch directories](pnpm-patch-directories.md) — keep the editable directory at its original location until patch-commit; pnpm tracks that path.
+- [Mobile-only Quick View](mobile-only-quick-view.md) — Quick View is a phone-only overview; desktop users use Command Center.

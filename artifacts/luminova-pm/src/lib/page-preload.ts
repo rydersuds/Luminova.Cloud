@@ -30,7 +30,6 @@ export type PreloadEnvironment = {
 
 const primaryPageLoaders = [
   { href: "/", loader: pageModules.dashboard },
-  { href: "/mobile", loader: pageModules.mobileOverview },
   { href: "/projects", loader: pageModules.projects },
   { href: "/schedule", loader: pageModules.schedule },
   { href: "/trades", loader: pageModules.trades },

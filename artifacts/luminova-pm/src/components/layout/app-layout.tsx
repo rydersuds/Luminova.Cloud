@@ -31,13 +31,13 @@ import { CookieConsentBanner } from "@/components/cookie-consent-banner"
 
 type IndicatorPhase = "idle" | "travel" | "settle"
 
-type NavItem = { href: string; label: string; icon: typeof Building2; hint: string; adminOnly?: boolean; managersOnly?: boolean }
+type NavItem = { href: string; label: string; icon: typeof Building2; hint: string; adminOnly?: boolean; managersOnly?: boolean; mobileOnly?: boolean }
 // Overview pages first, then the supporting tools. Project boards open from All Projects.
 const WORKSPACE_GROUP = {
   label: "Workspace",
   items: [
     { href: "/", label: "Command Center", icon: Building2, hint: "Today across all sites" },
-    { href: "/mobile", label: "Quick View", icon: Smartphone, hint: "Important work at a glance" },
+    { href: "/mobile", label: "Quick View", icon: Smartphone, hint: "Important work at a glance", mobileOnly: true },
     { href: "/projects", label: "All Projects", icon: FolderKanban, hint: "Every job site and its progress" },
     { href: "/schedule", label: "Schedule", icon: CalendarRange, hint: "Timeline and calendar across projects" },
     { href: "/approvals", label: "Approvals", icon: BadgeCheck, hint: "Budget checks and over-budget approvals", managersOnly: true },
@@ -126,7 +126,7 @@ export function AppLayoutView({
 }: AppLayoutViewProps) {
   const isAdmin = role === "Admin"
   const isManager = isAdmin || role === "Project Manager"
-  const visibleItem = (item: NavItem) => (!item.adminOnly || isAdmin) && (!item.managersOnly || isManager)
+  const visibleItem = (item: NavItem) => (!item.adminOnly || isAdmin) && (!item.managersOnly || isManager) && (!item.mobileOnly || isMobile)
   const matchesNav = (item: NavItem, path: string) =>
     path === item.href || (item.href !== "/" && path.startsWith(`${item.href}/`))
   const crumbs = getBreadcrumbs(location)
@@ -136,7 +136,7 @@ export function AppLayoutView({
     () => initialSidebarCollapsed ?? readSidebarCollapsedPreference(),
   )
   const [profileOpen, setProfileOpen] = useState(initialProfileOpen)
-  const [isMobile, setIsMobile] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 767px)").matches)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const sidebarRef = useRef<HTMLElement>(null)
   const navRef = useRef<HTMLElement>(null)
