@@ -4,7 +4,7 @@ import { getGetDashboardSummaryQueryKey, getGetProjectsQueryKey } from "@workspa
 import { useAuth } from "@clerk/react"
 import { CheckCircle2, ChevronDown, ChevronUp, LoaderCircle, UploadCloud, XCircle } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
-import { boundedTextSnippet, cleanupDismissedImportErrors, collectFolderCandidates, forgetDismissedImportError, importFileStorageUnavailableMessage, ImportFileStorageError, pendingDismissedImportStorageKey, rememberDismissedImportError, readBatchImportResponse, wasImportErrorDismissed, type FolderCandidate, type SkippedFolderFile } from "@/lib/project-folder-import"
+import { boundedTextSnippet, cleanupDismissedImportErrors, collectFolderCandidates, forgetDismissedImportError, importFileStorageUnavailableMessage, ImportFileStorageError, importSessionFailureMessage, pendingDismissedImportStorageKey, rememberDismissedImportError, readBatchImportResponse, wasImportErrorDismissed, type FolderCandidate, type SkippedFolderFile } from "@/lib/project-folder-import"
 
 export type FolderImportStatus = "idle" | "uploading" | "building" | "success" | "error"
 type FolderImportProgress = { uploaded: number; failed: number }
@@ -16,6 +16,7 @@ type ImportSession = {
   uploaded: number
   failed: number
   retryable: boolean
+  failureStage?: string | null
   error?: string | null
 }
 type FolderImportContextValue = {
@@ -171,6 +172,11 @@ export function ProjectFolderImportProvider({
   const collectFolderFiles = React.useCallback((files: File[]) => {
     if (activeImportRef.current) return
     const { accepted, skipped } = collectFolderCandidates(files)
+    const previousSession = sessionRef.current
+    if (previousSession?.status === "failed" && !previousSession.retryable) {
+      scheduleImportFileCleanup(previousSession.importId, previousSession.documents.map((item) => item.relativePath))
+      sessionRef.current = null
+    }
     folderFilesRef.current = accepted
     setFolderFiles(accepted)
     setSkippedFolderFiles(skipped)
@@ -184,10 +190,16 @@ export function ProjectFolderImportProvider({
   const startFolderImport = React.useCallback(async () => {
     const candidates = [...folderFilesRef.current]
     if (activeImportRef.current || !candidates.length) return
+    if (sessionRef.current?.status === "failed" && !sessionRef.current.retryable) {
+      setFolderStatus("error")
+      setFolderError(`${importSessionFailureMessage(sessionRef.current)} Select files again to start a new import.`)
+      return
+    }
     dismissedPendingErrorRef.current = false
     forgetDismissedImportError("__pending__")
     activeImportRef.current = true
     importGenerationRef.current += 1
+    const importGeneration = importGenerationRef.current
     setFolderStatus("uploading")
     setFolderError("")
     let session = sessionRef.current
@@ -268,7 +280,9 @@ export function ProjectFolderImportProvider({
     setSkippedFolderFiles((current) => [...current, ...failures])
     if (uploadedPaths.size !== session.documents.length) {
       const missing = session.documents.length - uploadedPaths.size
-      const message = `${missing} file${missing === 1 ? "" : "s"} still need to be uploaded. Retry only the failed or missing files.`
+      const causes = failures.slice(0, 3).map(({ name, reason }) => `${name}: ${reason}`).join("; ")
+      const detail = causes ? ` ${causes}` : ""
+      const message = `Uploading failed. ${missing} file${missing === 1 ? "" : "s"} still need to be uploaded.${detail} Retry only the failed or missing files.`
       setFolderStatus("error"); setFolderError(message)
       activeImportRef.current = false
       toast({ variant: "destructive", title: "Project folder import failed", description: message })
@@ -292,10 +306,13 @@ export function ProjectFolderImportProvider({
     const reconcileBuild = async (): Promise<
       { state: "completed" } | { state: "retryable" | "terminal"; session: ImportSession } | { state: "unavailable" }
     > => {
-      for (let attempt = 0; attempt < 45; attempt++) {
+      let consecutiveFailures = 0
+      while (true) {
+        if (importGenerationRef.current !== importGeneration) return { state: "unavailable" }
         try {
           const statusResponse = await authenticatedFetch(`/api/project-import-sessions/${session.importId}`)
           const active = await readBatchImportResponse<ImportSession | null>(statusResponse, { operation: "Checking project build status" })
+          consecutiveFailures = 0
           if (!active) return { state: "completed" }
           if (active.importId !== session.importId) return { state: "unavailable" }
           if (active.status === "completed") return { state: "completed" }
@@ -304,11 +321,12 @@ export function ProjectFolderImportProvider({
           }
           setFolderStatus("building")
         } catch {
+          consecutiveFailures++
+          if (consecutiveFailures >= 6) return { state: "unavailable" }
           // Brief proxy and API outages are expected while a long build is running.
         }
         await new Promise((resolve) => window.setTimeout(resolve, 2000))
       }
-      return { state: "unavailable" }
     }
 
     let buildAttempt = 0
@@ -333,12 +351,13 @@ export function ProjectFolderImportProvider({
           continue
         }
         const message = recovery.state === "terminal"
-          ? recovery.session.error || "The project could not be built. Retry when ready."
+          ? importSessionFailureMessage(recovery.session)
           : recovery.state === "retryable"
-            ? recovery.session.error || "The project build was interrupted again. Retry when ready."
+            ? importSessionFailureMessage(recovery.session)
             : buildError instanceof Error
               ? `${buildError.message} Build recovery is temporarily unavailable. Retry to continue from the uploaded files.`
               : "Build recovery is temporarily unavailable. Retry to continue from the uploaded files."
+        if (recovery.state === "terminal" || recovery.state === "retryable") sessionRef.current = recovery.session
         setFolderStatus("error"); setFolderError(message)
         activeImportRef.current = false
         toast({ variant: "destructive", title: "Project folder import failed", description: message })
@@ -424,30 +443,27 @@ export function ProjectFolderImportProvider({
         if (session.status === "building") {
           setFolderStatus("building")
           let transientFailures = 0
-          let attempts = 0
           const checkBuild = async () => {
              if (cancelled || importGenerationRef.current !== importGeneration) return
-            attempts++
             try {
               const statusResponse = await authenticatedFetch(`/api/project-import-sessions/${session.importId}`)
               const active = await readBatchImportResponse<ImportSession | null>(statusResponse, { operation: "Checking project build status" })
               transientFailures = 0
               if (active?.importId === session.importId && active.status === "building") {
-                if (attempts < 45) poll = window.setTimeout(checkBuild, 2000)
-                else {
-                  setFolderStatus("error")
-                  setFolderError("The project build is still unavailable. Retry to continue from the uploaded files.")
-                }
+                poll = window.setTimeout(checkBuild, 2000)
                 return
               }
               if (active?.importId === session.importId && active.status === "failed") {
                 sessionRef.current = active
-                if (active.retryable && restored.length) {
+                if (!active.retryable) {
+                  setFolderStatus("error")
+                  setFolderError(importSessionFailureMessage(active))
+                } else if (restored.length) {
                   setFolderStatus("idle")
                   if (!cancelled) await startFolderImport()
                 } else {
                   setFolderStatus("error")
-                  setFolderError(active.error || "The project could not be built. Retry when ready.")
+                  setFolderError(importSessionFailureMessage(active))
                 }
                 return
               }
@@ -460,7 +476,7 @@ export function ProjectFolderImportProvider({
               setFolderStatus("success")
             } catch (error) {
               transientFailures++
-              if (attempts < 45 && transientFailures < 6) {
+              if (transientFailures < 6) {
                 poll = window.setTimeout(checkBuild, 2000)
              } else if (!cancelled && importGenerationRef.current === importGeneration) {
                 sessionRef.current = session
@@ -480,7 +496,9 @@ export function ProjectFolderImportProvider({
           const uploadedPaths = new Set(session.uploadedPaths)
           const missingFiles = session.documents.filter((document) => !uploadedPaths.has(document.relativePath)).length
           const missingSummary = missingFiles === 1 ? "1 file still needs to be uploaded." : `${missingFiles} files still need to be uploaded.`
-          setFolderError(session.error || `${missingFiles > 0 ? `${missingSummary} ` : ""}Select only the missing files to continue this import.`)
+          setFolderError(session.error
+            ? importSessionFailureMessage(session)
+            : `${missingFiles > 0 ? `${missingSummary} ` : ""}Select only the missing files to continue this import.`)
         }
       } catch (error) {
         if (!cancelled) {

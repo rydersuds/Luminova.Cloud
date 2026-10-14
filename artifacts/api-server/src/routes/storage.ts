@@ -32,6 +32,8 @@ router.post("/storage/uploads/request-url", async (req: AuthenticatedRequest, re
     return;
   }
   const importId = typeof req.body?.importId === "string" ? req.body.importId : null;
+  let stage = importId ? "checking the import upload manifest" : "creating an upload URL";
+  try {
   if (importId) {
     const [session] = await db.select({
       id: projectImportBatchesTable.id,
@@ -47,7 +49,7 @@ router.post("/storage/uploads/request-url", async (req: AuthenticatedRequest, re
       return;
     }
   }
-  try {
+    stage = "creating an upload URL";
     const uploadURL = await storage.getObjectEntityUploadURL();
     const objectPath = storage.normalizeObjectEntityPath(uploadURL);
     if (parsed.data.purpose === "schedule-image") {
@@ -70,7 +72,7 @@ router.post("/storage/uploads/request-url", async (req: AuthenticatedRequest, re
       metadata: parsed.data,
     }));
   } catch (error) {
-    req.log.error({ err: error }, "Failed to generate project document upload URL");
+    req.log.error({ err: error, importId, stage }, "Project import upload URL request failed");
     res.status(500).json({ error: "The document upload could not be started." });
   }
 });

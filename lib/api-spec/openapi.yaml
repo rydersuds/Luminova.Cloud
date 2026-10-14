@@ -3128,7 +3128,7 @@ components:
             $ref: "#/components/schemas/ProjectImportManifestDocument"
     ProjectImportSession:
       type: object
-      required: [importId, status, documents, uploadedPaths, uploaded, failed, retryable, createdAt, updatedAt]
+      required: [importId, status, documents, uploadedPaths, uploaded, failed, retryable, failureStage, createdAt, updatedAt]
       properties:
         importId: { type: string }
         status: { type: string, enum: [uploading, ready, building, completed, failed] }
@@ -3144,6 +3144,7 @@ components:
         retryable:
           type: boolean
           description: Whether the preserved session can safely be submitted to the build endpoint again.
+        failureStage: { type: ["string", "null"] }
         error: { type: ["string", "null"] }
         projectId: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }

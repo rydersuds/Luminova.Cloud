@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { formatDateOnly, formatDaysRemaining, getDaysRemaining } from "./utils.ts"
-import { boundedTextSnippet, cleanupDismissedImportErrors, collectFolderCandidates, dismissedImportStorageKey, forgetDismissedImportError, folderFileIssue, normalizeRelativePath, pendingDismissedImportStorageKey, readBatchImportResponse, rememberDismissedImportError, wasImportErrorDismissed } from "./project-folder-import.ts"
+import { boundedTextSnippet, cleanupDismissedImportErrors, collectFolderCandidates, dismissedImportStorageKey, forgetDismissedImportError, folderFileIssue, importSessionFailureMessage, normalizeRelativePath, pendingDismissedImportStorageKey, readBatchImportResponse, rememberDismissedImportError, wasImportErrorDismissed } from "./project-folder-import.ts"
 import { LEGAL_CONSENT_LABEL, PRIVACY_PATH, TERMS_PATH, canSubmitSignIn } from "./legal-consent.ts"
 
 test("sign-in eligibility requires affirmative legal consent", () => {
@@ -101,6 +101,21 @@ test("batch import response reader preserves JSON API errors", async () => {
     ),
     /Import session expired\./,
   )
+})
+
+test("restored import failures identify their stage without replacing the actionable server message", () => {
+  assert.equal(
+    importSessionFailureMessage({
+      failureStage: "document analysis",
+      error: "Project document analysis is temporarily unavailable. Your uploaded files are preserved; retry this import.",
+    }),
+    "Project document analysis is temporarily unavailable. Your uploaded files are preserved; retry this import.",
+  )
+  assert.equal(
+    importSessionFailureMessage({ failureStage: "document analysis", error: "Document analysis failed: The files could not be interpreted." }),
+    "Document analysis failed: The files could not be interpreted.",
+  )
+  assert.equal(importSessionFailureMessage({}), "The import could not be completed. Retry the import.")
 })
 
 test("batch import response reader distinguishes authentication from preview routing failures", async () => {

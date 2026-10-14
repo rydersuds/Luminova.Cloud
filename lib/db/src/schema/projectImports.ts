@@ -9,6 +9,8 @@ export const projectImportBatchesTable = pgTable("project_import_batches", {
   manifest: jsonb("manifest").notNull().default([]),
   analysis: jsonb("analysis"),
   error: text("error"),
+  failureStage: text("failure_stage"),
+  retryable: boolean("retryable").notNull().default(true),
   buildLeaseId: text("build_lease_id"),
   dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

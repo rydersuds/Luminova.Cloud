@@ -18,6 +18,8 @@ export interface ProjectImportSession {
   /** Whether the preserved session can safely be submitted to the build endpoint again. */
   retryable: boolean;
   /** @nullable */
+  failureStage: string | null;
+  /** @nullable */
   error?: string | null;
   /** @nullable */
   projectId?: string | null;

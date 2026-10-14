@@ -330,7 +330,7 @@ test.describe('navigation contrast', () => {
     await expect(page.getByRole('link', { name: 'Command Center' })).toBeFocused();
 
     await page.keyboard.press('Tab');
-    await expect(page.getByRole('link', { name: 'All Projects' })).toBeFocused();
+    await expect(page.getByRole('link', { name: 'Quick View' })).toBeFocused();
 
     await page.keyboard.press('Escape');
     await expect(drawer).not.toBeVisible();

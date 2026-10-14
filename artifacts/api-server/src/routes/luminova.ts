@@ -268,7 +268,23 @@ type AuthenticatedRequest = Request &
 
 ;
 
-type ProjectImportBuildRequest = Request & { projectImportBuildLeaseId?: string };
+type ProjectImportBuildRequest = Request & {
+  projectImportBuildLeaseId?: string;
+  projectImportFailureStage?: string;
+  projectImportFailureMessage?: string;
+  projectImportRetryable?: boolean;
+};
+
+const setProjectImportFailure = (
+  req: ProjectImportBuildRequest,
+  stage: string,
+  message: string,
+  retryable: boolean,
+) => {
+  req.projectImportFailureStage = stage;
+  req.projectImportFailureMessage = message;
+  req.projectImportRetryable = retryable;
+};
 
 
 const router: IRouter = Router()
@@ -5903,7 +5919,8 @@ const importSessionResponse = async (batch: typeof projectImportBatchesTable.$in
     uploadedPaths: uploaded.map((item) => item.relativePath),
     uploaded: uploaded.length,
     failed: 0,
-    retryable: batch.status === "uploading" || batch.status === "ready" || batch.status === "failed",
+    retryable: batch.retryable && (batch.status === "uploading" || batch.status === "ready" || batch.status === "failed"),
+    failureStage: batch.failureStage,
     error: batch.error,
     projectId: batch.projectId,
     createdAt: batch.createdAt.toISOString(),
@@ -6020,7 +6037,10 @@ router.post("/project-import-sessions", async (req, res): Promise<void> =>
 
 
   const workspaceId = requestWorkspaceId(req as AuthenticatedRequest);
-  const batch = await db.transaction(async (transaction) => {
+  const importId = `import-${randomUUID()}`;
+  let batch: typeof projectImportBatchesTable.$inferSelect;
+  try {
+    batch = await db.transaction(async (transaction) => {
     const now = new Date();
     await transaction.update(projectImportBatchesTable).set({
       dismissedAt: now,
@@ -6032,14 +6052,20 @@ router.post("/project-import-sessions", async (req, res): Promise<void> =>
       inArray(projectImportBatchesTable.status, ["uploading", "ready", "failed"]),
     ));
     const [created] = await transaction.insert(projectImportBatchesTable).values({
-      id: `import-${randomUUID()}`,
+      id: importId,
       ownerId,
       workspaceId,
       status: "uploading",
       manifest: parsed.data.documents,
+      retryable: true,
     }).returning();
     return created;
-  });
+    });
+  } catch (error) {
+    req.log.error({ err: error, importId, stage: "session creation" }, "Project import session creation failed");
+    res.status(500).json({ error: "The import session could not be created. Your selected files are still available; retry." });
+    return;
+  }
 
 
   res.status(201).json(CreateProjectImportSessionResponse.parse(await importSessionResponse(batch)))
@@ -6097,7 +6123,9 @@ router.get("/project-import-sessions", async (req, res): Promise<void> =>
 
 
     status: "failed",
-    error: "The previous build was interrupted. Retry to continue.",
+    error: "The previous project build was interrupted. Your uploaded files are preserved; retry this import.",
+    failureStage: "project build",
+    retryable: true,
     buildLeaseId: null,
     updatedAt: new Date(),
   
@@ -6170,7 +6198,9 @@ router.get("/project-import-sessions/:importId", async (req, res): Promise<void>
   const staleBefore = new Date(Date.now() - projectImportBuildLeaseMs);
   await db.update(projectImportBatchesTable).set({
     status: "failed",
-    error: "The previous build was interrupted. Retry to continue.",
+    error: "The previous project build was interrupted. Your uploaded files are preserved; retry this import.",
+    failureStage: "project build",
+    retryable: true,
     buildLeaseId: null,
     updatedAt: new Date(),
   }).where(and(
@@ -6246,6 +6276,8 @@ router.post("/project-import-sessions/:importId/documents", async (req, res): Pr
     res.status(400).json({ error: "Provide valid uploaded document metadata." });
     return;
   }
+  let stage = "checking the import session";
+  try {
   const [batch] = await db.select().from(projectImportBatchesTable)
     .where(and(
       eq(projectImportBatchesTable.id, params.data.importId),
@@ -6315,6 +6347,7 @@ router.post("/project-import-sessions/:importId/documents", async (req, res): Pr
   if (!existing) 
 {
 
+    stage = "verifying the uploaded document";
 
     await storage.verifyConstructionDocument(parsed.data)
 ;
@@ -6348,10 +6381,11 @@ router.post("/project-import-sessions/:importId/documents", async (req, res): Pr
 }
 
 
+  stage = "recording the attached document";
   const [updated] = await db.update(projectImportBatchesTable).set(
 {
 
- status: "uploading", error: null, updatedAt: new Date() 
+ status: "uploading", error: null, failureStage: null, retryable: true, updatedAt: new Date()
 }
 
 )
@@ -6362,6 +6396,12 @@ router.post("/project-import-sessions/:importId/documents", async (req, res): Pr
   res.json(AttachProjectImportDocumentResponse.parse(await importSessionResponse(updated)))
 ;
 
+  } catch (error) {
+    req.log.error({ err: error, importId: params.data.importId, stage }, "Project import document attachment failed");
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Saving the uploaded file failed temporarily. Its contents remain available; retry this upload." });
+    }
+  }
 
 }
 
@@ -6372,6 +6412,8 @@ router.post("/project-import-sessions/:importId/documents", async (req, res): Pr
 const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: Response): Promise<void> => 
 {
 
+  const diagnosticImportId = typeof req.params.importId === "string" ? req.params.importId : null;
+  setProjectImportFailure(req, "document validation", "The uploaded document details are invalid. Choose the affected files again to start a new import.", false);
 
   const parsed = CreateProjectImportBody.safeParse(req.body)
 ;
@@ -6380,6 +6422,7 @@ const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: R
   if (!parsed.success) 
 {
 
+    req.log.warn({ importId: diagnosticImportId, stage: req.projectImportFailureStage }, "Project import document validation failed");
 
     res.status(400).json(
 {
@@ -6411,6 +6454,7 @@ const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: R
   if (!ownerId) 
 {
 
+    setProjectImportFailure(req, "authentication", "Sign in again before retrying this import.", true);
 
     res.status(401).json(
 {
@@ -6444,6 +6488,7 @@ const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: R
     if (!normalizedPath || normalizedPath !== document.relativePath || paths.has(normalizedPath.toLowerCase())) 
 {
 
+      req.log.warn({ importId: diagnosticImportId, stage: req.projectImportFailureStage }, "Project import document paths were rejected");
 
       res.status(400).json(
 {
@@ -6468,6 +6513,7 @@ const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: R
 
 }
 
+  setProjectImportFailure(req, "uploaded-file verification", "One or more uploaded files could not be verified. Select the affected files again to start a new import.", false);
   try 
 {
 
@@ -6502,7 +6548,7 @@ const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: R
     req.log.warn(
 {
 
- err: error 
+ err: error, importId: diagnosticImportId, stage: req.projectImportFailureStage
 }
 
 , "Project import contained an unverifiable upload")
@@ -6538,6 +6584,7 @@ const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: R
 ;
 
 
+  setProjectImportFailure(req, "document analysis", "The project documents could not be interpreted. Select different files to start a new import.", false);
   try 
 {
 
@@ -6609,20 +6656,28 @@ const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: R
 {
 
 
+    const errorStatus = error && typeof error === "object" && "status" in error && typeof error.status === "number"
+      ? error.status
+      : undefined;
+    const retryable = errorStatus === undefined || ![400, 413, 422].includes(errorStatus);
+    const failureMessage = retryable
+      ? "Project document analysis is temporarily unavailable. Your uploaded files are preserved; retry this import."
+      : "The project documents could not be interpreted. Select different files to start a new import.";
+    setProjectImportFailure(req, "document analysis", failureMessage, retryable);
     req.log.error(
 {
 
- err: error 
+ err: error, importId: diagnosticImportId, stage: req.projectImportFailureStage, retryable
 }
 
 , "Project import extraction failed")
 ;
 
 
-    res.status(422).json(
+    res.status(retryable ? 503 : 422).json(
 {
 
- error: "The project documents could not be interpreted. The uploaded files remain private." 
+ error: failureMessage
 }
 
 )
@@ -6680,6 +6735,7 @@ const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: R
 ;
 
 
+  setProjectImportFailure(req, "project preparation", "The project could not be prepared. Your uploaded files are preserved; retry this import.", true);
   const vendorByName = new Map((await allTrades()).filter(isDirectoryTrade).map((trade) => [trade.companyName.toLowerCase(), trade]))
 ;
 
@@ -6984,6 +7040,7 @@ const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: R
 ;
 
 
+  setProjectImportFailure(req, "project persistence", "The project could not be saved. Your uploaded files are preserved; retry this import.", true);
   try 
 {
 
@@ -6999,6 +7056,8 @@ const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: R
           status: "completed",
           analysis,
           error: null,
+          failureStage: null,
+          retryable: false,
           buildLeaseId: null,
           updatedAt: new Date(),
         }).where(and(
@@ -7215,7 +7274,7 @@ const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: R
     req.log.error(
 {
 
- err: error, projectId: project.id 
+ err: error, projectId: project.id, importId, stage: req.projectImportFailureStage
 }
 
 , "Project import metadata persistence failed")
@@ -7322,6 +7381,13 @@ router.post("/project-import-sessions/:importId/build", async (req, res): Promis
     return;
   }
 
+  if (batch.status === "failed" && !batch.retryable) {
+    res.status(422).json({
+      error: batch.error ?? "This import cannot be retried with its current files. Choose different files to start a new import.",
+    });
+    return;
+  }
+
   const documents = await db.select().from(projectDocumentsTable).where(and(
     eq(projectDocumentsTable.importBatchId, batch.id),
     eq(projectDocumentsTable.ownerId, ownerId),
@@ -7336,6 +7402,8 @@ router.post("/project-import-sessions/:importId/build", async (req, res): Promis
   const [locked] = await db.update(projectImportBatchesTable).set({
     status: "building",
     error: null,
+    failureStage: null,
+    retryable: true,
     buildLeaseId,
     updatedAt: new Date(),
   })
@@ -7378,12 +7446,21 @@ router.post("/project-import-sessions/:importId/build", async (req, res): Promis
     if (res.statusCode >= 400) 
 {
 
+      const importRequest = req as ProjectImportBuildRequest;
+      const failureStage = importRequest.projectImportFailureStage ?? "project build";
+      const failureMessage = importRequest.projectImportFailureMessage
+        ?? "The project build failed. Your uploaded files are preserved; retry this import.";
 
       await db.update(projectImportBatchesTable).set(
 {
 
 
-        status: "failed", error: "The project could not be built. Retry when ready.", buildLeaseId: null, updatedAt: new Date(),
+        status: "failed",
+        error: failureMessage,
+        failureStage,
+        retryable: importRequest.projectImportRetryable ?? res.statusCode >= 500,
+        buildLeaseId: null,
+        updatedAt: new Date(),
       
 }
 
@@ -7402,12 +7479,23 @@ router.post("/project-import-sessions/:importId/build", async (req, res): Promis
  catch (error) 
 {
 
+    const importRequest = req as ProjectImportBuildRequest;
+    const failureStage = importRequest.projectImportFailureStage ?? "project build";
+    const failureMessage = importRequest.projectImportFailureMessage
+      ?? "The project build failed. Your uploaded files are preserved; retry this import.";
+    req.log.error({ err: error, importId: batch.id, stage: failureStage }, "Project import build failed unexpectedly");
 
-    await db.update(projectImportBatchesTable).set(
+    try {
+      await db.update(projectImportBatchesTable).set(
 {
 
 
-      status: "failed", error: "The project could not be built. Retry when ready.", buildLeaseId: null, updatedAt: new Date(),
+      status: "failed",
+      error: failureMessage,
+      failureStage,
+      retryable: importRequest.projectImportRetryable ?? true,
+      buildLeaseId: null,
+      updatedAt: new Date(),
     
 }
 
@@ -7416,10 +7504,10 @@ router.post("/project-import-sessions/:importId/build", async (req, res): Promis
       eq(projectImportBatchesTable.buildLeaseId, buildLeaseId),
     ))
 ;
-
-
-    throw error
-;
+    } catch (persistError) {
+      req.log.error({ err: persistError, importId: batch.id, stage: failureStage }, "Project import failure state could not be saved");
+    }
+    if (!res.headersSent) res.status(500).json({ error: failureMessage });
 
 
 }

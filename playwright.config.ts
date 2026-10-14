@@ -4,6 +4,7 @@ export default defineConfig({
   testDir: './artifacts/luminova-pm/tests/visual',
   outputDir: './artifacts/luminova-pm/test-results',
   snapshotPathTemplate: '{testDir}/__snapshots__/{testFilePath}/{arg}{ext}',
+  workers: 2,
   use: {
     baseURL: 'http://127.0.0.1:4173',
     colorScheme: 'light',

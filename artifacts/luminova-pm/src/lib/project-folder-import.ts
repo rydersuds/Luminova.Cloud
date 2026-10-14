@@ -15,6 +15,17 @@ export type SkippedFolderFile = {
   reason: string
 }
 
+export const importSessionFailureMessage = (session: {
+  failureStage?: string | null
+  error?: string | null
+}) => {
+  const message = session.error?.trim()
+  const stage = session.failureStage?.trim()
+  if (!message) return stage ? `${stage} failed. Retry the import or choose different files.` : "The import could not be completed. Retry the import."
+  if (!stage || message.toLowerCase().includes(stage.toLowerCase())) return message
+  return `${stage.charAt(0).toUpperCase()}${stage.slice(1)} failed: ${message}`
+}
+
 type BatchImportResponseContext = {
   operation: string
   fileName?: string

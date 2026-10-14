@@ -8,7 +8,15 @@ const files = [
   { name: 'budget.txt', mimeType: 'text/plain', buffer: Buffer.from('Budget: $1000') },
 ];
 
-function session(status: SessionStatus, documents: Document[], uploadedPaths: string[], error: string | null = null, importId = 'import-recovery-test') {
+function session(
+  status: SessionStatus,
+  documents: Document[],
+  uploadedPaths: string[],
+  error: string | null = null,
+  importId = 'import-recovery-test',
+  retryable = status === 'uploading' || status === 'failed',
+  failureStage: string | null = null,
+) {
   return {
     importId,
     status,
@@ -16,7 +24,8 @@ function session(status: SessionStatus, documents: Document[], uploadedPaths: st
     uploadedPaths,
     uploaded: uploadedPaths.length,
     failed: 0,
-    retryable: status === 'uploading' || status === 'failed',
+    retryable,
+    failureStage,
     error,
     buildLeaseId: null,
   };
@@ -27,11 +36,14 @@ async function installImportApi(page: Page) {
   const uploadedPaths = new Set<string>();
   let status: SessionStatus = 'uploading';
   let error: string | null = null;
+  let retryable = true;
+  let failureStage: string | null = null;
   let buildRequests = 0;
   let projectsCreated = 0;
   let attachRequests = 0;
   const uploadRequests: string[] = [];
   let holdBuild = false;
+  let failBuildResponseWhileBuilding = false;
   let blockAdditionalAttaches = false;
   let failUploads = false;
   let importId = 'import-recovery-test';
@@ -39,13 +51,25 @@ async function installImportApi(page: Page) {
   let statusCheckFailures = 0;
   let interruptNextBuild = false;
   let returnHistoricalFailureAfterCompletion = false;
+  let failAnalysisRequests = 0;
+  let nextImportId: string | null = null;
   const dismissedImportIds = new Set<string>();
   let dismissRequests = 0;
+  let buildStatusChecks = 0;
 
   await page.route('**/api/project-import-sessions', async (route) => {
     if (route.request().method() === 'POST') {
+      if (nextImportId) {
+        importId = nextImportId;
+        nextImportId = null;
+        uploadedPaths.clear();
+        status = 'uploading';
+        error = null;
+        retryable = true;
+        failureStage = null;
+      }
       documents = route.request().postDataJSON().documents;
-      await route.fulfill({ status: 201, json: session(status, documents, [...uploadedPaths], null, importId) });
+      await route.fulfill({ status: 201, json: session(status, documents, [...uploadedPaths], null, importId, retryable, failureStage) });
       return;
     }
     if (statusCheckFailures > 0) {
@@ -58,7 +82,7 @@ async function installImportApi(page: Page) {
       return;
     }
     const activeSession = documents.length && !dismissedImportIds.has(importId)
-      ? session(status, documents, [...uploadedPaths], error, importId)
+      ? session(status, documents, [...uploadedPaths], error, importId, retryable, failureStage)
       : null;
     await route.fulfill({
       contentType: 'application/json',
@@ -72,7 +96,8 @@ async function installImportApi(page: Page) {
       await route.fulfill({ status: 204 });
       return;
     }
-    await route.fulfill({ json: session(status, documents, [...uploadedPaths], error, importId) });
+    if (route.request().method() === 'GET') buildStatusChecks++;
+    await route.fulfill({ json: session(status, documents, [...uploadedPaths], error, importId, retryable, failureStage) });
   });
   await page.route('**/api/storage/uploads/request-url', async (route) => {
     const body = route.request().postDataJSON();
@@ -91,7 +116,7 @@ async function installImportApi(page: Page) {
       return;
     }
     uploadedPaths.add(route.request().postDataJSON().relativePath);
-    await route.fulfill({ json: session(status, documents, [...uploadedPaths]) });
+    await route.fulfill({ json: session(status, documents, [...uploadedPaths], error, importId, retryable, failureStage) });
   });
   await page.route('**/api/project-import-sessions/*/build', async (route) => {
     buildRequests++;
@@ -104,15 +129,34 @@ async function installImportApi(page: Page) {
       return;
     }
     status = 'building';
+    if (failBuildResponseWhileBuilding) {
+      failBuildResponseWhileBuilding = false;
+      await route.fulfill({ status: 502, body: 'Gateway disconnected while the server build remains active' });
+      return;
+    }
+    if (failAnalysisRequests > 0) {
+      failAnalysisRequests--;
+      status = 'failed';
+      error = 'The project documents could not be interpreted. Select different files to start a new import.';
+      retryable = false;
+      failureStage = 'document analysis';
+      await route.fulfill({ status: 422, json: { error } });
+      return;
+    }
     if (holdBuild) return;
     if (interruptNextBuild) {
       interruptNextBuild = false;
       status = 'failed';
       error = 'The previous build was interrupted. Retry to continue.';
+      retryable = true;
+      failureStage = 'project build';
       await route.fulfill({ status: 502, body: 'Gateway disconnected' });
       return;
     }
     status = 'completed';
+    retryable = false;
+    failureStage = null;
+    error = null;
     projectsCreated++;
     if (gatewayBuildFailures > 0) {
       gatewayBuildFailures--;
@@ -129,14 +173,23 @@ async function installImportApi(page: Page) {
     get buildRequests() { return buildRequests; },
     get projectsCreated() { return projectsCreated; },
     get dismissRequests() { return dismissRequests; },
-    setStatus(next: SessionStatus, message: string | null = null) { status = next; error = message; },
+    get buildStatusChecks() { return buildStatusChecks; },
+    setStatus(next: SessionStatus, message: string | null = null) {
+      status = next;
+      error = message;
+      retryable = next === 'uploading' || next === 'failed';
+      failureStage = null;
+    },
     holdBuild() { holdBuild = true; },
+    failBuildOnceWhileBuilding() { failBuildResponseWhileBuilding = true; },
     blockAdditionalAttaches(value: boolean) { blockAdditionalAttaches = value; },
     failUploads(value: boolean) { failUploads = value; },
     failNextBuildAtGateway() { gatewayBuildFailures++; },
     failStatusChecks(count: number) { statusCheckFailures = count; },
     interruptNextBuild() { interruptNextBuild = true; },
     returnHistoricalFailureAfterCompletion() { returnHistoricalFailureAfterCompletion = true; },
+    failNextBuildAtAnalysis() { failAnalysisRequests++; },
+    prepareFreshSession() { nextImportId = 'import-recovery-test-retry'; },
     setImportId(next: string) { importId = next; },
     seedDocuments() {
       documents = files.map(file => ({
@@ -274,6 +327,24 @@ test('reload while building polls until the existing build resolves', async ({ p
   expect(api.buildRequests).toBe(1);
 });
 
+test('a long-running build keeps polling instead of reporting a false timeout', async ({ page }) => {
+  const api = await installImportApi(page);
+  api.failBuildOnceWhileBuilding();
+  await selectAndStart(page);
+  await expect.poll(() => api.buildStatusChecks, { timeout: 5_000 }).toBeGreaterThan(0);
+  await page.evaluate(() => {
+    const originalSetTimeout = window.setTimeout.bind(window);
+    window.setTimeout = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) =>
+      originalSetTimeout(handler, timeout !== undefined && timeout >= 2000 ? 10 : timeout, ...args)) as typeof window.setTimeout;
+  });
+  await expect.poll(() => api.buildStatusChecks, { timeout: 10_000 }).toBeGreaterThan(45);
+  await expect(page.getByLabel('Import status')).toHaveText('building');
+
+  api.setStatus('completed');
+  await expect(page.getByLabel('Import status')).toHaveText('success', { timeout: 5_000 });
+  expect(api.buildRequests).toBe(1);
+});
+
 test('a gateway failure after server completion reconciles to success without a duplicate build', async ({ page }) => {
   const api = await installImportApi(page);
   api.failNextBuildAtGateway();
@@ -327,6 +398,26 @@ test('an interrupted build retries the preserved session exactly once', async ({
   expect(api.projectsCreated).toBe(1);
 });
 
+test('a permanent analysis failure shows its stage and requires a fresh import', async ({ page }) => {
+  const api = await installImportApi(page);
+  api.failNextBuildAtAnalysis();
+
+  await selectAndStart(page);
+  const activity = page.getByRole('complementary', { name: 'Project folder import activity' });
+  await expect(activity.getByRole('alert')).toContainText('Document analysis failed');
+  await expect(activity.getByRole('alert')).toContainText('Select different files to start a new import');
+  expect(api.buildRequests).toBe(1);
+  expect(api.projectsCreated).toBe(0);
+
+  api.prepareFreshSession();
+  await page.getByLabel('Project folder files').setInputFiles(files);
+  await page.getByRole('button', { name: 'Start import' }).click();
+  await expect(page.getByLabel('Import status')).toHaveText('success', { timeout: 10_000 });
+  expect(api.buildRequests).toBe(2);
+  expect(api.uploadRequests).toHaveLength(4);
+  expect(api.projectsCreated).toBe(1);
+});
+
 test('completed import stays successful when browser cleanup fails', async ({ page }) => {
   const api = await installImportApi(page);
   await makeImportCleanupStorageUnavailable(page);
@@ -350,6 +441,7 @@ test('dismissed import errors stay hidden for the session when dismissal storage
   const activity = page.getByRole('complementary', { name: 'Project folder import activity' });
   const dashboardAlert = page.getByTestId('dashboard-import-alert');
   await expect(activity.getByRole('alert')).toContainText('2 files still need to be uploaded');
+  await expect(activity.getByRole('alert')).toContainText('Uploading failed.');
   await expect(dashboardAlert).toContainText('2 files still need to be uploaded');
 
   await activity.getByRole('button', { name: 'Dismiss error' }).click();

@@ -61,6 +61,7 @@ let apiServer: Server | undefined;
 let analysisServer: Server | undefined;
 let isolatedPool: typeof import("@workspace/db")["pool"] | undefined;
 const uploadedObjectPaths: string[] = [];
+const importFailureLogs: unknown[] = [];
 
 try {
   await adminPool.query(`create database "${databaseName}"`);
@@ -73,6 +74,7 @@ try {
     DATABASE_URL: isolatedDatabaseUrl,
   });
 
+  let transientAnalysisFailures = 10;
   analysisServer = createServer(async (req, res) => {
     if (req.method !== "POST" || req.url !== "/chat/completions") {
       res.writeHead(404).end();
@@ -80,6 +82,12 @@ try {
     }
     for await (const _chunk of req) {
       // Drain the production OpenAI request before returning the deterministic fixture.
+    }
+    if (transientAnalysisFailures > 0) {
+      transientAnalysisFailures--;
+      res.writeHead(503, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: { message: "Temporary analysis service outage." } }));
+      return;
     }
     await new Promise((resolve) => setTimeout(resolve, 150));
     res.setHeader("Content-Type", "application/json");
@@ -101,8 +109,11 @@ try {
               clientName: "",
               pmName: "",
               description: "",
+              startDate: "2025-01-01",
               targetDate: "2026-01-01",
               budgetDollars: 0,
+              internalBudgetDollars: 0,
+              clientQuoteDollars: 0,
             },
             documents: [
               { relativePath: "scope.txt", classification: "contract" },
@@ -135,6 +146,7 @@ try {
     (req as typeof req & { log: Console }).log = {
       ...console,
       error(value: unknown) {
+        importFailureLogs.push(value);
         const error = value && typeof value === "object" && "err" in value ? value.err : value;
         process.stderr.write(`Folder import integration route error: ${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
       },
@@ -160,7 +172,7 @@ try {
     body: JSON.stringify({ documents: manifest }),
   })) as { importId: string };
 
-  const attach = async (file: typeof files[number]) => {
+  const attach = async (file: typeof files[number], verifyAttachmentRecovery = false) => {
     const upload = await json(await fetch(`${baseUrl}/storage/uploads/request-url`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -187,6 +199,20 @@ try {
       contentType: file.contentType,
       textSnippet: file.body.toString("utf8"),
     };
+    if (verifyAttachmentRecovery) {
+      const failedAttachment = await fetch(`${baseUrl}/project-import-sessions/${created.importId}/documents`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...payload,
+          objectPath: `${payload.objectPath.slice(0, payload.objectPath.lastIndexOf("/") + 1)}missing-${runId}`,
+        }),
+      });
+      assert.equal(failedAttachment.status, 500);
+      const failureBody = await failedAttachment.json() as { error: string };
+      assert.match(failureBody.error, /uploaded file failed temporarily.*retry this upload/i);
+      assert.doesNotMatch(failureBody.error, /ObjectNotFound|stack| at /i);
+    }
     await json(await fetch(`${baseUrl}/project-import-sessions/${created.importId}/documents`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -206,10 +232,40 @@ try {
     body: JSON.stringify(firstAttachment),
   });
   assert.equal(duplicateAttach.status, 200);
-  await attach(files[1]);
+  await attach(files[1], true);
+  assert.ok(importFailureLogs.some((entry) =>
+    entry && typeof entry === "object" &&
+    "importId" in entry && entry.importId === created.importId &&
+    "stage" in entry && entry.stage === "verifying the uploaded document",
+  ), "The attachment failure log is missing its import ID or stage.");
 
   const attachmentCount = await database.db.select().from(database.projectDocumentsTable);
   assert.equal(attachmentCount.length, 2, "Duplicate attachment request created an extra database row.");
+
+  const analysisFailure = await fetch(`${baseUrl}/project-import-sessions/${created.importId}/build`, { method: "POST" });
+  transientAnalysisFailures = 0;
+  assert.equal(analysisFailure.status, 503);
+  const analysisFailureBody = await analysisFailure.json() as { error: string };
+  assert.match(analysisFailureBody.error, /analysis is temporarily unavailable/i);
+  assert.doesNotMatch(analysisFailureBody.error, /Temporary analysis service outage|stack| at /i);
+  const analysisSession = await json(await fetch(`${baseUrl}/project-import-sessions/${created.importId}`)) as {
+    status: string;
+    retryable: boolean;
+    failureStage: string | null;
+    error: string | null;
+    uploadedPaths: string[];
+  };
+  assert.equal(analysisSession.status, "failed");
+  assert.equal(analysisSession.retryable, true);
+  assert.equal(analysisSession.failureStage, "document analysis");
+  assert.match(analysisSession.error ?? "", /preserved; retry/i);
+  assert.deepEqual(analysisSession.uploadedPaths.sort(), ["budget.txt", "scope.txt"]);
+  assert.ok(importFailureLogs.some((entry) =>
+    entry && typeof entry === "object" &&
+    "importId" in entry && entry.importId === created.importId &&
+    "stage" in entry && entry.stage === "document analysis" &&
+    "retryable" in entry && entry.retryable === true,
+  ), "The analysis failure log is missing its import ID or stage.");
 
   await database.db.update(database.projectImportBatchesTable)
     .set({
@@ -247,6 +303,22 @@ try {
 
   const duplicateBuild = await fetch(`${baseUrl}/project-import-sessions/${created.importId}/build`, { method: "POST" });
   assert.equal(duplicateBuild.status, 409);
+
+  const permanentImport = await json(await fetch(`${baseUrl}/project-import-sessions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ documents: [{ relativePath: "rejected.txt", name: "rejected.txt", size: 1, contentType: "text/plain" }] }),
+  })) as { importId: string };
+  await database.db.update(database.projectImportBatchesTable).set({
+    status: "failed",
+    error: "The project documents could not be interpreted. Select different files to start a new import.",
+    failureStage: "document analysis",
+    retryable: false,
+  }).where(eq(database.projectImportBatchesTable.id, permanentImport.importId));
+  const blockedRetry = await fetch(`${baseUrl}/project-import-sessions/${permanentImport.importId}/build`, { method: "POST" });
+  assert.equal(blockedRetry.status, 422, "A permanent input failure was submitted to analysis again.");
+  const blockedRetryBody = await blockedRetry.json() as { error: string };
+  assert.match(blockedRetryBody.error, /Select different files/i);
 
   const projects = await database.db.select().from(database.importedProjectsTable);
   assert.equal(projects.length, 1, "Duplicate build requests created more than one project.");
