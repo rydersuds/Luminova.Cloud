@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { BoardGroupColor } from './boardGroupColor';
 import type { BoardItemPriority } from './boardItemPriority';
 import type { BoardItemStatus } from './boardItemStatus';
 
@@ -16,6 +17,7 @@ export interface BoardItemUpdate {
      * @maxLength 200
      */
   name?: string;
+  color?: BoardGroupColor | null;
   status?: BoardItemStatus;
   priority?: BoardItemPriority | null;
   /**

@@ -16,6 +16,15 @@ export interface BoardImportPreviewRow {
      * @nullable
      */
   sourceGroup: string | null;
+  /**
+     * @nullable
+     * @pattern ^#[0-9a-fA-F]{6}$
+     */
+  sourceColor?: string | null;
+  /** @maxLength 300 */
+  categoryReason?: string;
+  /** @maxLength 300 */
+  dateEvidence?: string;
   /** @maxLength 500 */
   name: string;
   status: BoardItemStatus | null;

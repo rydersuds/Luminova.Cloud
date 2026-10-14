@@ -63,7 +63,7 @@ export function ProjectBoard({ projectId }: { projectId: string }) {
     entries: visibleItems.filter((item) => item.groupId === group.id).sort((a, b) => a.position - b.position),
   })), [groups, visibleItems])
   const calendarEntries: CalendarEntry[] = useMemo(() => sections.flatMap((section) =>
-    section.entries.map((entry) => ({ ...entry, color: section.color }))), [sections])
+    section.entries.map((entry) => ({ ...entry, color: entry.color ?? section.color }))), [sections])
 
   if (board.isLoading) {
     return <div className="space-y-3" aria-busy="true" aria-label="Loading board">{[0, 1, 2].map((key) => <div key={key} className="skeleton-line h-14" />)}</div>

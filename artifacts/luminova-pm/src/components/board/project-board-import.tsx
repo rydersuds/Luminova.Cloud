@@ -132,6 +132,7 @@ export function ProjectBoardImport({ projectId, groups, actions }: Props) {
       const initialMappings: Record<string, GroupMapping> = {}
       sourceGroups.forEach((key, index) => {
         const sourceName = result.rows.find((row) => sourceKey(row.sourceGroup) === key)?.sourceGroup ?? ""
+        const detectedColor = result.rows.find((row) => sourceKey(row.sourceGroup) === key && row.sourceColor)?.sourceColor
         const matching = groups.find((group) => group.name.trim().toLowerCase() === sourceName.trim().toLowerCase())
         const fallbackGroup = groups[0]
         if (matching) {
@@ -140,7 +141,7 @@ export function ProjectBoardImport({ projectId, groups, actions }: Props) {
           initialMappings[key] = {
             targetRef: `new:import-${index}`,
             name: sourceName.slice(0, 80),
-            color: GROUP_COLORS[(groups.length + index) % GROUP_COLORS.length],
+            color: detectedColor ?? GROUP_COLORS[(groups.length + index) % GROUP_COLORS.length],
           }
         } else if (fallbackGroup) {
           initialMappings[key] = { targetRef: fallbackGroup.id, name: "", color: "gold" }
@@ -197,6 +198,7 @@ export function ProjectBoardImport({ projectId, groups, actions }: Props) {
           ? mappings[sourceKey(row.sourceGroup)].targetRef.slice(4)
           : mappings[sourceKey(row.sourceGroup)].targetRef,
         name: row.name.trim(),
+        color: row.sourceColor ?? null,
         ...(row.status ? { status: row.status } : {}),
         priority: row.priority,
         assignee: row.assignee?.trim() || null,
@@ -225,7 +227,7 @@ export function ProjectBoardImport({ projectId, groups, actions }: Props) {
           <DialogHeader className="shrink-0 border-b px-5 py-4 pr-12 text-left">
             <DialogTitle>Import schedule rows</DialogTitle>
             <DialogDescription>
-              Upload a schedule PDF and AI fills in the tasks, groups, owners, and dates automatically. Review the results, then import them. CSV, Excel, JPEG, and PNG also work.
+              Upload a schedule PDF or screenshot. AI reads the dates and colours and suggests the best construction category for each task. Review the results, then import them. CSV and Excel also work.
             </DialogDescription>
           </DialogHeader>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
@@ -249,7 +251,7 @@ export function ProjectBoardImport({ projectId, groups, actions }: Props) {
                 }}
               />
             </label>
-            {loading && <p className="flex items-center gap-2 text-sm" role="status" data-testid="status-board-import-loading"><LoaderCircle className="h-4 w-4 animate-spin" />{/\.(pdf|jpe?g|png)$/i.test(file?.name ?? "") ? "AI is reading the schedule and filling in tasks and dates…" : "Reading file and preparing preview…"}</p>}
+            {loading && <p className="flex items-center gap-2 text-sm" role="status" data-testid="status-board-import-loading"><LoaderCircle className="h-4 w-4 animate-spin" />{/\.(pdf|jpe?g|png)$/i.test(file?.name ?? "") ? "AI is reading dates, matching colours, and checking construction categories…" : "Reading file and preparing preview…"}</p>}
             {error && <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive" data-testid="alert-board-import">{error}</p>}
             {preview && (
               <div className="space-y-4" data-testid="panel-board-import-preview">
@@ -307,6 +309,7 @@ export function ProjectBoardImport({ projectId, groups, actions }: Props) {
                                 }))}
                                 className="h-9 rounded-md border border-input bg-background px-2 text-sm"
                               >
+                                {mapping.color.startsWith("#") && <option value={mapping.color}>Screenshot colour ({mapping.color})</option>}
                                 {GROUP_COLORS.map((color) => <option key={color} value={color}>{color}</option>)}
                               </select>
                             </>
@@ -335,6 +338,16 @@ export function ProjectBoardImport({ projectId, groups, actions }: Props) {
                             <td className="whitespace-nowrap p-2 text-muted-foreground">#{row.rowNumber}<span className="sr-only">, {sourceLabel(row.sourceGroup)}</span></td>
                             <td className="min-w-48 p-2">
                               <input value={row.name} maxLength={500} aria-label={`Task name for row ${row.rowNumber}`} data-testid={`input-board-import-name-${row.localId}`} onChange={(event) => updateRow(row.localId, { name: event.target.value })} className="h-9 w-full rounded-md border border-input bg-background px-2" />
+                              {row.sourceColor && <label className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                                <input type="color" value={row.sourceColor} aria-label={`Screenshot colour for row ${row.rowNumber}`} onChange={(event) => updateRow(row.localId, { sourceColor: event.target.value })} className="h-6 w-8 rounded border" />
+                                Screenshot colour
+                                <button type="button" className="underline" onClick={() => updateRow(row.localId, { sourceColor: null })}>Use group colour</button>
+                              </label>}
+                              {(row.categoryReason || row.dateEvidence) && <details className="mt-1 text-xs text-muted-foreground">
+                                <summary className="cursor-pointer">AI notes</summary>
+                                {row.categoryReason && <p className="mt-1">{row.categoryReason}</p>}
+                                {row.dateEvidence && <p className="mt-1">{row.dateEvidence}</p>}
+                              </details>}
                               {issues.length > 0 && (
                                 <ul className="mt-1 space-y-1 text-xs text-destructive">
                                   {issues.map((issue) => (

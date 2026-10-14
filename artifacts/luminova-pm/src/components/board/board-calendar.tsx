@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 import { Link } from "wouter"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
-import { GROUP_TONE, STATUS_TONE, dayToDate, formatDay, groupTextColor, isOverdue, itemSpan, timelineLabel, todayDay } from "./board-model"
+import { GROUP_TONE, STATUS_TONE, dayToDate, formatDay, groupTone, groupTextColor, isOverdue, itemSpan, timelineLabel, todayDay } from "./board-model"
 import { StatusLegend, type TimelineEntry } from "./board-timeline"
 import type { BoardGroupColor } from "@workspace/api-client-react"
 
@@ -97,7 +97,7 @@ export function BoardCalendar({
       className,
       title: editable && !entry.href ? `${title(entry)}. Drag to another day to move it.` : title(entry),
       style: {
-        background: `hsl(${GROUP_TONE[entry.color]})`,
+        background: `hsl(${groupTone(entry.color)})`,
         color: groupTextColor(entry.color),
         ...placement,
       } as React.CSSProperties,

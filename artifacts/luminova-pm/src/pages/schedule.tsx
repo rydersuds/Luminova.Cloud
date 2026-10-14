@@ -48,7 +48,7 @@ export default function SchedulePage() {
     })), [projects, visible, hidden])
 
   const calendarEntries: CalendarEntry[] = useMemo(() => sections.flatMap((section) =>
-    section.entries.map((entry) => ({ ...entry, detail: section.title, color: section.color }))), [sections])
+    section.entries.map((entry) => ({ ...entry, detail: section.title, color: entry.color ?? section.color }))), [sections])
 
   const overdue = visible.filter((item) => isOverdue(item, today))
   const thisWeek = visible.filter((item) => {

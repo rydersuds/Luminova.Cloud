@@ -19,6 +19,10 @@ export type BoardImportRawRow = {
   startDate: string;
   endDate: string;
   cost: string;
+  sourceColor?: string | null;
+  categoryReason?: string;
+  dateEvidence?: string;
+  issues?: string[];
 };
 
 const STATUS_VALUES = ["Not started", "Working on it", "Stuck", "Done"] as const;
@@ -26,7 +30,8 @@ const PRIORITY_VALUES = ["Low", "Medium", "High", "Critical"] as const;
 type Status = typeof STATUS_VALUES[number];
 type Priority = typeof PRIORITY_VALUES[number];
 
-const headerAliases: Record<keyof Omit<BoardImportRawRow, "rowNumber">, string[]> = {
+type BoardTableField = "name" | "group" | "status" | "priority" | "assignee" | "startDate" | "endDate" | "cost";
+const headerAliases: Record<BoardTableField, string[]> = {
   name: ["task", "item", "task name", "item name", "activity", "work item", "milestone", "description"],
   group: ["group", "phase", "section", "stage", "category", "workstream"],
   status: ["status", "progress", "state"],
@@ -37,9 +42,9 @@ const headerAliases: Record<keyof Omit<BoardImportRawRow, "rowNumber">, string[]
   cost: ["cost", "budget", "amount", "estimated cost", "planned cost"],
 };
 
-function headerKey(value: string): keyof Omit<BoardImportRawRow, "rowNumber"> | null {
+function headerKey(value: string): BoardTableField | null {
   const normalized = value.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
-  for (const [key, aliases] of Object.entries(headerAliases) as [keyof Omit<BoardImportRawRow, "rowNumber">, string[]][]) {
+  for (const [key, aliases] of Object.entries(headerAliases) as [BoardTableField, string[]][]) {
     if (aliases.includes(normalized)) return key;
   }
   return null;
@@ -211,7 +216,7 @@ function normalizeCost(value: string, issues: string[]) {
 function normalizeRows(rawRows: BoardImportRawRow[]): BoardImportPreview {
   if (!rawRows.length) throw new Error("No schedule rows were found beneath the header.");
   const rows: BoardImportPreviewRow[] = rawRows.map((raw) => {
-    const issues: string[] = [];
+    const issues: string[] = [...(raw.issues ?? [])];
     const name = raw.name.trim();
     if (!name) issues.push("Task name is required.");
     if (name.length > 200) issues.push("Task name is over 200 characters; shorten it before import.");
@@ -220,6 +225,9 @@ function normalizeRows(rawRows: BoardImportRawRow[]): BoardImportPreview {
     return {
       rowNumber: raw.rowNumber,
       sourceGroup,
+      sourceColor: raw.sourceColor ?? null,
+      categoryReason: raw.categoryReason ?? "",
+      dateEvidence: raw.dateEvidence ?? "",
       name: name.slice(0, 500),
       status: normalizeStatus(raw.status, issues),
       priority: normalizePriority(raw.priority, issues),
@@ -240,8 +248,8 @@ function normalizeRows(rawRows: BoardImportRawRow[]): BoardImportPreview {
   return { groups, rows };
 }
 
-async function extractImageRows(buffer: Buffer): Promise<BoardImportRawRow[]> {
-  return extractAiSchedule({ text: "", images: [buffer] });
+async function extractImageRows(buffer: Buffer, context: Partial<ScheduleDocument> = {}): Promise<BoardImportRawRow[]> {
+  return extractAiSchedule({ ...context, text: "", images: [buffer] });
 }
 
 export function isSupportedBoardImportName(filename: string) {
@@ -253,6 +261,7 @@ export async function extractBoardImport(
   filename: string,
   imageExtractor = extractImageRows,
   pdfExtractor: (document: ScheduleDocument) => Promise<BoardImportRawRow[]> = extractAiSchedule,
+  context: Partial<ScheduleDocument> = {},
 ): Promise<BoardImportPreview> {
   if (!buffer.length) throw new Error("Choose a non-empty file.");
   if (buffer.length > MAX_BOARD_IMPORT_BYTES) throw new Error("Files must be 8 MiB or smaller.");
@@ -281,7 +290,7 @@ export async function extractBoardImport(
       // AI can use timeline legends, years, and phase headings across pages.
       for (let page = 1; page <= info.total; page += 1) {
         const screenshot = await parser.getScreenshot({
-          partial: [page], desiredWidth: 1600, imageBuffer: true, imageDataUrl: false,
+          partial: [page], desiredWidth: 2400, imageBuffer: true, imageDataUrl: false,
         });
         const image = screenshot.pages[0]?.data;
         if (!image?.length) throw new Error(`PDF page ${page} could not be read. No tasks were added.`);
@@ -291,7 +300,7 @@ export async function extractBoardImport(
         }
         images.push(Buffer.from(image));
       }
-      rawRows = await pdfExtractor({ text, images });
+      rawRows = await pdfExtractor({ ...context, text, images });
     } finally {
       await parser.destroy();
     }
@@ -299,7 +308,7 @@ export async function extractBoardImport(
     const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8;
     const isPng = buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
     if (!isJpeg && !isPng) throw new Error("The image content doesn't match a JPEG or PNG file.");
-    rawRows = await imageExtractor(buffer);
+    rawRows = await imageExtractor(buffer, context);
   } else {
     throw new Error("Choose a CSV, XLSX, PDF, JPEG, or PNG file.");
   }

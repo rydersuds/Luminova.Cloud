@@ -608,13 +608,17 @@ export const GetProjectBoardParams = zod.object({
   "projectId": zod.coerce.string()
 })
 
+export const getProjectBoardResponseGroupsItemColorTwoRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const getProjectBoardResponseItemsItemColorOneTwoRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+
+
 export const GetProjectBoardResponse = zod.object({
   "projectId": zod.string(),
   "groups": zod.array(zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
   "name": zod.string(),
-  "color": zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']),
+  "color": zod.union([zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']),zod.string().regex(getProjectBoardResponseGroupsItemColorTwoRegExp)]),
   "position": zod.number().int()
 })),
   "items": zod.array(zod.object({
@@ -622,6 +626,7 @@ export const GetProjectBoardResponse = zod.object({
   "projectId": zod.string(),
   "groupId": zod.string(),
   "name": zod.string(),
+  "color": zod.union([zod.union([zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']),zod.string().regex(getProjectBoardResponseItemsItemColorOneTwoRegExp)]),zod.null()]).optional(),
   "status": zod.enum(['Not started', 'Working on it', 'Stuck', 'Done']),
   "priority": zod.union([zod.enum(['Low', 'Medium', 'High', 'Critical']),zod.null()]),
   "assignee": zod.string().nullable(),
@@ -643,18 +648,22 @@ export const CreateBoardGroupParams = zod.object({
 
 export const createBoardGroupBodyNameMax = 80;
 
+export const createBoardGroupBodyColorTwoRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
 
 
 export const CreateBoardGroupBody = zod.object({
   "name": zod.string().min(1).max(createBoardGroupBodyNameMax),
-  "color": zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']).optional()
+  "color": zod.union([zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']),zod.string().regex(createBoardGroupBodyColorTwoRegExp)]).optional()
 })
+
+export const createBoardGroupResponseColorTwoRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+
 
 export const CreateBoardGroupResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
   "name": zod.string(),
-  "color": zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']),
+  "color": zod.union([zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']),zod.string().regex(createBoardGroupResponseColorTwoRegExp)]),
   "position": zod.number().int()
 })
 
@@ -672,21 +681,25 @@ export const UpdateBoardGroupParams = zod.object({
 
 export const updateBoardGroupBodyNameMax = 80;
 
+export const updateBoardGroupBodyColorTwoRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
 export const updateBoardGroupBodyPositionMin = 0;
 
 
 
 export const UpdateBoardGroupBody = zod.object({
   "name": zod.string().min(1).max(updateBoardGroupBodyNameMax).optional(),
-  "color": zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']).optional(),
+  "color": zod.union([zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']),zod.string().regex(updateBoardGroupBodyColorTwoRegExp)]).optional(),
   "position": zod.number().int().min(updateBoardGroupBodyPositionMin).optional()
 })
+
+export const updateBoardGroupResponseColorTwoRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+
 
 export const UpdateBoardGroupResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
   "name": zod.string(),
-  "color": zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']),
+  "color": zod.union([zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']),zod.string().regex(updateBoardGroupResponseColorTwoRegExp)]),
   "position": zod.number().int()
 })
 
@@ -734,11 +747,15 @@ export const CreateBoardItemBody = zod.object({
   "costCents": zod.number().int().min(createBoardItemBodyCostCentsMin).nullish()
 })
 
+export const createBoardItemResponseColorOneTwoRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+
+
 export const CreateBoardItemResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
   "groupId": zod.string(),
   "name": zod.string(),
+  "color": zod.union([zod.union([zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']),zod.string().regex(createBoardItemResponseColorOneTwoRegExp)]),zod.null()]).optional(),
   "status": zod.enum(['Not started', 'Working on it', 'Stuck', 'Done']),
   "priority": zod.union([zod.enum(['Low', 'Medium', 'High', 'Critical']),zod.null()]),
   "assignee": zod.string().nullable(),
@@ -773,6 +790,11 @@ export const previewBoardImportResponseGroupsMax = 30;
 
 export const previewBoardImportResponseRowsItemSourceGroupMax = 200;
 
+export const previewBoardImportResponseRowsItemSourceColorRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const previewBoardImportResponseRowsItemCategoryReasonMax = 300;
+
+export const previewBoardImportResponseRowsItemDateEvidenceMax = 300;
+
 export const previewBoardImportResponseRowsItemNameMax = 500;
 
 export const previewBoardImportResponseRowsItemAssigneeMax = 200;
@@ -792,6 +814,9 @@ export const PreviewBoardImportResponse = zod.object({
   "rows": zod.array(zod.object({
   "rowNumber": zod.number().int().min(1),
   "sourceGroup": zod.string().max(previewBoardImportResponseRowsItemSourceGroupMax).nullable(),
+  "sourceColor": zod.string().regex(previewBoardImportResponseRowsItemSourceColorRegExp).nullish(),
+  "categoryReason": zod.string().max(previewBoardImportResponseRowsItemCategoryReasonMax).optional(),
+  "dateEvidence": zod.string().max(previewBoardImportResponseRowsItemDateEvidenceMax).optional(),
   "name": zod.string().max(previewBoardImportResponseRowsItemNameMax),
   "status": zod.union([zod.enum(['Not started', 'Working on it', 'Stuck', 'Done']),zod.null()]),
   "priority": zod.union([zod.enum(['Low', 'Medium', 'High', 'Critical']),zod.null()]),
@@ -816,12 +841,14 @@ export const importBoardItemsBodyGroupsToCreateItemKeyMax = 40;
 
 export const importBoardItemsBodyGroupsToCreateItemNameMax = 80;
 
+export const importBoardItemsBodyGroupsToCreateItemColorTwoRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
 export const importBoardItemsBodyGroupsToCreateMax = 30;
 
 export const importBoardItemsBodyItemsItemGroupRefMax = 80;
 
 export const importBoardItemsBodyItemsItemNameMax = 200;
 
+export const importBoardItemsBodyItemsItemColorOneTwoRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
 export const importBoardItemsBodyItemsItemAssigneeMax = 120;
 
 export const importBoardItemsBodyItemsItemStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
@@ -836,11 +863,12 @@ export const ImportBoardItemsBody = zod.object({
   "groupsToCreate": zod.array(zod.object({
   "key": zod.string().min(1).max(importBoardItemsBodyGroupsToCreateItemKeyMax),
   "name": zod.string().min(1).max(importBoardItemsBodyGroupsToCreateItemNameMax),
-  "color": zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate'])
+  "color": zod.union([zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']),zod.string().regex(importBoardItemsBodyGroupsToCreateItemColorTwoRegExp)])
 })).max(importBoardItemsBodyGroupsToCreateMax),
   "items": zod.array(zod.object({
   "groupRef": zod.string().min(1).max(importBoardItemsBodyItemsItemGroupRefMax),
   "name": zod.string().min(1).max(importBoardItemsBodyItemsItemNameMax),
+  "color": zod.union([zod.union([zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']),zod.string().regex(importBoardItemsBodyItemsItemColorOneTwoRegExp)]),zod.null()]).optional(),
   "status": zod.enum(['Not started', 'Working on it', 'Stuck', 'Done']).optional(),
   "priority": zod.union([zod.enum(['Low', 'Medium', 'High', 'Critical']),zod.null()]).optional(),
   "assignee": zod.string().max(importBoardItemsBodyItemsItemAssigneeMax).nullish(),
@@ -850,12 +878,16 @@ export const ImportBoardItemsBody = zod.object({
 })).min(1).max(importBoardItemsBodyItemsMax)
 })
 
+export const importBoardItemsResponseGroupsItemColorTwoRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const importBoardItemsResponseItemsItemColorOneTwoRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+
+
 export const ImportBoardItemsResponse = zod.object({
   "groups": zod.array(zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
   "name": zod.string(),
-  "color": zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']),
+  "color": zod.union([zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']),zod.string().regex(importBoardItemsResponseGroupsItemColorTwoRegExp)]),
   "position": zod.number().int()
 })),
   "items": zod.array(zod.object({
@@ -863,6 +895,7 @@ export const ImportBoardItemsResponse = zod.object({
   "projectId": zod.string(),
   "groupId": zod.string(),
   "name": zod.string(),
+  "color": zod.union([zod.union([zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']),zod.string().regex(importBoardItemsResponseItemsItemColorOneTwoRegExp)]),zod.null()]).optional(),
   "status": zod.enum(['Not started', 'Working on it', 'Stuck', 'Done']),
   "priority": zod.union([zod.enum(['Low', 'Medium', 'High', 'Critical']),zod.null()]),
   "assignee": zod.string().nullable(),
@@ -889,6 +922,7 @@ export const UpdateBoardItemParams = zod.object({
 
 export const updateBoardItemBodyNameMax = 200;
 
+export const updateBoardItemBodyColorOneTwoRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
 export const updateBoardItemBodyAssigneeMax = 120;
 
 export const updateBoardItemBodyStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
@@ -902,6 +936,7 @@ export const updateBoardItemBodyPositionMin = 0;
 export const UpdateBoardItemBody = zod.object({
   "groupId": zod.string().min(1).optional(),
   "name": zod.string().min(1).max(updateBoardItemBodyNameMax).optional(),
+  "color": zod.union([zod.union([zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']),zod.string().regex(updateBoardItemBodyColorOneTwoRegExp)]),zod.null()]).optional(),
   "status": zod.enum(['Not started', 'Working on it', 'Stuck', 'Done']).optional(),
   "priority": zod.union([zod.enum(['Low', 'Medium', 'High', 'Critical']),zod.null()]).optional(),
   "assignee": zod.string().max(updateBoardItemBodyAssigneeMax).nullish(),
@@ -912,11 +947,15 @@ export const UpdateBoardItemBody = zod.object({
   "position": zod.number().int().min(updateBoardItemBodyPositionMin).optional()
 })
 
+export const updateBoardItemResponseColorOneTwoRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+
+
 export const UpdateBoardItemResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
   "groupId": zod.string(),
   "name": zod.string(),
+  "color": zod.union([zod.union([zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']),zod.string().regex(updateBoardItemResponseColorOneTwoRegExp)]),zod.null()]).optional(),
   "status": zod.enum(['Not started', 'Working on it', 'Stuck', 'Done']),
   "priority": zod.union([zod.enum(['Low', 'Medium', 'High', 'Critical']),zod.null()]),
   "assignee": zod.string().nullable(),
@@ -945,11 +984,16 @@ export const DeleteBoardItemResponse = zod.void()
 /**
  * @summary Dated board items across every project the user can open, for the portfolio timeline and calendar
  */
+export const getBoardScheduleResponseOneColorOneTwoRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const getBoardScheduleResponseTwoGroupColorTwoRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+
+
 export const GetBoardScheduleResponseItem = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
   "groupId": zod.string(),
   "name": zod.string(),
+  "color": zod.union([zod.union([zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']),zod.string().regex(getBoardScheduleResponseOneColorOneTwoRegExp)]),zod.null()]).optional(),
   "status": zod.enum(['Not started', 'Working on it', 'Stuck', 'Done']),
   "priority": zod.union([zod.enum(['Low', 'Medium', 'High', 'Critical']),zod.null()]),
   "assignee": zod.string().nullable(),
@@ -961,7 +1005,7 @@ export const GetBoardScheduleResponseItem = zod.object({
 }).and(zod.object({
   "projectName": zod.string(),
   "groupName": zod.string(),
-  "groupColor": zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate'])
+  "groupColor": zod.union([zod.enum(['gold', 'amber', 'orange', 'red', 'pink', 'violet', 'indigo', 'blue', 'sky', 'teal', 'green', 'lime', 'slate']),zod.string().regex(getBoardScheduleResponseTwoGroupColorTwoRegExp)])
 }))
 export const GetBoardScheduleResponse = zod.array(GetBoardScheduleResponseItem)
 

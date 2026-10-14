@@ -4,7 +4,7 @@ import { ChevronDown, GripVertical, MoreHorizontal, Plus, Trash2 } from "lucide-
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { CostCell, DatesCell, DependsCell, PriorityCell, StatusCell, TextCell } from "./board-cells"
-import { BOARD_STATUSES, GROUP_COLORS, GROUP_TONE, STATUS_TONE, formatCents, groupTextColor, initials, itemSpan, personColor, shortDate } from "./board-model"
+import { BOARD_STATUSES, GROUP_COLORS, GROUP_TONE, STATUS_TONE, formatCents, groupTone, groupTextColor, initials, itemSpan, personColor, shortDate } from "./board-model"
 import type { BoardActions } from "./use-board"
 
 const DRAG_TYPE = "application/x-luminova-board-item"
@@ -48,7 +48,7 @@ export function BoardTable({ board, visibleItems, actions, filtered }: Props) {
         const groupItems = visibleItems.filter((item) => item.groupId === group.id).sort((a, b) => a.position - b.position)
         const isCollapsed = collapsed.has(group.id)
         return (
-          <section key={group.id} aria-label={group.name} className="board-group" style={{ "--group": GROUP_TONE[group.color] } as React.CSSProperties}>
+          <section key={group.id} aria-label={group.name} className="board-group" style={{ "--group": groupTone(group.color) } as React.CSSProperties}>
             <GroupHeader
               group={group}
               count={groupItems.length}
@@ -241,7 +241,7 @@ function ItemMenu({ item, groups, actions }: { item: BoardItem; groups: BoardGro
         <DropdownMenuLabel>Move to group</DropdownMenuLabel>
         {groups.filter((group) => group.id !== item.groupId).map((group) => (
           <DropdownMenuItem key={group.id} onSelect={() => actions.updateItem(item.id, { groupId: group.id })} className="gap-2">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ background: `hsl(${GROUP_TONE[group.color]})` }} />
+            <span className="h-2.5 w-2.5 rounded-full" style={{ background: `hsl(${groupTone(item.color ?? group.color)})` }} aria-label={item.color ? `Source colour ${item.color}` : undefined} />
             {group.name}
           </DropdownMenuItem>
         ))}

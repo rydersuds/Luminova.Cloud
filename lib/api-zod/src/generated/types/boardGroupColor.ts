@@ -6,21 +6,4 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BoardGroupColor = typeof BoardGroupColor[keyof typeof BoardGroupColor];
-
-
-export const BoardGroupColor = {
-  gold: 'gold',
-  amber: 'amber',
-  orange: 'orange',
-  red: 'red',
-  pink: 'pink',
-  violet: 'violet',
-  indigo: 'indigo',
-  blue: 'blue',
-  sky: 'sky',
-  teal: 'teal',
-  green: 'green',
-  lime: 'lime',
-  slate: 'slate',
-} as const;
+export type BoardGroupColor = 'gold' | 'amber' | 'orange' | 'red' | 'pink' | 'violet' | 'indigo' | 'blue' | 'sky' | 'teal' | 'green' | 'lime' | 'slate' | string;

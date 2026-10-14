@@ -25,6 +25,7 @@ export const projectBoardItemsTable = pgTable("project_board_items", {
   groupId: text("group_id").notNull().references(() => projectBoardGroupsTable.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   status: text("status").notNull().default("Not started"),
+  color: text("color"),
   priority: text("priority"),
   assignee: text("assignee"),
   startDate: date("start_date", { mode: "string" }),

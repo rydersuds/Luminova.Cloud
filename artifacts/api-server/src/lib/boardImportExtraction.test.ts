@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import ExcelJS from "exceljs";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { extractBoardImport, isSupportedBoardImportName, type BoardImportRawRow } from "./boardImportExtraction";
 
 function makeOnePagePdf(stream = "BT /F1 10 Tf 72 720 Td (Task) Tj 120 0 Td (Group) Tj 0 -20 Td (Install cabinets) Tj 120 0 Td (Pre-construction) Tj ET") {
@@ -133,4 +135,34 @@ test("live AI reads a PDF schedule and populates task dates", { skip: process.en
   assert.equal(preview.rows[1].startDate, "2026-10-19");
   assert.equal(preview.rows[1].endDate, "2026-10-21");
   assert.equal(preview.rows[0].issues.length, 0);
+});
+
+test("live AI captures abbreviated screenshot dates, original colours, and inferred construction categories", { skip: process.env.RUN_AI_SCHEDULE_TEST !== "1" }, async () => {
+  const { stdout } = await promisify(execFile)("magick", [
+    "-size", "1400x320", "xc:white", "-font", "DejaVu-Sans", "-pointsize", "26",
+    "-fill", "black", "-annotate", "+30+45", "Construction Schedule - October 2026",
+    "-annotate", "+30+100", "Task", "-annotate", "+500+100", "Start", "-annotate", "+760+100", "Finish",
+    "-fill", "#33AA66", "-draw", "rectangle 30,130 430,180",
+    "-fill", "white", "-annotate", "+45+164", "Install cabinets",
+    "-fill", "black", "-annotate", "+500+164", "15-Oct", "-annotate", "+760+164", "18-Oct",
+    "-fill", "#337ABB", "-draw", "rectangle 30,210 430,260",
+    "-fill", "white", "-annotate", "+45+244", "Electrical rough-in",
+    "-fill", "black", "-annotate", "+500+244", "19-Oct-26", "-annotate", "+760+244", "21-Oct-26",
+    "png:-",
+  ], { encoding: "buffer", maxBuffer: 2 * 1024 * 1024 });
+  const preview = await extractBoardImport(stdout, "schedule.png", undefined, undefined, {
+    categories: ["Interior finishes", "Mechanical, electrical & plumbing"],
+    projectDates: { start: "2026-10-01", end: "2026-11-30" },
+  });
+  assert.equal(preview.rows.length, 2);
+  assert.equal(preview.rows[0].startDate, "2026-10-15");
+  assert.equal(preview.rows[0].endDate, "2026-10-18");
+  assert.equal(preview.rows[1].startDate, "2026-10-19");
+  assert.equal(preview.rows[1].endDate, "2026-10-21");
+  assert.equal(preview.rows[0].sourceColor, "#33AA66");
+  assert.equal(preview.rows[1].sourceColor, "#337ABB");
+  assert.equal(preview.rows[0].sourceGroup, "Interior finishes");
+  assert.equal(preview.rows[1].sourceGroup, "Mechanical, electrical & plumbing");
+  assert.ok(preview.rows[0].categoryReason);
+  assert.ok(preview.rows[1].dateEvidence);
 });

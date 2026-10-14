@@ -1110,24 +1110,7 @@ export interface ScheduleImageInput {
   contentType: ScheduleImageInputContentType;
 }
 
-export type BoardGroupColor = typeof BoardGroupColor[keyof typeof BoardGroupColor];
-
-
-export const BoardGroupColor = {
-  gold: 'gold',
-  amber: 'amber',
-  orange: 'orange',
-  red: 'red',
-  pink: 'pink',
-  violet: 'violet',
-  indigo: 'indigo',
-  blue: 'blue',
-  sky: 'sky',
-  teal: 'teal',
-  green: 'green',
-  lime: 'lime',
-  slate: 'slate',
-} as const;
+export type BoardGroupColor = 'gold' | 'amber' | 'orange' | 'red' | 'pink' | 'violet' | 'indigo' | 'blue' | 'sky' | 'teal' | 'green' | 'lime' | 'slate' | string;
 
 export type BoardItemStatus = typeof BoardItemStatus[keyof typeof BoardItemStatus];
 
@@ -1162,6 +1145,7 @@ export interface BoardItem {
   projectId: string;
   groupId: string;
   name: string;
+  color?: BoardGroupColor | null;
   status: BoardItemStatus;
   priority: BoardItemPriority | null;
   /** @nullable */
@@ -1255,6 +1239,15 @@ export interface BoardImportPreviewRow {
      * @nullable
      */
   sourceGroup: string | null;
+  /**
+     * @nullable
+     * @pattern ^#[0-9a-fA-F]{6}$
+     */
+  sourceColor?: string | null;
+  /** @maxLength 300 */
+  categoryReason?: string;
+  /** @maxLength 300 */
+  dateEvidence?: string;
   /** @maxLength 500 */
   name: string;
   status: BoardItemStatus | null;
@@ -1318,6 +1311,7 @@ export interface BoardImportItemInput {
      * @maxLength 200
      */
   name: string;
+  color?: BoardGroupColor | null;
   status?: BoardItemStatus;
   priority?: BoardItemPriority | null;
   /**
@@ -1365,6 +1359,7 @@ export interface BoardItemUpdate {
      * @maxLength 200
      */
   name?: string;
+  color?: BoardGroupColor | null;
   status?: BoardItemStatus;
   priority?: BoardItemPriority | null;
   /**

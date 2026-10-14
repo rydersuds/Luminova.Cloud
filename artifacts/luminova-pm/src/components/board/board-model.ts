@@ -38,7 +38,25 @@ export const GROUP_TONE: Record<BoardGroupColor, string> = {
 
 /** Text colour that stays readable on each group colour when used as a fill. */
 const LIGHT_FILLS = new Set<BoardGroupColor>(["gold", "amber", "orange", "sky", "lime", "pink", "slate"])
-export const groupTextColor = (color: BoardGroupColor) => (LIGHT_FILLS.has(color) ? "hsl(36 40% 8%)" : "#fff")
+export function groupTone(color: BoardGroupColor): string {
+  if (!/^#[0-9a-f]{6}$/i.test(color)) return GROUP_TONE[color] ?? GROUP_TONE.gold
+  const [r, g, b] = [1, 3, 5].map((index) => parseInt(color.slice(index, index + 2), 16) / 255)
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), delta = max - min
+  const lightness = (max + min) / 2
+  const saturation = delta ? delta / (1 - Math.abs(2 * lightness - 1)) : 0
+  const hue = !delta ? 0 : max === r ? ((g - b) / delta + 6) % 6 : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4
+  return `${(hue * 60).toFixed(4)} ${(saturation * 100).toFixed(4)}% ${(lightness * 100).toFixed(4)}%`
+}
+
+export function groupTextColor(color: BoardGroupColor) {
+  if (!/^#[0-9a-f]{6}$/i.test(color)) return LIGHT_FILLS.has(color) ? "hsl(36 40% 8%)" : "#fff"
+  const linear = [1, 3, 5].map((index) => {
+    const channel = parseInt(color.slice(index, index + 2), 16) / 255
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+  })
+  const luminance = linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722
+  return luminance > 0.179 ? "#000" : "#fff"
+}
 
 /** Picks a stable colour for a person or company so the same owner always looks the same. */
 export function personColor(name: string): BoardGroupColor {

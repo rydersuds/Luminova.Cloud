@@ -65,6 +65,7 @@ function serializeItem(row: ProjectBoardItemRow) {
     projectId: row.projectId,
     groupId: row.groupId,
     name: row.name,
+    color: row.color,
     status: row.status,
     priority: row.priority,
     assignee: row.assignee,
@@ -195,7 +196,13 @@ router.post("/projects/:projectId/board/import/preview", async (req: Authenticat
       return;
     }
     try {
-      const preview = await extractBoardImport(req.body, filename.data["X-File-Name"]);
+      const categories = await db.select({ name: projectBoardGroupsTable.name }).from(projectBoardGroupsTable)
+        .where(boardScope(projectBoardGroupsTable, access.workspaceId, access.project.id));
+      const preview = await extractBoardImport(req.body, filename.data["X-File-Name"], undefined, undefined, {
+        filename: filename.data["X-File-Name"],
+        categories: categories.length ? categories.map((group) => group.name) : DEFAULT_BOARD_GROUPS.map((group) => group.name),
+        projectDates: { start: access.project.startDate, end: access.project.targetDate },
+      });
       res.json(PreviewBoardImportResponse.parse(preview));
     } catch (error) {
       req.log.warn({ err: error, projectId: access.project.id }, "Board import file could not be parsed");
@@ -280,6 +287,7 @@ router.post("/projects/:projectId/board/import", async (req: AuthenticatedReques
           projectId: access.project.id,
           groupId: group.id,
           name: item.name.trim(),
+          color: item.color ?? null,
           status: item.status ?? "Not started",
           priority: item.priority ?? null,
           assignee: item.assignee?.trim() || null,

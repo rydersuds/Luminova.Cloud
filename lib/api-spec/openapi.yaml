@@ -2994,8 +2994,11 @@ components:
           type: string
           enum: [image/jpeg, image/png, image/webp]
     BoardGroupColor:
-      type: string
-      enum: [gold, amber, orange, red, pink, violet, indigo, blue, sky, teal, green, lime, slate]
+      anyOf:
+        - type: string
+          enum: [gold, amber, orange, red, pink, violet, indigo, blue, sky, teal, green, lime, slate]
+        - type: string
+          pattern: "^#[0-9a-fA-F]{6}$"
     BoardItemStatus:
       type: string
       enum: ["Not started", "Working on it", "Stuck", "Done"]
@@ -3019,6 +3022,10 @@ components:
         projectId: { type: string }
         groupId: { type: string }
         name: { type: string }
+        color:
+          anyOf:
+            - $ref: "#/components/schemas/BoardGroupColor"
+            - type: "null"
         status: { $ref: "#/components/schemas/BoardItemStatus" }
         priority:
           anyOf:
@@ -3095,6 +3102,9 @@ components:
       properties:
         rowNumber: { type: integer, minimum: 1 }
         sourceGroup: { type: [string, "null"], maxLength: 200 }
+        sourceColor: { type: [string, "null"], pattern: "^#[0-9a-fA-F]{6}$" }
+        categoryReason: { type: string, maxLength: 300 }
+        dateEvidence: { type: string, maxLength: 300 }
         name: { type: string, maxLength: 500 }
         status:
           anyOf:
@@ -3125,6 +3135,10 @@ components:
       properties:
         groupRef: { type: string, minLength: 1, maxLength: 80 }
         name: { type: string, minLength: 1, maxLength: 200 }
+        color:
+          anyOf:
+            - $ref: "#/components/schemas/BoardGroupColor"
+            - type: "null"
         status: { $ref: "#/components/schemas/BoardItemStatus" }
         priority:
           anyOf:
@@ -3162,6 +3176,10 @@ components:
       properties:
         groupId: { type: string, minLength: 1 }
         name: { type: string, minLength: 1, maxLength: 200 }
+        color:
+          anyOf:
+            - $ref: "#/components/schemas/BoardGroupColor"
+            - type: "null"
         status: { $ref: "#/components/schemas/BoardItemStatus" }
         priority:
           anyOf:

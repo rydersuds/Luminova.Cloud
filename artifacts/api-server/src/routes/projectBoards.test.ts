@@ -179,21 +179,25 @@ test("project boards are scoped to authorized project team members and keep orde
   assert.equal(invalidDates.status, 400);
   const createdGroupName = `Imported phase ${suffix}`;
   const createdImport = await call("POST", `${boardPath}/import`, ownerId, {
-    groupsToCreate: [{ key: "new-import-phase", name: createdGroupName, color: "indigo" }],
+    groupsToCreate: [{ key: "new-import-phase", name: createdGroupName, color: "#1177CC" }],
     items: [
       { groupRef: pre.id, name: "Imported permit milestone", status: "Not started" },
-      { groupRef: "new-import-phase", name: "Imported electrical rough-in", startDate: "2026-07-01" },
+      { groupRef: "new-import-phase", name: "Imported electrical rough-in", startDate: "2026-07-01", color: "#33AA66" },
     ],
   });
   assert.equal(createdImport.status, 201);
   const importResult = await createdImport.json() as {
-    groups: Array<{ id: string; name: string; position: number }>;
-    items: Array<{ name: string; groupId: string; position: number }>;
+    groups: Array<{ id: string; name: string; position: number; color: string }>;
+    items: Array<{ name: string; groupId: string; position: number; color: string | null }>;
   };
   assert.deepEqual(importResult.groups.map(({ name }) => name), [createdGroupName]);
   assert.deepEqual(importResult.items.map(({ name }) => name), ["Imported permit milestone", "Imported electrical rough-in"]);
   assert.ok(importResult.items[0].position > 0, "import appends after existing group items");
   assert.equal(importResult.items[1].groupId, importResult.groups[0].id);
+  assert.equal(importResult.groups[0].color, "#1177CC");
+  assert.equal(importResult.items[1].color, "#33AA66");
+  const reloadedImport = await (await call("GET", boardPath, ownerId)).json() as { items: Array<{ name: string; color: string | null }> };
+  assert.equal(reloadedImport.items.find((item) => item.name === "Imported electrical rough-in")?.color, "#33AA66");
   const retained = await db.select().from(projectBoardItemsTable).where(eq(projectBoardItemsTable.projectId, projectId));
   assert.ok(retained.some((item) => item.id === survey.id), "import does not replace or remove existing items");
   assert.equal(retained.length, beforeImport.length + 2);

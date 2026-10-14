@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerE
 import type { BoardGroupColor, BoardItemStatus } from "@workspace/api-client-react"
 import { Link } from "wouter"
 import { cn } from "@/lib/utils"
-import { GROUP_TONE, STATUS_TONE, dayToDate, formatDay, groupTextColor, isOverdue, itemSpan, shortDate, timelineLabel, todayDay } from "./board-model"
+import { GROUP_TONE, STATUS_TONE, dayToDate, formatDay, groupTone, groupTextColor, isOverdue, itemSpan, shortDate, timelineLabel, todayDay } from "./board-model"
 
 export type TimelineEntry = {
   id: string
@@ -11,6 +11,7 @@ export type TimelineEntry = {
   startDate: string | null
   endDate: string | null
   dependsOnId: string | null
+  color?: BoardGroupColor | null
   /** Shown under the name, e.g. the project on the portfolio timeline. */
   detail?: string
   href?: string
@@ -142,7 +143,7 @@ export function BoardTimeline({
       <div className="board-timeline">
         <div className="board-timeline-labels" style={{ paddingTop: 52 }}>
           {rows.map((row) => row.kind === "section" ? (
-            <div key={`s-${row.section.id}`} className="board-timeline-section" style={{ height: ROW, "--group": GROUP_TONE[row.section.color] } as React.CSSProperties}>
+            <div key={`s-${row.section.id}`} className="board-timeline-section" style={{ height: ROW, "--group": groupTone(row.section.color) } as React.CSSProperties}>
               {row.section.href ? <Link href={row.section.href} className="truncate hover:text-primary">{row.section.title}</Link> : <span className="truncate">{row.section.title}</span>}
             </div>
           ) : (
@@ -235,8 +236,8 @@ export function BoardTimeline({
                       top: top + 7,
                       left: x(span.start),
                       width: Math.max(dayWidth, (span.end - span.start + 1) * dayWidth),
-                      background: `hsl(${GROUP_TONE[row.section.color]})`,
-                      color: groupTextColor(row.section.color),
+                      background: `hsl(${groupTone(entry.color ?? row.section.color)})`,
+                      color: groupTextColor(entry.color ?? row.section.color),
                     } as React.CSSProperties}
                     title={`${entry.name}: ${timelineLabel({ startDate: formatDay(span.start), endDate: formatDay(span.end) })}${overdue ? " (overdue)" : ""}`}
                     onPointerDown={(event) => onPointerDown(event, entry, "move")}
