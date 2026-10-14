@@ -26,3 +26,9 @@ Portfolio budgets historically mix manual-entry cents and imported dollars. Norm
 **Why:** Older imports can have valid dollar totals without source/detail metadata; assuming all budgets are cents introduces a hundredfold error.
 
 **How to apply:** Preserve explicit monetary units on new budget records and use known legacy source provenance for old records. Normalize when aggregating without rewriting the original evidence.
+
+Client-facing contract totals are accepted quote value, not internal cost budget. Imports must place an explicitly supported overall contract price in the project client quote and only populate the internal budget from explicit internal-cost evidence.
+
+**Why:** Signed renovation contracts can contain the full client price without providing Luminova's internal cost budget; conflating them overstates project and portfolio budgets.
+
+**How to apply:** Keep client contract totals in `clientQuote` and gate `budgeted` on an identified internal budget source.
