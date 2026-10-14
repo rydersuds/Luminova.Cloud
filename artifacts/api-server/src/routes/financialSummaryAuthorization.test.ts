@@ -19,6 +19,7 @@ import { calculateProjectProgress } from "../lib/projectProgress";
 
 test("portfolio financial summary only includes the authenticated owner's records", async (t) => {
   const suffix = randomUUID();
+  const clientName = `Test Client ${suffix}`;
   const ownerId = `financial-owner-${suffix}`;
   const otherOwnerId = `financial-other-${suffix}`;
   const managerId = `financial-manager-${suffix}`;
@@ -29,7 +30,7 @@ test("portfolio financial summary only includes the authenticated owner's record
     {
       id: clientIds[0],
       workspaceId: "default",
-      name: "Test Client",
+      name: clientName,
       logoObjectPath: `/objects/test-client-logo-${suffix}`,
       createdBy: ownerId,
     },
@@ -57,7 +58,7 @@ test("portfolio financial summary only includes the authenticated owner's record
       ownerId,
       data: {
         id: `project-a-${suffix}`, name: "Owned project", address: "1 Test Street", region: "Calgary",
-        status: "Planning", progress: 0, pmName: "Test PM", clientName: "Test Client",
+        status: "Planning", progress: 0, pmName: "Test PM", clientName,
         startDate: "2026-07-26", targetDate: "2026-12-31", budgeted: 1200, invoiced: 375, exteriorImage: "", description: "Test project",
         clientQuote: { total: 1000, revision: "Q-A", portions: [] },
         budgetLineItems: [{ id: "actual-a", code: "ACT-01", description: "Verified internal cost", budgeted: 50, invoiced: 50, variance: -50 }],
@@ -248,7 +249,11 @@ test("portfolio financial summary only includes the authenticated owner's record
   app.use(express.json());
   app.use((req, _res, next) => {
     const actor = req.header("x-test-user");
-    if (actor) Object.assign(req, { userId: actor });
+    const auth = Object.assign(
+      () => ({ userId: actor || null, orgId: null, tokenType: "session_token" }),
+      { [Symbol.for("@clerk/express.auth")]: true },
+    );
+    if (actor) Object.assign(req, { userId: actor, auth });
     next();
   });
   app.use(luminovaRouter);
@@ -316,7 +321,7 @@ test("portfolio financial summary only includes the authenticated owner's record
       projectName: "Owned project",
       vendor: "Client",
       direction: "luminova_to_client",
-      clientName: "Test Client",
+      clientName,
       clientLogoUrl: `/api/storage/objects/test-client-logo-${suffix}`,
       amount: 300,
       date: "2026-09-01",
@@ -396,14 +401,14 @@ test("portfolio financial summary only includes the authenticated owner's record
       region: "Calgary",
       status: "Planning",
       projectManagerId: managerId,
-      clientName: "Test Client",
+      clientName,
       startDate: "2026-01-01",
       targetDate: "2027-03-31",
       budgeted: 500,
       description: "Created directly.",
     }),
   });
-  assert.equal(createdProjectResponse.status, 201);
+  assert.equal(createdProjectResponse.status, 201, await createdProjectResponse.clone().text());
   const createdProject = await createdProjectResponse.json() as { id: string };
   const [createdProjectRow] = await db.select({ importBatchId: importedProjectsTable.importBatchId })
     .from(importedProjectsTable)

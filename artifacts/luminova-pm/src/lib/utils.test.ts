@@ -106,14 +106,14 @@ test("batch import response reader preserves JSON API errors", async () => {
 test("restored import failures identify their stage without replacing the actionable server message", () => {
   assert.equal(
     importSessionFailureMessage({
-      failureStage: "document analysis",
-      error: "Project document analysis is temporarily unavailable. Your uploaded files are preserved; retry this import.",
+      failureStage: "project analysis",
+      error: "Project analysis is temporarily unavailable (provider HTTP 503). Your uploaded files are preserved; retry this import after the service recovers.",
     }),
-    "Project document analysis is temporarily unavailable. Your uploaded files are preserved; retry this import.",
+    "Project analysis is temporarily unavailable (provider HTTP 503). Your uploaded files are preserved; retry this import after the service recovers.",
   )
   assert.equal(
-    importSessionFailureMessage({ failureStage: "document analysis", error: "Document analysis failed: The files could not be interpreted." }),
-    "Document analysis failed: The files could not be interpreted.",
+    importSessionFailureMessage({ failureStage: "project analysis", error: "Project analysis failed: The files could not be interpreted." }),
+    "Project analysis failed: The files could not be interpreted.",
   )
   assert.equal(importSessionFailureMessage({}), "The import could not be completed. Retry the import.")
 })

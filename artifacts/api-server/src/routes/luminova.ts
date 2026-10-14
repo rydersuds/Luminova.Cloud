@@ -196,6 +196,11 @@ import { spawn } from "node:child_process";
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
+import {
+  classifyProjectImportAnalysisError,
+  createProjectImportAiClient,
+  projectImportAnalysisFailureMessage,
+} from "../lib/projectImportAnalysis";
 import { ObjectStorageService } from "../lib/objectStorage";
 import {
   createProjectDocumentPreview,
@@ -1062,17 +1067,10 @@ async function analyzeImportedPhotos(
 {
 
 
-  const client = new OpenAI(
-{
-
-
+  const client = new OpenAI({
     baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
     apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  
-}
-
-)
-;
+  });
 
 
   const photos = documents.filter((document) => document.contentType.toLowerCase().startsWith("image/"))
@@ -1293,17 +1291,7 @@ async function analyzeProjectImport(documents: Array<
 ;
 
 
-  const client = new OpenAI(
-{
-
-
-    baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-    apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  
-}
-
-)
-;
+  const client = createProjectImportAiClient();
 
 
   const response = await client.chat.completions.parse(
@@ -6593,22 +6581,37 @@ const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: R
 ;
 
 
-  setProjectImportFailure(req, "document analysis", "The project documents could not be interpreted. Select different files to start a new import.", false);
-  try 
-{
+  setProjectImportFailure(req, "document enrichment", "Project document enrichment failed; the original uploaded files are preserved.", true);
+  try {
+    analyzedDocuments = await enrichFinancialDocumentSnippets(parsed.data.documents, req.log);
+  } catch (error) {
+    req.log.warn({
+      err: {
+        name: error instanceof Error ? error.name : "UnknownError",
+        ...classifyProjectImportAnalysisError(error),
+      },
+      importId: diagnosticImportId,
+      stage: "document enrichment",
+    }, "Project import document enrichment failed; continuing without enriched snippets");
+  }
 
+  setProjectImportFailure(req, "internal budget extraction", "Internal budget extraction failed; the uploaded project documents are preserved.", true);
+  try {
+    internalBudget = await extractInternalBudgetFromDocuments(parsed.data.documents, req.log);
+  } catch (error) {
+    req.log.warn({
+      err: {
+        name: error instanceof Error ? error.name : "UnknownError",
+        ...classifyProjectImportAnalysisError(error),
+      },
+      importId: diagnosticImportId,
+      stage: "internal budget extraction",
+    }, "Project import internal budget extraction failed; continuing without the optional budget");
+  }
 
-    [analyzedDocuments, internalBudget] = await Promise.all([
-      enrichFinancialDocumentSnippets(parsed.data.documents, req.log),
-      extractInternalBudgetFromDocuments(parsed.data.documents, req.log),
-    ])
-;
-
-
-    analysis = await analyzeProjectImport(analyzedDocuments)
-;
-
-
+  setProjectImportFailure(req, "project analysis", "Project analysis did not return a valid result. Choose different files to start a new import.", false);
+  try {
+    analysis = await analyzeProjectImport(analyzedDocuments);
     const analyzedPaths = new Set(analyzedDocuments.map((document) => document.relativePath))
 ;
 
@@ -6665,25 +6668,26 @@ const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: R
 {
 
 
-    const errorStatus = error && typeof error === "object" && "status" in error && typeof error.status === "number"
-      ? error.status
-      : undefined;
-    const retryable = errorStatus === undefined || ![400, 413, 422].includes(errorStatus);
-    const failureMessage = retryable
-      ? "Project document analysis is temporarily unavailable. Your uploaded files are preserved; retry this import."
-      : "The project documents could not be interpreted. Select different files to start a new import.";
-    setProjectImportFailure(req, "document analysis", failureMessage, retryable);
+    const details = classifyProjectImportAnalysisError(error);
+    const failureMessage = projectImportAnalysisFailureMessage(details);
+    setProjectImportFailure(req, "project analysis", failureMessage, details.retryable);
     req.log.error(
 {
 
- err: error, importId: diagnosticImportId, stage: req.projectImportFailureStage, retryable
+ err: {
+   name: error instanceof Error ? error.name : "UnknownError",
+   ...details,
+ },
+ importId: diagnosticImportId,
+ stage: req.projectImportFailureStage,
+ retryable: details.retryable,
 }
 
-, "Project import extraction failed")
+    , "Project import project analysis failed")
 ;
 
 
-    res.status(retryable ? 503 : 422).json(
+    res.status(details.retryable ? 503 : 422).json(
 {
 
  error: failureMessage

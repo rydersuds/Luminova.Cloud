@@ -75,18 +75,38 @@ try {
   });
 
   let transientAnalysisFailures = 10;
+  const analysisRequests: Array<{
+    model?: string;
+    responseFormatType?: string;
+    responseSchemaName?: string;
+    maxCompletionTokens?: number;
+  }> = [];
   analysisServer = createServer(async (req, res) => {
     if (req.method !== "POST" || req.url !== "/chat/completions") {
       res.writeHead(404).end();
       return;
     }
-    for await (const _chunk of req) {
-      // Drain the production OpenAI request before returning the deterministic fixture.
-    }
+    const requestChunks: Buffer[] = [];
+    for await (const chunk of req) requestChunks.push(Buffer.from(chunk));
+    const requestBody = JSON.parse(Buffer.concat(requestChunks).toString("utf8")) as {
+      model?: string;
+      max_completion_tokens?: number;
+      response_format?: { type?: string; json_schema?: { name?: string } };
+    };
+    analysisRequests.push({
+      model: requestBody.model,
+      responseFormatType: requestBody.response_format?.type,
+      responseSchemaName: requestBody.response_format?.json_schema?.name,
+      maxCompletionTokens: requestBody.max_completion_tokens,
+    });
     if (transientAnalysisFailures > 0) {
       transientAnalysisFailures--;
       res.writeHead(503, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: { message: "Temporary analysis service outage." } }));
+      res.end(JSON.stringify({ error: {
+        message: "Temporary analysis service outage.",
+        type: "server_error",
+        code: "upstream_overloaded",
+      } }));
       return;
     }
     await new Promise((resolve) => setTimeout(resolve, 150));
@@ -111,7 +131,6 @@ try {
               description: "",
               startDate: "2025-01-01",
               targetDate: "2026-01-01",
-              budgetDollars: 0,
               internalBudgetDollars: 0,
               clientQuoteDollars: 0,
             },
@@ -149,6 +168,9 @@ try {
         importFailureLogs.push(value);
         const error = value && typeof value === "object" && "err" in value ? value.err : value;
         process.stderr.write(`Folder import integration route error: ${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
+      },
+      warn(value: unknown) {
+        importFailureLogs.push(value);
       },
     } as Console;
     next();
@@ -246,8 +268,15 @@ try {
   transientAnalysisFailures = 0;
   assert.equal(analysisFailure.status, 503);
   const analysisFailureBody = await analysisFailure.json() as { error: string };
-  assert.match(analysisFailureBody.error, /analysis is temporarily unavailable/i);
+  assert.match(analysisFailureBody.error, /project analysis is temporarily unavailable.*HTTP 503/i);
   assert.doesNotMatch(analysisFailureBody.error, /Temporary analysis service outage|stack| at /i);
+  assert.equal(analysisRequests.length, 3, "Provider retries must be bounded to the initial request plus two retries.");
+  assert.ok(analysisRequests.every((request) =>
+    request.model === "gpt-5-mini" &&
+    request.responseFormatType === "json_schema" &&
+    request.responseSchemaName === "project_import_analysis" &&
+    request.maxCompletionTokens === 8192,
+  ), "The configured model and structured response request must reach the OpenAI-compatible provider.");
   const analysisSession = await json(await fetch(`${baseUrl}/project-import-sessions/${created.importId}`)) as {
     status: string;
     retryable: boolean;
@@ -257,15 +286,18 @@ try {
   };
   assert.equal(analysisSession.status, "failed");
   assert.equal(analysisSession.retryable, true);
-  assert.equal(analysisSession.failureStage, "document analysis");
-  assert.match(analysisSession.error ?? "", /preserved; retry/i);
+  assert.equal(analysisSession.failureStage, "project analysis");
+  assert.match(analysisSession.error ?? "", /temporarily unavailable.*preserved; retry/i);
   assert.deepEqual(analysisSession.uploadedPaths.sort(), ["budget.txt", "scope.txt"]);
   assert.ok(importFailureLogs.some((entry) =>
     entry && typeof entry === "object" &&
     "importId" in entry && entry.importId === created.importId &&
-    "stage" in entry && entry.stage === "document analysis" &&
+    "stage" in entry && entry.stage === "project analysis" &&
+    "err" in entry && entry.err && typeof entry.err === "object" &&
+    "category" in entry.err && entry.err.category === "temporary_provider" &&
+    "status" in entry.err && entry.err.status === 503 &&
     "retryable" in entry && entry.retryable === true,
-  ), "The analysis failure log is missing its import ID or stage.");
+  ), "The project analysis failure log is missing its import ID, sub-step, or safe upstream classification.");
 
   await database.db.update(database.projectImportBatchesTable)
     .set({
@@ -275,6 +307,7 @@ try {
       updatedAt: new Date(Date.now() - 60_000),
     })
     .where(eq(database.projectImportBatchesTable.id, created.importId));
+  transientAnalysisFailures = 2;
   const interrupted = await json(await fetch(`${baseUrl}/project-import-sessions`)) as {
     importId: string;
     status: string;
@@ -289,6 +322,8 @@ try {
   const buildRequests = [0, 1].map(() => fetch(`${baseUrl}/project-import-sessions/${created.importId}/build`, { method: "POST" }));
   const buildResponses = await Promise.all(buildRequests);
   assert.deepEqual(buildResponses.map((response) => response.status).sort(), [201, 409]);
+  assert.equal(transientAnalysisFailures, 0, "The preserved-session retry must recover after repeated temporary provider failures.");
+  assert.equal(analysisRequests.length, 6, "Recovery must use bounded provider retries rather than restarting uploads or looping.");
 
   const completedSession = await json(await fetch(`${baseUrl}/project-import-sessions/${created.importId}`)) as {
     importId: string;
@@ -311,14 +346,14 @@ try {
   })) as { importId: string };
   await database.db.update(database.projectImportBatchesTable).set({
     status: "failed",
-    error: "The project documents could not be interpreted. Select different files to start a new import.",
-    failureStage: "document analysis",
+    error: "The project documents could not be analyzed with the current request. Choose different or smaller files to start a new import.",
+    failureStage: "project analysis",
     retryable: false,
   }).where(eq(database.projectImportBatchesTable.id, permanentImport.importId));
   const blockedRetry = await fetch(`${baseUrl}/project-import-sessions/${permanentImport.importId}/build`, { method: "POST" });
   assert.equal(blockedRetry.status, 422, "A permanent input failure was submitted to analysis again.");
   const blockedRetryBody = await blockedRetry.json() as { error: string };
-  assert.match(blockedRetryBody.error, /Select different files/i);
+  assert.match(blockedRetryBody.error, /Choose different or smaller files/i);
 
   const projects = await database.db.select().from(database.importedProjectsTable);
   assert.equal(projects.length, 1, "Duplicate build requests created more than one project.");

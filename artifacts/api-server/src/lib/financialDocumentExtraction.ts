@@ -1,11 +1,15 @@
 import AdmZip from "adm-zip";
 import ExcelJS from "exceljs";
 import mammoth from "mammoth";
-import OpenAI from "openai";
+import type OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { PDFParse } from "pdf-parse";
 import { z } from "zod";
 import { ObjectStorageService } from "./objectStorage";
+import {
+  classifyProjectImportAnalysisError,
+  createProjectImportAiClient,
+} from "./projectImportAnalysis";
 
 type ImportDocument = {
   objectPath: string;
@@ -182,7 +186,12 @@ export async function extractInternalBudgetFromDocuments(
       const budget = await extractWorkbookInternalBudget(buffer, document.relativePath);
       if (budget) return budget;
     } catch (error) {
-      log.warn({ err: error, relativePath: document.relativePath }, "Internal budget workbook extraction failed");
+      log.warn({
+        stage: "internal budget extraction",
+        relativePath: document.relativePath,
+        category: "document_extraction",
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      }, "Internal budget workbook extraction failed");
     }
   }
   return null;
@@ -233,10 +242,7 @@ export async function enrichFinancialDocumentSnippets(
   log: ExtractionLog,
 ) {
   const storage = new ObjectStorageService();
-  const client = new OpenAI({
-    baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-    apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  });
+  let client: ReturnType<typeof createProjectImportAiClient> | undefined;
   let nextIndex = 0;
   const enriched = [...documents];
   const workers = Array.from({ length: Math.min(2, documents.length) }, async () => {
@@ -257,14 +263,25 @@ export async function enrichFinancialDocumentSnippets(
       try {
         const file = await storage.getObjectEntityFile(document.objectPath);
         const [buffer] = await file.download();
-        const textSnippet = isImage
-          ? await extractImageText(client, document, buffer)
-          : await extractOfficeText(document, buffer);
+        let textSnippet: string;
+        if (isImage) {
+          client ??= createProjectImportAiClient();
+          textSnippet = await extractImageText(client, document, buffer);
+        } else {
+          textSnippet = await extractOfficeText(document, buffer);
+        }
         enriched[index] = textSnippet
           ? { ...document, textSnippet, extractionFailed: false }
           : { ...document, extractionFailed: true };
       } catch (error) {
-        log.warn({ err: error, relativePath: document.relativePath }, "Private financial document text extraction failed");
+        const isImage = document.contentType.toLowerCase().startsWith("image/");
+        log.warn({
+          stage: "document enrichment",
+          relativePath: document.relativePath,
+          ...(isImage
+            ? classifyProjectImportAnalysisError(error)
+            : { category: "document_content_extraction", errorName: error instanceof Error ? error.name : "UnknownError" }),
+        }, "Private financial document text extraction failed");
         enriched[index] = { ...document, extractionFailed: true };
       }
     }
