@@ -6,6 +6,7 @@ import { BoardCalendar, type CalendarEntry } from "./board-calendar"
 import { BOARD_STATUSES, STATUS_TONE, formatCents, isOverdue } from "./board-model"
 import { BoardTable } from "./board-table"
 import { BoardTimeline, type TimelineSection } from "./board-timeline"
+import { ProjectBoardImport } from "./project-board-import"
 import { useBoard } from "./use-board"
 
 const VIEWS = [
@@ -104,6 +105,7 @@ export function ProjectBoard({ projectId }: { projectId: string }) {
           <span className="sr-only">Search items</span>
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search items or owners" className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
         </label>
+        <ProjectBoardImport projectId={projectId} groups={groups} actions={board} />
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter by status">
           {BOARD_STATUSES.map((status) => {
             const active = statuses.has(status)

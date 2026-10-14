@@ -5,6 +5,7 @@ import {
   createBoardItem,
   deleteBoardGroup,
   deleteBoardItem,
+  importBoardItems,
   getGetBoardScheduleQueryKey,
   getGetProjectBoardQueryKey,
   updateBoardGroup,
@@ -15,6 +16,8 @@ import {
   type BoardItem,
   type BoardItemInput,
   type BoardItemUpdate,
+  type BoardImportInput,
+  type BoardImportResult,
   type ProjectBoard,
 } from "@workspace/api-client-react"
 import { useToast } from "@/hooks/use-toast"
@@ -124,6 +127,24 @@ export function useBoard(projectId: string, enabled = true) {
     }
   }, [projectId, queryClient, key, settle, toast])
 
+  const importItems = useCallback(async (input: BoardImportInput): Promise<BoardImportResult | null> => {
+    try {
+      const created = await importBoardItems(projectId, input)
+      queryClient.setQueryData<ProjectBoard>(key, (board) => board
+        ? {
+            ...board,
+            groups: [...board.groups, ...created.groups],
+            items: [...board.items, ...created.items],
+          }
+        : board)
+      settle()
+      return created
+    } catch (error) {
+      toast({ title: "Board import not saved", description: errorMessage(error), variant: "destructive" })
+      return null
+    }
+  }, [projectId, queryClient, key, settle, toast])
+
   const updateGroup = useCallback((groupId: string, update: BoardGroupUpdate) => optimistic(
     (board) => {
       const groups = board.groups.map((group) => (group.id === groupId ? { ...group, ...update, position: group.position } : group))
@@ -143,7 +164,7 @@ export function useBoard(projectId: string, enabled = true) {
     "Group not deleted",
   ), [optimistic, projectId])
 
-  return { ...query, updateItem, addItem, removeItem, addGroup, updateGroup, removeGroup }
+  return { ...query, updateItem, addItem, removeItem, addGroup, updateGroup, removeGroup, importItems }
 }
 
-export type BoardActions = Pick<ReturnType<typeof useBoard>, "updateItem" | "addItem" | "removeItem" | "addGroup" | "updateGroup" | "removeGroup">
+export type BoardActions = Pick<ReturnType<typeof useBoard>, "updateItem" | "addItem" | "removeItem" | "addGroup" | "updateGroup" | "removeGroup" | "importItems">

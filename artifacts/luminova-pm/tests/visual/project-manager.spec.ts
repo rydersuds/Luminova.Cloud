@@ -463,6 +463,73 @@ test('shows project board groups and scheduled work', async ({ page }) => {
   }
 });
 
+test('reviews, fixes, maps, and confirms imported board rows before appending them', async ({ page }) => {
+  const state = makeBoardState([]);
+  await installProjectBoard(page, state);
+  await page.route('**/api/projects/riverstone/board/import/preview', route => route.fulfill({
+    json: {
+      groups: ['Pre-construction', 'Electrical'],
+      rows: [
+        {
+          rowNumber: 2, sourceGroup: 'Pre-construction', name: 'Permit review', status: 'Working on it',
+          priority: null, assignee: 'Maya Chen', startDate: '2026-10-20', endDate: null, costCents: null, issues: [],
+        },
+        {
+          rowNumber: 3, sourceGroup: 'Electrical', name: '', status: null, priority: null, assignee: null,
+          startDate: null, endDate: null, costCents: null, issues: ['Task name is required.'],
+        },
+      ],
+    },
+  }));
+  await page.route('**/api/projects/riverstone/board/import', async route => {
+    const input = route.request().postDataJSON() as {
+      groupsToCreate: Array<{ key: string; name: string; color: string }>;
+      items: Array<{ groupRef: string; name: string; status?: string; priority: string | null; assignee: string | null; startDate: string | null; endDate: string | null; costCents: number | null }>;
+    };
+    const createdGroups = input.groupsToCreate.map((group, index) => ({
+      id: `group-import-${index}`, projectId: 'riverstone', name: group.name, color: group.color, position: state.groups.length + index,
+    }));
+    const groupByRef = new Map([
+      ...state.groups.map(group => [group.id, group] as const),
+      ...input.groupsToCreate.map((group, index) => [group.key, createdGroups[index]] as const),
+    ]);
+    const createdItems = input.items.map((item, index) => {
+      const group = groupByRef.get(item.groupRef)!;
+      return {
+        id: `item-import-${index}`, projectId: 'riverstone', groupId: group.id, name: item.name,
+        status: item.status ?? 'Not started', priority: item.priority, assignee: item.assignee,
+        startDate: item.startDate, endDate: item.endDate, costCents: item.costCents,
+        dependsOnId: null, position: state.items.filter(existing => existing.groupId === group.id).length,
+      };
+    });
+    state.groups.push(...createdGroups);
+    state.items.push(...createdItems);
+    await route.fulfill({ status: 201, json: { groups: createdGroups, items: createdItems } });
+  });
+
+  await page.goto('/__visual/project-panorama?tab=board');
+  await page.getByTestId('button-import-board-file').click();
+  const chooser = page.getByTestId('input-board-import-file');
+  await chooser.setInputFiles({ name: 'notes.json', mimeType: 'application/json', buffer: Buffer.from('{}') });
+  await expect(page.getByTestId('alert-board-import')).toContainText('Choose a CSV, XLSX, PDF, JPEG, or PNG file.');
+
+  await chooser.setInputFiles({ name: 'schedule.csv', mimeType: 'text/csv', buffer: Buffer.from('Task,Group\\nPermit review,Pre-construction') });
+  const dialog = page.getByRole('dialog', { name: 'Import schedule rows' });
+  await expect(dialog.getByTestId('text-board-import-count')).toHaveText('2 rows detected');
+  await expect(dialog.getByTestId('button-confirm-board-import')).toBeDisabled();
+  await dialog.getByLabel('Task name for row 3').fill('Install electrical rough-in');
+  await dialog.getByLabel('New group name for Electrical').fill('Electrical rough-in');
+  const confirm = dialog.getByTestId('button-confirm-board-import');
+  await expect(confirm).toBeEnabled();
+  await confirm.click();
+
+  await expect(page.locator('button[aria-label^="Item name: Install electrical"]')).toBeVisible();
+  await expect(page.locator('button[aria-label^="Item name: Permit review"]')).toBeVisible();
+  await expect(dialog).toHaveCount(0);
+  expect(state.groups.some(group => group.name === 'Electrical rough-in')).toBe(true);
+  expect(state.items.map(item => item.name)).toEqual(['Permit review', 'Install electrical rough-in']);
+});
+
 test('shows portfolio schedule items and switches to calendar view', async ({ page }) => {
   await installIdentity(page, 'Project Manager');
   await page.route('**/api/board-items', route => route.fulfill({

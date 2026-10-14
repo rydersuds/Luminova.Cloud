@@ -24,6 +24,9 @@ import type {
   BoardGroup,
   BoardGroupInput,
   BoardGroupUpdate,
+  BoardImportInput,
+  BoardImportPreview,
+  BoardImportResult,
   BoardItem,
   BoardItemInput,
   BoardItemUpdate,
@@ -1546,6 +1549,152 @@ export const useCreateBoardItem = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getCreateBoardItemMutationOptions(options));
+    }
+
+export const getPreviewBoardImportUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/board/import/preview`
+}
+
+/**
+ * Accepts one CSV, XLSX, PDF, JPEG, or PNG file up to 8 MiB as a raw binary body. The upload is processed in memory and not retained.
+ * @summary Parse a private board import file for user review
+ */
+export const previewBoardImport = async (projectId: string,
+    previewBoardImportBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<BoardImportPreview> => {
+
+  return customFetch<BoardImportPreview>(getPreviewBoardImportUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream', ...options?.headers },
+    body: previewBoardImportBody
+  }
+);}
+
+
+
+
+
+export const getPreviewBoardImportMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewBoardImport>>, TError,{projectId: string;data: BodyType<Blob>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewBoardImport>>, TError,{projectId: string;data: BodyType<Blob>}, TContext> => {
+
+const mutationKey = ['previewBoardImport'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewBoardImport>>, {projectId: string;data: BodyType<Blob>}> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  previewBoardImport(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewBoardImportMutationResult = NonNullable<Awaited<ReturnType<typeof previewBoardImport>>>
+    export type PreviewBoardImportMutationBody = BodyType<Blob>
+    export type PreviewBoardImportMutationError = ErrorType<void>
+
+    /**
+ * @summary Parse a private board import file for user review
+ */
+export const usePreviewBoardImport = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewBoardImport>>, TError,{projectId: string;data: BodyType<Blob>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewBoardImport>>,
+        TError,
+        {projectId: string;data: BodyType<Blob>},
+        TContext
+      > => {
+      return useMutation(getPreviewBoardImportMutationOptions(options));
+    }
+
+export const getImportBoardItemsUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/board/import`
+}
+
+/**
+ * Creates new groups and items in one transaction. Existing board records are not changed.
+ * @summary Append confirmed rows to the project board
+ */
+export const importBoardItems = async (projectId: string,
+    boardImportInput: BoardImportInput, options?: Parameters<typeof customFetch>[1]): Promise<BoardImportResult> => {
+
+  return customFetch<BoardImportResult>(getImportBoardItemsUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(boardImportInput)
+  }
+);}
+
+
+
+
+
+export const getImportBoardItemsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importBoardItems>>, TError,{projectId: string;data: BodyType<BoardImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof importBoardItems>>, TError,{projectId: string;data: BodyType<BoardImportInput>}, TContext> => {
+
+const mutationKey = ['importBoardItems'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof importBoardItems>>, {projectId: string;data: BodyType<BoardImportInput>}> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  importBoardItems(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ImportBoardItemsMutationResult = NonNullable<Awaited<ReturnType<typeof importBoardItems>>>
+    export type ImportBoardItemsMutationBody = BodyType<BoardImportInput>
+    export type ImportBoardItemsMutationError = ErrorType<void>
+
+    /**
+ * @summary Append confirmed rows to the project board
+ */
+export const useImportBoardItems = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importBoardItems>>, TError,{projectId: string;data: BodyType<BoardImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof importBoardItems>>,
+        TError,
+        {projectId: string;data: BodyType<BoardImportInput>},
+        TContext
+      > => {
+      return useMutation(getImportBoardItemsMutationOptions(options));
     }
 
 export const getUpdateBoardItemUrl = (projectId: string,

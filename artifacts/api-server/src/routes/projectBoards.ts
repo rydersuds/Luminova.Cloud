@@ -1,4 +1,4 @@
-import { Router, type IRouter, type Request, type Response } from "express";
+import express, { Router, type IRouter, type Request, type Response } from "express";
 import { createHash, randomUUID } from "node:crypto";
 import { and, asc, eq, inArray, ne } from "drizzle-orm";
 import {
@@ -20,6 +20,12 @@ import {
   GetBoardScheduleResponse,
   GetProjectBoardParams,
   GetProjectBoardResponse,
+  ImportBoardItemsBody,
+  ImportBoardItemsParams,
+  ImportBoardItemsResponse,
+  PreviewBoardImportHeader,
+  PreviewBoardImportParams,
+  PreviewBoardImportResponse,
   UpdateBoardGroupBody,
   UpdateBoardGroupParams,
   UpdateBoardGroupResponse,
@@ -29,6 +35,7 @@ import {
 } from "@workspace/api-zod";
 import { findAuthorizedProject, projectsForOwner, requestWorkspaceId } from "./luminova";
 import { requireWorkspaceRole } from "./users";
+import { extractBoardImport, isSupportedBoardImportName, MAX_BOARD_IMPORT_BYTES } from "../lib/boardImportExtraction";
 
 type AuthenticatedRequest = Request & { userId?: string };
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -158,6 +165,140 @@ router.get("/projects/:projectId/board", async (req: AuthenticatedRequest, res):
   } catch (error) {
     req.log.error({ err: error, projectId: access.project.id }, "Failed to load project board");
     res.status(500).json({ error: "The board could not be loaded." });
+  }
+});
+
+router.post("/projects/:projectId/board/import/preview", async (req: AuthenticatedRequest, res): Promise<void> => {
+  const params = PreviewBoardImportParams.safeParse(req.params);
+  if (!params.success) return invalid(res, "Choose a valid project.");
+  const access = await authorizeBoard(req, res, params.data.projectId);
+  if (!access) return;
+  const filename = PreviewBoardImportHeader.safeParse({ "X-File-Name": req.get("X-File-Name") });
+  if (!filename.success) return invalid(res, "Choose a supported file with a valid filename.");
+  if (!isSupportedBoardImportName(filename.data["X-File-Name"])) {
+    res.status(415).json({ error: "Choose a CSV, XLSX, PDF, JPEG, or PNG file." });
+    return;
+  }
+
+  express.raw({ type: "application/octet-stream", limit: MAX_BOARD_IMPORT_BYTES })(req, res, async (parseError) => {
+    if (parseError) {
+      const status = typeof parseError === "object" && parseError && "status" in parseError
+        ? Number(parseError.status)
+        : 400;
+      res.status(status === 413 ? 413 : 400).json({
+        error: status === 413 ? "Files must be 8 MiB or smaller." : "The uploaded file could not be read.",
+      });
+      return;
+    }
+    if (!Buffer.isBuffer(req.body) || !req.body.length) {
+      res.status(400).json({ error: "Choose a non-empty file." });
+      return;
+    }
+    try {
+      const preview = await extractBoardImport(req.body, filename.data["X-File-Name"]);
+      res.json(PreviewBoardImportResponse.parse(preview));
+    } catch (error) {
+      req.log.warn({ err: error, projectId: access.project.id }, "Board import file could not be parsed");
+      const message = error instanceof Error ? error.message : "The file could not be read.";
+      res.status(422).json({ error: message });
+    }
+  });
+});
+
+router.post("/projects/:projectId/board/import", async (req: AuthenticatedRequest, res): Promise<void> => {
+  const params = ImportBoardItemsParams.safeParse(req.params);
+  const body = ImportBoardItemsBody.safeParse(req.body);
+  if (!params.success || !body.success) return invalid(res, "Review the imported rows and check their fields and group mappings.");
+  const access = await authorizeBoard(req, res, params.data.projectId);
+  if (!access) return;
+
+  const groups = await db.select().from(projectBoardGroupsTable)
+    .where(boardScope(projectBoardGroupsTable, access.workspaceId, access.project.id))
+    .orderBy(asc(projectBoardGroupsTable.position), asc(projectBoardGroupsTable.createdAt));
+  const existingGroupIds = new Set(groups.map((group) => group.id));
+  const newGroupKeys = new Set<string>();
+  const newGroupNames = new Set<string>();
+  for (const group of body.data.groupsToCreate) {
+    const key = group.key.trim();
+    const name = group.name.trim();
+    if (!key || !name || existingGroupIds.has(key) || newGroupKeys.has(key)) {
+      return invalid(res, "New group mappings must have unique keys and non-empty names.");
+    }
+    const normalizedName = name.toLocaleLowerCase();
+    if (newGroupNames.has(normalizedName)) {
+      return invalid(res, "Each new board group must have a unique name.");
+    }
+    newGroupKeys.add(key);
+    newGroupNames.add(normalizedName);
+  }
+  for (const item of body.data.items) {
+    if (!existingGroupIds.has(item.groupRef) && !newGroupKeys.has(item.groupRef)) {
+      return invalid(res, "Map every imported row to a group on this project's board.");
+    }
+    const name = item.name.trim();
+    if (!name) return invalid(res, "Every imported row needs a task name.");
+    if (item.startDate && item.endDate && item.endDate < item.startDate) {
+      return invalid(res, "An imported row has an end date before its start date.");
+    }
+    for (const value of [item.startDate, item.endDate]) {
+      if (value) {
+        const parsedDate = new Date(`${value}T00:00:00.000Z`);
+        if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== value) {
+          return invalid(res, "An imported row has an invalid calendar date.");
+        }
+      }
+    }
+  }
+
+  try {
+    const result = await db.transaction(async (tx) => {
+      const createdGroups = body.data.groupsToCreate.length
+        ? await tx.insert(projectBoardGroupsTable).values(body.data.groupsToCreate.map((group, index) => ({
+          id: randomUUID(),
+          workspaceId: access.workspaceId,
+          projectId: access.project.id,
+          name: group.name.trim(),
+          color: group.color,
+          position: groups.length + index,
+        }))).returning()
+        : [];
+      const groupByRef = new Map<string, ProjectBoardGroupRow>(groups.map((group) => [group.id, group]));
+      body.data.groupsToCreate.forEach((group, index) => groupByRef.set(group.key, createdGroups[index]));
+
+      const positions = new Map<string, number>();
+      const counts = await tx.select({ groupId: projectBoardItemsTable.groupId })
+        .from(projectBoardItemsTable)
+        .where(boardScope(projectBoardItemsTable, access.workspaceId, access.project.id));
+      for (const row of counts) positions.set(row.groupId, (positions.get(row.groupId) ?? 0) + 1);
+      const createdItems = await tx.insert(projectBoardItemsTable).values(body.data.items.map((item) => {
+        const group = groupByRef.get(item.groupRef)!;
+        const position = positions.get(group.id) ?? 0;
+        positions.set(group.id, position + 1);
+        return {
+          id: randomUUID(),
+          workspaceId: access.workspaceId,
+          projectId: access.project.id,
+          groupId: group.id,
+          name: item.name.trim(),
+          status: item.status ?? "Not started",
+          priority: item.priority ?? null,
+          assignee: item.assignee?.trim() || null,
+          startDate: item.startDate ?? null,
+          endDate: item.endDate ?? null,
+          costCents: item.costCents ?? null,
+          position,
+          createdBy: access.userId,
+        };
+      })).returning();
+      return { groups: createdGroups, items: createdItems };
+    });
+    res.status(201).json(ImportBoardItemsResponse.parse({
+      groups: result.groups.map(serializeGroup),
+      items: result.items.map(serializeItem),
+    }));
+  } catch (error) {
+    req.log.error({ err: error, projectId: access.project.id }, "Failed to append imported board items");
+    res.status(500).json({ error: "The board import could not be saved. No rows were added." });
   }
 });
 

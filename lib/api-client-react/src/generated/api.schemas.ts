@@ -1238,6 +1238,41 @@ export interface BoardItemInput {
   costCents?: number | null;
 }
 
+export interface BoardImportPreviewRow {
+  /** @minimum 1 */
+  rowNumber: number;
+  /**
+     * @maxLength 200
+     * @nullable
+     */
+  sourceGroup: string | null;
+  /** @maxLength 500 */
+  name: string;
+  status: BoardItemStatus | null;
+  priority: BoardItemPriority | null;
+  /**
+     * @maxLength 200
+     * @nullable
+     */
+  assignee: string | null;
+  /**
+     * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  startDate: string | null;
+  /**
+     * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  endDate: string | null;
+  /** @nullable */
+  costCents: number | null;
+  /**
+     * @maxItems 10
+     * @items.maxLength 200
+     */
+  issues: string[];
+}
 export interface BoardItemUpdate {
   /** @minLength 1 */
   groupId?: string;
@@ -1568,3 +1603,77 @@ trade?: string;
 status?: VendorQuoteStatus;
 direction?: QuoteDirection;
 };
+
+export interface BoardImportInput {
+  /** @maxItems 30 */
+  groupsToCreate: BoardImportGroupInput[];
+  /**
+     * @minItems 1
+     * @maxItems 250
+     */
+  items: BoardImportItemInput[];
+}
+
+export interface BoardImportResult {
+  groups: BoardGroup[];
+  items: BoardItem[];
+}
+
+export interface BoardImportItemInput {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  groupRef: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  name: string;
+  status?: BoardItemStatus;
+  priority?: BoardItemPriority | null;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  assignee?: string | null;
+  /**
+     * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  startDate?: string | null;
+  /**
+     * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  endDate?: string | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  costCents?: number | null;
+}
+
+export interface BoardImportPreview {
+  /**
+     * @maxItems 30
+     * @items.maxLength 80
+     */
+  groups: string[];
+  /** @maxItems 250 */
+  rows: BoardImportPreviewRow[];
+}
+
+export interface BoardImportGroupInput {
+  /**
+     * @minLength 1
+     * @maxLength 40
+     */
+  key: string;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  name: string;
+  color: BoardGroupColor;
+}

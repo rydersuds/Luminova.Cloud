@@ -467,6 +467,74 @@ paths:
           description: Project team access required
         "404":
           description: Project or group not found
+  /projects/{projectId}/board/import/preview:
+    post:
+      operationId: previewBoardImport
+      tags: [boards]
+      summary: Parse a private board import file for user review
+      description: Accepts one CSV, XLSX, PDF, JPEG, or PNG file up to 8 MiB as a raw binary body. The upload is processed in memory and not retained.
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - name: X-File-Name
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 255 }
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        "200":
+          description: Parsed rows and row-level validation feedback
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BoardImportPreview" }
+        "400":
+          description: Invalid or unreadable file
+        "401":
+          description: Authentication required
+        "403":
+          description: Project team access required
+        "404":
+          description: Project not found
+        "413":
+          description: File exceeds the 8 MiB limit
+        "415":
+          description: Unsupported file format
+        "422":
+          description: File could not be read or contained no schedule rows
+        "500":
+          description: Unexpected file-processing failure
+  /projects/{projectId}/board/import:
+    post:
+      operationId: importBoardItems
+      tags: [boards]
+      summary: Append confirmed rows to the project board
+      description: Creates new groups and items in one transaction. Existing board records are not changed.
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BoardImportInput" }
+      responses:
+        "201":
+          description: Created groups and items
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BoardImportResult" }
+        "400":
+          description: Invalid rows or group mappings
+        "401":
+          description: Authentication required
+        "403":
+          description: Project team access required
+        "404":
+          description: Project or referenced board group not found
+        "500":
+          description: Import could not be saved; no rows were added
   /projects/{projectId}/board/items/{itemId}:
     patch:
       operationId: updateBoardItem
@@ -3002,6 +3070,86 @@ components:
         startDate: { type: [string, "null"], pattern: "^\\d{4}-\\d{2}-\\d{2}$" }
         endDate: { type: [string, "null"], pattern: "^\\d{4}-\\d{2}-\\d{2}$" }
         costCents: { type: [integer, "null"], minimum: 0 }
+    BoardImportPreview:
+      type: object
+      required: [groups, rows]
+      properties:
+        groups:
+          type: array
+          maxItems: 30
+          items: { type: string, maxLength: 80 }
+        rows:
+          type: array
+          maxItems: 250
+          items: { $ref: "#/components/schemas/BoardImportPreviewRow" }
+    BoardImportPreviewRow:
+      type: object
+      required: [rowNumber, sourceGroup, name, status, priority, assignee, startDate, endDate, costCents, issues]
+      properties:
+        rowNumber: { type: integer, minimum: 1 }
+        sourceGroup: { type: [string, "null"], maxLength: 200 }
+        name: { type: string, maxLength: 500 }
+        status:
+          anyOf:
+            - $ref: "#/components/schemas/BoardItemStatus"
+            - type: "null"
+        priority:
+          anyOf:
+            - $ref: "#/components/schemas/BoardItemPriority"
+            - type: "null"
+        assignee: { type: [string, "null"], maxLength: 200 }
+        startDate: { type: [string, "null"], pattern: "^\\d{4}-\\d{2}-\\d{2}$" }
+        endDate: { type: [string, "null"], pattern: "^\\d{4}-\\d{2}-\\d{2}$" }
+        costCents: { type: [integer, "null"] }
+        issues:
+          type: array
+          maxItems: 10
+          items: { type: string, maxLength: 200 }
+    BoardImportGroupInput:
+      type: object
+      required: [key, name, color]
+      properties:
+        key: { type: string, minLength: 1, maxLength: 40 }
+        name: { type: string, minLength: 1, maxLength: 80 }
+        color: { $ref: "#/components/schemas/BoardGroupColor" }
+    BoardImportItemInput:
+      type: object
+      required: [groupRef, name]
+      properties:
+        groupRef: { type: string, minLength: 1, maxLength: 80 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        status: { $ref: "#/components/schemas/BoardItemStatus" }
+        priority:
+          anyOf:
+            - $ref: "#/components/schemas/BoardItemPriority"
+            - type: "null"
+        assignee: { type: [string, "null"], maxLength: 120 }
+        startDate: { type: [string, "null"], pattern: "^\\d{4}-\\d{2}-\\d{2}$" }
+        endDate: { type: [string, "null"], pattern: "^\\d{4}-\\d{2}-\\d{2}$" }
+        costCents: { type: [integer, "null"], minimum: 0 }
+    BoardImportInput:
+      type: object
+      required: [groupsToCreate, items]
+      properties:
+        groupsToCreate:
+          type: array
+          maxItems: 30
+          items: { $ref: "#/components/schemas/BoardImportGroupInput" }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 250
+          items: { $ref: "#/components/schemas/BoardImportItemInput" }
+    BoardImportResult:
+      type: object
+      required: [groups, items]
+      properties:
+        groups:
+          type: array
+          items: { $ref: "#/components/schemas/BoardGroup" }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/BoardItem" }
     BoardItemUpdate:
       type: object
       properties:
