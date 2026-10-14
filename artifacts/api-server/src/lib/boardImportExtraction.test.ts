@@ -4,6 +4,7 @@ import ExcelJS from "exceljs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { extractBoardImport, isSupportedBoardImportName, type BoardImportRawRow } from "./boardImportExtraction";
+import { readPdfGanttEvidence } from "./pdfGanttEvidence";
 
 function makeOnePagePdf(stream = "BT /F1 10 Tf 72 720 Td (Task) Tj 120 0 Td (Group) Tj 0 -20 Td (Install cabinets) Tj 120 0 Td (Pre-construction) Tj ET") {
   const objects = [
@@ -116,6 +117,38 @@ test("rejects unsupported, mislabeled, empty, and unreadable files without produ
   await assert.rejects(() => extractBoardImport(Buffer.from("no headers here"), "schedule.csv"), /No task or item column/);
   await assert.rejects(() => extractBoardImport(Buffer.from("not an image"), "schedule.png"), /doesn't match/);
   await assert.rejects(() => extractBoardImport(Buffer.from("not a PDF"), "schedule.pdf"), /isn't readable/);
+});
+
+test("vector Gantt dates align with uneven daily columns and retain grey and dark task bars", async () => {
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  let x = 180;
+  const cells = Array.from({ length: 60 }, (_, index) => {
+    const width = [6, 7, 8][index % 3];
+    const date = new Date(Date.UTC(2026, 7, 25 + index));
+    const label = date.getUTCDate() === 1 ? monthNames[date.getUTCMonth()] : String(date.getUTCDate());
+    const cell = { x, width, label };
+    x += width;
+    return cell;
+  });
+  const bar = (from: number, to: number, y: number, color: string, name: string) => [
+    `${color} rg ${cells[from].x} ${y} ${cells[to].x + cells[to].width - cells[from].x} 12 re f`,
+    `0 0 0 rg BT /F1 6 Tf 20 ${y + 5} Td (${name}) Tj ET`,
+  ].join("\n");
+  const pdf = makeOnePagePdf([
+    "BT /F1 9 Tf 20 760 Td (Project Start: Tue, Aug 25, 2026) Tj ET",
+    ...cells.map((cell) => `BT /F1 3 Tf ${cell.x + cell.width / 2 - cell.label.length * .75} 700 Td (${cell.label}) Tj ET`),
+    bar(42, 45, 600, ".89 .286 .282", "Flooring"),
+    bar(58, 58, 570, ".35 .35 .35", "Final Inspection"),
+    bar(59, 59, 540, ".15 .15 .15", "Completion"),
+  ].join("\n"));
+  const evidence = await readPdfGanttEvidence(pdf);
+  assert.equal(evidence.length, 3);
+  assert.equal(evidence[0].startDate, "2026-10-06");
+  assert.equal(evidence[0].endDate, "2026-10-09");
+  assert.equal(evidence[1].startDate, "2026-10-22");
+  assert.equal(evidence[1].color, "#595959");
+  assert.equal(evidence[2].startDate, "2026-10-23");
+  assert.equal(evidence[2].color, "#262626");
 });
 
 test("live AI reads a PDF schedule and populates task dates", { skip: process.env.RUN_AI_SCHEDULE_TEST !== "1" }, async () => {

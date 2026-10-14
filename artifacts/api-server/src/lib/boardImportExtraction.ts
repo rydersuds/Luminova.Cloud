@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import { PDFParse } from "pdf-parse";
 import type { BoardImportPreview, BoardImportPreviewRow } from "@workspace/api-zod";
 import { extractAiSchedule, type ScheduleDocument } from "./boardScheduleAI";
+import { readPdfGanttEvidence } from "./pdfGanttEvidence";
 
 export const MAX_BOARD_IMPORT_BYTES = 8 * 1024 * 1024;
 export const MAX_BOARD_IMPORT_ROWS = 250;
@@ -300,7 +301,8 @@ export async function extractBoardImport(
         }
         images.push(Buffer.from(image));
       }
-      rawRows = await pdfExtractor({ ...context, text, images });
+      const ganttEvidence = await readPdfGanttEvidence(buffer, context.projectDates?.start);
+      rawRows = await pdfExtractor({ ...context, text, images, ganttEvidence });
     } finally {
       await parser.destroy();
     }

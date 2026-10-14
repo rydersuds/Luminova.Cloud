@@ -72,6 +72,18 @@ test("unresolved screenshot dates are explicitly flagged for review instead of s
   assert.equal(rows[0].endDate, "");
 });
 
+test("verified daily-grid evidence corrects already-populated AI dates before the preview", async () => {
+  const client = mockClient({ finish_reason: "stop", message: { parsed: { rows: [row] } } });
+  const rows = await extractAiSchedule({
+    text: "", images: [],
+    ganttEvidence: [{ task: row.name, startDate: "2026-10-16", endDate: "2026-10-19", color: "#595959", page: 1 }],
+  }, client);
+  assert.equal(rows[0].startDate, "2026-10-16");
+  assert.equal(rows[0].endDate, "2026-10-19");
+  assert.equal(rows[0].sourceColor, "#595959");
+  assert.equal(rows[0].group, row.group);
+});
+
 test("empty, invalid, refused, and truncated AI schedules never become partial imports", async () => {
   for (const choice of [
     { finish_reason: "stop", message: { parsed: { rows: [] } } },

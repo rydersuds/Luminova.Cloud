@@ -36,7 +36,8 @@ export async function screenshotPalette(images: Buffer[]): Promise<string[]> {
     for (let index = 0; index + 2 < pixels.length; index += 3) {
       const rgb = [...pixels.subarray(index, index + 3)];
       const max = Math.max(...rgb), min = Math.min(...rgb);
-      if (max < 60 || min > 240 || (max - min) / Math.max(max, 1) < 0.15) continue;
+      // Keep neutral inspection and milestone fills; ignore pale row/grid backgrounds.
+      if (min > 240 || ((max - min) / Math.max(max, 1) < 0.15 && min >= 160)) continue;
       const hex = `#${pixels.subarray(index, index + 3).toString("hex").toUpperCase()}`;
       counts.set(hex, (counts.get(hex) ?? 0) + 1);
     }

@@ -3,6 +3,7 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import type { BoardImportRawRow } from "./boardImportExtraction";
 import { screenshotPalette, matchScreenshotColour } from "./scheduleColours";
+import { applyPdfGanttEvidence, type GanttEvidence } from "./pdfGanttEvidence";
 
 export type ScheduleDocument = {
   text: string;
@@ -11,6 +12,7 @@ export type ScheduleDocument = {
   categories?: string[];
   projectDates?: { start?: string | null; end?: string | null };
   palette?: string[];
+  ganttEvidence?: GanttEvidence[];
 };
 
 const scheduleSchema = z.object({
@@ -42,7 +44,7 @@ function documentContent(document: ScheduleDocument): OpenAI.Chat.Completions.Ch
   return [
     {
       type: "text",
-      text: `Schedule file: ${document.filename ?? "uploaded schedule"}\nExisting construction categories: ${JSON.stringify(document.categories ?? [])}\nActual sampled screenshot colours (choose a matching fill from these when present): ${JSON.stringify(document.palette ?? [])}\nProject date context (use only to resolve an omitted year, never as task dates): ${JSON.stringify(document.projectDates ?? {})}\nExtracted document text:\n${document.text}`,
+      text: `Schedule file: ${document.filename ?? "uploaded schedule"}\nExisting construction categories: ${JSON.stringify(document.categories ?? [])}\nActual sampled screenshot colours (choose a matching fill from these when present): ${JSON.stringify(document.palette ?? [])}\nProject date context (use only to resolve an omitted year, never as task dates): ${JSON.stringify(document.projectDates ?? {})}\nVerified PDF daily-grid task-bar geometry (use when the task name matches): ${JSON.stringify(document.ganttEvidence ?? [])}\nExtracted document text:\n${document.text}`,
     },
     ...document.images.map((image) => ({
       type: "image_url" as const,
@@ -83,7 +85,7 @@ export async function extractAiSchedule(
             "Use both the page images and extracted text. Read tables, scanned pages, and Gantt charts.",
             "Identify phase/group headings and carry them to their tasks, including across page breaks.",
             "When there is no explicit category heading, infer the best construction phase/trade from the task's actual work. Prefer a suitable existing construction category; otherwise use a concise construction category. Explain whether the category is read or inferred in categoryReason. Do not use a filename or document title as a category.",
-            "Preserve the visible category or task-bar fill colour as a six-digit hexadecimal sourceColor. Use the legend and colour-coded bars to associate tasks with categories. Ignore text, white page backgrounds, grid lines, and status-cell colours. Return null if there is no clear task/category colour.",
+            "Preserve the visible category or task-bar fill colour as a six-digit hexadecimal sourceColor, including grey inspection bars and black/dark milestone bars. Use the legend and colour-coded bars to associate tasks with categories. Ignore text, white page backgrounds, weekend/holiday shading, grid lines, and status-cell colours. Return null if there is no clear task/category colour.",
             "Ignore repeated column headers, page numbers, legends, document titles, and summary totals. Do not duplicate rows repeated at page boundaries, but preserve genuinely distinct tasks with the same name.",
             "Inspect dates carefully: include small start/finish columns, dates printed within or beside bars, month names, two-digit years, dd-MMM-yy, repeated timeline headers, legends, footnotes, and dates split across lines.",
             "Normalize unambiguous dates to YYYY-MM-DD. Resolve an abbreviated/omitted year from a printed year or reliable project date context, explaining its source in dateEvidence. Handle December-to-January rollover. Never use today's year or guess ambiguous day/month order.",
@@ -114,6 +116,7 @@ export async function extractAiSchedule(
   const rows: BoardImportRawRow[] = result.data.rows.map((row, index) => ({
     ...row, sourceColor: matchScreenshotColour(row.sourceColor, document.palette ?? []), rowNumber: index + 1,
   }));
+  applyPdfGanttEvidence(rows, document.ganttEvidence ?? []);
   const incomplete = rows.filter((row) => !row.startDate || !row.endDate);
   if (incomplete.length) {
     try {
