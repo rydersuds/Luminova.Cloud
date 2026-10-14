@@ -125,6 +125,7 @@ export default function Dashboard() {
 
   // Import State
   const [dragActive, setDragActive] = React.useState(false)
+  const [folderDropError, setFolderDropError] = React.useState("")
   const [parsedRows, setParsedRows] = React.useState<any[]>([])
   const [importStatus, setImportStatus] = React.useState<"idle" | "processing" | "success">("idle")
   const folderInputRef = React.useRef<HTMLInputElement>(null)
@@ -132,11 +133,11 @@ export default function Dashboard() {
     const output: File[] = []
     const visit = async (entry: any, prefix = ""): Promise<void> => {
       if (entry.isFile) {
-        await new Promise<void>((resolve) => entry.file((file: File) => {
+        await new Promise<void>((resolve, reject) => entry.file((file: File) => {
           Object.defineProperty(file, "webkitRelativePath", { value: `${prefix}${file.name}` })
           output.push(file)
           resolve()
-        }, resolve))
+        }, reject))
       } else if (entry.isDirectory) {
         const reader = entry.createReader()
         const entries: any[] = []
@@ -158,9 +159,21 @@ export default function Dashboard() {
   const handleFolderDrop = async (event: React.DragEvent) => {
     event.preventDefault()
     setDragActive(false)
-    const files = await readDroppedEntries(event.dataTransfer.items)
-    collectFolderFiles(files.length ? files : Array.from(event.dataTransfer.files))
-    void startFolderImport()
+    setFolderDropError("")
+    // Capture the fallback while the browser still exposes the drop payload.
+    const fallbackFiles = Array.from(event.dataTransfer.files)
+    try {
+      const files = await readDroppedEntries(event.dataTransfer.items)
+      const selectedFiles = files.length ? files : fallbackFiles
+      if (!selectedFiles.length) {
+        setFolderDropError("No readable files were found. Choose the project folder again and retry.")
+        return
+      }
+      collectFolderFiles(selectedFiles)
+      void startFolderImport()
+    } catch {
+      setFolderDropError("The dropped file or folder could not be read. It may have moved or become unavailable. Choose it again and retry.")
+    }
   }
 
   const handleFile = async (file: File) => {
@@ -344,7 +357,10 @@ export default function Dashboard() {
                         Manual Entry
                       </button>
                       <button 
-                        onClick={() => setIntakeMode("import")} 
+                        onClick={() => {
+                          setIntakeMode("import")
+                          setFolderDropError("")
+                        }} 
                         className={cn(
                           "px-6 py-3 font-mono text-sm tracking-widest uppercase transition-all border-b-2 relative", 
                           intakeMode === "import" ? "border-primary text-primary bg-primary/5" : "border-transparent text-muted-foreground hover:text-foreground"
@@ -450,6 +466,7 @@ export default function Dashboard() {
                               onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
                               onDragLeave={() => setDragActive(false)}
                               onDrop={handleFolderDrop}
+                              data-testid="project-folder-dropzone"
                               className={cn(
                                 "p-12 flex flex-col items-center justify-center text-center transition-all bg-black/10 rounded-2xl recessed-3d",
                                 dragActive ? "border-primary bg-primary/10 scale-[1.02]" : ""
@@ -461,6 +478,7 @@ export default function Dashboard() {
                                 className="hidden"
                                 id="folder-upload"
                                 onChange={(event) => {
+                                  setFolderDropError("")
                                   collectFolderFiles(Array.from(event.target.files || []))
                                   void startFolderImport()
                                 }}
@@ -475,6 +493,7 @@ export default function Dashboard() {
                                 <div>
                                   <p className="text-lg font-heading tracking-tight mb-1 drop-shadow-sm">Drop a project folder</p>
                                   <p className="text-sm font-mono text-muted-foreground">Or choose a folder. Supported construction documents and images are uploaded privately.</p>
+                                  {folderDropError && <p role="alert" className="mt-3 text-sm text-destructive">{folderDropError}</p>}
                                 </div>
                                 <div className="flex gap-4 mt-4">
                                   <span className="flex items-center gap-1.5 text-xs font-mono surface-3d px-3 py-1 text-muted-foreground"><FileText className="h-3 w-3" /> Documents</span>

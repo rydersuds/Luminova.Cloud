@@ -20,3 +20,9 @@ Import-error dismissal must be durable on the server, not only recorded in brows
 **Why:** Browser storage can be cleared, unavailable, or device-specific. If the server keeps returning the same failed session, a locally dismissed error resurfaces indefinitely.
 
 **How to apply:** Exclude server-dismissed sessions from active and exact recovery lookups, migrate existing browser dismissal markers by persisting them during restore, and keep dismissal separate from destructive uploaded-file cleanup.
+
+Folder drag traversal can fail asynchronously when a dropped file or directory disappears or becomes inaccessible. Capture the browser's fallback file list during the drop event, catch entry-read failures, and do not start an import from a partial traversal.
+
+**Why:** Uncaught `FileSystemEntry` callback errors can escape the React drop handler as a runtime overlay; silently continuing can build an incomplete project.
+
+**How to apply:** Reject both file and directory read callbacks on failure, handle traversal errors at the drop boundary with a retry instruction, and only pass a complete traversal (or the synchronous fallback list when traversal is unsupported) to the import provider.

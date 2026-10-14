@@ -694,3 +694,63 @@ test('quick view hides internal schedule and approvals from clients', async ({ p
   expect(scheduleRequests).toBe(0);
   expect(approvalRequests).toBe(0);
 });
+
+for (const failedEntry of ['file', 'directory'] as const) {
+  test(`a dropped ${failedEntry} that disappears during reading shows recovery guidance without starting an import`, async ({ page }) => {
+    await installIdentity(page);
+    let createSessionRequests = 0;
+    await page.route('**/api/project-import-sessions', async route => {
+      if (route.request().method() === 'POST') createSessionRequests += 1;
+      await route.fulfill({ json: null });
+    });
+    await page.route('**/api/projects', route => route.fulfill({ json: [project] }));
+    await page.route('**/api/dashboard/summary', route => route.fulfill({
+      json: { activeProjects: 1, awaitingApproval: 0, unreadMessages: 0, new360Photos: 0, budgeted: 0, invoiced: 0, recentActivity: [] },
+    }));
+    await page.route('**/api/invoices/summary', route => route.fulfill({
+      json: { invoicedRevenue: 0, invoicedExpenses: 0, upcomingClientPayments: 0, acceptedClientQuoteValue: 0 },
+    }));
+
+    await page.goto('/__visual/dashboard-cards');
+    await page.getByRole('button', { name: /INITIALIZE PROJECT|NEW PROJECT/ }).click();
+    await page.getByRole('button', { name: 'Batch Import' }).click();
+    const pageErrors: string[] = [];
+    page.on('pageerror', error => pageErrors.push(error.message));
+
+    await page.evaluate((entryType) => {
+      const dropzone = document.querySelector<HTMLElement>('[data-testid="project-folder-dropzone"]');
+      if (!dropzone) throw new Error('Project folder drop zone was not found');
+      const file = new File(['plan'], 'site-plan.txt', { type: 'text/plain' });
+      const missing = () => new DOMException(
+        'A requested file or directory could not be found at the time an operation was processed.',
+        'NotFoundError',
+      );
+      const entry = entryType === 'file'
+        ? {
+            isFile: true,
+            isDirectory: false,
+            name: 'site-plan.txt',
+            file: (_success: (file: File) => void, failure: (error: DOMException) => void) => queueMicrotask(() => failure(missing())),
+          }
+        : {
+            isFile: false,
+            isDirectory: true,
+            name: 'Site Plans',
+            createReader: () => ({
+              readEntries: (_success: (entries: unknown[]) => void, failure: (error: DOMException) => void) => queueMicrotask(() => failure(missing())),
+            }),
+          };
+      const event = new DragEvent('drop', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'dataTransfer', {
+        value: { items: [{ webkitGetAsEntry: () => entry }], files: [file] },
+      });
+      dropzone.dispatchEvent(event);
+    }, failedEntry);
+
+    await expect(
+      page.getByTestId('project-folder-dropzone').getByRole('alert'),
+    ).toContainText('could not be read');
+    expect(createSessionRequests).toBe(0);
+    expect(pageErrors).toEqual([]);
+  });
+}
