@@ -3,8 +3,7 @@ import test from "node:test";
 import ExcelJS from "exceljs";
 import { extractBoardImport, isSupportedBoardImportName, type BoardImportRawRow } from "./boardImportExtraction";
 
-function makeOnePagePdf() {
-  const stream = "BT /F1 10 Tf 72 720 Td (Task) Tj 120 0 Td (Group) Tj 0 -20 Td (Install cabinets) Tj 120 0 Td (Pre-construction) Tj ET";
+function makeOnePagePdf(stream = "BT /F1 10 Tf 72 720 Td (Task) Tj 120 0 Td (Group) Tj 0 -20 Td (Install cabinets) Tj 120 0 Td (Pre-construction) Tj ET") {
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
     "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
@@ -80,7 +79,7 @@ test("uses the bounded image extraction result for JPEG and PNG screenshot files
   }
 });
 
-test("extracts schedule rows from a text PDF through its bounded page preview", async () => {
+test("always sends PDF text and page images together to AI, then normalizes the populated schedule", async () => {
   const raw: BoardImportRawRow[] = [{
     rowNumber: 1,
     group: "Pre-construction",
@@ -88,18 +87,23 @@ test("extracts schedule rows from a text PDF through its bounded page preview", 
     status: "Not started",
     priority: "",
     assignee: "",
-    startDate: "",
-    endDate: "",
+    startDate: "2026-10-15",
+    endDate: "2026-10-18",
     cost: "",
   }];
   let screenshotCount = 0;
-  const preview = await extractBoardImport(makeOnePagePdf(), "schedule.pdf", async (screenshot) => {
+  const preview = await extractBoardImport(makeOnePagePdf(), "schedule.pdf", undefined, async ({ text, images }) => {
     screenshotCount += 1;
+    assert.match(text, /Install cabinets/);
+    assert.equal(images.length, 1);
+    const screenshot = images[0];
     assert.deepEqual([...screenshot.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
     return raw;
   });
   assert.equal(screenshotCount, 1);
   assert.equal(preview.rows[0].name, "Install cabinets");
+  assert.equal(preview.rows[0].startDate, "2026-10-15");
+  assert.equal(preview.rows[0].endDate, "2026-10-18");
   assert.deepEqual(preview.groups, ["Pre-construction"]);
 });
 
@@ -110,4 +114,23 @@ test("rejects unsupported, mislabeled, empty, and unreadable files without produ
   await assert.rejects(() => extractBoardImport(Buffer.from("no headers here"), "schedule.csv"), /No task or item column/);
   await assert.rejects(() => extractBoardImport(Buffer.from("not an image"), "schedule.png"), /doesn't match/);
   await assert.rejects(() => extractBoardImport(Buffer.from("not a PDF"), "schedule.pdf"), /isn't readable/);
+});
+
+test("live AI reads a PDF schedule and populates task dates", { skip: process.env.RUN_AI_SCHEDULE_TEST !== "1" }, async () => {
+  const pdf = makeOnePagePdf([
+    "BT /F1 11 Tf 50 720 Td",
+    "(Construction Schedule - 2026) Tj 0 -25 Td",
+    "(Phase: Interior finishes) Tj 0 -25 Td",
+    "(Task | Owner | Start | Finish) Tj 0 -25 Td",
+    "(Install cabinets | Morgan | October 15, 2026 | October 18, 2026) Tj 0 -25 Td",
+    "(Paint walls | Jamie | October 19, 2026 | October 21, 2026) Tj ET",
+  ].join(" "));
+  const preview = await extractBoardImport(pdf, "schedule.pdf");
+  assert.equal(preview.rows.length, 2);
+  assert.equal(preview.rows[0].name.toLowerCase(), "install cabinets");
+  assert.equal(preview.rows[0].startDate, "2026-10-15");
+  assert.equal(preview.rows[0].endDate, "2026-10-18");
+  assert.equal(preview.rows[1].startDate, "2026-10-19");
+  assert.equal(preview.rows[1].endDate, "2026-10-21");
+  assert.equal(preview.rows[0].issues.length, 0);
 });

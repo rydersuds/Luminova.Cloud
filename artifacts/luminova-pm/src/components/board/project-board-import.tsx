@@ -225,7 +225,7 @@ export function ProjectBoardImport({ projectId, groups, actions }: Props) {
           <DialogHeader className="shrink-0 border-b px-5 py-4 pr-12 text-left">
             <DialogTitle>Import schedule rows</DialogTitle>
             <DialogDescription>
-              Upload one CSV, Excel, PDF, JPEG, or PNG file. Review every row and group mapping before anything is added.
+              Upload a schedule PDF and AI fills in the tasks, groups, owners, and dates automatically. Review the results, then import them. CSV, Excel, JPEG, and PNG also work.
             </DialogDescription>
           </DialogHeader>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
@@ -233,11 +233,12 @@ export function ProjectBoardImport({ projectId, groups, actions }: Props) {
               <FileUp className="h-5 w-5 text-primary" aria-hidden="true" />
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-semibold">{file?.name ?? "Choose a schedule file"}</span>
-                <span className="block text-xs text-muted-foreground">CSV, XLSX, PDF, JPEG, or PNG · up to 8 MiB</span>
+                <span className="block text-xs text-muted-foreground">CSV, XLSX, PDF, JPEG, or PNG · up to 8 MiB · PDFs up to 20 pages</span>
               </span>
               <span className="board-solid-btn">Browse files</span>
               <input
                 type="file"
+                disabled={loading || saving}
                 accept=".csv,.xlsx,.pdf,.jpg,.jpeg,.png"
                 className="sr-only"
                 aria-label="Choose a board import file"
@@ -248,10 +249,11 @@ export function ProjectBoardImport({ projectId, groups, actions }: Props) {
                 }}
               />
             </label>
-            {loading && <p className="flex items-center gap-2 text-sm" role="status" data-testid="status-board-import-loading"><LoaderCircle className="h-4 w-4 animate-spin" />Reading file and preparing preview…</p>}
+            {loading && <p className="flex items-center gap-2 text-sm" role="status" data-testid="status-board-import-loading"><LoaderCircle className="h-4 w-4 animate-spin" />{/\.(pdf|jpe?g|png)$/i.test(file?.name ?? "") ? "AI is reading the schedule and filling in tasks and dates…" : "Reading file and preparing preview…"}</p>}
             {error && <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive" data-testid="alert-board-import">{error}</p>}
             {preview && (
               <div className="space-y-4" data-testid="panel-board-import-preview">
+                {/\.(pdf|jpe?g|png)$/i.test(file?.name ?? "") && <p className="text-sm text-muted-foreground">AI has filled in the detected fields. Check the dates before importing; unclear or missing values are left blank.</p>}
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm font-semibold" data-testid="text-board-import-count">
                     {rows.length} {rows.length === 1 ? "row" : "rows"} detected
