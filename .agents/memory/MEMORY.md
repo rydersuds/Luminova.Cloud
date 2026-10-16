@@ -16,6 +16,7 @@
 - [Project import AI diagnostics](project-import-ai-diagnostics.md) — log safe provider categories by analysis sub-step, never raw provider messages or uploaded content.
 - [Codegen dependency remediation](codegen-dependency-remediation.md) — keep the resolved generator stable when safe transitive pins remove advisories without output changes.
 - [Workspace invitation lifecycle](workspace-invitation-lifecycle.md) — scope provider invitations before exposure or mutation, and serialize provider cleanup with local access changes.
+- [Clerk organization invitation email](clerk-organization-invitation-email.md) — explicitly request invitation email; the Backend API supports `notify` even when the installed SDK type omits it.
 - [Entry agreement replacement](entry-agreement-replacement.md) — direct uploads become the sole designated agreement while previous agreements remain ordinary contract files.
 - [Workspace-scoped standalone vendor seeding](standalone-vendor-seeding.md) — seed IDs must be workspace-safe without changing imported-vendor deduplication.
 - [Profile photo control layout](profile-photo-layout.md) — keep avatar actions fixed-size so responsive user-card scroll behavior stays stable.

@@ -1672,6 +1672,7 @@ paths:
       operationId: inviteClientUser
       tags: [users]
       summary: Invite a new Client user to a client organization
+      description: Requests that Clerk create the organization invitation and send its email. A successful response confirms the invitation operation, not inbox delivery.
       parameters:
         - $ref: "#/components/parameters/ClientId"
       requestBody:
@@ -1682,7 +1683,7 @@ paths:
               $ref: "#/components/schemas/ClientInvitationInput"
       responses:
         "201":
-          description: Client invitation sent
+          description: Client invitation created; email delivery is not confirmed by this response
           content:
             application/json:
               schema:
@@ -1738,6 +1739,7 @@ paths:
       operationId: inviteWorkspaceUser
       tags: [users]
       summary: Invite a user with an initial workspace role
+      description: Requests that Clerk create the invitation and send its email. A successful response confirms the invitation operation, not inbox delivery.
       requestBody:
         required: true
         content:
@@ -1746,7 +1748,7 @@ paths:
               $ref: "#/components/schemas/WorkspaceInvitationInput"
       responses:
         "201":
-          description: Invitation sent
+          description: Invitation created; email delivery is not confirmed by this response
           content:
             application/json:
               schema:
@@ -1766,11 +1768,12 @@ paths:
       operationId: resendWorkspaceInvitation
       tags: [users]
       summary: Resend a pending workspace invitation
+      description: Creates a replacement invitation and requests email notification through Clerk. A successful response confirms the invitation operation, not inbox delivery.
       parameters:
         - $ref: "#/components/parameters/InvitationId"
       responses:
         "200":
-          description: Replacement invitation sent
+          description: Replacement invitation created; email delivery is not confirmed by this response
           content:
             application/json:
               schema:

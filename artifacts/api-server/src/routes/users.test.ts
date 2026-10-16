@@ -372,6 +372,10 @@ async function startApi(
   revokeMemberships: Parameters<typeof createUsersRouter>[2] = revokeClientMemberships,
   logoStorage?: ObjectStorageService,
   seedOrganizationMembers = true,
+  requestLogger: {
+    warn: (context: unknown, message?: string) => void;
+    error: (context: unknown, message?: string) => void;
+  } = { warn: () => undefined, error: () => undefined },
 ) {
   if (organizationId !== "default" && seedOrganizationMembers) {
     const existingUsers = await client.users.getUserList({ limit: 500 });
@@ -408,7 +412,7 @@ async function startApi(
     Object.assign(req, {
       userId: actorId,
       auth,
-      log: { warn: () => undefined, error: () => undefined },
+      log: requestLogger,
     });
     next();
   });
@@ -646,6 +650,158 @@ test("lists, resends, and revokes pending invitations", async () => {
   const replacement = await resent.json() as { id: string };
   assert.equal((await fetch(`${base}/users/invitations/${replacement.id}`, { method: "DELETE" })).status, 204);
   assert.equal(fake.getInvitations().find((invitation) => invitation.id === replacement.id)?.status, "revoked");
+});
+
+test("organization workspace invitations and resends explicitly request email notifications", async () => {
+  const fake = fakeClerk([makeUser("admin", "Admin")]);
+  const base = await startApi("admin", fake.client, undefined, "organization-mail-delivery");
+  const created = await fetch(`${base}/users/invitations`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "org-invite@example.com", role: "Field Team" }),
+  });
+  assert.equal(created.status, 201);
+  assert.deepEqual(fake.invitations.at(-1), {
+    organizationId: "organization-mail-delivery",
+    emailAddress: "org-invite@example.com",
+    role: "org:member",
+    inviterUserId: "admin",
+    publicMetadata: { role: "Field Team", workspaceId: "organization-mail-delivery" },
+    notify: true,
+  });
+
+  const original = await created.json() as { id: string };
+  const resent = await fetch(`${base}/users/invitations/${original.id}/resend`, { method: "POST" });
+  assert.equal(resent.status, 200);
+  assert.deepEqual(fake.invitations.at(-1), {
+    organizationId: "organization-mail-delivery",
+    emailAddress: "org-invite@example.com",
+    role: "org:member",
+    inviterUserId: "admin",
+    publicMetadata: { role: "Field Team", workspaceId: "organization-mail-delivery" },
+    notify: true,
+  });
+  assert.equal(fake.getInvitations().find((invitation) => invitation.id === original.id)?.status, "revoked");
+});
+
+test("default-workspace client invitations and resends use Clerk email notifications", async () => {
+  const fake = fakeClerk([makeUser("admin", "Admin")]);
+  const base = await startApi("admin", fake.client);
+  const client = await createTestClient(base, "Default Workspace Client Invite");
+  const created = await inviteClientUser(base, client.id, "client-invite@example.com");
+  assert.equal(created.status, 201);
+  assert.deepEqual(fake.invitations.at(-1), {
+    emailAddress: "client-invite@example.com",
+    publicMetadata: { role: "Client", workspaceId: "default" },
+    notify: true,
+    ignoreExisting: false,
+  });
+
+  const original = await created.json() as { id: string };
+  const resent = await fetch(`${base}/users/invitations/${original.id}/resend`, { method: "POST" });
+  assert.equal(resent.status, 200);
+  assert.deepEqual(fake.invitations.at(-1), {
+    emailAddress: "client-invite@example.com",
+    publicMetadata: { role: "Client", workspaceId: "default" },
+    notify: true,
+    ignoreExisting: true,
+  });
+  const pending = await db.select().from(clientInvitationsTable).where(eq(clientInvitationsTable.clientId, client.id));
+  assert.equal(pending[0]?.invitationId, (await resent.json() as { id: string }).id);
+});
+
+test("organization-backed client invitation resend requests email notification and updates its client record", async () => {
+  const fake = fakeClerk([makeUser("admin", "Admin")]);
+  const base = await startApi("admin", fake.client, undefined, "organization-client-resend");
+  const client = await createTestClient(base, "Organization Client Invite");
+  const created = await inviteClientUser(base, client.id, "organization-client@example.com");
+  assert.equal(created.status, 201);
+  const original = await created.json() as { id: string };
+
+  const resent = await fetch(`${base}/users/invitations/${original.id}/resend`, { method: "POST" });
+  assert.equal(resent.status, 200);
+  assert.deepEqual(fake.invitations.at(-1), {
+    organizationId: "organization-client-resend",
+    emailAddress: "organization-client@example.com",
+    role: "org:member",
+    inviterUserId: "admin",
+    publicMetadata: { role: "Client", workspaceId: "organization-client-resend" },
+    notify: true,
+  });
+  const replacement = await resent.json() as { id: string; email: string; role: string };
+  assert.equal(replacement.email, "organization-client@example.com");
+  assert.equal(replacement.role, "Client");
+  const pending = await db.select().from(clientInvitationsTable).where(eq(clientInvitationsTable.clientId, client.id));
+  assert.equal(pending[0]?.invitationId, replacement.id);
+});
+
+test("workspace invitation provider failures return errors and log no recipient address", async () => {
+  const fake = fakeClerk([makeUser("admin", "Admin")]);
+  const logs: Array<{ context: unknown; message?: string }> = [];
+  fake.client.invitations.createInvitation = async () => {
+    throw { status: 503, errors: [{ code: "invitation_email_failed", longMessage: "Invitation service unavailable." }] };
+  };
+  const base = await startApi(
+    "admin",
+    fake.client,
+    undefined,
+    "default",
+    undefined,
+    undefined,
+    true,
+    { warn: (context, message) => logs.push({ context, message }), error: () => undefined },
+  );
+  const response = await fetch(`${base}/users/invitations`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "private.person@example.com", role: "Project Manager" }),
+  });
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), { error: "Invitation service unavailable." });
+  const providerLog = logs.find(({ message }) => message === "Clerk workspace invitation creation failed");
+  assert(providerLog);
+  assert.deepEqual(providerLog.context, {
+    workspaceId: "default",
+    recipientDomain: "example.com",
+    providerStatus: 503,
+    providerCode: "invitation_email_failed",
+    operation: "create_workspace_invitation",
+    responseStatus: 502,
+  });
+  assert.equal(JSON.stringify(providerLog.context).includes("private.person"), false);
+});
+
+test("failed default-workspace resend keeps the original invitation pending", async () => {
+  const fake = fakeClerk([makeUser("admin", "Admin")]);
+  const logs: Array<{ context: unknown; message?: string }> = [];
+  fake.client.invitations.createInvitation = async () => {
+    throw { status: 503, errors: [{ code: "invitation_email_failed" }] };
+  };
+  const base = await startApi(
+    "admin",
+    fake.client,
+    undefined,
+    "default",
+    undefined,
+    undefined,
+    true,
+    { warn: (context, message) => logs.push({ context, message }), error: () => undefined },
+  );
+  const response = await fetch(`${base}/users/invitations/inv_pending/resend`, { method: "POST" });
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), { error: "Clerk could not resend the invitation" });
+  assert.equal(fake.getInvitations().find((invitation) => invitation.id === "inv_pending")?.status, "pending");
+  const providerLog = logs.find(({ message }) => message === "Clerk workspace invitation resend failed");
+  assert(providerLog);
+  assert.deepEqual(providerLog.context, {
+    workspaceId: "default",
+    recipientDomain: "example.com",
+    providerStatus: 503,
+    providerCode: "invitation_email_failed",
+    invitationId: "inv_pending",
+    operation: "resend_workspace_invitation",
+    responseStatus: 502,
+  });
 });
 
 test("returns useful errors when Clerk invitation actions fail", async () => {
@@ -1402,6 +1558,7 @@ test("invites a client user, shows pending state, and reconciles an accepted inv
     role: "org:member",
     inviterUserId: "admin",
     publicMetadata: { role: "Client", workspaceId: "workspace-client-invite-a" },
+    notify: true,
   });
   const invitation = await invited.json() as { id: string; email: string; role: string; status: string; createdAt: number };
   assert.deepEqual(invitation, {
@@ -1571,7 +1728,17 @@ test("rejects client invitations for existing users and translates Clerk failure
     makeUser("admin", "Admin"),
     makeUser("existing-client", "Client", "existing@example.com"),
   ]);
-  const base = await startApi("admin", fake.client, undefined, "workspace-client-invite-errors");
+  const logs: Array<{ context: unknown; message?: string }> = [];
+  const base = await startApi(
+    "admin",
+    fake.client,
+    undefined,
+    "workspace-client-invite-errors",
+    undefined,
+    undefined,
+    true,
+    { warn: (context, message) => logs.push({ context, message }), error: () => undefined },
+  );
   const client = await createTestClient(base, "Invite Error Client");
 
   const existing = await inviteClientUser(base, client.id, "existing@example.com");
@@ -1584,6 +1751,16 @@ test("rejects client invitations for existing users and translates Clerk failure
   const failed = await inviteClientUser(base, client.id, "new-failure@example.com");
   assert.equal(failed.status, 502);
   assert.deepEqual(await failed.json(), { error: "Invitation service unavailable." });
+  const providerLog = logs.find(({ message }) => message === "Clerk client invitation creation failed");
+  assert(providerLog);
+  assert.deepEqual(providerLog.context, {
+    workspaceId: "workspace-client-invite-errors",
+    recipientDomain: "example.com",
+    providerStatus: 503,
+    clientId: client.id,
+    responseStatus: 502,
+  });
+  assert.equal(JSON.stringify(providerLog.context).includes("new-failure"), false);
   assert.deepEqual(await db.select().from(clientInvitationsTable).where(eq(clientInvitationsTable.clientId, client.id)), []);
 });
 

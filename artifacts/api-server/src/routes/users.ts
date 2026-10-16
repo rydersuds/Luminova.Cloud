@@ -165,6 +165,16 @@ function invitationWorkspaceId(invitation: WorkspaceInvitationRecord): string {
   const scope = invitation.publicMetadata?.workspaceId;
   return typeof scope === "string" && scope ? scope : "default";
 }
+function invitationFailureLogContext(scope: string, email: string, error: unknown) {
+  const clerkError = error as ClerkError;
+  const recipientDomain = email.slice(email.lastIndexOf("@") + 1).toLowerCase();
+  return {
+    workspaceId: scope,
+    recipientDomain: recipientDomain || "unknown",
+    ...(typeof clerkError.status === "number" ? { providerStatus: clerkError.status } : {}),
+    ...(clerkError.errors?.[0]?.code ? { providerCode: clerkError.errors[0].code } : {}),
+  };
+}
 function serializeInvitation(invitation: WorkspaceInvitationRecord) {
   return {
     id: invitation.id,
@@ -1228,7 +1238,11 @@ router.post("/clients/:clientId/invitations", async (req: AuthenticatedRequest, 
       return;
     }
     const normalized = clerkErrorResponse(error, "Clerk could not send the client invitation");
-    req.log.warn({ status: normalized.status }, "Client invitation failed");
+    req.log.warn({
+      ...invitationFailureLogContext(scope, body.data.email, error),
+      clientId: params.data.clientId,
+      responseStatus: normalized.status,
+    }, "Clerk client invitation creation failed");
     res.status(normalized.status).json({ error: normalized.error });
   }
 });
@@ -1286,11 +1300,13 @@ router.post("/users/invitations", async (req: AuthenticatedRequest, res): Promis
     res.status(400).json({ error: "Enter a valid email address and workspace role" });
     return;
   }
+  const scope = workspaceId(req);
+  const email = parsed.data.email.trim().toLowerCase();
   try {
     const invitation = await createWorkspaceInvitation(
       client,
-      workspaceId(req),
-      parsed.data.email.trim().toLowerCase(),
+      scope,
+      email,
       parsed.data.role,
       req.userId,
     );
@@ -1303,7 +1319,11 @@ router.post("/users/invitations", async (req: AuthenticatedRequest, res): Promis
     }));
   } catch (error) {
     const normalized = clerkErrorResponse(error, "Clerk could not send the invitation");
-    req.log.warn({ status: normalized.status }, "Clerk invitation failed");
+    req.log.warn({
+      ...invitationFailureLogContext(scope, email, error),
+      operation: "create_workspace_invitation",
+      responseStatus: normalized.status,
+    }, "Clerk workspace invitation creation failed");
     res.status(normalized.status).json({ error: normalized.error });
   }
 });
@@ -1315,13 +1335,15 @@ router.post("/users/invitations/:invitationId/resend", async (req: Authenticated
     res.status(400).json({ error: "Invalid invitation" });
     return;
   }
+  const scope = workspaceId(req);
+  let recipientEmail = "";
   try {
-    const scope = workspaceId(req);
     const invitation = await getWorkspaceInvitation(client, scope, params.data.invitationId);
     if (!invitation || invitation.status !== "pending") {
       res.status(404).json({ error: "Invitation not found" });
       return;
     }
+    recipientEmail = invitation.emailAddress;
     if (usesOrganizationInvitations(client, scope)) {
       await revokeWorkspaceInvitation(client, scope, invitation.id, req.userId);
     }
@@ -1354,7 +1376,12 @@ router.post("/users/invitations/:invitationId/resend", async (req: Authenticated
     res.json(ResendWorkspaceInvitationResponse.parse(serializeInvitation(replacement)));
   } catch (error) {
     const normalized = clerkErrorResponse(error, "Clerk could not resend the invitation");
-    req.log.warn({ status: normalized.status }, "Clerk invitation resend failed");
+    req.log.warn({
+      ...invitationFailureLogContext(scope, recipientEmail || "unknown@unknown", error),
+      invitationId: params.data.invitationId,
+      operation: "resend_workspace_invitation",
+      responseStatus: normalized.status,
+    }, "Clerk workspace invitation resend failed");
     res.status(normalized.status).json({ error: normalized.error });
   }
 });
@@ -1598,12 +1625,18 @@ async function createWorkspaceInvitation(
   ignoreExisting = false,
 ): Promise<WorkspaceInvitationRecord> {
   if (usesOrganizationInvitations(client, scope)) {
-    return await client.organizations.createOrganizationInvitation({
+    // Clerk's Backend API accepts `notify`; the installed SDK forwards unknown
+    // request fields but its current parameter type does not include this flag.
+    const invitationParams = {
       organizationId: scope,
       emailAddress: email,
       role: "org:member",
       inviterUserId,
       publicMetadata: { role, workspaceId: scope },
+      notify: true,
+    } as Parameters<typeof client.organizations.createOrganizationInvitation>[0] & { notify: boolean };
+    return await client.organizations.createOrganizationInvitation({
+      ...invitationParams,
     }) as unknown as WorkspaceInvitationRecord;
   }
   return await client.invitations.createInvitation({

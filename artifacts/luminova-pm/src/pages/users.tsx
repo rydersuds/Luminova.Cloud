@@ -61,6 +61,10 @@ function errorMessage(error: unknown, fallback: string) {
   return typed.data?.error || typed.message || fallback
 }
 
+function invitationAcceptedMessage(email: string) {
+  return `Clerk accepted the invitation request for ${email}, but this app cannot confirm inbox delivery. Ask the recipient to verify the address and check spam. If it is missing, review Clerk Email Logs and delivery settings before resending.`
+}
+
 function RoleSelect({ value, onChange, disabled, id }: {
   value: WorkspaceRole
   onChange: (role: WorkspaceRole) => void
@@ -282,7 +286,7 @@ export default function Users() {
       await inviteClientUser.mutateAsync({ clientId: client.id, data: { email } })
       setClientInviteEmailByClient((current) => ({ ...current, [client.id]: "" }))
       await Promise.all([refreshClients(), refreshInvitations(), refreshUsers()])
-      setFeedback({ kind: "success", message: `Client invitation sent to ${email}.` })
+      setFeedback({ kind: "success", message: invitationAcceptedMessage(email) })
     } catch (error) {
       setFeedback({ kind: "error", message: errorMessage(error, "Unable to invite this client user.") })
     }
@@ -328,7 +332,7 @@ export default function Users() {
       setInviteRole("Project Manager")
       setInviteOpen(false)
       await refreshInvitations()
-      setFeedback({ kind: "success", message: `Invitation sent to ${email}.` })
+      setFeedback({ kind: "success", message: invitationAcceptedMessage(email) })
     } catch (error) {
       setFeedback({ kind: "error", message: errorMessage(error, "Unable to send the invitation.") })
     }
@@ -340,7 +344,7 @@ export default function Users() {
     try {
       await resendInvitation.mutateAsync({ invitationId: invitation.id })
       await refreshInvitations()
-      setFeedback({ kind: "success", message: `A new invitation was sent to ${invitation.email}.` })
+      setFeedback({ kind: "success", message: invitationAcceptedMessage(invitation.email) })
     } catch (error) {
       setFeedback({ kind: "error", message: errorMessage(error, "Unable to resend this invitation.") })
     } finally {

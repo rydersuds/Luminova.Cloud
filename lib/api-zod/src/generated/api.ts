@@ -2962,6 +2962,7 @@ export const GrantClientAccessResponse = zod.object({
 
 
 /**
+ * Requests that Clerk create the organization invitation and send its email. A successful response confirms the invitation operation, not inbox delivery.
  * @summary Invite a new Client user to a client organization
  */
 
@@ -3017,6 +3018,7 @@ export const GetWorkspaceInvitationsResponse = zod.array(GetWorkspaceInvitations
 
 
 /**
+ * Requests that Clerk create the invitation and send its email. A successful response confirms the invitation operation, not inbox delivery.
  * @summary Invite a user with an initial workspace role
  */
 export const inviteWorkspaceUserBodyEmailMin = 3;
@@ -3039,6 +3041,7 @@ export const InviteWorkspaceUserResponse = zod.object({
 
 
 /**
+ * Creates a replacement invitation and requests email notification through Clerk. A successful response confirms the invitation operation, not inbox delivery.
  * @summary Resend a pending workspace invitation
  */
 

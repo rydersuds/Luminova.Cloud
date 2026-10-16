@@ -277,7 +277,9 @@ test.describe('Users & Roles background treatment', () => {
     await expect(page.getByRole('alert')).toHaveText('Invitation service unavailable. Try again.');
 
     await page.getByRole('button', { name: 'Send client invitation' }).click();
-    await expect(page.getByText('Client invitation sent to new.client@luminova.test.')).toBeVisible();
+    await expect(page.getByText(
+      'Clerk accepted the invitation request for new.client@luminova.test, but this app cannot confirm inbox delivery. Ask the recipient to verify the address and check spam. If it is missing, review Clerk Email Logs and delivery settings before resending.',
+    )).toBeVisible();
     await expect(page.getByText('new.client@luminova.test', { exact: true })).toBeVisible();
     await expect(page.getByText('Invitation pending')).toHaveCount(2);
   });

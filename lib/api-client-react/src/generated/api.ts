@@ -5699,6 +5699,7 @@ export const getInviteClientUserUrl = (clientId: string,) => {
 }
 
 /**
+ * Requests that Clerk create the organization invitation and send its email. A successful response confirms the invitation operation, not inbox delivery.
  * @summary Invite a new Client user to a client organization
  */
 export const inviteClientUser = async (clientId: string,
@@ -5921,6 +5922,7 @@ export const getInviteWorkspaceUserUrl = () => {
 }
 
 /**
+ * Requests that Clerk create the invitation and send its email. A successful response confirms the invitation operation, not inbox delivery.
  * @summary Invite a user with an initial workspace role
  */
 export const inviteWorkspaceUser = async (workspaceInvitationInput: WorkspaceInvitationInput, options?: Parameters<typeof customFetch>[1]): Promise<WorkspaceInvitation> => {
@@ -5992,6 +5994,7 @@ export const getResendWorkspaceInvitationUrl = (invitationId: string,) => {
 }
 
 /**
+ * Creates a replacement invitation and requests email notification through Clerk. A successful response confirms the invitation operation, not inbox delivery.
  * @summary Resend a pending workspace invitation
  */
 export const resendWorkspaceInvitation = async (invitationId: string, options?: Parameters<typeof customFetch>[1]): Promise<WorkspaceInvitation> => {
