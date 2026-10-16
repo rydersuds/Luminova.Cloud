@@ -25,8 +25,10 @@ type FolderImportContextValue = {
   folderStatus: FolderImportStatus
   folderProgress: FolderImportProgress
   folderError: string
+  isCancelling: boolean
   collectFolderFiles: (files: File[]) => void
   startFolderImport: () => Promise<void>
+  cancelFolderImport: () => Promise<void>
   clearFolderImport: () => void
   dismissFolderError: () => void
   isActive: boolean
@@ -101,11 +103,14 @@ export function ProjectFolderImportProvider({
   const [folderStatus, setFolderStatus] = React.useState<FolderImportStatus>("idle")
   const [folderProgress, setFolderProgress] = React.useState<FolderImportProgress>({ uploaded: 0, failed: 0 })
   const [folderError, setFolderError] = React.useState("")
+  const [isCancelling, setIsCancelling] = React.useState(false)
   const isActive = folderStatus === "uploading" || folderStatus === "building"
   const activeImportRef = React.useRef(false)
   const importGenerationRef = React.useRef(0)
   const folderFilesRef = React.useRef<FolderCandidate[]>([])
   const sessionRef = React.useRef<ImportSession | null>(null)
+  const uploadControllerRef = React.useRef<AbortController | null>(null)
+  const sessionPreparationRef = React.useRef<Promise<ImportSession> | null>(null)
   const dismissedImportIdsRef = React.useRef(new Set<string>())
   const dismissedPendingErrorRef = React.useRef(false)
   const restoreStartedRef = React.useRef(false)
@@ -130,7 +135,60 @@ export function ProjectFolderImportProvider({
     setFolderProgress({ uploaded: 0, failed: 0 })
     setFolderError("")
     setFolderStatus("idle")
+    setIsCancelling(false)
   }, [isActive])
+
+  const cancelFolderImport = React.useCallback(async () => {
+    const controller = uploadControllerRef.current
+    if (!controller || isCancelling) return
+    setIsCancelling(true)
+    const importGeneration = importGenerationRef.current
+    importGenerationRef.current += 1
+    controller.abort()
+    try {
+      const preparation = sessionPreparationRef.current
+      let session = sessionRef.current
+      if (!session && preparation) {
+        try {
+          session = await preparation
+        } catch {
+          session = sessionRef.current
+        }
+      }
+      if (session?.importId) {
+        const response = await authenticatedFetch(`/api/project-import-sessions/${session.importId}`, { method: "DELETE" })
+        await readBatchImportResponse<void>(response, {
+          operation: "Canceling the project upload",
+          expectsJson: false,
+        })
+      }
+      if (session?.importId) {
+        scheduleImportFileCleanup(session.importId, session.documents.map((item) => item.relativePath))
+      }
+      activeImportRef.current = false
+      uploadControllerRef.current = null
+      sessionPreparationRef.current = null
+      sessionRef.current = null
+      folderFilesRef.current = []
+      setFolderFiles([])
+      setSkippedFolderFiles([])
+      setFolderProgress({ uploaded: 0, failed: 0 })
+      setFolderError("")
+      setFolderStatus("idle")
+      toast({ title: "Project upload canceled", description: "The unfinished upload was stopped. No project was created." })
+    } catch (error) {
+      activeImportRef.current = false
+      uploadControllerRef.current = null
+      sessionPreparationRef.current = null
+      setFolderStatus("error")
+      setFolderError(error instanceof Error
+        ? `${error.message} The upload may still be saved; retry or dismiss it.`
+        : "The upload could not be canceled. Its files are preserved; retry or dismiss it.")
+      toast({ variant: "destructive", title: "Could not cancel project upload", description: "The upload may still be saved. Retry or dismiss it." })
+    } finally {
+      if (importGenerationRef.current > importGeneration) setIsCancelling(false)
+    }
+  }, [authenticatedFetch, isCancelling])
 
   const persistFolderImportDismissal = React.useCallback(async (importId: string) => {
     for (const delay of [0, 500, 1500]) {
@@ -200,26 +258,37 @@ export function ProjectFolderImportProvider({
     activeImportRef.current = true
     importGenerationRef.current += 1
     const importGeneration = importGenerationRef.current
+    const controller = new AbortController()
+    uploadControllerRef.current = controller
     setFolderStatus("uploading")
     setFolderError("")
     let session = sessionRef.current
     try {
       if (!session) {
-        const created = await authenticatedFetch("/api/project-import-sessions", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ documents: candidates.map(({ file, relativePath }) => ({
-            relativePath, name: file.name, size: file.size, contentType: file.type || "application/octet-stream",
-          })) }),
-        })
-        const body = await readBatchImportResponse<ImportSession>(created, {
-          operation: "Creating the import session",
-          requestPath: "/api/project-import-sessions",
-        })
-        session = body
-        sessionRef.current = body
-        await saveImportFiles(body.importId, candidates)
+        const preparation = (async () => {
+          const created = await authenticatedFetch("/api/project-import-sessions", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ documents: candidates.map(({ file, relativePath }) => ({
+              relativePath, name: file.name, size: file.size, contentType: file.type || "application/octet-stream",
+            })) }),
+          })
+          const body = await readBatchImportResponse<ImportSession>(created, {
+            operation: "Creating the import session",
+            requestPath: "/api/project-import-sessions",
+          })
+          sessionRef.current = body
+          await saveImportFiles(body.importId, candidates)
+          return body
+        })()
+        sessionPreparationRef.current = preparation
+        try {
+          session = await preparation
+        } finally {
+          if (sessionPreparationRef.current === preparation) sessionPreparationRef.current = null
+        }
       }
     } catch (error) {
+      if (importGenerationRef.current !== importGeneration) return
       const message = error instanceof ImportFileStorageError
         ? importFileStorageUnavailableMessage
         : error instanceof Error ? error.message : "Could not preserve the import session."
@@ -227,6 +296,8 @@ export function ProjectFolderImportProvider({
       setFolderStatus("error"); setFolderError(message); activeImportRef.current = false
       return
     }
+    if (importGenerationRef.current !== importGeneration || controller.signal.aborted) return
+    sessionPreparationRef.current = Promise.resolve(session)
     const uploadedPaths = new Set(session.uploadedPaths)
     setFolderProgress({ uploaded: uploadedPaths.size, failed: 0 })
     const failures: SkippedFolderFile[] = []
@@ -237,17 +308,19 @@ export function ProjectFolderImportProvider({
         const request = await authenticatedFetch("/api/storage/uploads/request-url", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name: candidate.file.name, size: candidate.file.size, contentType: candidate.file.type || "application/octet-stream", relativePath: candidate.relativePath, importId: session.importId }),
+          signal: controller.signal,
         })
         const signed = await readBatchImportResponse<{ uploadURL?: string; objectPath?: string }>(request, {
           operation: "Requesting an upload URL",
           fileName: candidate.relativePath,
         })
         if (!signed.uploadURL || !signed.objectPath) throw new Error(`Requesting an upload URL for "${candidate.relativePath}" returned incomplete data. Please retry the import.`)
-        const put = await fetch(signed.uploadURL, { method: "PUT", headers: { "Content-Type": candidate.file.type || "application/octet-stream" }, body: candidate.file })
+        const put = await fetch(signed.uploadURL, { method: "PUT", headers: { "Content-Type": candidate.file.type || "application/octet-stream" }, body: candidate.file, signal: controller.signal })
         await readBatchImportResponse<void>(put, { operation: "Uploading", fileName: candidate.relativePath, expectsJson: false })
         const attached = await authenticatedFetch(`/api/project-import-sessions/${session.importId}/documents`, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ relativePath: candidate.relativePath, objectPath: signed.objectPath, name: candidate.file.name, size: candidate.file.size, contentType: candidate.file.type || "application/octet-stream", textSnippet: await boundedTextSnippet(candidate.file) }),
+          signal: controller.signal,
         })
         const attachedBody = await readBatchImportResponse<ImportSession>(attached, {
           operation: "Saving the completed upload",
@@ -257,8 +330,9 @@ export function ProjectFolderImportProvider({
         sessionRef.current = attachedBody
         setFolderProgress((current) => ({ ...current, uploaded: current.uploaded + 1 }))
       } catch (error) {
+        if (controller.signal.aborted || importGenerationRef.current !== importGeneration) return
         try {
-          const recovery = await authenticatedFetch("/api/project-import-sessions")
+          const recovery = await authenticatedFetch("/api/project-import-sessions", { signal: controller.signal })
           const recovered = await readBatchImportResponse<ImportSession | null>(recovery, { operation: "Checking upload recovery" })
           if (recovered?.importId === session.importId && recovered.uploadedPaths.includes(candidate.relativePath)) {
             uploadedPaths.add(candidate.relativePath)
@@ -274,9 +348,12 @@ export function ProjectFolderImportProvider({
       }
     }
     const worker = async () => {
-      while (cursor < candidates.length) await uploadOne(candidates[cursor++])
+      while (cursor < candidates.length && !controller.signal.aborted && importGenerationRef.current === importGeneration) {
+        await uploadOne(candidates[cursor++])
+      }
     }
     await Promise.all(Array.from({ length: Math.min(4, candidates.length) }, worker))
+    if (controller.signal.aborted || importGenerationRef.current !== importGeneration) return
     setSkippedFolderFiles((current) => [...current, ...failures])
     if (uploadedPaths.size !== session.documents.length) {
       const missing = session.documents.length - uploadedPaths.size
@@ -288,6 +365,7 @@ export function ProjectFolderImportProvider({
       toast({ variant: "destructive", title: "Project folder import failed", description: message })
       return
     }
+    uploadControllerRef.current = null
     setFolderStatus("building")
     const finishImport = async () => {
       await Promise.all([
@@ -295,6 +373,7 @@ export function ProjectFolderImportProvider({
         queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() }),
       ])
       setFolderStatus("success")
+      activeImportRef.current = false
       setFolderError("")
       scheduleImportFileCleanup(session.importId, session.documents.map((item) => item.relativePath))
       cleanupDismissedImportErrors(null)
