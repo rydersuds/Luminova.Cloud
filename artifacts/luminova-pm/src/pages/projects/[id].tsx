@@ -781,7 +781,6 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
               </Button>
             )}
             <Button variant="outline" size="sm" asChild>
-              <Link href={projectWorkflowHref("/messages", project.id)}>Project messages</Link>
             </Button>
           </nav>
           <Tabs value={activeTab} onValueChange={selectTab} className="w-full">

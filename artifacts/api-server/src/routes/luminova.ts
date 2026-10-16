@@ -24,11 +24,6 @@ import
 
   CreateInvoiceBody,
   CreateInvoiceResponse,
-  CreateProjectConversationBody,
-  CreateProjectConversationResponse,
-  CreateProjectMessageBody,
-  CreateProjectMessageParams,
-  CreateProjectMessageResponse,
   CreateProjectImportBody,
   CreateProjectImportResponse,
   CreateProjectImportSessionBody,
@@ -65,9 +60,6 @@ import
   GetFinancialSummaryResponse,
   GetProjectActivityParams,
   GetProjectActivityResponse,
-  GetProjectConversationParams,
-  GetProjectConversationResponse,
-  GetProjectConversationsResponse,
   GetProjectDocumentPreviewParams,
   GetProjectDocumentPreviewResponse,
   GetProjectParams,
@@ -4498,7 +4490,6 @@ router.get("/dashboard/summary", async (req: AuthenticatedRequest, res) =>
       awaitingApproval: invoiceRecords.filter((invoice) =>
         ["pending", "pending approval"].includes(invoice.status.trim().toLowerCase()),
       ).length,
-      unreadMessages: null,
       new360Photos: recent360Photos.length,
       budgeted: projectRecords.reduce((sum, project) =>
         project.budgetEnabled === false ? sum : sum + budgetInDollars(project), 0),
@@ -4647,11 +4638,10 @@ router.get("/search", async (req: AuthenticatedRequest, res) =>
 {
 
 
-    const [projectRecords, tradeRecords, financialRecords, conversationRecords] = await Promise.all([
+    const [projectRecords, tradeRecords, financialRecords] = await Promise.all([
       projectsForOwner(req.userId, requestWorkspaceId(req)),
       tradesForOwner(req.userId, requestWorkspaceId(req)),
       financialRecordsForOwner(req.userId, requestWorkspaceId(req)),
-      conversationsForUser(req),
     ])
 ;
 
@@ -4773,36 +4763,6 @@ router.get("/search", async (req: AuthenticatedRequest, res) =>
 }
 
 ),
-      ...conversationRecords.flatMap((conversation) =>
-        conversation.messages.flatMap((message) => 
-{
-
-
-          const searchable = `${conversation.title} ${conversation.projectName} ${conversation.context} ${message.text}`
-;
-
-
-          return matches(searchable) ? [
-{
-
-
-            id: message.id,
-            kind: "message" as const,
-            title: conversation.title,
-            subtitle: `${message.text} · ${conversation.projectName}`,
-            href: `/messages?conversation=${encodeURIComponent(conversation.id)}`,
-            rank: rank(conversation.title, searchable),
-          
-}
-
-] : []
-;
-
-
-}
-
-),
-      ),
     ]
       .sort((a, b) => a.rank - b.rank || a.title.localeCompare(b.title))
       .slice(0, limit)
@@ -4855,6 +4815,7 @@ router.get("/search", async (req: AuthenticatedRequest, res) =>
 ;
 
 
+/* Communications API routes are retired; keep conversation tables and existing records intact.
 router.get("/conversations", async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.userId) {
     res.status(401).json({ error: "Authentication required" });
@@ -5091,7 +5052,7 @@ router.post("/conversations/:conversationId/messages", async (req: Authenticated
   }));
 });
 
-/* Legacy creator-owned conversation routes replaced by participant-scoped routes above.
+Legacy creator-owned conversation handlers are retained here as inactive historical code.
 router.get("/conversations", async (req: AuthenticatedRequest, res): Promise<void> =>
 {
 

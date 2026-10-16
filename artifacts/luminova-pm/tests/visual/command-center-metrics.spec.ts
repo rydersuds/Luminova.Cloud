@@ -3,7 +3,6 @@ import { expect, test, type Page } from '@playwright/test';
 const dashboard = {
   activeProjects: 3,
   awaitingApproval: 2,
-  unreadMessages: null,
   new360Photos: 4,
   budgetEnabledProjects: 3,
   budgeted: 100000,

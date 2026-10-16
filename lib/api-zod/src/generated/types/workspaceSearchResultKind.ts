@@ -14,5 +14,4 @@ export const WorkspaceSearchResultKind = {
   vendor: 'vendor',
   quote: 'quote',
   invoice: 'invoice',
-  message: 'message',
 } as const;

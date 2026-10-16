@@ -23,7 +23,6 @@ export const HealthCheckResponse = zod.object({
 export const GetDashboardSummaryResponse = zod.object({
   "activeProjects": zod.number().int(),
   "awaitingApproval": zod.number().int(),
-  "unreadMessages": zod.number().int().nullable(),
   "new360Photos": zod.number().int(),
   "budgetEnabledProjects": zod.number().int().describe('Number of accessible projects included in internal budget reporting.'),
   "budgeted": zod.number(),
@@ -2294,200 +2293,12 @@ export const SearchWorkspaceQueryParams = zod.object({
 
 export const SearchWorkspaceResponseItem = zod.object({
   "id": zod.string(),
-  "kind": zod.enum(['project', 'vendor', 'quote', 'invoice', 'message']),
+  "kind": zod.enum(['project', 'vendor', 'quote', 'invoice']),
   "title": zod.string(),
   "subtitle": zod.string(),
   "href": zod.string()
 })
 export const SearchWorkspaceResponse = zod.array(SearchWorkspaceResponseItem)
-
-
-/**
- * @summary List chats the authenticated user participates in
- */
-export const GetProjectConversationsResponseItem = zod.object({
-  "id": zod.string(),
-  "type": zod.enum(['direct', 'project']),
-  "projectId": zod.string().nullable(),
-  "projectName": zod.string().nullable(),
-  "title": zod.string(),
-  "context": zod.string(),
-  "participants": zod.array(zod.object({
-  "id": zod.string(),
-  "name": zod.string(),
-  "email": zod.string(),
-  "imageUrl": zod.string(),
-  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client'])
-})),
-  "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date(),
-  "messages": zod.array(zod.object({
-  "id": zod.string(),
-  "conversationId": zod.string(),
-  "projectId": zod.string().nullable(),
-  "senderId": zod.string(),
-  "sender": zod.object({
-  "id": zod.string(),
-  "name": zod.string(),
-  "email": zod.string(),
-  "imageUrl": zod.string(),
-  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client'])
-}),
-  "text": zod.string(),
-  "createdAt": zod.coerce.date()
-}))
-})
-export const GetProjectConversationsResponse = zod.array(GetProjectConversationsResponseItem)
-
-
-/**
- * @summary Create a direct or project chat
- */
-
-export const createProjectConversationBodyTitleMax = 160;
-
-export const createProjectConversationBodyContextDefault = `Project channel`;
-export const createProjectConversationBodyContextMax = 200;
-
-
-export const createProjectConversationBodyParticipantIdsMax = 50;
-
-
-
-export const CreateProjectConversationBody = zod.object({
-  "type": zod.enum(['direct', 'project']),
-  "projectId": zod.string().min(1).optional(),
-  "title": zod.string().min(1).max(createProjectConversationBodyTitleMax).optional(),
-  "context": zod.string().max(createProjectConversationBodyContextMax).default(createProjectConversationBodyContextDefault),
-  "participantIds": zod.array(zod.string().min(1)).min(1).max(createProjectConversationBodyParticipantIdsMax)
-})
-
-export const CreateProjectConversationResponse = zod.object({
-  "id": zod.string(),
-  "type": zod.enum(['direct', 'project']),
-  "projectId": zod.string().nullable(),
-  "projectName": zod.string().nullable(),
-  "title": zod.string(),
-  "context": zod.string(),
-  "participants": zod.array(zod.object({
-  "id": zod.string(),
-  "name": zod.string(),
-  "email": zod.string(),
-  "imageUrl": zod.string(),
-  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client'])
-})),
-  "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date(),
-  "messages": zod.array(zod.object({
-  "id": zod.string(),
-  "conversationId": zod.string(),
-  "projectId": zod.string().nullable(),
-  "senderId": zod.string(),
-  "sender": zod.object({
-  "id": zod.string(),
-  "name": zod.string(),
-  "email": zod.string(),
-  "imageUrl": zod.string(),
-  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client'])
-}),
-  "text": zod.string(),
-  "createdAt": zod.coerce.date()
-}))
-})
-
-
-/**
- * @summary List eligible chat participants and projects
- */
-export const GetChatOptionsResponse = zod.object({
-  "currentUserId": zod.string(),
-  "participants": zod.array(zod.object({
-  "id": zod.string(),
-  "name": zod.string(),
-  "email": zod.string(),
-  "imageUrl": zod.string(),
-  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client'])
-})),
-  "projects": zod.array(zod.object({
-  "id": zod.string(),
-  "name": zod.string(),
-  "clientName": zod.string(),
-  "eligibleParticipantIds": zod.array(zod.string())
-}))
-})
-
-
-/**
- * @summary Get a chat the authenticated user participates in
- */
-export const GetProjectConversationParams = zod.object({
-  "conversationId": zod.coerce.string()
-})
-
-export const GetProjectConversationResponse = zod.object({
-  "id": zod.string(),
-  "type": zod.enum(['direct', 'project']),
-  "projectId": zod.string().nullable(),
-  "projectName": zod.string().nullable(),
-  "title": zod.string(),
-  "context": zod.string(),
-  "participants": zod.array(zod.object({
-  "id": zod.string(),
-  "name": zod.string(),
-  "email": zod.string(),
-  "imageUrl": zod.string(),
-  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client'])
-})),
-  "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date(),
-  "messages": zod.array(zod.object({
-  "id": zod.string(),
-  "conversationId": zod.string(),
-  "projectId": zod.string().nullable(),
-  "senderId": zod.string(),
-  "sender": zod.object({
-  "id": zod.string(),
-  "name": zod.string(),
-  "email": zod.string(),
-  "imageUrl": zod.string(),
-  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client'])
-}),
-  "text": zod.string(),
-  "createdAt": zod.coerce.date()
-}))
-})
-
-
-/**
- * @summary Add a message to a chat the authenticated user participates in
- */
-export const CreateProjectMessageParams = zod.object({
-  "conversationId": zod.coerce.string()
-})
-
-export const createProjectMessageBodyTextMax = 5000;
-
-
-
-export const CreateProjectMessageBody = zod.object({
-  "text": zod.string().min(1).max(createProjectMessageBodyTextMax)
-})
-
-export const CreateProjectMessageResponse = zod.object({
-  "id": zod.string(),
-  "conversationId": zod.string(),
-  "projectId": zod.string().nullable(),
-  "senderId": zod.string(),
-  "sender": zod.object({
-  "id": zod.string(),
-  "name": zod.string(),
-  "email": zod.string(),
-  "imageUrl": zod.string(),
-  "role": zod.enum(['Admin', 'Project Manager', 'Field Team', 'Client'])
-}),
-  "text": zod.string(),
-  "createdAt": zod.coerce.date()
-})
 
 
 /**
@@ -3310,3 +3121,5 @@ export const DeleteWorkspaceUserParams = zod.object({
 })
 
 export const DeleteWorkspaceUserResponse = zod.void()
+
+

@@ -80,10 +80,8 @@ test('simulates project, panorama, schedule, quote, and invoice workflows, then 
   await page.getByTestId('button-schedule-timeline').click();
   await expect(page.getByText('30-day lookahead', { exact: true })).toBeVisible();
 
-  await page.getByTestId('nav-communications').click();
-  await page.getByTestId('input-message-draft').fill('Sample coordination update for the morning huddle.');
-  await page.getByTestId('button-send-message').click();
-  await expect(page.getByText('Sample coordination update for the morning huddle.', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('nav-communications')).toHaveCount(0);
+  await expect(page.getByTestId('input-message-draft')).toHaveCount(0);
 
   await page.getByTestId('nav-users').click();
   await page.getByTestId('select-role-filter').selectOption('Client');

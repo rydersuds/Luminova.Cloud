@@ -143,8 +143,6 @@ test('project workflow links keep context and project tabs survive reload on mob
   await expect(page.getByRole('tab', { name: 'Activity', exact: true })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Project workflow' }).getByRole('link', { name: 'Submit invoice', exact: true }))
     .toHaveAttribute('href', '/invoices?projectId=riverstone&submit=1');
-  await expect(page.getByRole('navigation', { name: 'Project workflow' }).getByRole('link', { name: 'Project messages', exact: true }))
-    .toHaveAttribute('href', '/messages?projectId=riverstone');
   await page.getByRole('tab', { name: 'Activity', exact: true }).click();
   await expect(page).toHaveURL(/tab=activity/);
   await page.reload();
@@ -160,7 +158,7 @@ test('featured projects switch accessibly and fit mobile screens', async ({ page
     json: [project, { ...project, id: 'prairie', name: 'Prairie House', pmName: 'Sam Carter' }],
   }));
   await page.route('**/api/dashboard/summary', route => route.fulfill({
-    json: { activeProjects: 2, awaitingApproval: 0, unreadMessages: 0, new360Photos: 0, budgetEnabledProjects: 0, budgeted: 0, invoiced: 0, recentActivity: [] },
+    json: { activeProjects: 2, awaitingApproval: 0, new360Photos: 0, budgetEnabledProjects: 0, budgeted: 0, invoiced: 0, recentActivity: [] },
   }));
   await page.goto('/__visual/dashboard-cards');
   const stage = page.getByTestId('dashboard-project-stage');
@@ -183,7 +181,7 @@ test('project highlights browse every project without crowding the banner', asyn
   }));
   await page.route('**/api/projects', route => route.fulfill({ json: highlights }));
   await page.route('**/api/dashboard/summary', route => route.fulfill({
-    json: { activeProjects: 9, awaitingApproval: 0, unreadMessages: 0, new360Photos: 0, budgetEnabledProjects: 0, budgeted: 0, invoiced: 0, recentActivity: [] },
+    json: { activeProjects: 9, awaitingApproval: 0, new360Photos: 0, budgetEnabledProjects: 0, budgeted: 0, invoiced: 0, recentActivity: [] },
   }));
   await page.goto('/__visual/dashboard-cards');
   const stage = page.getByTestId('dashboard-project-stage');
@@ -241,7 +239,6 @@ test('selects a workspace Project Manager while creating a project', async ({ pa
     json: {
       activeProjects: 0,
       awaitingApproval: 0,
-      unreadMessages: 0,
       new360Photos: 0,
       budgetEnabledProjects: 0,
       budgeted: 0,
@@ -276,7 +273,6 @@ test('keeps project initialization reachable on short desktop and mobile screens
     json: {
       activeProjects: 0,
       awaitingApproval: 0,
-      unreadMessages: 0,
       new360Photos: 0,
       budgetEnabledProjects: 0,
       budgeted: 0,
@@ -661,7 +657,6 @@ test('quick view keeps urgent project information readable on phones', async ({ 
     json: {
       activeProjects: 1,
       awaitingApproval: 1,
-      unreadMessages: 2,
       new360Photos: 1,
       budgetEnabledProjects: 1,
       budgeted: project.budgeted,
@@ -721,6 +716,7 @@ test('quick view keeps urgent project information readable on phones', async ({ 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/__visual/mobile-overview');
   await expect(page.getByTestId('page-mobile-overview')).toBeVisible();
+  await expect(page.getByTestId('link-signal-unread')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'The work, at a glance.' })).toBeVisible();
   await expect(page.getByTestId('value-client-revenue')).toHaveText('$112,840,000');
   await expect(page.getByTestId('value-budget-usage')).toContainText('$52,300,000');
@@ -748,7 +744,6 @@ test('quick view keeps client revenue visible when all project budgets are disab
     json: {
       activeProjects: 1,
       awaitingApproval: 0,
-      unreadMessages: 0,
       new360Photos: 0,
       budgetEnabledProjects: 0,
       budgeted: 0,
@@ -778,7 +773,6 @@ test('quick view hides internal schedule and approvals from clients', async ({ p
     json: {
       activeProjects: 1,
       awaitingApproval: 1,
-      unreadMessages: 0,
       new360Photos: 0,
       budgetEnabledProjects: 1,
       budgeted: project.budgeted,
@@ -817,7 +811,7 @@ for (const failedEntry of ['file', 'directory'] as const) {
     });
     await page.route('**/api/projects', route => route.fulfill({ json: [project] }));
     await page.route('**/api/dashboard/summary', route => route.fulfill({
-      json: { activeProjects: 1, awaitingApproval: 0, unreadMessages: 0, new360Photos: 0, budgetEnabledProjects: 0, budgeted: 0, invoiced: 0, recentActivity: [] },
+      json: { activeProjects: 1, awaitingApproval: 0, new360Photos: 0, budgetEnabledProjects: 0, budgeted: 0, invoiced: 0, recentActivity: [] },
     }));
     await page.route('**/api/invoices/summary', route => route.fulfill({
       json: { invoicedRevenue: 0, invoicedExpenses: 0, upcomingClientPayments: 0, acceptedClientQuoteValue: 0 },

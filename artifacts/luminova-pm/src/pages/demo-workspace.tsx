@@ -3,7 +3,7 @@ import {
   Activity as ActivityIcon, ArrowUpRight, Bell, BriefcaseBusiness, CalendarDays,
   Camera, Check, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, CircleDollarSign,
   ClipboardList, Clock3, Command, FileCheck2, FileText, Filter, HardHat, LayoutDashboard,
-  List, MapPin, MessageSquare, MoreHorizontal, Plus, RotateCcw, Search, Send, Settings2,
+  List, MapPin, MoreHorizontal, Plus, RotateCcw, Search, Settings2,
   ShieldCheck, SlidersHorizontal, Sparkles, Users, Wallet, X,
 } from "lucide-react";
 import {
@@ -24,7 +24,6 @@ const navGroups = [
     { id: "trades" as ModuleKey, label: "Trades & vendors", icon: HardHat },
     { id: "quotes" as ModuleKey, label: "Vendor quotes", icon: FileText },
     { id: "financials" as ModuleKey, label: "Financials", icon: Wallet },
-    { id: "communications" as ModuleKey, label: "Communications", icon: MessageSquare },
   ] },
   { label: "Organization", items: [
     { id: "users" as ModuleKey, label: "Users & roles", icon: Users },
@@ -126,8 +125,6 @@ export default function DemoWorkspace() {
   const [quoteFilter, setQuoteFilter] = useState("All quotes");
   const [quoteEditing, setQuoteEditing] = useState<string | null>(null);
   const [quoteDraft, setQuoteDraft] = useState("");
-  const [messageDraft, setMessageDraft] = useState("");
-  const [channel, setChannel] = useState("Riverstone · Field team");
   const [showIntake, setShowIntake] = useState(false);
   const [intakeName, setIntakeName] = useState("");
   const [intakeClient, setIntakeClient] = useState("");
@@ -145,7 +142,7 @@ export default function DemoWorkspace() {
   const visibleNav = navGroups.map((group) => ({
     ...group,
     items: persona === "Jordan Blake" ? group.items.filter((item) => !["financials", "quotes", "users"].includes(item.id))
-      : persona === "Elena Park" ? group.items.filter((item) => ["command", "projects", "communications", "profile"].includes(item.id))
+      : persona === "Elena Park" ? group.items.filter((item) => ["command", "projects", "profile"].includes(item.id))
         : persona !== "Morgan Reyes" ? group.items.filter((item) => item.id !== "users")
           : group.items,
   })).filter((group) => group.items.length);
@@ -160,7 +157,7 @@ export default function DemoWorkspace() {
     const hiddenForPersona = next === "Jordan Blake"
       ? ["financials", "quotes", "users"].includes(module)
       : next === "Elena Park"
-        ? !["command", "projects", "communications", "profile"].includes(module)
+        ? !["command", "projects", "profile"].includes(module)
         : next !== "Morgan Reyes" && module === "users";
     if (hiddenForPersona) setModule("command");
     flash("Sample persona changed", "Visibility is illustrative and remains local to this demo.");
@@ -172,10 +169,10 @@ export default function DemoWorkspace() {
   const resetDemo = () => {
     setData(cloneDemoData()); setModule("command"); setActiveProjectId("riverstone");
     setProjectTab("Overview"); setPersona("Morgan Reyes"); setQuery(""); setQuoteFilter("All quotes");
-    setChannel("Riverstone · Field team"); setSelectedInvoice(null); setQuoteEditing(null); setQuoteDraft("");
+    setSelectedInvoice(null); setQuoteEditing(null); setQuoteDraft("");
     setProjectFilter("All status"); setProjectView("grid"); setScheduleMode("Timeline"); setDirectoryFilter("All trades");
     setGalleryFilter("All media"); setProfilePrefs({ weekly: true, mentions: true, digest: false });
-    setMessageDraft(""); setShowIntake(false); setActivePhoto(null); setShowSearch(false); setShowMobileNav(false);
+    setShowIntake(false); setActivePhoto(null); setShowSearch(false); setShowMobileNav(false);
     setNotice({ title: "Demo reset", detail: "The original sample scenario has been restored." });
     window.setTimeout(() => setNotice(null), 2800);
   };
@@ -206,12 +203,6 @@ export default function DemoWorkspace() {
     setData((current) => ({ ...current, projects: [project, ...current.projects] }));
     setIntakeName(""); setIntakeClient(""); setShowIntake(false); flash("Sample project added");
   };
-  const sendMessage = () => {
-    if (!messageDraft.trim()) return;
-    const message = { id: `m-${Date.now()}`, channel, author: persona, time: "Just now", body: messageDraft.trim() };
-    setData((current) => ({ ...current, messages: [message, ...current.messages] }));
-    setMessageDraft(""); flash("Message added to the sample thread");
-  };
   const addSampleImport = () => {
     const found = data.projects.some((project) => project.id === "imported-sample");
     if (found) { flash("Sample import already added"); return; }
@@ -228,7 +219,6 @@ export default function DemoWorkspace() {
     trades: ["Supply chain / directory", "Trades & vendors", "Trusted partners and active capacity across your project portfolio."],
     quotes: ["Procurement / bid review", "Vendor quotes", "Review scope, compare pricing, and record a local decision."],
     financials: ["Cost control / accounts payable", "Financials", "Invoices and approvals tied to live project budgets."],
-    communications: ["Field network / project channels", "Communications", "Project conversations stay beside the work they coordinate."],
     users: ["Workspace / access control", "Users & roles", "Sample team access and visibility by role."],
     profile: ["Account / preferences", "Profile & preferences", "Personal workspace settings for this sample account."],
   };
@@ -268,7 +258,6 @@ export default function DemoWorkspace() {
         setData((current) => ({ ...current, quotes: current.quotes.map((quote) => quote.id === id ? { ...quote, amount } : quote) }));
       }} />;
     if (module === "financials") return <FinancialsView data={data} selectedInvoice={selectedInvoice} setSelectedInvoice={setSelectedInvoice} changeInvoice={changeInvoice} openProject={openProject} />;
-    if (module === "communications") return <CommunicationsView data={data} persona={persona} channel={channel} setChannel={setChannel} draft={messageDraft} setDraft={setMessageDraft} send={sendMessage} flash={flash} openProject={openProject} />;
     if (module === "users") return <UsersView data={data} persona={persona} onPersona={switchPersona} flash={flash} />;
     return <ProfileView persona={persona} prefs={profilePrefs} setPrefs={setProfilePrefs} onReset={resetDemo} flash={flash} />;
   }
@@ -598,26 +587,6 @@ function FinancialsView({ data, selectedInvoice, setSelectedInvoice, changeInvoi
   </div>;
 }
 
-function CommunicationsView({ data, persona, channel, setChannel, draft, setDraft, send, flash, openProject }: {
-  data: DemoData; persona: string; channel: string; setChannel: (value: string) => void; draft: string; setDraft: (value: string) => void; send: () => void; flash: (title: string, detail?: string) => void; openProject: (id: string) => void;
-}) {
-  const channels = Array.from(new Set(data.messages.map((message) => message.channel)));
-  const messages = data.messages.filter((message) => message.channel === channel);
-  const projectId = channel.split(" · ")[0].toLowerCase().replaceAll(" ", "");
-  const channelProject = data.projects.find((project) => project.name.toLowerCase().replaceAll(/[^a-z0-9]/g, "").startsWith(projectId.split("&")[0]));
-  return <div className="grid min-h-[600px] overflow-hidden rounded-xl border border-sidebar-border/80 bg-[#171b15] lg:grid-cols-[250px_1fr]">
-    <aside className="border-b border-sidebar-border/70 bg-[#141711] p-3 lg:border-b-0 lg:border-r"><div className="flex items-center justify-between px-2 py-2"><div><p className="font-mono text-[9px] uppercase tracking-widest text-sidebar-foreground/40">Channels</p><p className="mt-1 text-[10px] text-sidebar-foreground/35">Sample project rooms</p></div><button type="button" aria-label="Simulate new channel" data-testid="button-new-channel" onClick={() => flash("Channel creation simulated", "New project channels are not created in this sandbox.")} className="rounded-md p-1.5 text-sidebar-foreground/45 hover:bg-sidebar-accent"><Plus size={14} /></button></div>
-      <div className="mt-2 space-y-1">{channels.map((item, index) => <button type="button" key={item} data-testid={`button-channel-${index}`} aria-pressed={channel === item} onClick={() => setChannel(item)} className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left ${channel === item ? "bg-primary/10 text-primary" : "text-sidebar-foreground/60 hover:bg-sidebar-accent/50"}`}><span className="grid h-7 w-7 place-items-center rounded-md border border-sidebar-border/70 bg-sidebar-accent/35"><MessageSquare size={13} /></span><span className="min-w-0 flex-1"><span className="block truncate text-[10px] font-semibold">{item.split(" · ")[0]}</span><span className="mt-0.5 block truncate text-[9px] opacity-60">{item.split(" · ")[1]}</span></span><span className="h-1.5 w-1.5 rounded-full bg-primary/70" /></button>)}</div>
-      <div className="mt-5 border-t border-sidebar-border/60 pt-4"><p className="px-2 font-mono text-[8px] uppercase tracking-widest text-sidebar-foreground/35">Sandbox notice</p><p className="px-2 pt-2 text-[9px] leading-4 text-sidebar-foreground/40">Messages you send are added to this session only. Nothing is delivered to project teams.</p></div>
-    </aside>
-    <div className="flex min-h-[580px] min-w-0 flex-col">
-      <div className="flex items-center justify-between border-b border-sidebar-border/65 px-4 py-3.5"><div className="flex items-center gap-3"><div className="grid h-8 w-8 place-items-center rounded-lg border border-primary/20 bg-primary/10 text-primary"><MessageSquare size={15} /></div><div><p className="text-xs font-bold">{channel}</p><p className="mt-1 text-[9px] text-sidebar-foreground/40">{channelProject?.name || "Project coordination"} · {messages.length} messages</p></div></div><Button testId="button-channel-details" onClick={() => channelProject ? openProject(channelProject.id) : flash("Channel details", "Sample channel metadata only.")}><MoreHorizontal size={16} /></Button></div>
-      <div aria-label="Conversation messages" data-testid="message-thread" className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">{[...messages].reverse().map((message) => <div key={message.id} data-testid={`message-${message.id}`} className={`flex items-start gap-3 ${message.author === persona ? "flex-row-reverse" : ""}`}><div className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border text-[9px] font-bold ${message.author === persona ? "border-primary/30 bg-primary/10 text-primary" : "border-sidebar-border bg-sidebar-accent text-sidebar-foreground/65"}`}>{message.author.split(" ").map((part) => part[0]).join("")}</div><div className={`max-w-[82%] ${message.author === persona ? "text-right" : ""}`}><div className={`mb-1.5 flex items-center gap-2 text-[9px] text-sidebar-foreground/40 ${message.author === persona ? "justify-end" : ""}`}><span className="font-semibold text-sidebar-foreground/65">{message.author}</span><span>{message.time}</span></div><div className={`rounded-xl px-3.5 py-2.5 text-left text-[11px] leading-5 ${message.author === persona ? "rounded-tr-sm border border-primary/20 bg-primary/[.09]" : "rounded-tl-sm border border-sidebar-border/70 bg-sidebar-accent/35"}`}>{message.body}</div></div></div>)}</div>
-      <form onSubmit={(event) => { event.preventDefault(); send(); }} className="border-t border-sidebar-border/65 p-3 sm:p-4"><label htmlFor="message-draft" className="sr-only">Write a sample message</label><div className="flex items-end gap-2 rounded-xl border border-sidebar-border bg-[#131610] p-2 focus-within:border-primary/45"><textarea id="message-draft" data-testid="input-message-draft" value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); } }} placeholder={`Message ${channel.split(" · ")[0]}…`} rows={2} className="max-h-28 min-h-10 flex-1 resize-y bg-transparent px-2 py-1.5 text-xs outline-none placeholder:text-sidebar-foreground/30" /><button type="submit" data-testid="button-send-message" disabled={!draft.trim()} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Add simulated message"><Send size={15} /></button></div><p className="mt-2 px-1 text-[9px] text-sidebar-foreground/35">Enter to send · Shift + Enter for a new line · local demo only</p></form>
-    </div>
-  </div>;
-}
-
 function UsersView({ data, persona, onPersona, flash }: { data: DemoData; persona: string; onPersona: (persona: Persona) => void; flash: (title: string, detail?: string) => void }) {
   const [roleFilter, setRoleFilter] = useState("All access");
   const [visibility, setVisibility] = useState(true);
@@ -640,9 +609,9 @@ function ProfileView({ persona, prefs, setPrefs, onReset, flash }: {
   const toggle = (key: keyof typeof prefs) => setPrefs({ ...prefs, [key]: !prefs[key] });
   return <div className="grid gap-5 xl:grid-cols-[1fr_340px]">
     <div className="space-y-5"><section className="rounded-xl border border-sidebar-border/80 bg-[#171b15] p-5 sm:p-6"><div className="flex flex-wrap items-center gap-4"><div className="grid h-16 w-16 place-items-center rounded-2xl border border-primary/30 bg-primary/10 text-lg font-bold text-primary">{member.initials}</div><div className="min-w-0 flex-1"><p className="font-mono text-[9px] uppercase tracking-[.18em] text-primary">Sample account</p><h2 data-testid="profile-persona-name" className="mt-1 text-xl font-bold">{persona}</h2><p className="mt-1 text-xs text-sidebar-foreground/45">{member.role} · {member.email}</p></div><StatusPill>{member.access}</StatusPill></div><div className="mt-6 grid gap-3 border-t border-sidebar-border/60 pt-5 sm:grid-cols-2"><ProfileField label="Workspace" value="Luminova Fieldworks" /><ProfileField label="Region" value="Mountain · United States" /><ProfileField label="Time zone" value="Mountain Time (UTC−06:00)" /><ProfileField label="Default project" value="Riverstone House" /></div></section>
-      <section className="rounded-xl border border-sidebar-border/80 bg-[#171b15] p-5"><div className="flex items-start justify-between"><div><h3 className="text-xs font-bold">Notification preferences</h3><p className="mt-1 text-[10px] text-sidebar-foreground/40">Adjust this local sample profile.</p></div><Bell size={16} className="text-primary/75" /></div><div className="mt-3 divide-y divide-sidebar-border/50">{([["weekly", "Weekly project digest", "Monday morning portfolio summary"], ["mentions", "Direct mentions", "When your name is called in a project channel"], ["digest", "Daily field log", "A compact recap of new site records"]] as const).map(([key, label, description]) => <PreferenceRow key={key} testId={`toggle-pref-${key}`} label={label} description={description} value={prefs[key]} onToggle={() => toggle(key)} />)}</div></section>
-      <section className="rounded-xl border border-sidebar-border/80 bg-[#171b15] p-5"><div className="flex items-start justify-between"><div><h3 className="text-xs font-bold">Workspace defaults</h3><p className="mt-1 text-[10px] text-sidebar-foreground/40">Preferences are temporary for this session.</p></div><SlidersHorizontal size={16} className="text-sidebar-foreground/45" /></div><div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="text-[10px] text-sidebar-foreground/55">Start page<select aria-label="Choose demo start page preference" data-testid="select-start-page" onChange={() => flash("Start page preference updated")} defaultValue="Command center" className="mt-2 h-9 w-full rounded-lg border border-sidebar-border bg-sidebar-accent/35 px-3 text-xs text-sidebar-foreground outline-none"><option>Command center</option><option>All projects</option><option>Schedule</option><option>Communications</option></select></label><label className="text-[10px] text-sidebar-foreground/55">Date format<select aria-label="Choose date format" data-testid="select-date-format" onChange={() => flash("Date format preference updated")} defaultValue="MMM d, yyyy" className="mt-2 h-9 w-full rounded-lg border border-sidebar-border bg-sidebar-accent/35 px-3 text-xs text-sidebar-foreground outline-none"><option>MMM d, yyyy</option><option>MM/dd/yyyy</option><option>dd/MM/yyyy</option></select></label></div><div className="mt-4 flex justify-end"><Button testId="button-save-profile" variant="gold" onClick={() => flash("Profile preferences staged")}><Check size={13} /> Save preferences</Button></div></section></div>
-    <aside className="space-y-4"><section className="rounded-xl border border-primary/20 bg-primary/[.045] p-5"><div className="flex items-center gap-2 text-primary"><Sparkles size={16} /><span className="font-mono text-[9px] uppercase tracking-[.18em]">Demo session</span></div><h3 className="mt-3 text-sm font-bold">A safe place to explore</h3><p className="mt-2 text-[11px] leading-5 text-sidebar-foreground/55">This workspace runs entirely in memory. No account changes, messages, approvals, files, or records are sent to a service. Reload returns everything to the starting scenario.</p><div className="mt-4 space-y-2 border-t border-primary/15 pt-4 text-[10px] text-sidebar-foreground/55"><p className="flex items-center gap-2"><Check size={12} className="text-emerald-300" /> Sample data only</p><p className="flex items-center gap-2"><Check size={12} className="text-emerald-300" /> Backend operations simulated</p><p className="flex items-center gap-2"><Check size={12} className="text-emerald-300" /> Reset available at any time</p></div></section><section className="rounded-xl border border-sidebar-border/80 bg-[#171b15] p-5"><div className="grid h-9 w-9 place-items-center rounded-lg border border-sidebar-border bg-sidebar-accent/30 text-sidebar-foreground/65"><RotateCcw size={15} /></div><h3 className="mt-3 text-xs font-bold">Restore sample scenario</h3><p className="mt-1 text-[10px] leading-4 text-sidebar-foreground/45">Clear local changes and return to the original sample portfolio.</p><Button testId="button-profile-reset-demo" variant="outline" className="mt-4 w-full" onClick={onReset}>Reset demo workspace</Button></section><p className="px-1 font-mono text-[8px] uppercase leading-4 tracking-widest text-sidebar-foreground/30">Luminova construction operations · public demo</p></aside>
+      <section className="rounded-xl border border-sidebar-border/80 bg-[#171b15] p-5"><div className="flex items-start justify-between"><div><h3 className="text-xs font-bold">Notification preferences</h3><p className="mt-1 text-[10px] text-sidebar-foreground/40">Adjust this local sample profile.</p></div><Bell size={16} className="text-primary/75" /></div><div className="mt-3 divide-y divide-sidebar-border/50">{([["weekly", "Weekly project digest", "Monday morning portfolio summary"], ["mentions", "Schedule change alerts", "When dates move on a project schedule"], ["digest", "Daily field log", "A compact recap of new site records"]] as const).map(([key, label, description]) => <PreferenceRow key={key} testId={`toggle-pref-${key}`} label={label} description={description} value={prefs[key]} onToggle={() => toggle(key)} />)}</div></section>
+      <section className="rounded-xl border border-sidebar-border/80 bg-[#171b15] p-5"><div className="flex items-start justify-between"><div><h3 className="text-xs font-bold">Workspace defaults</h3><p className="mt-1 text-[10px] text-sidebar-foreground/40">Preferences are temporary for this session.</p></div><SlidersHorizontal size={16} className="text-sidebar-foreground/45" /></div><div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="text-[10px] text-sidebar-foreground/55">Start page<select aria-label="Choose demo start page preference" data-testid="select-start-page" onChange={() => flash("Start page preference updated")} defaultValue="Command center" className="mt-2 h-9 w-full rounded-lg border border-sidebar-border bg-sidebar-accent/35 px-3 text-xs text-sidebar-foreground outline-none"><option>Command center</option><option>All projects</option><option>Schedule</option></select></label><label className="text-[10px] text-sidebar-foreground/55">Date format<select aria-label="Choose date format" data-testid="select-date-format" onChange={() => flash("Date format preference updated")} defaultValue="MMM d, yyyy" className="mt-2 h-9 w-full rounded-lg border border-sidebar-border bg-sidebar-accent/35 px-3 text-xs text-sidebar-foreground outline-none"><option>MMM d, yyyy</option><option>MM/dd/yyyy</option><option>dd/MM/yyyy</option></select></label></div><div className="mt-4 flex justify-end"><Button testId="button-save-profile" variant="gold" onClick={() => flash("Profile preferences staged")}><Check size={13} /> Save preferences</Button></div></section></div>
+    <aside className="space-y-4"><section className="rounded-xl border border-primary/20 bg-primary/[.045] p-5"><div className="flex items-center gap-2 text-primary"><Sparkles size={16} /><span className="font-mono text-[9px] uppercase tracking-[.18em]">Demo session</span></div><h3 className="mt-3 text-sm font-bold">A safe place to explore</h3><p className="mt-2 text-[11px] leading-5 text-sidebar-foreground/55">This workspace runs entirely in memory. No account changes, approvals, files, or records are sent to a service. Reload returns everything to the starting scenario.</p><div className="mt-4 space-y-2 border-t border-primary/15 pt-4 text-[10px] text-sidebar-foreground/55"><p className="flex items-center gap-2"><Check size={12} className="text-emerald-300" /> Sample data only</p><p className="flex items-center gap-2"><Check size={12} className="text-emerald-300" /> Backend operations simulated</p><p className="flex items-center gap-2"><Check size={12} className="text-emerald-300" /> Reset available at any time</p></div></section><section className="rounded-xl border border-sidebar-border/80 bg-[#171b15] p-5"><div className="grid h-9 w-9 place-items-center rounded-lg border border-sidebar-border bg-sidebar-accent/30 text-sidebar-foreground/65"><RotateCcw size={15} /></div><h3 className="mt-3 text-xs font-bold">Restore sample scenario</h3><p className="mt-1 text-[10px] leading-4 text-sidebar-foreground/45">Clear local changes and return to the original sample portfolio.</p><Button testId="button-profile-reset-demo" variant="outline" className="mt-4 w-full" onClick={onReset}>Reset demo workspace</Button></section><p className="px-1 font-mono text-[8px] uppercase leading-4 tracking-widest text-sidebar-foreground/30">Luminova construction operations · public demo</p></aside>
   </div>;
 }
 

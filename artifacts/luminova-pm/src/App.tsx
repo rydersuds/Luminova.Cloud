@@ -42,7 +42,6 @@ const Projects = lazy(pageModules.projects);
 const TradesDirectory = lazy(pageModules.trades);
 const TradeDetail = lazy(pageModules.tradeDetail);
 const Invoices = lazy(pageModules.invoices);
-const Messages = lazy(pageModules.messages);
 const Users = lazy(pageModules.users);
 const Quotes = lazy(pageModules.quotes);
 const Profile = lazy(pageModules.profile);
@@ -92,7 +91,7 @@ function Home() {
           <img src="/luminova-logo.png" alt="Luminova Construction" className="mb-10 h-20 w-64 object-contain object-left" />
           <p className="font-mono text-xs uppercase tracking-[.24em] text-primary">Secure construction operations</p>
           <h1 className="mt-5 max-w-2xl text-5xl font-extrabold leading-[0.98] tracking-[-0.04em] sm:text-7xl">Build with complete visibility.</h1>
-          <p className="mt-6 max-w-xl text-base leading-7 text-sidebar-foreground/65">A precise command center for live projects, field documentation, schedules, budgets, invoices, vendors, and communications.</p>
+          <p className="mt-6 max-w-xl text-base leading-7 text-sidebar-foreground/65">A precise command center for live projects, field documentation, schedules, budgets, invoices, and vendors.</p>
           <div className="mt-9 flex flex-wrap items-center gap-4">
             <Link href="/sign-in" className="tech-clip gold-glow inline-flex h-12 items-center justify-center bg-primary px-8 font-bold text-primary-foreground transition-transform hover:-translate-y-0.5">Sign in</Link>
             <a href={`${basePath}/demo`} data-testid="link-public-demo" className="inline-flex h-12 items-center justify-center border border-primary/50 px-8 font-bold text-sidebar-foreground transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary">Explore interactive demo</a>
@@ -110,10 +109,10 @@ function Home() {
               <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[.16em] text-primary"><span className="h-1.5 w-1.5 rounded-full bg-primary" />Preview</span>
             </div>
             <div className="grid grid-cols-2 gap-px overflow-hidden border border-sidebar-border/60 bg-sidebar-border/60">
-              {["Projects", "Field records", "Financials", "Team channels"].map((label, index) => (
+              {["Projects", "Field records", "Financials", "Project partners"].map((label, index) => (
                 <div key={label} className="bg-sidebar/75 p-5">
                   <p className="font-mono text-[10px] uppercase tracking-[.14em] text-sidebar-foreground/45">{label}</p>
-                  <p className="mt-3 font-heading text-2xl font-bold text-sidebar-foreground">{["Sites", "360° photos", "Budgets", "Messages"][index]}</p>
+                  <p className="mt-3 font-heading text-2xl font-bold text-sidebar-foreground">{["Sites", "360° photos", "Budgets", "Partners"][index]}</p>
                 </div>
               ))}
             </div>
@@ -187,7 +186,6 @@ function AuthenticatedRoutes() {
         <Route path="/trades/:id" component={TradeDetail} />
         <Route path="/invoices" component={Invoices} />
         <Route path="/quotes" component={Quotes} />
-        <Route path="/messages" component={Messages} />
         <Route path="/users" component={Users} />
         <Route path="/profile" component={Profile} />
         <Route component={NotFound} />
@@ -314,20 +312,6 @@ function App() {
     return (
       <WouterRouter base={basePath}>
         <Suspense fallback={<PageFallback />}><DemoWorkspace /></Suspense>
-      </WouterRouter>
-    );
-  }
-
-  if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/messages')) {
-    return (
-      <WouterRouter base={basePath}>
-        <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl}>
-          <QueryClientProvider client={queryClient}>
-            <TooltipProvider>
-              <AppLayout><Suspense fallback={<WorkspacePageFallback />}><Messages /></Suspense></AppLayout>
-            </TooltipProvider>
-          </QueryClientProvider>
-        </ClerkProvider>
       </WouterRouter>
     );
   }

@@ -6,7 +6,6 @@ import {
   FileText,
   FolderKanban,
   Loader2,
-  MessageSquare,
   Search,
   Users,
   UserCog,
@@ -18,7 +17,6 @@ const DESTINATIONS = [
   { id: "vendors", title: "Trades & Vendors", subtitle: "Vendor directory and profiles", href: "/trades", icon: Users },
   { id: "quotes", title: "Vendor Quotes", subtitle: "Quotes submitted to Luminova", href: "/quotes", icon: FileText },
   { id: "financials", title: "Financials", subtitle: "Invoices and portfolio totals", href: "/invoices", icon: FileText },
-  { id: "communications", title: "Communications", subtitle: "Project messages", href: "/messages", icon: MessageSquare },
   { id: "users", title: "Users & Roles", subtitle: "Workspace access", href: "/users", icon: UserCog },
 ]
 
@@ -27,7 +25,6 @@ const resultIcons = {
   vendor: Users,
   quote: FileText,
   invoice: FileText,
-  message: MessageSquare,
 } satisfies Record<WorkspaceSearchResult["kind"], React.ElementType>
 
 export function GlobalSearch() {
@@ -78,7 +75,7 @@ export function GlobalSearch() {
         aria-label="Search the workspace"
         aria-expanded={showPanel}
         aria-controls="global-search-results"
-        placeholder="Search projects, vendors, messages…"
+        placeholder="Search projects, vendors, and invoices…"
         value={value}
         onChange={(event) => {
           setValue(event.target.value)

@@ -568,7 +568,6 @@ test('selects a standard photo as the exterior photo and keeps it selected after
     json: {
       activeProjects: 1,
       awaitingApproval: 0,
-      unreadMessages: 0,
       new360Photos: 0,
       budgetEnabledProjects: 1,
       budgeted: current.budgeted,

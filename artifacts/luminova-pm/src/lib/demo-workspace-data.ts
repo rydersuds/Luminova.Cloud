@@ -1,6 +1,6 @@
 export type ModuleKey =
   | "command" | "projects" | "project" | "schedule" | "trades" | "quotes"
-  | "financials" | "communications" | "users" | "profile";
+  | "financials" | "users" | "profile";
 
 export type ProjectStatus = "On track" | "Watch" | "At risk";
 export type BoardStatus = "To do" | "In progress" | "Review" | "Done";
@@ -69,14 +69,6 @@ export interface Invoice {
   description: string;
 }
 
-export interface DemoMessage {
-  id: string;
-  channel: string;
-  author: string;
-  time: string;
-  body: string;
-}
-
 export interface TeamMember {
   id: string;
   name: string;
@@ -112,7 +104,6 @@ export interface DemoData {
   vendors: Vendor[];
   quotes: Quote[];
   invoices: Invoice[];
-  messages: DemoMessage[];
   team: TeamMember[];
   photos: SitePhoto[];
   activity: Activity[];
@@ -155,13 +146,6 @@ export const initialDemoData: DemoData = {
     { id: "i2", vendorId: "v6", projectId: "northline", number: "CM-11842", amount: 32750, date: "Jun 11", due: "Jun 25", status: "Pending approval", description: "Rough-in billing · floors 3–4" },
     { id: "i3", vendorId: "v4", projectId: "cedar", number: "ST-09117", amount: 8640, date: "Jun 09", due: "Jun 24", status: "Approved", description: "Lobby stone setting · final" },
     { id: "i4", vendorId: "v5", projectId: "mesa", number: "HC-20318", amount: 48750, date: "Jun 05", due: "Jun 20", status: "Paid", description: "Mobilization and site prep" },
-  ],
-  messages: [
-    { id: "m1", channel: "Riverstone · Field team", author: "Avery Chen", time: "9:42 AM", body: "Millwork crew is staged for Thursday. I’ve flagged the two pantry fillers for the morning walk." },
-    { id: "m2", channel: "Riverstone · Field team", author: "Morgan Reyes", time: "9:18 AM", body: "Great. Please capture the north window reveal in the 360 before drywall closes." },
-    { id: "m3", channel: "Northline · Coordination", author: "Jordan Blake", time: "Yesterday", body: "Glazing lead time is holding at six weeks. Shop drawing review is the critical path this week." },
-    { id: "m4", channel: "Northline · Coordination", author: "Avery Chen", time: "Yesterday", body: "Updated the procurement milestone; structural steel inspection is now confirmed for Friday." },
-    { id: "m5", channel: "Cedar & Slate · Closeout", author: "Morgan Reyes", time: "Mon", body: "Fire marshal asked for the revised kitchen hood sequence. I’ve added it to the closeout list." },
   ],
   team: [
     { id: "u1", name: "Morgan Reyes", role: "Project Manager", email: "morgan@luminova.build", initials: "MR", access: "Admin", projectIds: ["riverstone", "cedar"] },

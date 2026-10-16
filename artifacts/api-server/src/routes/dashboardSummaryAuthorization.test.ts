@@ -14,7 +14,7 @@ import {
 } from "@workspace/db";
 import luminovaRouter from "./luminova";
 
-test("dashboard summary reports persisted, workspace-scoped metrics with explicit unavailable unread count", async (t) => {
+test("dashboard summary reports persisted, workspace-scoped project and financial metrics", async (t) => {
   const suffix = randomUUID();
   const ownerId = `dashboard-owner-${suffix}`;
   const workspaceId = `dashboard-workspace-${suffix}`;
@@ -172,7 +172,6 @@ test("dashboard summary reports persisted, workspace-scoped metrics with explici
   assert.deepEqual(await response.json(), {
     activeProjects: 2,
     awaitingApproval: 2,
-    unreadMessages: null,
     new360Photos: 1,
     budgetEnabledProjects: 5,
     budgeted: 3500,

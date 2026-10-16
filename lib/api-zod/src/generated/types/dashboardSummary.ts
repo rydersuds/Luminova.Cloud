@@ -10,8 +10,6 @@ import type { Activity } from './activity';
 export interface DashboardSummary {
   activeProjects: number;
   awaitingApproval: number;
-  /** @nullable */
-  unreadMessages: number | null;
   new360Photos: number;
   /** Number of accessible projects included in internal budget reporting. */
   budgetEnabledProjects: number;

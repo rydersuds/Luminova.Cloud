@@ -162,9 +162,9 @@ test.describe('navigation contrast', () => {
     await assertNavigationContrast(page, 'desktop hover');
     await expect(page).toHaveScreenshot('desktop-hover.png', { animations: 'disabled' });
 
-    await page.goto('/__visual/sidebar?active=messages');
-    await expect(page.getByRole('link', { name: 'Communications' })).toHaveAttribute('aria-current', 'page');
-    await expect(page).toHaveScreenshot('desktop-active-messages.png', { animations: 'disabled' });
+    await page.goto('/__visual/sidebar?active=projects');
+    await expect(page.getByRole('link', { name: 'All Projects' })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('link', { name: 'Communications' })).toHaveCount(0);
   });
 
   test('desktop profile-expanded and sign-out states', async ({ page }) => {
@@ -187,7 +187,7 @@ test.describe('navigation contrast', () => {
 
   test('desktop compact rail keeps destinations and profile actions usable', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto('/__visual/sidebar?sidebar=compact&active=messages&profile=open');
+    await page.goto('/__visual/sidebar?sidebar=compact&active=projects&profile=open');
     await expect(page.getByTestId('app-layout')).toBeVisible();
 
     const sidebar = page.locator('aside');
@@ -200,8 +200,8 @@ test.describe('navigation contrast', () => {
     const toggle = page.getByTestId('desktop-sidebar-toggle');
     await expect(toggle).toHaveAccessibleName('Expand sidebar');
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await expect(page.getByRole('link', { name: 'Communications' })).toHaveAttribute('title', 'Communications');
-    await expect(page.getByRole('link', { name: 'Communications' })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('link', { name: 'All Projects' })).toHaveAttribute('title', 'All Projects');
+    await expect(page.getByRole('link', { name: 'All Projects' })).toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeInViewport();
     await assertBackgroundlessSidebarControls(page);
@@ -211,7 +211,7 @@ test.describe('navigation contrast', () => {
     await page.keyboard.press('Enter');
     await expect(toggle).toHaveAccessibleName('Collapse sidebar');
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    await expect(page.getByRole('link', { name: 'Communications' })).not.toHaveAttribute('title', 'Communications');
+    await expect(page.getByRole('link', { name: 'All Projects' })).not.toHaveAttribute('title', 'All Projects');
   });
 
   test('desktop collapse preference survives reload and does not change mobile drawer behavior', async ({ page }) => {
@@ -382,10 +382,10 @@ test.describe('navigation selection motion', () => {
     await expect(indicator).toHaveAttribute('data-motion-phase', 'idle');
     await expectIndicatorAligned(indicator, page.getByRole('link', { name: 'All Projects' }));
 
-    const communications = page.getByRole('link', { name: 'Communications' });
-    await communications.click();
-    await expect(communications).toHaveAttribute('aria-current', 'page');
-    await expectStagedLanding(indicator, communications, 'down');
+    const schedule = page.getByRole('link', { name: 'Schedule' });
+    await schedule.click();
+    await expect(schedule).toHaveAttribute('aria-current', 'page');
+    await expectStagedLanding(indicator, schedule, 'down');
 
     const projects = page.getByRole('link', { name: 'All Projects' });
     await projects.click();
@@ -440,13 +440,13 @@ test.describe('navigation selection motion', () => {
     await expect(page.getByTestId('desktop-sidebar-toggle')).toHaveAccessibleName('Expand sidebar');
 
     const indicator = page.getByTestId('sidebar-selection-indicator');
-    const messages = page.getByRole('link', { name: 'Communications' });
-    await messages.click();
-    await expect(messages).toHaveAttribute('aria-current', 'page');
-    await expectIndicatorAligned(indicator, messages);
+    const financials = page.getByRole('link', { name: 'Financials' });
+    await financials.click();
+    await expect(financials).toHaveAttribute('aria-current', 'page');
+    await expectIndicatorAligned(indicator, financials);
 
     await page.getByTestId('desktop-sidebar-toggle').click();
     await expect(page.getByTestId('desktop-sidebar-toggle')).toHaveAccessibleName('Collapse sidebar');
-    await expectIndicatorAligned(indicator, messages);
+    await expectIndicatorAligned(indicator, financials);
   });
 });

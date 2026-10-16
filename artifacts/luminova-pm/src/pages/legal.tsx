@@ -12,7 +12,7 @@ const termsSections: LegalSection[] = [
   {
     title: "1. About these terms",
     paragraphs: [
-      "These Terms & Conditions govern access to Luminova Construction PM, a construction project-management service for coordinating projects, trades, messages, documents, invoices, quotes, photographs, and related field information.",
+      "These Terms & Conditions govern access to Luminova Construction PM, a construction project-management service for coordinating projects, trades, documents, invoices, quotes, photographs, and related field information.",
       "Luminova Construction operates the service for its construction and project-operations teams and approved project collaborators. By using the service, you confirm that you are authorized to act for your organization and agree to follow these terms. If you do not agree, do not use the service.",
     ],
   },
@@ -27,7 +27,7 @@ const termsSections: LegalSection[] = [
     title: "3. Project content and permissions",
     paragraphs: [
       "Your organization retains ownership of the project information it submits. You grant the service provider a limited permission to host, process, transmit, back up, and display that information only as needed to operate, secure, support, and improve the service.",
-      "You are responsible for ensuring that you have the rights and permissions needed to upload drawings, site photographs, personal information, quotes, invoices, messages, and other content.",
+      "You are responsible for ensuring that you have the rights and permissions needed to upload drawings, site photographs, personal information, quotes, invoices, and other content.",
       "Workspace administrators control invitations, roles, project access, and shared records on behalf of their organization. Do not upload information that a person or organization has asked you not to disclose.",
     ],
   },
@@ -48,7 +48,7 @@ const termsSections: LegalSection[] = [
   {
     title: "6. Files, site media, and acceptable use",
     paragraphs: [
-      "The service supports project files, plans, invoices, quotes, site photographs, panoramas, messages, and related operational records. You must follow applicable privacy, copyright, employment, workplace-safety, surveillance, and site-access requirements when collecting or sharing them.",
+      "The service supports project files, plans, invoices, quotes, site photographs, panoramas, and related operational records. You must follow applicable privacy, copyright, employment, workplace-safety, surveillance, and site-access requirements when collecting or sharing them.",
       "Luminova Construction may remove content or restrict access when reasonably necessary to protect a project, person, workspace, system, or legal right. If the service is provided under a separate construction, employment, vendor, or commercial agreement, that agreement continues to govern the underlying project relationship.",
     ],
   },

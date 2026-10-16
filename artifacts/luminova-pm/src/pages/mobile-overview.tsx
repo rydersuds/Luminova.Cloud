@@ -8,7 +8,6 @@ import {
   Clock3,
   HardHat,
   MapPin,
-  MessageSquare,
   RefreshCw,
   Wallet,
 } from "lucide-react";
@@ -147,7 +146,6 @@ export default function MobileOverviewPage() {
     !summary
     || typeof summary.activeProjects !== "number"
     || typeof summary.awaitingApproval !== "number"
-    || (summary.unreadMessages !== null && typeof summary.unreadMessages !== "number")
     || typeof summary.new360Photos !== "number"
     || typeof summary.budgetEnabledProjects !== "number"
     || typeof summary.budgeted !== "number"
@@ -173,7 +171,6 @@ export default function MobileOverviewPage() {
   const signals = [
     { label: "Active sites", value: summary?.activeProjects, icon: HardHat, href: "/projects", tone: "text-[#e4c879]" },
     ...(canSeeApprovals ? [{ label: "For approval", value: summary?.awaitingApproval, icon: ClipboardCheck, href: "/approvals", tone: "text-[#edb978]" }] : []),
-    { label: "Unread", value: summary?.unreadMessages, icon: MessageSquare, href: "/messages", tone: "text-[#bed0c0]" },
     { label: "New 360s", value: summary?.new360Photos, icon: CheckCircle2, href: "/projects", tone: "text-[#bdc8bf]" },
   ];
 

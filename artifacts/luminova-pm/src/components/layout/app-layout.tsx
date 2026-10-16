@@ -5,7 +5,6 @@ import {
   Users,
   FileText,
   ClipboardList,
-  MessageSquare,
   UserCog,
   Menu,
   X,
@@ -55,7 +54,6 @@ const SUPPORT_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "Team",
     items: [
-      { href: "/messages", label: "Communications", icon: MessageSquare, hint: "Team messages" },
       { href: "/users", label: "Users & Roles", icon: UserCog, hint: "Access and invitations", adminOnly: true },
     ],
   },

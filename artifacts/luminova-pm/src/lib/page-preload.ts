@@ -6,7 +6,6 @@ export const pageModules = {
   trades: () => import("@/pages/trades"),
   tradeDetail: () => import("@/pages/trades/[id]"),
   invoices: () => import("@/pages/invoices"),
-  messages: () => import("@/pages/messages"),
   users: () => import("@/pages/users"),
   quotes: () => import("@/pages/quotes"),
   profile: () => import("@/pages/profile"),
@@ -35,11 +34,10 @@ const primaryPageLoaders = [
   { href: "/trades", loader: pageModules.trades },
   { href: "/invoices", loader: pageModules.invoices },
   { href: "/quotes", loader: pageModules.quotes },
-  { href: "/messages", loader: pageModules.messages },
   { href: "/users", loader: pageModules.users },
 ]
 
-const workspacePaths = ["/mobile", "/projects", "/schedule", "/approvals", "/trades", "/invoices", "/quotes", "/messages", "/users", "/profile"]
+const workspacePaths = ["/mobile", "/projects", "/schedule", "/approvals", "/trades", "/invoices", "/quotes", "/users", "/profile"]
 
 function browserPreloadEnvironment(): PreloadEnvironment | undefined {
   if (typeof navigator === "undefined") return undefined
@@ -80,9 +78,8 @@ export function preloadPage(href: string) {
             : href.startsWith("/trades/") ? pageModules.tradeDetail
               : href === "/invoices" ? pageModules.invoices
                 : href === "/quotes" ? pageModules.quotes
-                  : href === "/messages" ? pageModules.messages
-                    : href === "/users" ? pageModules.users
-                        : href === "/profile" ? pageModules.profile
+                  : href === "/users" ? pageModules.users
+                    : href === "/profile" ? pageModules.profile
                       : undefined
 
   if (loader) void loader()
