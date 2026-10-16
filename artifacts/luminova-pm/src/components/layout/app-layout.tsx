@@ -81,6 +81,7 @@ type AppLayoutViewProps = {
   location: string
   displayName: string
   email: string
+  profileImageUrl?: string | null
   onSignOut: () => void
   initialSidebarOpen?: boolean
   initialSidebarCollapsed?: boolean
@@ -107,11 +108,36 @@ function readSidebarCollapsedPreference() {
   }
 }
 
+function SidebarAvatar({ imageUrl, initials }: { imageUrl?: string | null; initials: string }) {
+  const [imageFailed, setImageFailed] = useState(false)
+  const showImage = Boolean(imageUrl) && !imageFailed
+
+  return (
+    <div
+      data-testid="sidebar-profile-avatar"
+      className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-primary/80 to-primary font-heading font-bold text-primary-foreground shadow-[inset_0_1px_3px_rgba(255,255,255,0.5),0_4px_12px_hsl(var(--primary)/0.4)]"
+    >
+      {showImage ? (
+        <img
+          data-testid="sidebar-profile-image"
+          src={imageUrl ?? undefined}
+          alt=""
+          aria-hidden="true"
+          className="h-full w-full object-cover"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        <span data-testid="sidebar-profile-initials">{initials || "PM"}</span>
+      )}
+    </div>
+  )
+}
 export function AppLayoutView({
   children,
   location,
   displayName,
   email,
+  profileImageUrl,
   onSignOut,
   initialSidebarOpen = false,
   initialSidebarCollapsed,
@@ -632,9 +658,11 @@ export function AppLayoutView({
                 sidebarCollapsed ? "justify-center px-2" : "gap-3 px-3",
               )}
             >
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/80 to-primary flex items-center justify-center font-heading font-bold text-primary-foreground shadow-[inset_0_1px_3px_rgba(255,255,255,0.5),0_4px_12px_hsl(var(--primary)/0.4)]">
-                {initials || "PM"}
-              </div>
+              <SidebarAvatar
+                key={profileImageUrl ?? "no-profile-image"}
+                imageUrl={profileImageUrl}
+                initials={initials}
+              />
               <div className={cn("min-w-0 flex-1", sidebarCollapsed && "sr-only")}>
                 <p className="font-bold truncate tracking-wide drop-shadow-sm">{displayName}</p>
                 <p
@@ -755,6 +783,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       location={location}
       displayName={user?.fullName || user?.firstName || "Project Manager"}
       email={user?.primaryEmailAddress?.emailAddress || "Signed in"}
+      profileImageUrl={user?.imageUrl}
       onSignOut={() => void signOut({ redirectUrl: import.meta.env.BASE_URL })}
     >
       {children}

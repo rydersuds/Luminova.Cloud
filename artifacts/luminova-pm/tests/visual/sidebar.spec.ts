@@ -149,6 +149,38 @@ const assertNavigationContrast = async (
 };
 
 test.describe('navigation contrast', () => {
+  test('profile photo and initials fallback render across desktop and mobile sidebars', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/__visual/sidebar?photo=sample');
+    const avatar = page.getByTestId('sidebar-profile-avatar');
+    const image = page.getByTestId('sidebar-profile-image');
+    await expect(image).toBeVisible();
+    await expect.poll(() => image.evaluate((element) => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+    await expect(avatar).toHaveCSS('width', '40px');
+    await expect(avatar).toHaveCSS('height', '40px');
+    await expect(image).toHaveCSS('object-fit', 'cover');
+    await expect(page).toHaveScreenshot('desktop-profile-photo.png', { animations: 'disabled' });
+
+    await page.goto('/__visual/sidebar?photo=sample&sidebar=compact');
+    await expect(page.getByTestId('sidebar-profile-image')).toBeVisible();
+    await expect(page.getByTestId('sidebar-profile-avatar')).toHaveCSS('width', '40px');
+    await expect(page).toHaveScreenshot('desktop-compact-profile-photo.png', { animations: 'disabled' });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/__visual/sidebar?photo=sample&drawer=open');
+    await expect(page.getByRole('dialog', { name: 'Main navigation' })).toBeVisible();
+    await expect(page.getByTestId('sidebar-profile-image')).toBeVisible();
+    await expect(page).toHaveScreenshot('mobile-drawer-profile-photo.png', { animations: 'disabled' });
+
+    await page.goto('/__visual/sidebar');
+    await expect(page.getByTestId('sidebar-profile-initials')).toHaveText('MR');
+    await expect(page.getByTestId('sidebar-profile-image')).toHaveCount(0);
+
+    await page.goto('/__visual/sidebar?photo=broken');
+    await expect(page.getByTestId('sidebar-profile-image')).toHaveCount(0);
+    await expect(page.getByTestId('sidebar-profile-initials')).toHaveText('MR');
+  });
+
   test('desktop active, hover, and shared dark surface', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await stabilize(page);

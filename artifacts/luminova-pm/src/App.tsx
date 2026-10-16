@@ -536,6 +536,12 @@ function SidebarVisualHarness() {
   const params = new URLSearchParams(window.location.search);
   const [activeLocation, setActiveLocation] = useState(`/${params.get('active') || 'projects'}`);
   const [initialDrawerOpen, setInitialDrawerOpen] = useState(params.get('drawer') === 'open');
+  const photoMode = params.get('photo');
+  const profileImageUrl = photoMode === 'sample'
+    ? `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><defs><linearGradient id="bg" x2="0" y2="1"><stop stop-color="#9ed9df"/><stop offset="1" stop-color="#28647a"/></linearGradient></defs><rect width="80" height="80" fill="url(#bg)"/><circle cx="40" cy="31" r="16" fill="#f0c3a1"/><path d="M15 80c2-20 12-31 25-31s23 11 25 31" fill="#26384b"/><path d="M24 29c0-15 8-23 17-23 11 0 17 10 16 23-5-4-10-8-14-14-5 7-11 11-19 14" fill="#46352e"/></svg>')}`
+    : photoMode === 'broken'
+      ? `${basePath}/__visual/missing-profile-photo.jpg`
+      : undefined;
 
   return (
     <WouterRouter base={basePath}>
@@ -544,6 +550,7 @@ function SidebarVisualHarness() {
         location={activeLocation}
         displayName="Morgan Reyes"
         email="morgan@luminova.test"
+        profileImageUrl={profileImageUrl}
         onSignOut={() => undefined}
         onNavigate={(destination) => {
           setInitialDrawerOpen(false);
