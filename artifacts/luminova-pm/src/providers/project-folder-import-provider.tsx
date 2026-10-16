@@ -110,6 +110,7 @@ export function ProjectFolderImportProvider({
   const folderFilesRef = React.useRef<FolderCandidate[]>([])
   const sessionRef = React.useRef<ImportSession | null>(null)
   const uploadControllerRef = React.useRef<AbortController | null>(null)
+  const cancelRequestedRef = React.useRef(false)
   const sessionPreparationRef = React.useRef<Promise<ImportSession> | null>(null)
   const dismissedImportIdsRef = React.useRef(new Set<string>())
   const dismissedPendingErrorRef = React.useRef(false)
@@ -140,7 +141,8 @@ export function ProjectFolderImportProvider({
 
   const cancelFolderImport = React.useCallback(async () => {
     const controller = uploadControllerRef.current
-    if (!controller || isCancelling) return
+    if (!controller || cancelRequestedRef.current || isCancelling) return
+    cancelRequestedRef.current = true
     setIsCancelling(true)
     const importGeneration = importGenerationRef.current
     importGenerationRef.current += 1
@@ -148,11 +150,11 @@ export function ProjectFolderImportProvider({
     try {
       const preparation = sessionPreparationRef.current
       let session = sessionRef.current
-      if (!session && preparation) {
+      if (preparation) {
         try {
           session = await preparation
         } catch {
-          session = sessionRef.current
+          session = session ?? sessionRef.current
         }
       }
       if (session?.importId) {
@@ -186,6 +188,7 @@ export function ProjectFolderImportProvider({
         : "The upload could not be canceled. Its files are preserved; retry or dismiss it.")
       toast({ variant: "destructive", title: "Could not cancel project upload", description: "The upload may still be saved. Retry or dismiss it." })
     } finally {
+      cancelRequestedRef.current = false
       if (importGenerationRef.current > importGeneration) setIsCancelling(false)
     }
   }, [authenticatedFetch, isCancelling])
@@ -260,6 +263,7 @@ export function ProjectFolderImportProvider({
     const importGeneration = importGenerationRef.current
     const controller = new AbortController()
     uploadControllerRef.current = controller
+    cancelRequestedRef.current = false
     setFolderStatus("uploading")
     setFolderError("")
     let session = sessionRef.current
@@ -608,7 +612,7 @@ export function ProjectFolderImportProvider({
     }
   }, [authenticatedFetch, isLoaded, isSignedIn, persistFolderImportDismissal, queryClient, startFolderImport])
 
-  return <ProjectFolderImportContext.Provider value={{ folderFiles, skippedFolderFiles, folderStatus, folderProgress, folderError, collectFolderFiles, startFolderImport, clearFolderImport, dismissFolderError, isActive }}>
+  return <ProjectFolderImportContext.Provider value={{ folderFiles, skippedFolderFiles, folderStatus, folderProgress, folderError, isCancelling, collectFolderFiles, startFolderImport, cancelFolderImport, clearFolderImport, dismissFolderError, isActive }}>
     {children}
     <FolderImportActivity isSignedIn={Boolean(isSignedIn)} />
   </ProjectFolderImportContext.Provider>
@@ -621,7 +625,7 @@ export function useProjectFolderImport() {
 }
 
 function FolderImportActivity({ isSignedIn }: { isSignedIn: boolean }) {
-  const { folderFiles, skippedFolderFiles, folderStatus, folderProgress, folderError, dismissFolderError } = useProjectFolderImport()
+  const { folderFiles, skippedFolderFiles, folderStatus, folderProgress, folderError, isCancelling, cancelFolderImport, dismissFolderError } = useProjectFolderImport()
   const [expanded, setExpanded] = React.useState(true)
   if (!isSignedIn || folderStatus === "idle") return null
   const active = folderStatus === "uploading" || folderStatus === "building"
@@ -662,6 +666,7 @@ function FolderImportActivity({ isSignedIn }: { isSignedIn: boolean }) {
         {folderStatus === "building" ? "Uploads complete. Reading documents and creating the project." : `${folderFiles.length} supported files · ${skippedFolderFiles.length} skipped`}
       </p>
       {folderError && <p role="alert" className="mt-2 text-xs text-destructive">{folderError}</p>}
+      {folderStatus === "uploading" && <button type="button" onClick={() => void cancelFolderImport()} disabled={isCancelling} data-testid="button-cancel-project-upload" className="mt-3 w-full rounded-lg border border-destructive/40 px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50">{isCancelling ? "Canceling upload…" : "Cancel project upload"}</button>}
       {!active && <button type="button" onClick={dismissFolderError} className="mt-3 w-full rounded-lg border border-primary/25 px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-primary transition-colors hover:bg-primary/10">{isError ? "Dismiss error" : "Dismiss status"}</button>}
     </div>}
   </aside>

@@ -14,3 +14,9 @@ When restoring with no identified session, gate the recovery attempt once per au
 **Why:** An unstable callback dependency or a still-failing gateway can restart the restore effect after dismissal and repeatedly show the same transient 502 even though the user already hid it.
 
 **How to apply:** Reset the one-run guard when authentication is lost; clear it through a new provider mount or an explicit new import rather than allowing ordinary rerenders to start another restore loop.
+
+Cancellation is supported while project files are uploading, but not after project building starts.
+
+**Why:** Client uploads can be aborted and their exact session dismissed before the server starts creating a project; once building begins, the browser cannot guarantee that stopping a request will prevent completion.
+
+**How to apply:** Abort active transfers, wait for session creation and local file persistence, then dismiss that exact unfinished session before clearing its browser draft. Keep the server's build lock as the boundary for rejecting late cancellation attempts.

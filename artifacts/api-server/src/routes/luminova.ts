@@ -6192,6 +6192,21 @@ router.delete("/project-import-sessions/:importId", async (req, res): Promise<vo
     return;
   }
 
+  const [dismissed] = await db.update(projectImportBatchesTable).set({
+    dismissedAt: new Date(),
+    updatedAt: new Date(),
+  }).where(and(
+    eq(projectImportBatchesTable.id, params.data.importId),
+    eq(projectImportBatchesTable.ownerId, ownerId),
+    eq(projectImportBatchesTable.workspaceId, workspaceId),
+    isNull(projectImportBatchesTable.dismissedAt),
+    inArray(projectImportBatchesTable.status, ["uploading", "ready", "failed"]),
+  )).returning({ id: projectImportBatchesTable.id });
+  if (dismissed) {
+    res.status(204).end();
+    return;
+  }
+
   const [batch] = await db.select({
     id: projectImportBatchesTable.id,
     status: projectImportBatchesTable.status,
@@ -6205,7 +6220,7 @@ router.delete("/project-import-sessions/:importId", async (req, res): Promise<vo
     res.status(404).json({ error: "Import session not found." });
     return;
   }
-  if (batch.dismissedAt || batch.status === "completed") {
+  if (batch.dismissedAt) {
     res.status(204).end();
     return;
   }
@@ -6213,16 +6228,11 @@ router.delete("/project-import-sessions/:importId", async (req, res): Promise<vo
     res.status(409).json({ error: "This import is currently being built." });
     return;
   }
-
-  await db.update(projectImportBatchesTable).set({
-    dismissedAt: new Date(),
-    updatedAt: new Date(),
-  }).where(and(
-    eq(projectImportBatchesTable.id, batch.id),
-    eq(projectImportBatchesTable.ownerId, ownerId),
-    eq(projectImportBatchesTable.workspaceId, workspaceId),
-  ));
-  res.status(204).end();
+  if (batch.status === "completed") {
+    res.status(409).json({ error: "This import has already completed. Its project was not changed." });
+    return;
+  }
+  res.status(409).json({ error: "This import can no longer be canceled." });
 });
 
 router.post("/project-import-sessions/:importId/documents", async (req, res): Promise<void> => {
@@ -7382,7 +7392,11 @@ router.post("/project-import-sessions/:importId/build", async (req, res): Promis
     buildLeaseId,
     updatedAt: new Date(),
   })
-    .where(and(eq(projectImportBatchesTable.id, batch.id), inArray(projectImportBatchesTable.status, ["uploading", "failed"]))).returning();
+    .where(and(
+      eq(projectImportBatchesTable.id, batch.id),
+      isNull(projectImportBatchesTable.dismissedAt),
+      inArray(projectImportBatchesTable.status, ["uploading", "failed"]),
+    )).returning();
   if (!locked) {
     res.status(409).json({ error: batch.status === "completed" ? "This import has already completed." : "This import is already being built." });
     return;

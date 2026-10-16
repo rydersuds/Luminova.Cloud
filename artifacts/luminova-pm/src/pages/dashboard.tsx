@@ -93,7 +93,7 @@ export default function Dashboard() {
   const loadingProjects = projectQuery.isLoading
 
   const createProject = useCreateProject()
-  const { folderFiles, skippedFolderFiles, folderStatus, folderProgress, folderError, collectFolderFiles, startFolderImport, clearFolderImport, isActive: isFolderImportActive } = useProjectFolderImport()
+  const { folderFiles, skippedFolderFiles, folderStatus, folderProgress, folderError, isCancelling, collectFolderFiles, startFolderImport, cancelFolderImport, clearFolderImport, isActive: isFolderImportActive } = useProjectFolderImport()
 
   // Intake State
   const [intakeMode, setIntakeMode] = React.useState<"manual" | "import">("manual")
@@ -517,6 +517,7 @@ export default function Dashboard() {
                                   </div>
                                 </div>
                                 <div className="flex gap-3">
+                                  {folderStatus === "uploading" && <Button variant="outline" onClick={() => void cancelFolderImport()} disabled={isCancelling} className="font-mono text-xs uppercase btn-3d">{isCancelling ? "Canceling…" : "Cancel upload"}</Button>}
                                   <Button variant="outline" onClick={clearFolderImport} disabled={isFolderImportActive} className="font-mono text-xs uppercase btn-3d">Reset</Button>
                                   <Button onClick={() => void startFolderImport()} disabled={isFolderImportActive || folderStatus === "success"} className="btn-3d font-mono uppercase tracking-widest bg-primary text-primary-foreground">
                                     {folderStatus === "uploading" ? `Uploading ${folderProgress.uploaded + folderProgress.failed}/${folderFiles.length}` : folderStatus === "building" ? "Analyzing documents..." : folderStatus === "success" ? "Project initialized" : folderStatus === "error" ? "Retry upload" : "Starting upload..."}

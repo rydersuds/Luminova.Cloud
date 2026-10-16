@@ -525,6 +525,15 @@ function FolderImportVisualHarness() {
         onChange={(event) => folderImport.collectFolderFiles(Array.from(event.target.files || []))}
       />
       <button type="button" onClick={() => void folderImport.startFolderImport()}>Start import</button>
+      {folderImport.folderStatus === "uploading" && (
+        <button
+          type="button"
+          disabled={folderImport.isCancelling}
+          onClick={() => void folderImport.cancelFolderImport()}
+        >
+          {folderImport.isCancelling ? "Canceling…" : "Cancel upload"}
+        </button>
+      )}
       <output aria-label="Import status">{folderImport.folderStatus}</output>
       <output aria-label="Uploaded files">{folderImport.folderProgress.uploaded}</output>
       {folderImport.folderError && <p data-testid="dashboard-import-alert" role="alert">{folderImport.folderError}</p>}

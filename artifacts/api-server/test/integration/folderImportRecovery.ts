@@ -336,8 +336,30 @@ try {
   assert.equal(completedSession.retryable, false);
   assert.ok(completedSession.projectId);
 
+  const completedDelete = await fetch(`${baseUrl}/project-import-sessions/${created.importId}`, { method: "DELETE" });
+  assert.equal(completedDelete.status, 409, "A completed import must not be reported as canceled.");
+  const completedAfterDelete = await json(await fetch(`${baseUrl}/project-import-sessions/${created.importId}`)) as {
+    status: string;
+    projectId: string | null;
+  };
+  assert.equal(completedAfterDelete.status, "completed");
+  assert.equal(completedAfterDelete.projectId, completedSession.projectId);
+
   const duplicateBuild = await fetch(`${baseUrl}/project-import-sessions/${created.importId}/build`, { method: "POST" });
   assert.equal(duplicateBuild.status, 409);
+
+  const canceledImport = await json(await fetch(`${baseUrl}/project-import-sessions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ documents: [manifest[0]] }),
+  })) as { importId: string };
+  const canceled = await fetch(`${baseUrl}/project-import-sessions/${canceledImport.importId}`, { method: "DELETE" });
+  assert.equal(canceled.status, 204, "An unfinished upload should be dismissible.");
+  const repeatedCancellation = await fetch(`${baseUrl}/project-import-sessions/${canceledImport.importId}`, { method: "DELETE" });
+  assert.equal(repeatedCancellation.status, 204, "Canceling an already-dismissed session should remain safe.");
+  assert.equal(await (await fetch(`${baseUrl}/project-import-sessions`)).json(), null, "A canceled import must not be restored.");
+  const lateBuild = await fetch(`${baseUrl}/project-import-sessions/${canceledImport.importId}/build`, { method: "POST" });
+  assert.equal(lateBuild.status, 404, "A canceled upload must not start building later.");
 
   const permanentImport = await json(await fetch(`${baseUrl}/project-import-sessions`, {
     method: "POST",
@@ -354,6 +376,18 @@ try {
   assert.equal(blockedRetry.status, 422, "A permanent input failure was submitted to analysis again.");
   const blockedRetryBody = await blockedRetry.json() as { error: string };
   assert.match(blockedRetryBody.error, /Choose different or smaller files/i);
+
+  await database.db.update(database.projectImportBatchesTable).set({
+    status: "building",
+    buildLeaseId: "cancel-must-not-win-build",
+    updatedAt: new Date(),
+  }).where(eq(database.projectImportBatchesTable.id, permanentImport.importId));
+  const buildingDelete = await fetch(`${baseUrl}/project-import-sessions/${permanentImport.importId}`, { method: "DELETE" });
+  assert.equal(buildingDelete.status, 409, "Cancellation must not dismiss a session that is already building.");
+  const buildingAfterDelete = await json(await fetch(`${baseUrl}/project-import-sessions/${permanentImport.importId}`)) as {
+    status: string;
+  };
+  assert.equal(buildingAfterDelete.status, "building");
 
   const projects = await database.db.select().from(database.importedProjectsTable);
   assert.equal(projects.length, 1, "Duplicate build requests created more than one project.");

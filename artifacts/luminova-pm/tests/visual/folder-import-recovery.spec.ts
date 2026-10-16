@@ -55,6 +55,13 @@ async function installImportApi(page: Page) {
   let nextImportId: string | null = null;
   const dismissedImportIds = new Set<string>();
   let dismissRequests = 0;
+  let cancelRequests = 0;
+  let holdUploadTransfers = false;
+  let releaseHeldUploads: (() => void) | undefined;
+  let uploadsReleased = Promise.resolve();
+  let holdSessionCreation = false;
+  let releaseSessionCreation: (() => void) | undefined;
+  let sessionCreationReleased = Promise.resolve();
   let buildStatusChecks = 0;
 
   await page.route('**/api/project-import-sessions', async (route) => {
@@ -69,6 +76,7 @@ async function installImportApi(page: Page) {
         failureStage = null;
       }
       documents = route.request().postDataJSON().documents;
+      if (holdSessionCreation) await sessionCreationReleased;
       await route.fulfill({ status: 201, json: session(status, documents, [...uploadedPaths], null, importId, retryable, failureStage) });
       return;
     }
@@ -92,6 +100,7 @@ async function installImportApi(page: Page) {
   await page.route('**/api/project-import-sessions/*', async (route) => {
     if (route.request().method() === 'DELETE') {
       dismissRequests++;
+      cancelRequests++;
       dismissedImportIds.add(importId);
       await route.fulfill({ status: 204 });
       return;
@@ -108,7 +117,10 @@ async function installImportApi(page: Page) {
     }
     await route.fulfill({ json: { uploadURL: `http://127.0.0.1:4173/__folder-upload/${body.relativePath}`, objectPath: `/objects/${body.relativePath}` } });
   });
-  await page.route('**/__folder-upload/**', route => route.fulfill({ status: 200 }));
+  await page.route('**/__folder-upload/**', async (route) => {
+    if (holdUploadTransfers) await uploadsReleased;
+    await route.fulfill({ status: 200 });
+  });
   await page.route('**/api/project-import-sessions/*/documents', async (route) => {
     attachRequests++;
     if (blockAdditionalAttaches && uploadedPaths.size > 0) {
@@ -173,6 +185,7 @@ async function installImportApi(page: Page) {
     get buildRequests() { return buildRequests; },
     get projectsCreated() { return projectsCreated; },
     get dismissRequests() { return dismissRequests; },
+    get cancelRequests() { return cancelRequests; },
     get buildStatusChecks() { return buildStatusChecks; },
     setStatus(next: SessionStatus, message: string | null = null) {
       status = next;
@@ -184,6 +197,24 @@ async function installImportApi(page: Page) {
     failBuildOnceWhileBuilding() { failBuildResponseWhileBuilding = true; },
     blockAdditionalAttaches(value: boolean) { blockAdditionalAttaches = value; },
     failUploads(value: boolean) { failUploads = value; },
+    holdUploadTransfers() {
+      holdUploadTransfers = true;
+      uploadsReleased = new Promise<void>(resolve => { releaseHeldUploads = resolve; });
+    },
+    releaseUploadTransfers() {
+      holdUploadTransfers = false;
+      releaseHeldUploads?.();
+      releaseHeldUploads = undefined;
+    },
+    holdSessionCreation() {
+      holdSessionCreation = true;
+      sessionCreationReleased = new Promise<void>(resolve => { releaseSessionCreation = resolve; });
+    },
+    releaseSessionCreation() {
+      holdSessionCreation = false;
+      releaseSessionCreation?.();
+      releaseSessionCreation = undefined;
+    },
     failNextBuildAtGateway() { gatewayBuildFailures++; },
     failStatusChecks(count: number) { statusCheckFailures = count; },
     interruptNextBuild() { interruptNextBuild = true; },
@@ -224,6 +255,57 @@ async function makeDismissalStorageUnavailable(page: Page) {
     };
   });
 }
+
+test('canceling a project folder upload aborts active transfers and prevents project creation', async ({ page }) => {
+  const api = await installImportApi(page);
+  api.holdUploadTransfers();
+
+  await selectAndStart(page);
+  const cancelButton = page.getByRole('button', { name: 'Cancel upload' });
+  await expect(cancelButton).toBeVisible();
+  await expect.poll(() => api.uploadRequests.length).toBeGreaterThan(0);
+  await cancelButton.click();
+
+  await expect(page.getByLabel('Import status')).toHaveText('idle');
+  expect(api.cancelRequests).toBe(1);
+  expect(api.buildRequests).toBe(0);
+  expect(api.projectsCreated).toBe(0);
+  expect(api.uploadRequests.length).toBeGreaterThan(0);
+  api.releaseUploadTransfers();
+});
+
+test('canceling while the import session is being created waits before dismissing it', async ({ page }) => {
+  const api = await installImportApi(page);
+  api.holdSessionCreation();
+
+  await page.goto('/__visual/folder-import');
+  await page.getByLabel('Project folder files').setInputFiles(files);
+  await page.getByRole('button', { name: 'Start import' }).click();
+
+  const cancelButton = page.getByRole('button', { name: 'Cancel upload' });
+  await expect(cancelButton).toBeVisible();
+  await cancelButton.click();
+  await expect(page.getByRole('button', { name: 'Canceling…' })).toBeVisible();
+  expect(api.cancelRequests).toBe(0);
+
+  api.releaseSessionCreation();
+  await expect(page.getByLabel('Import status')).toHaveText('idle');
+  expect(api.cancelRequests).toBe(1);
+  expect(api.uploadRequests).toHaveLength(0);
+  expect(api.buildRequests).toBe(0);
+});
+
+test('project upload cannot be canceled after building begins', async ({ page }) => {
+  const api = await installImportApi(page);
+  api.holdBuild();
+
+  await selectAndStart(page);
+  await expect(page.getByLabel('Import status')).toHaveText('building');
+  await expect.poll(() => api.buildRequests).toBe(1);
+  await expect(page.getByRole('button', { name: 'Cancel upload' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Cancel project upload' })).toHaveCount(0);
+  expect(api.cancelRequests).toBe(0);
+});
 
 async function blockDismissalStorageObject(page: Page) {
   const installBlock = () => {
