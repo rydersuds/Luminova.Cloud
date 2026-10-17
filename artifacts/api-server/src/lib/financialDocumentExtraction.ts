@@ -52,8 +52,75 @@ export type ExtractedInternalBudget = {
 const MAX_DOCUMENT_BYTES = 15 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_TEXT_CHARACTERS = 50_000;
-const financialPathPattern = /(invoice|quote|quotation|estimate|bid|budget|proposal)/i;
+const MAX_FINANCIAL_PDF_OCR_PAGES = 8;
+const MAX_FINANCIAL_PDF_OCR_BYTES = 12 * 1024 * 1024;
+const financialPathPattern = /\b(?:invoice|quotes?|quotation|estimate|bid|budget|proposal|contract|agreement|pricing|cost|financial|schedule of values|change order|payment application)\b/i;
 const imageExtractionSchema = z.object({ text: z.string().max(MAX_TEXT_CHARACTERS) });
+
+const normalizeDocumentPath = (path: string) => path.replace(/[_-]+/g, " ");
+
+export function isFinancialDocumentPath(path: string) {
+  return financialPathPattern.test(normalizeDocumentPath(path));
+}
+
+export function isInternalBudgetDocumentPath(path: string) {
+  const normalized = normalizeDocumentPath(path);
+  const explicitInternal = /\b(?:internal(?:\s+project)?\s+(?:budget|cost|pricing)|our\s+cost|luminova\s+(?:cost|pricing)|cost\s+to\s+complete|cost\s+breakdown)\b/i.test(normalized);
+  if (explicitInternal) return true;
+  const hasBudgetCue = /\b(?:budget|pricing|cost\s+to\s+complete|cost\s+breakdown|cost\s+plan)\b/i.test(normalized);
+  const hasClientFacingCue = /\b(?:client|contract|quote|quotation|proposal|invoice|billing|revenue|selling|sales)\b/i.test(normalized);
+  return hasBudgetCue && !hasClientFacingCue;
+}
+
+type DocumentWithSnippet = { relativePath: string; textSnippet?: string };
+
+export function boundProjectImportDocumentSnippets<T extends DocumentWithSnippet>(
+  documents: T[],
+  maxCharacters = 250_000,
+  maxPerDocument = MAX_TEXT_CHARACTERS,
+): T[] {
+  let remaining = Math.max(0, maxCharacters);
+  const snippets = new Array<string | undefined>(documents.length);
+  const priority = documents
+    .map((document, index) => ({ document, index }))
+    .sort((left, right) =>
+      Number(isFinancialDocumentPath(right.document.relativePath)) -
+        Number(isFinancialDocumentPath(left.document.relativePath)) ||
+      left.index - right.index
+    );
+
+  for (const { document, index } of priority) {
+    const source = document.textSnippet;
+    if (!source || remaining <= 0) continue;
+    const length = Math.min(source.length, maxPerDocument, remaining);
+    snippets[index] = source.slice(0, length);
+    remaining -= length;
+  }
+
+  return documents.map((document, index) => ({
+    ...document,
+    textSnippet: snippets[index],
+  }));
+}
+
+export function financialPdfOcrPageNumbers(pageCount: number) {
+  if (!Number.isInteger(pageCount) || pageCount <= 0) return [];
+  if (pageCount <= MAX_FINANCIAL_PDF_OCR_PAGES) {
+    return Array.from({ length: pageCount }, (_, index) => index + 1);
+  }
+
+  const middlePage = Math.ceil(pageCount / 2);
+  return [...new Set([
+    1,
+    2,
+    3,
+    4,
+    middlePage,
+    pageCount - 2,
+    pageCount - 1,
+    pageCount,
+  ])].sort((left, right) => left - right);
+}
 
 const cleanText = (text: string) =>
   text
@@ -76,10 +143,53 @@ const decodeXmlText = (xml: string) =>
       .replace(/&#39;/g, "'"),
   );
 
-async function extractPdf(buffer: Buffer) {
+type FinancialImageInput = {
+  buffer: Buffer;
+  contentType: string;
+  pageNumber?: number;
+};
+
+async function extractPdf(
+  buffer: Buffer,
+  document: ImportDocument,
+  getClient: () => OpenAI,
+  log: ExtractionLog,
+) {
   const parser = new PDFParse({ data: buffer });
   try {
-    return cleanText((await parser.getText()).text);
+    const text = cleanText((await parser.getText()).text);
+    if (text.length >= 160) return text;
+
+    try {
+      const info = await parser.getInfo();
+      const images: FinancialImageInput[] = [];
+      let renderedBytes = 0;
+      for (const pageNumber of financialPdfOcrPageNumbers(info.total)) {
+        const screenshot = await parser.getScreenshot({
+          partial: [pageNumber],
+          desiredWidth: 1600,
+          imageBuffer: true,
+          imageDataUrl: false,
+        });
+        const image = screenshot.pages[0]?.data;
+        if (!image?.length || image.length > MAX_IMAGE_BYTES || renderedBytes + image.length > MAX_FINANCIAL_PDF_OCR_BYTES) {
+          continue;
+        }
+        images.push({ buffer: Buffer.from(image), contentType: "image/png", pageNumber });
+        renderedBytes += image.length;
+      }
+      if (images.length === 0) return text;
+
+      const ocrText = await extractImageText(getClient(), document, images);
+      return cleanText([text, ocrText].filter(Boolean).join("\n"));
+    } catch (error) {
+      log.warn({
+        stage: "scanned PDF OCR",
+        relativePath: document.relativePath,
+        ...classifyProjectImportAnalysisError(error),
+      }, "Financial PDF OCR failed; continuing with extracted text");
+      return text;
+    }
   } finally {
     await parser.destroy();
   }
@@ -118,33 +228,81 @@ const currencyValue = (cell: ExcelJS.Cell) => {
   if (value && typeof value === "object" && "result" in value && typeof value.result === "number" && Number.isFinite(value.result)) {
     return value.result;
   }
-  const parsed = Number(cell.text.replace(/[$,\s]/g, ""));
-  return Number.isFinite(parsed) ? parsed : null;
+  const text = cell.text.trim().replace(/[−–]/g, "-");
+  if (!text) return null;
+  const isParenthesizedNegative = /^\(.*\)$/.test(text);
+  const numericText = text.replace(/[^\d.-]/g, "");
+  const parsed = Number(numericText);
+  if (!Number.isFinite(parsed)) return null;
+  return isParenthesizedNegative ? -Math.abs(parsed) : parsed;
 };
 
 const roundCurrency = (value: number) => Math.round(value * 100) / 100;
 
-export async function extractWorkbookInternalBudget(buffer: Buffer, sourceRelativePath: string): Promise<ExtractedInternalBudget | null> {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);
-  const summary = workbook.worksheets.find((sheet) => /summary/i.test(sheet.name));
-  if (!summary) return null;
+const descriptionHeaderPattern = /\b(?:category|description|scope|division|trade|cost code|item|work package|phase)\b/i;
+const internalBudgetAmountHeaderPattern = /\b(?:internal(?:\s+project)?\s+(?:budget|cost|pricing)|our\s+(?:cost|pricing)|luminova\s+(?:cost|pricing)|construction\s+(?:budget|cost)|cost\s+to\s+complete|budget(?:ed)?(?:\s+(?:amount|cost))?)\b/i;
+const clientFacingAmountHeaderPattern = /\b(?:client|contract|quote|proposal|selling|sales|revenue|billable|retail)\b/i;
 
-  let grandTotal: number | null = null;
-  const rows: Array<{ description: string; amount: number }> = [];
-  summary.eachRow((row) => {
-    const description = row.getCell(2).text.trim();
-    const amount = currencyValue(row.getCell(3));
-    if (!description || amount === null || amount < 0) return;
-    if (/grand total|complete project restoration/i.test(description)) {
-      grandTotal = amount;
-      return;
-    }
-    if (/^(?:construction )?subtotal|^total before tax/i.test(description)) return;
-    rows.push({ description, amount });
-  });
-  if (grandTotal === null || grandTotal <= 0 || rows.length === 0) return null;
+type BudgetTableColumns = {
+  headerRow: number;
+  descriptionColumn: number;
+  amountColumn: number;
+};
 
+function findInternalBudgetTable(sheet: ExcelJS.Worksheet): BudgetTableColumns | null {
+  const maxHeaderRow = Math.min(sheet.rowCount, 30);
+  for (let rowNumber = 1; rowNumber <= maxHeaderRow; rowNumber += 1) {
+    const row = sheet.getRow(rowNumber);
+    const columns = Array.from({ length: row.cellCount }, (_, index) => index + 1);
+    const descriptionColumn = columns.find((column) => descriptionHeaderPattern.test(row.getCell(column).text));
+    const amountColumns = columns.filter((column) => {
+      const header = row.getCell(column).text;
+      return internalBudgetAmountHeaderPattern.test(header) && !clientFacingAmountHeaderPattern.test(header);
+    });
+    if (!descriptionColumn || amountColumns.length === 0) continue;
+
+    amountColumns.sort((left, right) => {
+      const score = (column: number) => {
+        const header = row.getCell(column).text;
+        if (/internal|our cost|luminova/i.test(header)) return 3;
+        if (/budget/i.test(header)) return 2;
+        return 1;
+      };
+      return score(right) - score(left);
+    });
+    return { headerRow: rowNumber, descriptionColumn, amountColumn: amountColumns[0] };
+  }
+  return null;
+}
+
+function hasClientFacingFinancialHeader(sheet: ExcelJS.Worksheet) {
+  const maxHeaderRow = Math.min(sheet.rowCount, 30);
+  for (let rowNumber = 1; rowNumber <= maxHeaderRow; rowNumber += 1) {
+    const row = sheet.getRow(rowNumber);
+    const columns = Array.from({ length: row.cellCount }, (_, index) => index + 1);
+    const hasDescription = columns.some((column) => descriptionHeaderPattern.test(row.getCell(column).text));
+    const hasClientAmount = columns.some((column) => clientFacingAmountHeaderPattern.test(row.getCell(column).text));
+    if (hasDescription && hasClientAmount) return true;
+  }
+  return false;
+}
+
+function budgetTotalScore(description: string) {
+  if (/\b(?:subtotal|before tax|pre[- ]tax|excluding tax)\b/i.test(description)) return 0;
+  if (/complete project restoration|grand total|final total/i.test(description)) return 5;
+  if (/\btotal\s+(?:(?:internal|our|construction|project)\s+)?(?:budget|cost)\b|\b(?:internal|our|project|construction)\s+(?:budget|cost)\s+total\b|\bbudget total\b/i.test(description)) {
+    return 4;
+  }
+  if (/^total$/i.test(description.trim())) return 2;
+  return 0;
+}
+
+function assembleInternalBudget(
+  sourceRelativePath: string,
+  rows: Array<{ description: string; amount: number }>,
+  totals: Array<{ amount: number; score: number }>,
+): ExtractedInternalBudget | null {
+  if (rows.length === 0 || totals.length === 0) return null;
   const lineItems = rows.map((row, index) => {
     const budgeted = roundCurrency(row.amount);
     return {
@@ -157,13 +315,78 @@ export async function extractWorkbookInternalBudget(buffer: Buffer, sourceRelati
     };
   });
   const itemTotal = roundCurrency(lineItems.reduce((sum, item) => sum + item.budgeted, 0));
-  if (Math.abs(itemTotal - roundCurrency(grandTotal)) > 0.02) return null;
+  const matchingTotal = totals
+    .filter((total) => total.amount > 0 && Math.abs(itemTotal - roundCurrency(total.amount)) <= 0.02)
+    .sort((left, right) => right.score - left.score)[0];
+  if (!matchingTotal) return null;
 
-  return {
-    sourceRelativePath,
-    total: roundCurrency(grandTotal),
-    lineItems,
-  };
+  return { sourceRelativePath, total: roundCurrency(matchingTotal.amount), lineItems };
+}
+
+function extractBudgetTable(
+  sheet: ExcelJS.Worksheet,
+  sourceRelativePath: string,
+  columns: BudgetTableColumns,
+) {
+  const rows: Array<{ description: string; amount: number }> = [];
+  const totals: Array<{ amount: number; score: number }> = [];
+  sheet.eachRow((row, rowNumber) => {
+    if (rowNumber <= columns.headerRow) return;
+    const description = row.getCell(columns.descriptionColumn).text.trim();
+    const amount = currencyValue(row.getCell(columns.amountColumn));
+    if (!description || amount === null || amount < 0) return;
+    const score = budgetTotalScore(description);
+    if (score > 0) {
+      totals.push({ amount, score });
+      return;
+    }
+    if (/\b(?:subtotal|before tax|pre[- ]tax|excluding tax)\b/i.test(description)) return;
+    rows.push({ description, amount });
+  });
+  return assembleInternalBudget(sourceRelativePath, rows, totals);
+}
+
+function extractLegacyBudgetSummary(sheet: ExcelJS.Worksheet, sourceRelativePath: string) {
+  const rows: Array<{ description: string; amount: number }> = [];
+  const totals: Array<{ amount: number; score: number }> = [];
+  sheet.eachRow((row) => {
+    const description = row.getCell(2).text.trim();
+    const amount = currencyValue(row.getCell(3));
+    if (!description || amount === null || amount < 0) return;
+    const score = budgetTotalScore(description);
+    if (score > 0) {
+      totals.push({ amount, score });
+      return;
+    }
+    if (/\b(?:subtotal|before tax|pre[- ]tax|excluding tax)\b/i.test(description)) return;
+    rows.push({ description, amount });
+  });
+  return assembleInternalBudget(sourceRelativePath, rows, totals);
+}
+
+export async function extractWorkbookInternalBudget(buffer: Buffer, sourceRelativePath: string): Promise<ExtractedInternalBudget | null> {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);
+
+  for (const sheet of workbook.worksheets) {
+    const columns = findInternalBudgetTable(sheet);
+    if (!columns) continue;
+    const result = extractBudgetTable(sheet, sourceRelativePath, columns);
+    if (result) return result;
+  }
+
+  if (
+    !isInternalBudgetDocumentPath(sourceRelativePath) ||
+    workbook.worksheets.some(hasClientFacingFinancialHeader)
+  ) {
+    return null;
+  }
+  const legacySheets = workbook.worksheets.filter((sheet) => /summary|budget|cost|pricing|estimate/i.test(sheet.name));
+  for (const sheet of legacySheets) {
+    const result = extractLegacyBudgetSummary(sheet, sourceRelativePath);
+    if (result) return result;
+  }
+  return null;
 }
 
 export async function extractInternalBudgetFromDocuments(
