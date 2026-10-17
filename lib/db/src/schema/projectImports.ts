@@ -53,6 +53,7 @@ const importedRecordColumns = {
 export const importedProjectsTable = pgTable("imported_projects", {
   ...importedRecordColumns,
   workspaceId: text("workspace_id").notNull().default("default"),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
 }, (table) => [
   index("imported_projects_workspace_idx").on(table.workspaceId),
 ]);

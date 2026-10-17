@@ -29,4 +29,11 @@ export interface Project {
   invoiced: number;
   exteriorImage: string;
   description: string;
+  /**
+     * Timestamp when this project was archived.
+     * @nullable
+     */
+  archivedAt?: Date | null;
+  /** Whether this project has a persisted record that supports archiving and deletion. */
+  canManageLifecycle?: boolean;
 }

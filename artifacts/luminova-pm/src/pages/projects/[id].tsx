@@ -6,6 +6,8 @@ import { TradeBudgets } from "@/components/approvals/trade-budgets"
 import { 
   useGetProject, 
   getGetProjectQueryKey,
+  useGetArchivedProject,
+  getGetArchivedProjectQueryKey,
   getGetProjectsQueryKey,
   getGetDashboardSummaryQueryKey,
   useCreateProjectPanorama,
@@ -45,6 +47,7 @@ import { ClientIdentity } from "@/components/client-identity"
 import { VendorIdentity } from "@/components/vendor-identity"
 import { cn, formatCurrency, formatDate, formatDateOnly, formatDaysRemaining, getDaysRemaining, getStatusColor } from "@/lib/utils"
 import { readImageDataUrl, uploadToSignedUrl, validateImageFile } from "@/lib/image-upload"
+import { ProjectLifecycleActions } from "@/components/project/project-lifecycle-actions"
 type ProjectPanorama = {
   id: string
   url: string
@@ -105,6 +108,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const params = useParams()
   const [location, setLocation] = useLocation()
   const search = useSearch()
+  const isArchivedView = new URLSearchParams(search).get("archived") === "true"
   const selectTab = (tab: string) => {
     const query = new URLSearchParams(search)
     query.set("tab", tab)
@@ -136,23 +140,31 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const uploadEntryAgreement = useUploadProjectEntryAgreement()
   const panoramaName = (label: string | null) => label || "Untitled panorama"
   const { data: currentUser } = useGetCurrentWorkspaceUser()
-  const canUseBoard = currentUser?.role !== "Client"
+  const canUseBoard = !isArchivedView && currentUser?.role !== "Client"
   const activeTab = projectTabFromSearch(search, canUseBoard)
   const isAdmin = currentUser?.role === "Admin"
   const { data: projectManagers, isLoading: loadingProjectManagers, isError: projectManagersError } = useGetProjectManagers({
-    query: { enabled: isAdmin, queryKey: getGetProjectManagersQueryKey() },
+    query: { enabled: isAdmin && !isArchivedView, queryKey: getGetProjectManagersQueryKey() },
   })
 
-  const { data: project, isLoading } = useGetProject(projectId, {
+  const activeProjectQuery = useGetProject(projectId, {
     query: {
-      enabled: !!projectId,
+      enabled: !!projectId && !isArchivedView,
       queryKey: getGetProjectQueryKey(projectId)
     }
   })
+  const archivedProjectQuery = useGetArchivedProject(projectId, {
+    query: {
+      enabled: !!projectId && isArchivedView,
+      queryKey: getGetArchivedProjectQueryKey(projectId),
+    },
+  })
+  const project = isArchivedView ? archivedProjectQuery.data : activeProjectQuery.data
+  const isLoading = isArchivedView ? archivedProjectQuery.isLoading : activeProjectQuery.isLoading
 
   const { data: activityList } = useGetProjectActivity(projectId, {
     query: {
-      enabled: !!projectId,
+      enabled: !!projectId && !isArchivedView,
       queryKey: getGetProjectActivityQueryKey(projectId)
     }
   })
@@ -510,6 +522,73 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
     )
   }
 
+  if (isArchivedView) {
+    const archiveStats = [
+      { label: "Invoices", value: project.invoices.length },
+      { label: "Vendors", value: project.trades.length },
+      { label: "Photos", value: project.photos.length },
+      { label: "Files", value: project.files.length },
+      { label: "Panoramas", value: project.panoramas.length },
+    ]
+    return (
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto bg-transparent">
+        <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6 md:p-8">
+          <button
+            onClick={() => setLocation("/projects?archived=true")}
+            className="flex w-fit items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Archived Projects
+          </button>
+          <Card>
+            <CardHeader className="space-y-4">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="space-y-3">
+                  <Badge variant="secondary">Archived project</Badge>
+                  <CardTitle className="text-2xl sm:text-3xl">{project.name}</CardTitle>
+                  <CardDescription>{project.address} · {project.region}</CardDescription>
+                </div>
+                {isAdmin && project.canManageLifecycle && (
+                  <ProjectLifecycleActions
+                    projectId={project.id}
+                    projectName={project.name}
+                    archived
+                  />
+                )}
+              </div>
+              <p className="max-w-2xl text-sm text-muted-foreground">
+                This project is hidden from active project lists. Its records and files are retained.
+                Restore it to reopen the full project history.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div><p className="text-xs text-muted-foreground">Client</p><p className="mt-1 font-medium">{project.clientName}</p></div>
+                <div><p className="text-xs text-muted-foreground">Project manager</p><p className="mt-1 font-medium">{project.pmName || "Unassigned"}</p></div>
+                <div><p className="text-xs text-muted-foreground">Status</p><p className="mt-1 font-medium">{project.status}</p></div>
+                <div><p className="text-xs text-muted-foreground">Schedule</p><p className="mt-1 font-medium">{formatDateOnly(project.startDate)} – {formatDateOnly(project.targetDate)}</p></div>
+              </div>
+              {project.description && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Project description</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm">{project.description}</p>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                {archiveStats.map(({ label, value }) => (
+                  <div key={label} className="rounded-lg border border-border/70 bg-muted/30 p-3">
+                    <p className="text-xs text-muted-foreground">{label}</p>
+                    <p className="mt-1 text-lg font-semibold">{value}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
   const actualCost = project.lineItems.reduce((sum, item) => sum + item.invoiced, 0)
   const budgetVariance = project.budgeted - actualCost
   const varianceIsPositive = budgetVariance >= 0
@@ -582,7 +661,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
         <div className="bg-transparent text-foreground shrink-0 border-b border-border/60">
           <div className="max-w-[1400px] mx-auto p-6 md:p-8 space-y-6">
             <button 
-              onClick={() => setLocation("/projects")}
+              onClick={() => setLocation(isArchivedView ? "/projects?archived=true" : "/projects")}
               className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-sm font-medium w-fit"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -626,6 +705,13 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
               </div>
               
               <div className="flex max-w-full flex-wrap items-center gap-3">
+                {isAdmin && project.canManageLifecycle && (
+                  <ProjectLifecycleActions
+                    projectId={project.id}
+                    projectName={project.name}
+                    archived={Boolean(project.archivedAt)}
+                  />
+                )}
                 <Button variant="outline" className="max-w-full whitespace-normal bg-transparent border-border text-foreground hover:bg-card/60 hover:text-foreground" onClick={() => setLocation(`/quotes?projectId=${project.id}`)}>
                   Vendor Quotes
                 </Button>

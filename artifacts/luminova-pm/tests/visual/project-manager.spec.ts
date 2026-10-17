@@ -399,12 +399,55 @@ test('edits the project start and end dates without exposing manual progress', a
 test('does not expose the assignment control to non-administrators', async ({ page }) => {
   await installIdentity(page, 'Project Manager');
   await page.route('**/api/projects/riverstone/activity', route => route.fulfill({ json: [] }));
-  await page.route('**/api/projects/riverstone', route => route.fulfill({ json: project }));
+  await page.route('**/api/projects/riverstone', route => route.fulfill({
+    json: { ...project, canManageLifecycle: true },
+  }));
 
   await page.goto('/__visual/project-panorama');
+  await expect(page.getByRole('button', { name: 'Archive project', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Delete permanently', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Edit Project' }).click();
   const dialog = page.getByRole('dialog', { name: 'Edit Project' });
   await expect(dialog.getByLabel('Project Manager')).toHaveCount(0);
+});
+
+test('administrators get safe archive and permanent-delete confirmations', async ({ page }) => {
+  await installIdentity(page, 'Admin');
+  await page.route('**/api/projects/riverstone/activity', route => route.fulfill({ json: [] }));
+  await page.route('**/api/projects/riverstone', route => route.fulfill({
+    json: { ...project, canManageLifecycle: true, archivedAt: null },
+  }));
+
+  await page.goto('/__visual/project-panorama');
+  await page.getByRole('button', { name: 'Archive project', exact: true }).click();
+  const archiveDialog = page.getByRole('dialog', { name: 'Archive this project?' });
+  await expect(archiveDialog).toContainText('history and files will be kept');
+  await archiveDialog.getByRole('button', { name: 'Cancel' }).click();
+
+  await page.getByRole('button', { name: 'Delete permanently', exact: true }).click();
+  const deleteDialog = page.getByRole('dialog', { name: 'Permanently delete this project?' });
+  await expect(deleteDialog).toContainText('Shared vendor profiles and other projects will not be deleted');
+  const confirmDelete = deleteDialog.getByRole('button', { name: 'Delete permanently', exact: true });
+  await expect(confirmDelete).toBeDisabled();
+  await deleteDialog.getByLabel('Type Riverstone Residence to confirm.').fill('Riverstone Residence');
+  await expect(confirmDelete).toBeEnabled();
+});
+
+test('archived project detail shows restore and permanent-delete actions', async ({ page }) => {
+  await installIdentity(page, 'Admin');
+  await page.route('**/api/projects/riverstone/activity', route => route.fulfill({ json: [] }));
+  await page.route('**/api/projects/riverstone/archived', route => route.fulfill({
+    json: {
+      ...project,
+      archivedAt: '2026-10-12T00:00:00.000Z',
+      canManageLifecycle: true,
+    },
+  }));
+
+  await page.goto('/__visual/project-panorama?archived=true');
+  await expect(page.getByRole('button', { name: 'Restore project', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Delete permanently', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Archive project', exact: true })).toHaveCount(0);
 });
 
 test('shows project board groups and scheduled work', async ({ page }) => {

@@ -14,4 +14,8 @@ status?: string;
 search?: string;
 region?: string;
 client?: string;
+/**
+ * Return archived projects instead of active projects. Administrator access required.
+ */
+archived?: boolean;
 };

@@ -49,7 +49,8 @@ export const GetProjectsQueryParams = zod.object({
   "status": zod.coerce.string().optional(),
   "search": zod.coerce.string().max(getProjectsQuerySearchMax).optional(),
   "region": zod.coerce.string().optional(),
-  "client": zod.coerce.string().optional()
+  "client": zod.coerce.string().optional(),
+  "archived": zod.coerce.boolean().optional().describe('Return archived projects instead of active projects. Administrator access required.')
 })
 
 export const getProjectsResponseStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
@@ -73,7 +74,9 @@ export const GetProjectsResponseItem = zod.object({
   "budgeted": zod.number(),
   "invoiced": zod.number(),
   "exteriorImage": zod.string(),
-  "description": zod.string()
+  "description": zod.string(),
+  "archivedAt": zod.coerce.date().nullish().describe('Timestamp when this project was archived.'),
+  "canManageLifecycle": zod.boolean().optional().describe('Whether this project has a persisted record that supports archiving and deletion.')
 })
 export const GetProjectsResponse = zod.array(GetProjectsResponseItem)
 
@@ -122,7 +125,9 @@ export const CreateProjectResponse = zod.object({
   "budgeted": zod.number(),
   "invoiced": zod.number(),
   "exteriorImage": zod.string(),
-  "description": zod.string()
+  "description": zod.string(),
+  "archivedAt": zod.coerce.date().nullish().describe('Timestamp when this project was archived.'),
+  "canManageLifecycle": zod.boolean().optional().describe('Whether this project has a persisted record that supports archiving and deletion.')
 })
 
 
@@ -172,7 +177,9 @@ export const GetProjectResponse = zod.object({
   "budgeted": zod.number(),
   "invoiced": zod.number(),
   "exteriorImage": zod.string(),
-  "description": zod.string()
+  "description": zod.string(),
+  "archivedAt": zod.coerce.date().nullish().describe('Timestamp when this project was archived.'),
+  "canManageLifecycle": zod.boolean().optional().describe('Whether this project has a persisted record that supports archiving and deletion.')
 }).and(zod.object({
   "clientQuote": zod.object({
   "total": zod.number(),
@@ -347,8 +354,219 @@ export const UpdateProjectResponse = zod.object({
   "budgeted": zod.number(),
   "invoiced": zod.number(),
   "exteriorImage": zod.string(),
-  "description": zod.string()
+  "description": zod.string(),
+  "archivedAt": zod.coerce.date().nullish().describe('Timestamp when this project was archived.'),
+  "canManageLifecycle": zod.boolean().optional().describe('Whether this project has a persisted record that supports archiving and deletion.')
 })
+
+
+/**
+ * @summary Permanently delete a project
+ */
+export const DeleteProjectParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+export const DeleteProjectResponse = zod.void()
+
+
+/**
+ * @summary Archive a project while retaining its records
+ */
+export const ArchiveProjectParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+export const ArchiveProjectResponse = zod.void()
+
+
+/**
+ * @summary Restore an archived project
+ */
+export const RestoreProjectParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+export const RestoreProjectResponse = zod.void()
+
+
+/**
+ * @summary Get an archived project (Administrators only)
+ */
+export const GetArchivedProjectParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+export const getArchivedProjectResponseOneStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getArchivedProjectResponseOneTargetDateRegExp = new RegExp('^$|^\\d{4}-\\d{2}-\\d{2}$');
+export const getArchivedProjectResponseTwoInvoicesItemAttachmentOneObjectPathRegExp = new RegExp('^/objects');
+export const getArchivedProjectResponseTwoInvoicesItemAttachmentOneNameMax = 255;
+
+export const getArchivedProjectResponseTwoInvoicesItemAttachmentOneSizeMax = 20971520;
+
+export const getArchivedProjectResponseTwoTradesItemProfilePhotoPositionXMin = 0;
+export const getArchivedProjectResponseTwoTradesItemProfilePhotoPositionXMax = 100;
+
+export const getArchivedProjectResponseTwoTradesItemProfilePhotoPositionYMin = 0;
+export const getArchivedProjectResponseTwoTradesItemProfilePhotoPositionYMax = 100;
+
+export const getArchivedProjectResponseTwoTradesItemProfilePhotoZoomMax = 2;
+
+export const getArchivedProjectResponseTwoFilesItemAiConfidenceMin = 0;
+export const getArchivedProjectResponseTwoFilesItemAiConfidenceMax = 100;
+
+
+export const getArchivedProjectResponseTwoScheduleImagesItemEffectiveDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const GetArchivedProjectResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "address": zod.string(),
+  "region": zod.string(),
+  "status": zod.string(),
+  "progress": zod.number(),
+  "pmName": zod.string(),
+  "projectManagerId": zod.string().nullable(),
+  "clientName": zod.string(),
+  "clientLogoUrl": zod.string().nullish(),
+  "startDate": zod.string().regex(getArchivedProjectResponseOneStartDateRegExp),
+  "targetDate": zod.string().regex(getArchivedProjectResponseOneTargetDateRegExp),
+  "budgetEnabled": zod.boolean().describe('Whether internal project budgeting and trade limits are active.'),
+  "budgeted": zod.number(),
+  "invoiced": zod.number(),
+  "exteriorImage": zod.string(),
+  "description": zod.string(),
+  "archivedAt": zod.coerce.date().nullish().describe('Timestamp when this project was archived.'),
+  "canManageLifecycle": zod.boolean().optional().describe('Whether this project has a persisted record that supports archiving and deletion.')
+}).and(zod.object({
+  "clientQuote": zod.object({
+  "total": zod.number(),
+  "revision": zod.string(),
+  "portions": zod.array(zod.object({
+  "code": zod.string(),
+  "label": zod.string(),
+  "amount": zod.number()
+}))
+}),
+  "lineItems": zod.array(zod.object({
+  "id": zod.string(),
+  "code": zod.string(),
+  "description": zod.string(),
+  "budgeted": zod.number(),
+  "invoiced": zod.number(),
+  "variance": zod.number(),
+  "detailItems": zod.array(zod.object({
+  "id": zod.string(),
+  "description": zod.string(),
+  "unit": zod.string().nullable(),
+  "quantity": zod.number().nullable(),
+  "budgeted": zod.number().nullable()
+})).optional()
+})),
+  "invoices": zod.array(zod.object({
+  "id": zod.string(),
+  "invoiceNumber": zod.string(),
+  "projectId": zod.string(),
+  "projectName": zod.string(),
+  "vendor": zod.string(),
+  "direction": zod.enum(['luminova_to_client', 'company_to_luminova']).optional(),
+  "clientName": zod.string().nullish(),
+  "clientLogoUrl": zod.string().nullish(),
+  "amount": zod.number(),
+  "date": zod.string(),
+  "status": zod.string(),
+  "lineItem": zod.string(),
+  "overage": zod.number(),
+  "budgetLineItemId": zod.string().nullish(),
+  "budgetRemainingBefore": zod.number().nullish(),
+  "budgetRemainingAfter": zod.number().nullish(),
+  "approvalReason": zod.enum(['within_budget', 'over_budget', 'budget_unavailable', 'external_authorization_required', 'pre_approved']).optional(),
+  "purchaseApprovalId": zod.string().nullish(),
+  "submittedById": zod.string().optional(),
+  "attachment": zod.object({
+  "objectPath": zod.string().regex(getArchivedProjectResponseTwoInvoicesItemAttachmentOneObjectPathRegExp),
+  "name": zod.string().min(1).max(getArchivedProjectResponseTwoInvoicesItemAttachmentOneNameMax),
+  "size": zod.number().int().min(1).max(getArchivedProjectResponseTwoInvoicesItemAttachmentOneSizeMax),
+  "contentType": zod.enum(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
+}).and(zod.object({
+  "url": zod.string()
+})).optional()
+})),
+  "trades": zod.array(zod.object({
+  "id": zod.string(),
+  "companyName": zod.string(),
+  "contactName": zod.string(),
+  "tradeType": zod.string(),
+  "specialties": zod.array(zod.string()).optional(),
+  "region": zod.string(),
+  "rating": zod.number(),
+  "reviewCount": zod.number().int(),
+  "completedJobs": zod.number().int(),
+  "initials": zod.string(),
+  "accent": zod.string(),
+  "profilePhotoUrl": zod.string().nullish(),
+  "profilePhotoPositionX": zod.number().min(getArchivedProjectResponseTwoTradesItemProfilePhotoPositionXMin).max(getArchivedProjectResponseTwoTradesItemProfilePhotoPositionXMax).optional(),
+  "profilePhotoPositionY": zod.number().min(getArchivedProjectResponseTwoTradesItemProfilePhotoPositionYMin).max(getArchivedProjectResponseTwoTradesItemProfilePhotoPositionYMax).optional(),
+  "profilePhotoZoom": zod.number().min(1).max(getArchivedProjectResponseTwoTradesItemProfilePhotoZoomMax).optional(),
+  "phone": zod.string().optional(),
+  "email": zod.string().optional(),
+  "website": zod.string().optional(),
+  "regions": zod.array(zod.string()).optional(),
+  "licence": zod.string().optional(),
+  "insurance": zod.string().optional(),
+  "insuranceExpiry": zod.string().optional(),
+  "sourceNotes": zod.string().optional()
+})),
+  "photos": zod.array(zod.object({
+  "id": zod.string(),
+  "url": zod.string(),
+  "caption": zod.string(),
+  "phase": zod.string(),
+  "date": zod.string(),
+  "visualCaption": zod.string(),
+  "visualTags": zod.array(zod.string())
+})),
+  "files": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "relativePath": zod.string(),
+  "url": zod.string(),
+  "contentType": zod.string(),
+  "classification": zod.string(),
+  "isEntryAgreement": zod.boolean(),
+  "collection": zod.string(),
+  "linkedEntityType": zod.string().nullish(),
+  "linkedEntityId": zod.string().nullish(),
+  "aiConfidence": zod.number().int().min(getArchivedProjectResponseTwoFilesItemAiConfidenceMin).max(getArchivedProjectResponseTwoFilesItemAiConfidenceMax).nullish()
+})),
+  "panoramas": zod.array(zod.object({
+  "id": zod.string(),
+  "url": zod.string(),
+  "label": zod.string().nullable(),
+  "location": zod.string().nullable(),
+  "date": zod.string().nullable()
+})),
+  "scheduleImages": zod.array(zod.object({
+  "id": zod.string(),
+  "url": zod.string(),
+  "name": zod.string(),
+  "relativePath": zod.string(),
+  "contentType": zod.string(),
+  "size": zod.number().int().min(1),
+  "revision": zod.string().nullable(),
+  "effectiveDate": zod.string().regex(getArchivedProjectResponseTwoScheduleImagesItemEffectiveDateRegExp).nullable(),
+  "isCurrent": zod.boolean()
+})),
+  "activity": zod.array(zod.object({
+  "id": zod.string(),
+  "type": zod.string(),
+  "title": zod.string(),
+  "description": zod.string(),
+  "author": zod.string(),
+  "date": zod.string()
+}))
+}))
 
 
 /**
@@ -1240,7 +1458,9 @@ export const CreateProjectImportResponse = zod.object({
   "budgeted": zod.number(),
   "invoiced": zod.number(),
   "exteriorImage": zod.string(),
-  "description": zod.string()
+  "description": zod.string(),
+  "archivedAt": zod.coerce.date().nullish().describe('Timestamp when this project was archived.'),
+  "canManageLifecycle": zod.boolean().optional().describe('Whether this project has a persisted record that supports archiving and deletion.')
 }),
   "importId": zod.string(),
   "documentsImported": zod.number().int(),
@@ -1477,7 +1697,9 @@ export const BuildProjectImportSessionResponse = zod.object({
   "budgeted": zod.number(),
   "invoiced": zod.number(),
   "exteriorImage": zod.string(),
-  "description": zod.string()
+  "description": zod.string(),
+  "archivedAt": zod.coerce.date().nullish().describe('Timestamp when this project was archived.'),
+  "canManageLifecycle": zod.boolean().optional().describe('Whether this project has a persisted record that supports archiving and deletion.')
 }),
   "importId": zod.string(),
   "documentsImported": zod.number().int(),
@@ -3124,3 +3346,5 @@ export const DeleteWorkspaceUserParams = zod.object({
 })
 
 export const DeleteWorkspaceUserResponse = zod.void()
+
+

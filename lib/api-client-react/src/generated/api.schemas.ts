@@ -234,6 +234,13 @@ export interface Project {
   invoiced: number;
   exteriorImage: string;
   description: string;
+  /**
+     * Timestamp when this project was archived.
+     * @nullable
+     */
+  archivedAt?: string | null;
+  /** Whether this project has a persisted record that supports archiving and deletion. */
+  canManageLifecycle?: boolean;
 }
 
 export interface ProjectInput {
@@ -1553,6 +1560,10 @@ status?: string;
 search?: string;
 region?: string;
 client?: string;
+/**
+ * Return archived projects instead of active projects. Administrator access required.
+ */
+archived?: boolean;
 };
 
 export type GetTradesParams = {
@@ -1593,3 +1604,4 @@ trade?: string;
 status?: VendorQuoteStatus;
 direction?: QuoteDirection;
 };
+

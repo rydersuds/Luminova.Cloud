@@ -585,6 +585,296 @@ export const useUpdateProject = <TError = ErrorType<unknown>,
       return useMutation(getUpdateProjectMutationOptions(options));
     }
 
+export const getDeleteProjectUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}`
+}
+
+/**
+ * @summary Permanently delete a project
+ */
+export const deleteProject = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteProjectUrl(projectId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteProjectMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProject>>, TError,{projectId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteProject>>, TError,{projectId: string}, TContext> => {
+
+const mutationKey = ['deleteProject'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteProject>>, {projectId: string}> = (props) => {
+          const {projectId} = props ?? {};
+
+          return  deleteProject(projectId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteProjectMutationResult = NonNullable<Awaited<ReturnType<typeof deleteProject>>>
+
+    export type DeleteProjectMutationError = ErrorType<void>
+
+    /**
+ * @summary Permanently delete a project
+ */
+export const useDeleteProject = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProject>>, TError,{projectId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteProject>>,
+        TError,
+        {projectId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteProjectMutationOptions(options));
+    }
+
+export const getArchiveProjectUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/archive`
+}
+
+/**
+ * @summary Archive a project while retaining its records
+ */
+export const archiveProject = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getArchiveProjectUrl(projectId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getArchiveProjectMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveProject>>, TError,{projectId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof archiveProject>>, TError,{projectId: string}, TContext> => {
+
+const mutationKey = ['archiveProject'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof archiveProject>>, {projectId: string}> = (props) => {
+          const {projectId} = props ?? {};
+
+          return  archiveProject(projectId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ArchiveProjectMutationResult = NonNullable<Awaited<ReturnType<typeof archiveProject>>>
+
+    export type ArchiveProjectMutationError = ErrorType<void>
+
+    /**
+ * @summary Archive a project while retaining its records
+ */
+export const useArchiveProject = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveProject>>, TError,{projectId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof archiveProject>>,
+        TError,
+        {projectId: string},
+        TContext
+      > => {
+      return useMutation(getArchiveProjectMutationOptions(options));
+    }
+
+export const getRestoreProjectUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/restore`
+}
+
+/**
+ * @summary Restore an archived project
+ */
+export const restoreProject = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getRestoreProjectUrl(projectId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRestoreProjectMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof restoreProject>>, TError,{projectId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof restoreProject>>, TError,{projectId: string}, TContext> => {
+
+const mutationKey = ['restoreProject'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof restoreProject>>, {projectId: string}> = (props) => {
+          const {projectId} = props ?? {};
+
+          return  restoreProject(projectId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RestoreProjectMutationResult = NonNullable<Awaited<ReturnType<typeof restoreProject>>>
+
+    export type RestoreProjectMutationError = ErrorType<void>
+
+    /**
+ * @summary Restore an archived project
+ */
+export const useRestoreProject = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof restoreProject>>, TError,{projectId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof restoreProject>>,
+        TError,
+        {projectId: string},
+        TContext
+      > => {
+      return useMutation(getRestoreProjectMutationOptions(options));
+    }
+
+export const getGetArchivedProjectUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/archived`
+}
+
+/**
+ * @summary Get an archived project (Administrators only)
+ */
+export const getArchivedProject = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<ProjectDetail> => {
+
+  return customFetch<ProjectDetail>(getGetArchivedProjectUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetArchivedProjectQueryKey = (projectId: string,) => {
+    return [
+    `/api/projects/${projectId}/archived`
+    ] as const;
+    }
+
+
+export const getGetArchivedProjectQueryOptions = <TData = Awaited<ReturnType<typeof getArchivedProject>>, TError = ErrorType<void>>(projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getArchivedProject>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetArchivedProjectQueryKey(projectId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getArchivedProject>>> = ({ signal }) => getArchivedProject(projectId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getArchivedProject>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetArchivedProjectQueryResult = NonNullable<Awaited<ReturnType<typeof getArchivedProject>>>
+export type GetArchivedProjectQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get an archived project (Administrators only)
+ */
+
+export function useGetArchivedProject<TData = Awaited<ReturnType<typeof getArchivedProject>>, TError = ErrorType<void>>(
+ projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getArchivedProject>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetArchivedProjectQueryOptions(projectId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetProjectDocumentPreviewUrl = (projectId: string,
     documentId: string,) => {
 
@@ -6270,3 +6560,4 @@ export const useDeleteWorkspaceUser = <TError = ErrorType<void>,
       > => {
       return useMutation(getDeleteWorkspaceUserMutationOptions(options));
     }
+

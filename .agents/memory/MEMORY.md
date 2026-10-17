@@ -36,3 +36,5 @@
 - [pnpm patch directories](pnpm-patch-directories.md) — keep the editable directory at its original location until patch-commit; pnpm tracks that path.
 - [Mobile-only Quick View](mobile-only-quick-view.md) — Quick View is a phone-only overview; desktop users use Command Center.
 - [Schedule import fidelity](schedule-import-fidelity.md) — preserve visible dates and per-task source colours; AI category suggestions stay editable.
+- [Project removal policy](project-removal-policy.md) — only Administrators may archive, restore, or permanently delete; archive retains history and deletion stays project-scoped.
+- [Transaction query serialization](transaction-query-serialization.md) — await database queries sequentially when they share a Drizzle transaction connection.

@@ -1,8 +1,9 @@
 import * as React from "react"
-import { useLocation } from "wouter"
+import { useLocation, useSearch } from "wouter"
 import {
   getGetProjectsQueryKey,
   useGetProjects,
+  useGetCurrentWorkspaceUser,
 } from "@workspace/api-client-react"
 import { Input } from "@/components/ui/input"
 import { Building2, Grid2X2, List, Search } from "lucide-react"
@@ -30,17 +31,22 @@ export function getProjectClientOptions(projects: Array<{ clientName?: string }>
 
 export default function Projects() {
   const [, setLocation] = useLocation()
+  const searchParams = new URLSearchParams(useSearch())
   const [search, setSearch] = React.useState("")
   const [status, setStatus] = React.useState("")
   const [region, setRegion] = React.useState("")
   const [client, setClient] = React.useState("")
   const [view, setView] = React.useState<"grid" | "list">("grid")
+  const { data: currentUser } = useGetCurrentWorkspaceUser()
+  const isAdmin = currentUser?.role === "Admin"
+  const showArchived = isAdmin && searchParams.get("archived") === "true"
 
   const params = {
     search: search || undefined,
     status: status || undefined,
     region: region || undefined,
     client: client || undefined,
+    archived: isAdmin && showArchived ? true : undefined,
   }
   const { data: projects, isLoading } = useGetProjects(params, {
     query: { queryKey: getGetProjectsQueryKey(params) },
@@ -77,11 +83,21 @@ export default function Projects() {
           <header className="hud-header hud-frame flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <div className="mb-3 flex items-center gap-4"><span className="hud-kicker">Project network</span></div>
-              <h1 className="text-3xl font-extrabold tracking-[-0.03em] sm:text-5xl">All Projects</h1>
+               <h1 className="text-3xl font-extrabold tracking-[-0.03em] sm:text-5xl">
+                 {showArchived ? "Archived Projects" : "All Projects"}
+               </h1>
             </div>
-            <div role="group" aria-label="Layout" className="hud-segment self-start lg:self-auto">
-              <button type="button" aria-pressed={view === "grid"} onClick={() => setView("grid")} aria-label="Grid view"><Grid2X2 className="h-3.5 w-3.5" />Grid</button>
-              <button type="button" aria-pressed={view === "list"} onClick={() => setView("list")} aria-label="List view"><List className="h-3.5 w-3.5" />List</button>
+             <div className="flex flex-wrap items-center gap-3 self-start lg:self-auto">
+               {isAdmin && (
+                 <div role="group" aria-label="Project collection" className="hud-segment">
+                   <button type="button" aria-pressed={!showArchived} onClick={() => setLocation("/projects")}>Active</button>
+                   <button type="button" aria-pressed={showArchived} onClick={() => setLocation("/projects?archived=true")}>Archived</button>
+                 </div>
+               )}
+               <div role="group" aria-label="Layout" className="hud-segment">
+                 <button type="button" aria-pressed={view === "grid"} onClick={() => setView("grid")} aria-label="Grid view"><Grid2X2 className="h-3.5 w-3.5" />Grid</button>
+                 <button type="button" aria-pressed={view === "list"} onClick={() => setView("list")} aria-label="List view"><List className="h-3.5 w-3.5" />List</button>
+               </div>
             </div>
           </header>
 
@@ -132,7 +148,7 @@ export default function Projects() {
 
           <div className="flex items-center gap-4">
             <p className="shrink-0 font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              {isLoading ? "Scanning projects" : `${projects?.length ?? 0} projects found`}
+              {isLoading ? "Scanning projects" : `${projects?.length ?? 0} ${showArchived ? "archived " : ""}projects found`}
             </p>
             <div aria-hidden="true" className="hud-rule flex-1" />
           </div>
@@ -146,13 +162,20 @@ export default function Projects() {
           ) : projects?.length === 0 ? (
             <div className="filter-dock py-20 text-center">
               <Building2 className="mx-auto mb-4 h-12 w-12 text-primary/50" />
-              <h2 className="text-xl font-semibold">No matching projects</h2>
-              <p className="mt-2 text-sm text-muted-foreground">Clear or adjust the filters to expand the results.</p>
+              <h2 className="text-xl font-semibold">{showArchived ? "No archived projects" : "No matching projects"}</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {showArchived ? "Projects you archive will appear here." : "Clear or adjust the filters to expand the results."}
+              </p>
             </div>
           ) : (
             <div className={view === "grid" ? "pgrid" : "pgrid-list"}>
               {projects?.map((project) => (
-                <ProjectCard key={project.id} project={project} layout={view === "list" ? "row" : "tile"} onOpen={() => setLocation(`/projects/${project.id}`)} />
+                 <ProjectCard
+                   key={project.id}
+                   project={project}
+                   layout={view === "list" ? "row" : "tile"}
+                   onOpen={() => setLocation(`/projects/${project.id}${showArchived ? "?archived=true" : ""}`)}
+                 />
               ))}
             </div>
           )}

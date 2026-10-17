@@ -79,6 +79,11 @@ paths:
           in: query
           schema:
             type: string
+        - name: archived
+          in: query
+          description: Return archived projects instead of active projects. Administrator access required.
+          schema:
+            type: boolean
       responses:
         "200":
           description: Project list
@@ -140,6 +145,69 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Project"
+    delete:
+      operationId: deleteProject
+      tags: [projects]
+      summary: Permanently delete a project
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "204":
+          description: Project and its project-specific records have been deleted.
+        "403":
+          description: Administrator access required.
+        "404":
+          description: Project not found.
+        "409":
+          description: Project is still building and cannot be deleted.
+        "502":
+          description: Project files could not be removed; project records were preserved.
+  /projects/{projectId}/archive:
+    post:
+      operationId: archiveProject
+      tags: [projects]
+      summary: Archive a project while retaining its records
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "204":
+          description: Project archived.
+        "403":
+          description: Administrator access required.
+        "404":
+          description: Project not found.
+  /projects/{projectId}/restore:
+    post:
+      operationId: restoreProject
+      tags: [projects]
+      summary: Restore an archived project
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "204":
+          description: Project restored.
+        "403":
+          description: Administrator access required.
+        "404":
+          description: Project not found.
+  /projects/{projectId}/archived:
+    get:
+      operationId: getArchivedProject
+      tags: [projects]
+      summary: Get an archived project (Administrators only)
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Archived project details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDetail"
+        "403":
+          description: Administrator access required.
+        "404":
+          description: Archived project not found.
   /projects/{projectId}/documents/{documentId}/preview:
     get:
       operationId: getProjectDocumentPreview
@@ -2149,6 +2217,8 @@ components:
         invoiced: { type: number }
         exteriorImage: { type: string }
         description: { type: string }
+        archivedAt: { type: ["string", "null"], format: date-time, description: Timestamp when this project was archived. }
+        canManageLifecycle: { type: boolean, description: Whether this project has a persisted record that supports archiving and deletion. }
     ProjectInput:
       type: object
       additionalProperties: false

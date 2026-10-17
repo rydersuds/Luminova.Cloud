@@ -182,7 +182,7 @@ import
   clientsTable,
   clientMembersTable,
 } from "@workspace/db";
-import { and, desc, eq, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import OpenAI from "openai";
@@ -194,6 +194,14 @@ import {
   projectImportAnalysisFailureMessage,
 } from "../lib/projectImportAnalysis";
 import { ObjectStorageService } from "../lib/objectStorage";
+import {
+  archiveProject as archiveProjectRecord,
+  permanentlyDeleteProject,
+  ProjectLifecycleConflictError,
+  ProjectLifecycleNotFoundError,
+  ProjectLifecycleStorageError,
+  restoreProject as restoreProjectRecord,
+} from "../lib/projectLifecycle";
 import {
   createProjectDocumentPreview,
   getProjectDocumentPreviewKind,
@@ -1897,6 +1905,10 @@ const trades: Array<
 type Project = (typeof projects)[number] & 
 {
 
+  archivedAt?: string | null;
+
+  canManageLifecycle?: boolean;
+
 
   projectManagerId?: string | null
 ;
@@ -3002,7 +3014,11 @@ const financialRecordsForOwner = async (ownerId: string, scope = "default") =>
 
 ;
 
-export const projectsForOwner = async (ownerId: string, workspaceId: string) => {
+export const projectsForOwner = async (
+  ownerId: string,
+  workspaceId: string,
+  options: { archived?: boolean } = {},
+) => {
   if (workspaceId === "default") {
     await applyMadisonParkRevenueCorrection(ownerId, undefined, undefined, workspaceId);
   }
@@ -3010,11 +3026,15 @@ export const projectsForOwner = async (ownerId: string, workspaceId: string) => 
     db.select({
       data: importedProjectsTable.data,
       importBatchId: importedProjectsTable.importBatchId,
+      archivedAt: importedProjectsTable.archivedAt,
     })
       .from(importedProjectsTable)
       .where(and(
         eq(importedProjectsTable.ownerId, ownerId),
         eq(importedProjectsTable.workspaceId, workspaceId),
+        options.archived
+          ? isNotNull(importedProjectsTable.archivedAt)
+          : isNull(importedProjectsTable.archivedAt),
       )),
     db.select().from(projectExteriorPhotosTable),
     financialRecordsForOwner(ownerId, workspaceId),
@@ -3029,6 +3049,8 @@ export const projectsForOwner = async (ownerId: string, workspaceId: string) => 
       : persistedProject.clientQuote?.total ?? 0;
     const project = withCalculatedProjectProgress({
       ...persistedProject,
+      archivedAt: row.archivedAt?.toISOString() ?? null,
+      canManageLifecycle: true,
       budgetEnabled: persistedProject.budgetEnabled !== false,
       budgetAmountUnit: persistedProject.budgetAmountUnit ??
         (row.importBatchId.startsWith("manual-") ? "cents" : "dollars"),
@@ -3042,9 +3064,11 @@ export const projectsForOwner = async (ownerId: string, workspaceId: string) => 
     const exteriorPhoto = exteriorPhotoByProject.get(project.id);
     return exteriorPhoto?.ownerId === ownerId ? { ...project, exteriorImage: exteriorPhoto.exteriorImage } : project;
   });
-  const seededProjects = workspaceId === "default" ? projects.map((project) => {
+  const seededProjects = workspaceId === "default" && !options.archived ? projects.map((project) => {
     const normalizedProject = withCalculatedProjectProgress({
       ...project,
+      archivedAt: null,
+      canManageLifecycle: false,
       budgetEnabled: (project as Project).budgetEnabled !== false,
       budgetAmountUnit: "cents" as const,
     });
@@ -3257,8 +3281,8 @@ const tradesForOwner = async (ownerId: string, workspaceId = "default") =>
 ;
 
 
-const findOwnedProject = async (projectId: string, ownerId: string, workspaceId: string) =>
-  (await projectsForOwner(ownerId, workspaceId)).find((project) => project.id === projectId)
+const findOwnedProject = async (projectId: string, ownerId: string, workspaceId: string, archived = false) =>
+  (await projectsForOwner(ownerId, workspaceId, { archived })).find((project) => project.id === projectId)
 ;
 
 const findWorkspaceProject = async (projectId: string, workspaceId: string): Promise<Project | undefined> => {
@@ -3304,7 +3328,12 @@ const findProject = async (projectId: string) => (await allProjects()).find((pro
 ;
 
 
-export const findAuthorizedProject = async (projectId: string, ownerId: string, workspaceId: string): Promise<Project | undefined> =>
+export const findAuthorizedProject = async (
+  projectId: string,
+  ownerId: string,
+  workspaceId: string,
+  archived = false,
+): Promise<Project | undefined> =>
 {
 
 
@@ -3314,11 +3343,15 @@ export const findAuthorizedProject = async (projectId: string, ownerId: string, 
 ;
 
 
-  if (directProject) return withCalculatedProjectProgress(directProject)
+  if (directProject && !archived) return withCalculatedProjectProgress({
+    ...directProject,
+    archivedAt: null,
+    canManageLifecycle: false,
+  })
 ;
 
 
-  return findOwnedProject(projectId, ownerId, workspaceId)
+  return findOwnedProject(projectId, ownerId, workspaceId, archived)
 ;
 
 
@@ -5586,7 +5619,19 @@ router.get("/projects", async (req: AuthenticatedRequest, res) =>
 {
 
 
-    const result = (await projectsForOwner(req.userId, requestWorkspaceId(req))).filter((project) =>
+    const archived = parsed.data.archived;
+    if (archived && !await requireWorkspaceRole(
+      req,
+      res,
+      ["Admin"],
+      "Administrator access required",
+      requestProjectAssignmentClient(req),
+    )) return;
+    const result = (await projectsForOwner(
+      req.userId,
+      requestWorkspaceId(req),
+      { archived: archived === true },
+    )).filter((project) =>
       (!status || project.status === status) &&
       (!region || project.region === region) &&
       (!client || project.clientName === client) &&
@@ -5633,6 +5678,95 @@ router.get("/projects", async (req: AuthenticatedRequest, res) =>
 )
 ;
 
+
+const requireProjectLifecycleAdmin = (req: AuthenticatedRequest, res: Response) =>
+  requireWorkspaceRole(
+    req,
+    res,
+    ["Admin"],
+    "Administrator access required",
+    requestProjectAssignmentClient(req),
+  );
+
+router.post("/projects/:projectId/archive", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  if (!await requireProjectLifecycleAdmin(req, res)) return;
+  const parsed = GetProjectParams.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  try {
+    const archived = await archiveProjectRecord(parsed.data.projectId, requestWorkspaceId(req));
+    if (!archived) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+    res.status(204).end();
+  } catch (error) {
+    req.log.error({ err: error }, "Failed to archive project");
+    res.status(500).json({ error: "Project could not be archived." });
+  }
+});
+
+router.post("/projects/:projectId/restore", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  if (!await requireProjectLifecycleAdmin(req, res)) return;
+  const parsed = GetProjectParams.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  try {
+    const restored = await restoreProjectRecord(parsed.data.projectId, requestWorkspaceId(req));
+    if (!restored) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+    res.status(204).end();
+  } catch (error) {
+    req.log.error({ err: error }, "Failed to restore project");
+    res.status(500).json({ error: "Project could not be restored." });
+  }
+});
+
+router.delete("/projects/:projectId", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  if (!await requireProjectLifecycleAdmin(req, res)) return;
+  const parsed = GetProjectParams.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  try {
+    await permanentlyDeleteProject(parsed.data.projectId, requestWorkspaceId(req));
+    res.status(204).end();
+  } catch (error) {
+    if (error instanceof ProjectLifecycleNotFoundError) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+    if (error instanceof ProjectLifecycleConflictError) {
+      res.status(409).json({ error: "The project is still being built and cannot be deleted yet." });
+      return;
+    }
+    if (error instanceof ProjectLifecycleStorageError) {
+      res.status(502).json({ error: "Project files could not be removed; the project was kept. Please retry." });
+      return;
+    }
+    req.log.error({ err: error }, "Failed to permanently delete project");
+    res.status(500).json({ error: "Project could not be deleted." });
+  }
+});
 
 router.post("/projects", async (req, res): Promise<void> => 
 {
@@ -7579,7 +7713,37 @@ router.get("/projects/:projectId/documents/:documentId/preview", async (req: Aut
   }
 });
 
-router.get("/projects/:projectId", async (req: AuthenticatedRequest, res): Promise<void> => 
+router.get("/projects/:projectId/archived", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  if (!await requireProjectLifecycleAdmin(req, res)) return;
+  const parsed = GetProjectParams.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const workspaceId = requestWorkspaceId(req);
+  const project = await findAuthorizedProject(parsed.data.projectId, req.userId, workspaceId, true);
+  if (!project?.archivedAt) {
+    res.status(404).json({ error: "Archived project not found" });
+    return;
+  }
+  try {
+    const clients = await clientBrandingForWorkspace(workspaceId);
+    res.json(GetProjectResponse.parse(enrichProjectClient(
+      await detailsFor(project, req.userId, workspaceId),
+      clients,
+    )));
+  } catch (error) {
+    req.log.error({ err: error, projectId: project.id }, "Failed to load archived project");
+    res.status(500).json({ error: "Project details could not be loaded." });
+  }
+});
+
+router.get("/projects/:projectId", async (req: AuthenticatedRequest, res): Promise<void> =>
 {
 
 

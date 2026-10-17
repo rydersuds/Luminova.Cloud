@@ -109,3 +109,34 @@ test.describe('All Projects region filter', () => {
     await expect(page.getByRole('button', { name: 'Filters', exact: true })).toBeFocused();
   });
 });
+
+test('administrators can switch between active and archived project lists', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('luminova-cookie-consent-v1', 'accepted');
+  });
+  await page.route('**/api/users/me', route => route.fulfill({ json: { userId: 'user-admin', role: 'Admin' } }));
+  const archivedProject = makeProject({
+    id: 'archived-foundation',
+    name: 'Archived Foundation',
+    archivedAt: '2026-10-12T00:00:00.000Z',
+    canManageLifecycle: true,
+  });
+  const requestedUrls: string[] = [];
+  await page.route('**/api/projects**', async (route) => {
+    const url = new URL(route.request().url());
+    requestedUrls.push(`${url.pathname}${url.search}`);
+    await route.fulfill({
+      json: url.searchParams.get('archived') === 'true' ? [archivedProject] : [makeProject()],
+    });
+  });
+
+  await page.goto('/__visual/project-cards');
+  await expect(page.getByRole('heading', { name: 'All Projects' })).toBeVisible();
+  await page.getByRole('button', { name: 'Archived', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Archived Projects' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Archived Foundation' })).toBeVisible();
+  await expect.poll(() => requestedUrls.some((url) => url.includes('archived=true'))).toBe(true);
+  await page.getByRole('button', { name: 'Active', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'All Projects' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Calgary Tower Renewal' })).toBeVisible();
+});
