@@ -54,7 +54,7 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_TEXT_CHARACTERS = 50_000;
 const MAX_FINANCIAL_PDF_OCR_PAGES = 8;
 const MAX_FINANCIAL_PDF_OCR_BYTES = 12 * 1024 * 1024;
-const financialPathPattern = /\b(?:invoice|quotes?|quotation|estimate|bid|budget|proposal|contract|agreement|pricing|cost|financial|schedule of values|change order|payment application)\b/i;
+const financialPathPattern = /\b(?:invoices?|quotes?|quotations?|estimates?|bids?|budgets?|proposals?|contracts?|agreements?|pricing|costs?|financials?|schedule of values|change orders?|payment applications?)\b/i;
 const imageExtractionSchema = z.object({ text: z.string().max(MAX_TEXT_CHARACTERS) });
 
 const normalizeDocumentPath = (path: string) => path.replace(/[_-]+/g, " ");
@@ -65,11 +65,20 @@ export function isFinancialDocumentPath(path: string) {
 
 export function isInternalBudgetDocumentPath(path: string) {
   const normalized = normalizeDocumentPath(path);
-  const explicitInternal = /\b(?:internal(?:\s+project)?\s+(?:budget|cost|pricing)|our\s+cost|luminova\s+(?:cost|pricing)|cost\s+to\s+complete|cost\s+breakdown)\b/i.test(normalized);
+  const explicitInternal = /\b(?:internal(?:\s+project)?\s+(?:budgets?|costs?|pricing)|our\s+costs?|luminova\s+(?:costs?|pricing)|cost\s+to\s+complete|cost\s+breakdown)\b/i.test(normalized);
   if (explicitInternal) return true;
-  const hasBudgetCue = /\b(?:budget|pricing|cost\s+to\s+complete|cost\s+breakdown|cost\s+plan)\b/i.test(normalized);
-  const hasClientFacingCue = /\b(?:client|contract|quote|quotation|proposal|invoice|billing|revenue|selling|sales)\b/i.test(normalized);
+  const hasBudgetCue = /\b(?:budgets?|pricing|cost\s+to\s+complete|cost\s+breakdown|cost\s+plan)\b/i.test(normalized);
+  const hasClientFacingCue = /\b(?:client|contracts?|quotes?|quotations?|proposals?|invoices?|billing|revenue|selling|sales)\b/i.test(normalized);
   return hasBudgetCue && !hasClientFacingCue;
+}
+
+function financialSnippetPriority(path: string) {
+  const normalized = normalizeDocumentPath(path);
+  if (
+    isInternalBudgetDocumentPath(path) ||
+    /\b(?:contracts?|agreements?|quotes?|quotations?|proposals?)\b/i.test(normalized)
+  ) return 2;
+  return isFinancialDocumentPath(path) ? 1 : 0;
 }
 
 type DocumentWithSnippet = { relativePath: string; textSnippet?: string };
@@ -84,8 +93,8 @@ export function boundProjectImportDocumentSnippets<T extends DocumentWithSnippet
   const priority = documents
     .map((document, index) => ({ document, index }))
     .sort((left, right) =>
-      Number(isFinancialDocumentPath(right.document.relativePath)) -
-        Number(isFinancialDocumentPath(left.document.relativePath)) ||
+      financialSnippetPriority(right.document.relativePath) -
+        financialSnippetPriority(left.document.relativePath) ||
       left.index - right.index
     );
 
@@ -158,7 +167,10 @@ async function extractPdf(
   const parser = new PDFParse({ data: buffer });
   try {
     const text = cleanText((await parser.getText()).text);
-    if (text.length >= 160) return text;
+    if (
+      text.length >= 160 ||
+      (!isFinancialDocumentPath(document.relativePath) && !isFinancialDocumentPath(document.name))
+    ) return text;
 
     try {
       const info = await parser.getInfo();
@@ -240,7 +252,7 @@ const currencyValue = (cell: ExcelJS.Cell) => {
 const roundCurrency = (value: number) => Math.round(value * 100) / 100;
 
 const descriptionHeaderPattern = /\b(?:category|description|scope|division|trade|cost code|item|work package|phase)\b/i;
-const internalBudgetAmountHeaderPattern = /\b(?:internal(?:\s+project)?\s+(?:budget|cost|pricing)|our\s+(?:cost|pricing)|luminova\s+(?:cost|pricing)|construction\s+(?:budget|cost)|cost\s+to\s+complete|budget(?:ed)?(?:\s+(?:amount|cost))?)\b/i;
+const internalBudgetAmountHeaderPattern = /\b(?:internal(?:\s+project)?\s+(?:budget|cost|pricing)s?|our\s+(?:costs?|pricing)|luminova\s+(?:costs?|pricing)|construction\s+(?:budget|cost)s?|cost\s+to\s+complete|budget(?:ed)?(?:\s+(?:amount|cost))?)\b/i;
 const clientFacingAmountHeaderPattern = /\b(?:client|contract|quote|proposal|selling|sales|revenue|billable|retail)\b/i;
 
 type BudgetTableColumns = {
@@ -288,13 +300,18 @@ function hasClientFacingFinancialHeader(sheet: ExcelJS.Worksheet) {
 }
 
 function budgetTotalScore(description: string) {
-  if (/\b(?:subtotal|before tax|pre[- ]tax|excluding tax)\b/i.test(description)) return 0;
+  if (isSubtotalOrPreTaxTotal(description)) return 0;
   if (/complete project restoration|grand total|final total/i.test(description)) return 5;
   if (/\btotal\s+(?:(?:internal|our|construction|project)\s+)?(?:budget|cost)\b|\b(?:internal|our|project|construction)\s+(?:budget|cost)\s+total\b|\bbudget total\b/i.test(description)) {
     return 4;
   }
   if (/^total$/i.test(description.trim())) return 2;
   return 0;
+}
+
+function isSubtotalOrPreTaxTotal(description: string) {
+  return /\bsubtotal\b/i.test(description) ||
+    /^(?:total\s+before\s+tax|before\s+tax|pre[- ]tax(?:\s+total)?|excluding\s+tax)\b/i.test(description.trim());
 }
 
 function assembleInternalBudget(
@@ -340,7 +357,7 @@ function extractBudgetTable(
       totals.push({ amount, score });
       return;
     }
-    if (/\b(?:subtotal|before tax|pre[- ]tax|excluding tax)\b/i.test(description)) return;
+    if (isSubtotalOrPreTaxTotal(description)) return;
     rows.push({ description, amount });
   });
   return assembleInternalBudget(sourceRelativePath, rows, totals);
@@ -358,7 +375,7 @@ function extractLegacyBudgetSummary(sheet: ExcelJS.Worksheet, sourceRelativePath
       totals.push({ amount, score });
       return;
     }
-    if (/\b(?:subtotal|before tax|pre[- ]tax|excluding tax)\b/i.test(description)) return;
+    if (isSubtotalOrPreTaxTotal(description)) return;
     rows.push({ description, amount });
   });
   return assembleInternalBudget(sourceRelativePath, rows, totals);
@@ -396,9 +413,10 @@ export async function extractInternalBudgetFromDocuments(
   const candidates = documents
     .filter((document) =>
       document.size <= MAX_DOCUMENT_BYTES &&
-      /budget/i.test(document.relativePath) &&
+      isFinancialDocumentPath(document.relativePath) &&
       (/\.xlsx$/i.test(document.name) || document.contentType.includes("spreadsheetml")))
     .sort((a, b) =>
+      Number(isInternalBudgetDocumentPath(b.relativePath)) - Number(isInternalBudgetDocumentPath(a.relativePath)) ||
       Number(/luminova pricing/i.test(b.relativePath)) - Number(/luminova pricing/i.test(a.relativePath)) ||
       a.relativePath.localeCompare(b.relativePath));
   const storage = new ObjectStorageService();
@@ -420,10 +438,15 @@ export async function extractInternalBudgetFromDocuments(
   return null;
 }
 
-async function extractOfficeText(document: ImportDocument, buffer: Buffer) {
+async function extractOfficeText(
+  document: ImportDocument,
+  buffer: Buffer,
+  getClient: () => OpenAI,
+  log: ExtractionLog,
+) {
   const lowerName = document.name.toLowerCase();
   if (lowerName.endsWith(".pdf") || document.contentType === "application/pdf") {
-    return extractPdf(buffer);
+    return extractPdf(buffer, document, getClient, log);
   }
   if (lowerName.endsWith(".xlsx") || document.contentType.includes("spreadsheetml")) {
     return extractWorkbook(buffer);
@@ -438,7 +461,20 @@ async function extractOfficeText(document: ImportDocument, buffer: Buffer) {
   return "";
 }
 
-async function extractImageText(client: OpenAI, document: ImportDocument, buffer: Buffer) {
+async function extractImageText(client: OpenAI, document: ImportDocument, images: FinancialImageInput[]) {
+  const content: Array<
+    | { type: "text"; text: string }
+    | { type: "image_url"; image_url: { url: string } }
+  > = [];
+  for (const image of images) {
+    if (image.pageNumber !== undefined) {
+      content.push({ type: "text", text: `PDF page ${image.pageNumber}:` });
+    }
+    content.push({
+      type: "image_url",
+      image_url: { url: `data:${image.contentType};base64,${image.buffer.toString("base64")}` },
+    });
+  }
   const response = await client.chat.completions.parse({
     model: "gpt-5-mini",
     max_completion_tokens: 4096,
@@ -451,8 +487,8 @@ async function extractImageText(client: OpenAI, document: ImportDocument, buffer
       {
         role: "user",
         content: [
-          { type: "text", text: `Private uploaded document: ${document.name}` },
-          { type: "image_url", image_url: { url: `data:${document.contentType};base64,${buffer.toString("base64")}` } },
+          { type: "text", text: `Private uploaded financial document: ${document.name}. Transcribe each image in order and retain page labels.` },
+          ...content,
         ],
       },
     ],
@@ -473,10 +509,23 @@ export async function enrichFinancialDocumentSnippets(
       const index = nextIndex++;
       const document = documents[index];
       const isImage = document.contentType.toLowerCase().startsWith("image/");
+      const isPdf =
+        /\.pdf$/i.test(document.name) ||
+        document.contentType.toLowerCase() === "application/pdf";
       const isSupportedOfficeDocument =
         /(\.pdf|\.xlsx|\.docx|\.odt)$/i.test(document.name) ||
         /(pdf|spreadsheetml|wordprocessingml|opendocument\.text)/i.test(document.contentType);
-      if (document.textSnippet?.trim() || (!isSupportedOfficeDocument && !(isImage && financialPathPattern.test(document.relativePath)))) continue;
+      const existingSnippet = document.textSnippet?.trim() ?? "";
+      const shouldRetryShortFinancialPdf =
+        isPdf &&
+        existingSnippet.length < 160 &&
+        (isFinancialDocumentPath(document.relativePath) || isFinancialDocumentPath(document.name));
+      if (
+        (existingSnippet && !shouldRetryShortFinancialPdf) ||
+        (!isSupportedOfficeDocument && !(isImage && (
+          isFinancialDocumentPath(document.relativePath) || isFinancialDocumentPath(document.name)
+        )))
+      ) continue;
       const maxBytes = isImage ? MAX_IMAGE_BYTES : MAX_DOCUMENT_BYTES;
       if (document.size > maxBytes) {
         log.warn({ relativePath: document.relativePath, size: document.size }, "Financial document is too large for bounded extraction");
@@ -489,10 +538,18 @@ export async function enrichFinancialDocumentSnippets(
         let textSnippet: string;
         if (isImage) {
           client ??= createProjectImportAiClient();
-          textSnippet = await extractImageText(client, document, buffer);
+          textSnippet = await extractImageText(client, document, [
+            { buffer, contentType: document.contentType },
+          ]);
         } else {
-          textSnippet = await extractOfficeText(document, buffer);
+          textSnippet = await extractOfficeText(
+            document,
+            buffer,
+            () => (client ??= createProjectImportAiClient()),
+            log,
+          );
         }
+        textSnippet = cleanText([existingSnippet, textSnippet].filter(Boolean).join("\n"));
         enriched[index] = textSnippet
           ? { ...document, textSnippet, extractionFailed: false }
           : { ...document, extractionFailed: true };

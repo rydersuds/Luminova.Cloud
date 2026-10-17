@@ -212,6 +212,7 @@ import {
   getStandaloneVendorProfile,
 } from "../lib/standaloneVendorProfiles";
 import {
+  boundProjectImportDocumentSnippets,
   enrichFinancialDocumentSnippets,
   extractInternalBudgetFromDocuments,
   type InternalBudgetLineItem,
@@ -1246,11 +1247,12 @@ async function analyzeProjectImport(documents: Array<
 {
 
 
+  const priorityDocuments = boundProjectImportDocumentSnippets(documents);
   let remainingSnippetCharacters = 250_000
 ;
 
 
-  const boundedDocuments = documents.map((document) => 
+  const boundedDocuments = priorityDocuments.map((document) =>
 {
 
 
@@ -7104,11 +7106,8 @@ const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: R
 
 
   const latestClientQuote = importedQuotes
-    .filter((quote) => quote.direction === "luminova_to_client")
-    .sort((a, b) =>
-      Number(b.isProjectTotal === true) - Number(a.isProjectTotal === true) ||
-      b.issueDate.localeCompare(a.issueDate)
-    )[0]
+    .filter((quote) => quote.direction === "luminova_to_client" && quote.isProjectTotal === true)
+    .sort((a, b) => b.issueDate.localeCompare(a.issueDate))[0]
 ;
 
 

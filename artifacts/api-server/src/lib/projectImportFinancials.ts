@@ -2,6 +2,7 @@ export type ImportedClientQuote = {
   total: number;
   quoteNumber: string;
   lineItems: Array<{ id: string; description: string; amount: number }>;
+  isProjectTotal?: boolean;
 };
 
 export type ImportedClientQuoteSummary = {
@@ -21,9 +22,26 @@ export function resolveImportedClientQuote(
   clientQuoteDollars: number | null | undefined,
   latestClientQuote?: ImportedClientQuote | null,
 ): ImportedClientQuoteSummary | undefined {
-  if (latestClientQuote) {
+  const hasProjectQuote =
+    latestClientQuote?.isProjectTotal === true &&
+    Number.isFinite(latestClientQuote.total) &&
+    latestClientQuote.total > 0;
+  const hasProjectClientTotal =
+    typeof clientQuoteDollars === "number" &&
+    Number.isFinite(clientQuoteDollars) &&
+    clientQuoteDollars > 0;
+
+  if (hasProjectClientTotal) {
+    const quoteMatchesContract = hasProjectQuote &&
+      Math.abs(latestClientQuote.total - clientQuoteDollars) <= 0.02;
+    if (!quoteMatchesContract) {
+      return { total: clientQuoteDollars, revision: "", portions: [] };
+    }
+  }
+
+  if (hasProjectQuote) {
     return {
-      total: latestClientQuote.total,
+      total: hasProjectClientTotal ? clientQuoteDollars : latestClientQuote.total,
       revision: latestClientQuote.quoteNumber,
       portions: latestClientQuote.lineItems.map((lineItem) => ({
         code: lineItem.id,
@@ -33,9 +51,9 @@ export function resolveImportedClientQuote(
     };
   }
 
-  if (typeof clientQuoteDollars !== "number" || !Number.isFinite(clientQuoteDollars) || clientQuoteDollars <= 0) {
-    return undefined;
+  if (hasProjectClientTotal) {
+    return { total: clientQuoteDollars, revision: "", portions: [] };
   }
 
-  return { total: clientQuoteDollars, revision: "", portions: [] };
+  return undefined;
 }
