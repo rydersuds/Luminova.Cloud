@@ -101,39 +101,43 @@ export function ProjectLifecycleActions({
 
   return (
     <>
-      {archived ? (
+      <div className="flex flex-wrap items-center gap-2">
+        {archived ? (
+          <Button
+            variant="outline"
+            className="max-w-full whitespace-normal border-border bg-transparent text-foreground hover:bg-card/60 hover:text-foreground"
+            onClick={handleRestore}
+            disabled={isPending}
+          >
+            <RotateCcw className="mr-2 h-4 w-4" />
+            Restore project
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="max-w-full whitespace-normal text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+            onClick={() => setAction("archive")}
+            disabled={isPending}
+          >
+            <Archive className="mr-2 h-3.5 w-3.5" />
+            Archive project
+          </Button>
+        )}
         <Button
           variant="outline"
-          className="max-w-full whitespace-normal border-border bg-transparent text-foreground hover:bg-card/60 hover:text-foreground"
-          onClick={handleRestore}
+          size="sm"
+          className="max-w-full whitespace-normal border-border/60 bg-transparent text-muted-foreground hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive"
+          onClick={() => {
+            setConfirmation("")
+            setAction("delete")
+          }}
           disabled={isPending}
         >
-          <RotateCcw className="mr-2 h-4 w-4" />
-          Restore project
+          <Trash2 className="mr-2 h-3.5 w-3.5" />
+          Delete permanently
         </Button>
-      ) : (
-        <Button
-          variant="outline"
-          className="max-w-full whitespace-normal border-border bg-transparent text-foreground hover:bg-card/60 hover:text-foreground"
-          onClick={() => setAction("archive")}
-          disabled={isPending}
-        >
-          <Archive className="mr-2 h-4 w-4" />
-          Archive project
-        </Button>
-      )}
-      <Button
-        variant="destructive"
-        className="max-w-full whitespace-normal"
-        onClick={() => {
-          setConfirmation("")
-          setAction("delete")
-        }}
-        disabled={isPending}
-      >
-        <Trash2 className="mr-2 h-4 w-4" />
-        Delete permanently
-      </Button>
+      </div>
 
       <Dialog open={action !== null} onOpenChange={(open) => !open && closeDialog()}>
         <DialogContent>
