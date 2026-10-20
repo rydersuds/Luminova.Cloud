@@ -26,6 +26,31 @@ export const resolveProjectStartDate = (project: {
   return LEGACY_PROJECT_START_DATE;
 };
 
+export type ProjectBoardTimelineItem = {
+  startDate?: unknown;
+  endDate?: unknown;
+};
+
+export const resolveProjectTimeline = (
+  project: { startDate?: unknown; targetDate?: unknown },
+  boardItems: ProjectBoardTimelineItem[] = [],
+) => {
+  const boardStartDates = boardItems
+    .map((item) => item.startDate)
+    .filter((date): date is string => typeof date === "string" && isValidCalendarDate(date))
+    .sort();
+  const boardEndDates = boardItems
+    .map((item) => item.endDate)
+    .filter((date): date is string => typeof date === "string" && isValidCalendarDate(date))
+    .sort();
+
+  return {
+    startDate: boardStartDates[0] ?? resolveProjectStartDate(project),
+    targetDate: boardEndDates.at(-1) ??
+      (typeof project.targetDate === "string" ? project.targetDate : ""),
+  };
+};
+
 export const calculateProjectProgress = (
   startDate: string,
   endDate: string,

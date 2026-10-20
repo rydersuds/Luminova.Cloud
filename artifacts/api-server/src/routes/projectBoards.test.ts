@@ -4,6 +4,7 @@ import type { AddressInfo } from "node:net";
 import { randomUUID } from "node:crypto";
 import express from "express";
 import { eq, inArray } from "drizzle-orm";
+import { calculateProjectProgress } from "../lib/projectProgress";
 import {
   db,
   importedProjectsTable,
@@ -12,6 +13,7 @@ import {
   projectImportBatchesTable,
 } from "@workspace/db";
 import projectBoardsRouter, { DEFAULT_BOARD_GROUPS } from "./projectBoards";
+import { projectsForOwner } from "./luminova";
 import { setWorkspaceRoleResolverForTests } from "./users";
 import { MAX_BOARD_IMPORT_BYTES } from "../lib/boardImportExtraction";
 
@@ -30,7 +32,8 @@ test("project boards are scoped to authorized project team members and keep orde
     ownerId,
     data: {
       id: projectId, name: "Board test project", address: "", region: "Calgary", status: "Planning", progress: 0,
-      pmName: "", clientName: "", targetDate: "", budgeted: 0, invoiced: 0, exteriorImage: "", description: "",
+      pmName: "", clientName: "", startDate: "2099-01-01", targetDate: "2099-12-31",
+      budgeted: 0, invoiced: 0, exteriorImage: "", description: "",
     },
   });
 
@@ -133,14 +136,28 @@ test("project boards are scoped to authorized project team members and keep orde
   const permit = await create("Building permit", pre.id, { startDate: "2026-05-01", endDate: "2026-05-20", status: "Working on it" });
   const survey = await create("Site survey", pre.id);
   const footings = await create("Pour footings", site.id, { startDate: "2026-06-01", endDate: "2026-06-05" });
+  const completionRange = await create("Long board completion range", pre.id, {
+    startDate: "2000-01-01",
+    endDate: "2099-12-31",
+  });
   assert.deepEqual([permit.position, survey.position], [0, 1]);
+
+  const listedProject = (await projectsForOwner(ownerId, "default")).find((project) => project.id === projectId);
+  assert.ok(listedProject);
+  assert.equal(listedProject.startDate, "2099-01-01", "the stored project timeline remains unchanged");
+  assert.equal(listedProject.targetDate, "2099-12-31", "the stored project target remains unchanged");
+  assert.equal(
+    listedProject.progress,
+    calculateProjectProgress("2000-01-01", "2099-12-31"),
+    "completion uses the board's earliest start and latest finish",
+  );
 
   const moved = await (await call("PATCH", `${boardPath}/items/${footings.id}`, ownerId, { groupId: pre.id, position: 0 })).json() as { groupId: string };
   assert.equal(moved.groupId, pre.id);
   const ordered = await db.select().from(projectBoardItemsTable).where(eq(projectBoardItemsTable.groupId, pre.id));
   assert.deepEqual(
     ordered.sort((a, b) => a.position - b.position).map((item) => item.id),
-    [footings.id, permit.id, survey.id],
+    [footings.id, permit.id, survey.id, completionRange.id],
     "moving into a group at position 0 renumbers the group",
   );
 

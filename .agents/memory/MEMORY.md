@@ -38,3 +38,4 @@
 - [Schedule import fidelity](schedule-import-fidelity.md) — preserve visible dates and per-task source colours; AI category suggestions stay editable.
 - [Project removal policy](project-removal-policy.md) — only Administrators may archive, restore, or permanently delete; archive retains history and deletion stays project-scoped.
 - [Transaction query serialization](transaction-query-serialization.md) — await database queries sequentially when they share a Drizzle transaction connection.
+- [Board-driven project completion](board-driven-project-completion.md) — board schedule dates override project dates for the existing date-based completion percentage.

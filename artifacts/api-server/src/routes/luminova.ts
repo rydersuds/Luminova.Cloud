@@ -135,6 +135,8 @@ import {
   calculateProjectProgress,
   isValidCalendarDate,
   resolveProjectStartDate,
+  resolveProjectTimeline,
+  type ProjectBoardTimelineItem,
 } from "../lib/projectProgress";
 
 
@@ -173,6 +175,7 @@ import
   conversationParticipantsTable,
   projectMessagesTable,
   projectScheduleMetadataTable,
+  projectBoardItemsTable,
   projectActivitiesTable,
   projectPanoramasTable,
   vendorJobHistoryTable,
@@ -2144,21 +2147,52 @@ type VendorQuote = (typeof vendorQuotes)[number] &
 ;
 
 
-const withCalculatedProjectProgress = (project: Project): Project => 
+const withCalculatedProjectProgress = (
+  project: Project,
+  boardItems: ProjectBoardTimelineItem[] = [],
+): Project =>
 {
+  const timeline = resolveProjectTimeline(project, boardItems);
   const startDate = resolveProjectStartDate(project);
   return {
     ...project,
     projectManagerId: project.projectManagerId ?? null,
     clientName: canonicalClientName(project.clientName),
     startDate,
-    progress: calculateProjectProgress(startDate, project.targetDate),
+    progress: calculateProjectProgress(timeline.startDate, timeline.targetDate),
   };
-
-
 }
-
 ;
+
+const withBoardCalculatedProjectProgressForProjects = async (
+  projectsToCalculate: Project[],
+  workspaceId: string,
+): Promise<Project[]> => {
+  if (!projectsToCalculate.length) return [];
+  const boardItems = await db.select({
+    projectId: projectBoardItemsTable.projectId,
+    startDate: projectBoardItemsTable.startDate,
+    endDate: projectBoardItemsTable.endDate,
+  }).from(projectBoardItemsTable).where(and(
+    eq(projectBoardItemsTable.workspaceId, workspaceId),
+    inArray(projectBoardItemsTable.projectId, projectsToCalculate.map((project) => project.id)),
+  ));
+  const itemsByProject = new Map<string, ProjectBoardTimelineItem[]>();
+  for (const item of boardItems) {
+    const items = itemsByProject.get(item.projectId) ?? [];
+    items.push(item);
+    itemsByProject.set(item.projectId, items);
+  }
+  return projectsToCalculate.map((project) =>
+    withCalculatedProjectProgress(project, itemsByProject.get(project.id)),
+  );
+};
+
+const withBoardCalculatedProjectProgress = async (
+  project: Project,
+  workspaceId: string,
+): Promise<Project> =>
+  (await withBoardCalculatedProjectProgressForProjects([project], workspaceId))[0];
 
 
 // Demo fixtures define the local record shapes above, but must never enter the live product.
@@ -3049,7 +3083,7 @@ export const projectsForOwner = async (
     const quoteTotal = acceptedQuote
       ? acceptedClientQuoteTotal(projectQuotes)
       : persistedProject.clientQuote?.total ?? 0;
-    const project = withCalculatedProjectProgress({
+    const project = {
       ...persistedProject,
       archivedAt: row.archivedAt?.toISOString() ?? null,
       canManageLifecycle: true,
@@ -3062,24 +3096,27 @@ export const projectsForOwner = async (
         revision: acceptedQuote?.quoteNumber ?? persistedProject.clientQuote?.revision ?? "",
         portions: persistedProject.clientQuote?.portions ?? [],
       },
-    });
+    };
     const exteriorPhoto = exteriorPhotoByProject.get(project.id);
     return exteriorPhoto?.ownerId === ownerId ? { ...project, exteriorImage: exteriorPhoto.exteriorImage } : project;
   });
   const seededProjects = workspaceId === "default" && !options.archived ? projects.map((project) => {
-    const normalizedProject = withCalculatedProjectProgress({
+    const normalizedProject = {
       ...project,
       archivedAt: null,
       canManageLifecycle: false,
       budgetEnabled: (project as Project).budgetEnabled !== false,
       budgetAmountUnit: "cents" as const,
-    });
+    };
     const exteriorPhoto = exteriorPhotoByProject.get(normalizedProject.id);
     return exteriorPhoto?.ownerId === "seeded-project"
       ? { ...normalizedProject, exteriorImage: exteriorPhoto.exteriorImage }
       : normalizedProject;
   }) : [];
-  return [...ownedProjects, ...seededProjects];
+  return withBoardCalculatedProjectProgressForProjects(
+    [...ownedProjects, ...seededProjects],
+    workspaceId,
+  );
 };
 
 
@@ -3290,7 +3327,7 @@ const findOwnedProject = async (projectId: string, ownerId: string, workspaceId:
 const findWorkspaceProject = async (projectId: string, workspaceId: string): Promise<Project | undefined> => {
   if (workspaceId === "default") {
     const seeded = projects.find((project) => project.id === projectId);
-    if (seeded) return withCalculatedProjectProgress(seeded);
+    if (seeded) return withBoardCalculatedProjectProgress(seeded, workspaceId);
   }
   const [record] = await db.select({ data: importedProjectsTable.data })
     .from(importedProjectsTable)
@@ -3299,7 +3336,9 @@ const findWorkspaceProject = async (projectId: string, workspaceId: string): Pro
       eq(importedProjectsTable.workspaceId, workspaceId),
     ))
     .limit(1);
-  return record ? withCalculatedProjectProgress(record.data as Project) : undefined;
+  return record
+    ? withBoardCalculatedProjectProgress(record.data as Project, workspaceId)
+    : undefined;
 };
 
 const findWorkspaceTrade = async (tradeId: string, workspaceId: string): Promise<Trade | undefined> => {
@@ -3345,11 +3384,11 @@ export const findAuthorizedProject = async (
 ;
 
 
-  if (directProject && !archived) return withCalculatedProjectProgress({
+  if (directProject && !archived) return withBoardCalculatedProjectProgress({
     ...directProject,
     archivedAt: null,
     canManageLifecycle: false,
-  })
+  }, workspaceId)
 ;
 
 
@@ -3555,7 +3594,10 @@ const accessibleProjectsForChat = async (req: AuthenticatedRequest, users: ChatU
   if (!user) return [];
   const projectRows = await db.select({ data: importedProjectsTable.data }).from(importedProjectsTable)
     .where(eq(importedProjectsTable.workspaceId, requestWorkspaceId(req)));
-  const workspaceProjects = projectRows.map((row) => withCalculatedProjectProgress(row.data as Project));
+  const workspaceProjects = await withBoardCalculatedProjectProgressForProjects(
+    projectRows.map((row) => row.data as Project),
+    requestWorkspaceId(req),
+  );
   if (user?.role !== "Client") return workspaceProjects;
   const memberships = await db.select({ clientId: clientMembersTable.clientId })
     .from(clientMembersTable)
@@ -9272,7 +9314,9 @@ router.patch("/projects/:projectId", async (req: AuthenticatedRequest, res): Pro
 ;
 
 
-    res.json(UpdateProjectResponse.parse(updated))
+    res.json(UpdateProjectResponse.parse(
+      await withBoardCalculatedProjectProgress(updated, workspaceId),
+    ))
 ;
 
 
@@ -9293,7 +9337,9 @@ router.patch("/projects/:projectId", async (req: AuthenticatedRequest, res): Pro
 ;
 
 
-  res.json(UpdateProjectResponse.parse(projects[index]))
+  res.json(UpdateProjectResponse.parse(
+    await withBoardCalculatedProjectProgress(projects[index], workspaceId),
+  ))
 ;
 
 

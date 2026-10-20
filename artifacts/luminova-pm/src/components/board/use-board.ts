@@ -7,7 +7,9 @@ import {
   deleteBoardItem,
   importBoardItems,
   getGetBoardScheduleQueryKey,
+  getGetProjectQueryKey,
   getGetProjectBoardQueryKey,
+  getGetProjectsQueryKey,
   updateBoardGroup,
   updateBoardItem,
   useGetProjectBoard,
@@ -67,7 +69,9 @@ export function useBoard(projectId: string, enabled = true) {
   const settle = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: key })
     void queryClient.invalidateQueries({ queryKey: getGetBoardScheduleQueryKey() })
-  }, [queryClient, key])
+    void queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) })
+    void queryClient.invalidateQueries({ queryKey: getGetProjectsQueryKey() })
+  }, [queryClient, key, projectId])
 
   /** Runs a change optimistically, restoring the previous board if the server refuses it. */
   const optimistic = useCallback(async (apply: (board: ProjectBoard) => ProjectBoard, send: () => Promise<unknown>, failure: string) => {
