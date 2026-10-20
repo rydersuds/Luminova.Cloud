@@ -60,6 +60,7 @@ import
   GetFinancialSummaryResponse,
   GetProjectActivityParams,
   GetProjectActivityResponse,
+  GetProjectLifecycleEventsResponse,
   GetProjectDocumentPreviewParams,
   GetProjectDocumentPreviewResponse,
   GetProjectParams,
@@ -177,6 +178,7 @@ import
   projectScheduleMetadataTable,
   projectBoardItemsTable,
   projectActivitiesTable,
+  projectLifecycleEventsTable,
   projectPanoramasTable,
   vendorJobHistoryTable,
   vendorReviewTable,
@@ -5732,6 +5734,22 @@ const requireProjectLifecycleAdmin = (req: AuthenticatedRequest, res: Response) 
     requestProjectAssignmentClient(req),
   );
 
+router.get("/project-lifecycle-events", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  if (!await requireProjectLifecycleAdmin(req, res)) return;
+
+  const events = await db.select().from(projectLifecycleEventsTable)
+    .where(eq(projectLifecycleEventsTable.workspaceId, requestWorkspaceId(req)))
+    .orderBy(desc(projectLifecycleEventsTable.createdAt));
+  res.json(GetProjectLifecycleEventsResponse.parse(events.map((event) => ({
+    ...event,
+    createdAt: event.createdAt.toISOString(),
+  }))));
+});
+
 router.post("/projects/:projectId/archive", async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.userId) {
     res.status(401).json({ error: "Authentication required" });
@@ -5744,7 +5762,7 @@ router.post("/projects/:projectId/archive", async (req: AuthenticatedRequest, re
     return;
   }
   try {
-    const archived = await archiveProjectRecord(parsed.data.projectId, requestWorkspaceId(req));
+    const archived = await archiveProjectRecord(parsed.data.projectId, requestWorkspaceId(req), req.userId);
     if (!archived) {
       res.status(404).json({ error: "Project not found" });
       return;
@@ -5768,7 +5786,7 @@ router.post("/projects/:projectId/restore", async (req: AuthenticatedRequest, re
     return;
   }
   try {
-    const restored = await restoreProjectRecord(parsed.data.projectId, requestWorkspaceId(req));
+    const restored = await restoreProjectRecord(parsed.data.projectId, requestWorkspaceId(req), req.userId);
     if (!restored) {
       res.status(404).json({ error: "Project not found" });
       return;
@@ -5792,7 +5810,7 @@ router.delete("/projects/:projectId", async (req: AuthenticatedRequest, res): Pr
     return;
   }
   try {
-    await permanentlyDeleteProject(parsed.data.projectId, requestWorkspaceId(req));
+    await permanentlyDeleteProject(parsed.data.projectId, requestWorkspaceId(req), req.userId);
     res.status(204).end();
   } catch (error) {
     if (error instanceof ProjectLifecycleNotFoundError) {

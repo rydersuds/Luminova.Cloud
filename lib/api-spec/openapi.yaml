@@ -190,6 +190,25 @@ paths:
           description: Administrator access required.
         "404":
           description: Project not found.
+  /project-lifecycle-events:
+    get:
+      operationId: getProjectLifecycleEvents
+      tags: [projects]
+      summary: List project archive, restore, and deletion events
+      description: Administrator-only audit history scoped to the active workspace.
+      responses:
+        "200":
+          description: Project lifecycle events, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProjectLifecycleEvent"
+        "401":
+          description: Authentication required.
+        "403":
+          description: Administrator access required.
   /projects/{projectId}/archived:
     get:
       operationId: getArchivedProject
@@ -3232,3 +3251,16 @@ components:
         description: { type: string }
         author: { type: string }
         date: { type: string }
+    ProjectLifecycleEvent:
+      type: object
+      required: [id, workspaceId, projectId, projectName, actorId, action, createdAt]
+      properties:
+        id: { type: string }
+        workspaceId: { type: string }
+        projectId: { type: string }
+        projectName: { type: string }
+        actorId: { type: string }
+        action:
+          type: string
+          enum: [archived, restored, permanently_deleted]
+        createdAt: { type: string, format: date-time }

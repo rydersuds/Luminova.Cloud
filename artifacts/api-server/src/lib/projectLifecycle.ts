@@ -1,4 +1,5 @@
 import { and, eq, inArray, isNull, isNotNull, or } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 import {
   conversationParticipantsTable,
   db,
@@ -8,6 +9,7 @@ import {
   importedVendorsTable,
   invoiceUploadReservationsTable,
   projectActivitiesTable,
+  projectLifecycleEventsTable,
   projectBoardGroupsTable,
   projectBoardItemsTable,
   projectConversationsTable,
@@ -31,51 +33,102 @@ export class ProjectLifecycleStorageError extends Error {}
 
 const objectStorage = new ObjectStorageService();
 
-export async function archiveProject(projectId: string, workspaceId: string): Promise<boolean> {
-  const [existing] = await db.select({ archivedAt: importedProjectsTable.archivedAt })
-    .from(importedProjectsTable)
-    .where(and(
-      eq(importedProjectsTable.id, projectId),
-      eq(importedProjectsTable.workspaceId, workspaceId),
-    ))
-    .limit(1);
-  if (!existing) return false;
-  if (existing.archivedAt) return true;
-
-  await db.update(importedProjectsTable)
-    .set({ archivedAt: new Date() })
-    .where(and(
-      eq(importedProjectsTable.id, projectId),
-      eq(importedProjectsTable.workspaceId, workspaceId),
-      isNull(importedProjectsTable.archivedAt),
-    ));
-  return true;
+function projectName(data: unknown, projectId: string): string {
+  if (data && typeof data === "object" && "name" in data && typeof data.name === "string") {
+    return data.name;
+  }
+  return projectId;
 }
 
-export async function restoreProject(projectId: string, workspaceId: string): Promise<boolean> {
-  const [existing] = await db.select({ id: importedProjectsTable.id })
-    .from(importedProjectsTable)
-    .where(and(
-      eq(importedProjectsTable.id, projectId),
-      eq(importedProjectsTable.workspaceId, workspaceId),
-    ))
-    .limit(1);
-  if (!existing) return false;
-
-  await db.update(importedProjectsTable)
-    .set({ archivedAt: null })
-    .where(and(
-      eq(importedProjectsTable.id, projectId),
-      eq(importedProjectsTable.workspaceId, workspaceId),
-      isNotNull(importedProjectsTable.archivedAt),
-    ));
-  return true;
+async function recordProjectLifecycleEvent(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  details: {
+    workspaceId: string;
+    projectId: string;
+    projectName: string;
+    actorId: string;
+    action: "archived" | "restored" | "permanently_deleted";
+  },
+) {
+  await tx.insert(projectLifecycleEventsTable).values({
+    id: randomUUID(),
+    ...details,
+  });
 }
 
-export async function permanentlyDeleteProject(projectId: string, workspaceId: string): Promise<void> {
+export async function archiveProject(projectId: string, workspaceId: string, actorId: string): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const [existing] = await tx.select({
+      archivedAt: importedProjectsTable.archivedAt,
+      data: importedProjectsTable.data,
+    })
+      .from(importedProjectsTable)
+      .where(and(
+        eq(importedProjectsTable.id, projectId),
+        eq(importedProjectsTable.workspaceId, workspaceId),
+      ))
+      .for("update")
+      .limit(1);
+    if (!existing) return false;
+    if (existing.archivedAt) return true;
+
+    await tx.update(importedProjectsTable)
+      .set({ archivedAt: new Date() })
+      .where(and(
+        eq(importedProjectsTable.id, projectId),
+        eq(importedProjectsTable.workspaceId, workspaceId),
+        isNull(importedProjectsTable.archivedAt),
+      ));
+    await recordProjectLifecycleEvent(tx, {
+      workspaceId,
+      projectId,
+      projectName: projectName(existing.data, projectId),
+      actorId,
+      action: "archived",
+    });
+    return true;
+  });
+}
+
+export async function restoreProject(projectId: string, workspaceId: string, actorId: string): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const [existing] = await tx.select({
+      archivedAt: importedProjectsTable.archivedAt,
+      data: importedProjectsTable.data,
+    })
+      .from(importedProjectsTable)
+      .where(and(
+        eq(importedProjectsTable.id, projectId),
+        eq(importedProjectsTable.workspaceId, workspaceId),
+      ))
+      .for("update")
+      .limit(1);
+    if (!existing) return false;
+    if (!existing.archivedAt) return true;
+
+    await tx.update(importedProjectsTable)
+      .set({ archivedAt: null })
+      .where(and(
+        eq(importedProjectsTable.id, projectId),
+        eq(importedProjectsTable.workspaceId, workspaceId),
+        isNotNull(importedProjectsTable.archivedAt),
+      ));
+    await recordProjectLifecycleEvent(tx, {
+      workspaceId,
+      projectId,
+      projectName: projectName(existing.data, projectId),
+      actorId,
+      action: "restored",
+    });
+    return true;
+  });
+}
+
+export async function permanentlyDeleteProject(projectId: string, workspaceId: string, actorId: string): Promise<void> {
   await db.transaction(async (tx) => {
     const [project] = await tx.select({
       importBatchId: importedProjectsTable.importBatchId,
+      data: importedProjectsTable.data,
     })
       .from(importedProjectsTable)
       .where(and(
@@ -209,5 +262,12 @@ export async function permanentlyDeleteProject(projectId: string, workspaceId: s
       eq(importedProjectsTable.id, projectId),
       eq(importedProjectsTable.workspaceId, workspaceId),
     ));
+    await recordProjectLifecycleEvent(tx, {
+      workspaceId,
+      projectId,
+      projectName: projectName(project.data, projectId),
+      actorId,
+      action: "permanently_deleted",
+    });
   });
 }

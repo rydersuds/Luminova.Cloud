@@ -368,6 +368,20 @@ test.describe('navigation contrast', () => {
     await page.keyboard.press('Tab');
     await expect(page.getByRole('link', { name: 'All Projects' })).toBeFocused();
 
+    const remainingNavigationLinks = [
+      'Schedule',
+      'Approvals',
+      'Trades & Vendors',
+      'Vendor Quotes',
+      'Financials',
+      'Users & Roles',
+      'Project History',
+    ];
+    for (const name of remainingNavigationLinks) {
+      await page.keyboard.press('Tab');
+      await expect(page.getByRole('link', { name, exact: true })).toBeFocused();
+    }
+
     await page.keyboard.press('Escape');
     await expect(drawer).not.toBeVisible();
     await expect(page.getByRole('button', { name: 'Open navigation' })).toBeFocused();

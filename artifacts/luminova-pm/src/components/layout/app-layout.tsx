@@ -19,6 +19,7 @@ import {
   CalendarRange,
   BadgeCheck,
   Smartphone,
+  History,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { preloadPage } from "@/lib/page-preload"
@@ -55,6 +56,13 @@ const SUPPORT_GROUPS: { label: string; items: NavItem[] }[] = [
     label: "Team",
     items: [
       { href: "/users", label: "Users & Roles", icon: UserCog, hint: "Access and invitations", adminOnly: true },
+        {
+          href: "/project-history",
+          label: "Project History",
+          icon: History,
+          hint: "Archive, restore, and deletion records",
+          adminOnly: true,
+        },
     ],
   },
 ]

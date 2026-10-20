@@ -67,6 +67,7 @@ import type {
   ProjectImportSession,
   ProjectImportSessionInput,
   ProjectInput,
+  ProjectLifecycleEvent,
   ProjectManager,
   ProjectUpdate,
   PurchaseApproval,
@@ -797,6 +798,84 @@ export const useRestoreProject = <TError = ErrorType<void>,
       > => {
       return useMutation(getRestoreProjectMutationOptions(options));
     }
+
+export const getGetProjectLifecycleEventsUrl = () => {
+
+
+
+
+  return `/api/project-lifecycle-events`
+}
+
+/**
+ * Administrator-only audit history scoped to the active workspace.
+ * @summary List project archive, restore, and deletion events
+ */
+export const getProjectLifecycleEvents = async ( options?: Parameters<typeof customFetch>[1]): Promise<ProjectLifecycleEvent[]> => {
+
+  return customFetch<ProjectLifecycleEvent[]>(getGetProjectLifecycleEventsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProjectLifecycleEventsQueryKey = () => {
+    return [
+    `/api/project-lifecycle-events`
+    ] as const;
+    }
+
+
+export const getGetProjectLifecycleEventsQueryOptions = <TData = Awaited<ReturnType<typeof getProjectLifecycleEvents>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectLifecycleEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProjectLifecycleEventsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProjectLifecycleEvents>>> = ({ signal }) => getProjectLifecycleEvents({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProjectLifecycleEvents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProjectLifecycleEventsQueryResult = NonNullable<Awaited<ReturnType<typeof getProjectLifecycleEvents>>>
+export type GetProjectLifecycleEventsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List project archive, restore, and deletion events
+ */
+
+export function useGetProjectLifecycleEvents<TData = Awaited<ReturnType<typeof getProjectLifecycleEvents>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectLifecycleEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProjectLifecycleEventsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetArchivedProjectUrl = (projectId: string,) => {
 

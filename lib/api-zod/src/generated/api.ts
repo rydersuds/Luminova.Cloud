@@ -391,6 +391,22 @@ export const RestoreProjectResponse = zod.void()
 
 
 /**
+ * Administrator-only audit history scoped to the active workspace.
+ * @summary List project archive, restore, and deletion events
+ */
+export const GetProjectLifecycleEventsResponseItem = zod.object({
+  "id": zod.string(),
+  "workspaceId": zod.string(),
+  "projectId": zod.string(),
+  "projectName": zod.string(),
+  "actorId": zod.string(),
+  "action": zod.enum(['archived', 'restored', 'permanently_deleted']),
+  "createdAt": zod.coerce.date()
+})
+export const GetProjectLifecycleEventsResponse = zod.array(GetProjectLifecycleEventsResponseItem)
+
+
+/**
  * @summary Get an archived project (Administrators only)
  */
 export const GetArchivedProjectParams = zod.object({

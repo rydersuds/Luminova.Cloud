@@ -47,6 +47,7 @@ const Quotes = lazy(pageModules.quotes);
 const Profile = lazy(pageModules.profile);
 const Schedule = lazy(pageModules.schedule);
 const Approvals = lazy(pageModules.approvals);
+const ProjectHistory = lazy(pageModules.projectHistory);
 const SignUpPage = lazy(() => import('@/pages/login').then(({ SignUpPage }) => ({ default: SignUpPage })));
 const PrivacyPage = lazy(() => import('@/pages/legal').then(({ PrivacyPage }) => ({ default: PrivacyPage })));
 const TermsPage = lazy(() => import('@/pages/legal').then(({ TermsPage }) => ({ default: TermsPage })));
@@ -187,6 +188,7 @@ function AuthenticatedRoutes() {
         <Route path="/invoices" component={Invoices} />
         <Route path="/quotes" component={Quotes} />
         <Route path="/users" component={Users} />
+        <Route path="/project-history" component={ProjectHistory} />
         <Route path="/profile" component={Profile} />
         <Route component={NotFound} />
       </Switch>

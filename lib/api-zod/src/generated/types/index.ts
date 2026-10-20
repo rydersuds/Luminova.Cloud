@@ -78,6 +78,8 @@ export * from './projectImportSession';
 export * from './projectImportSessionInput';
 export * from './projectImportSessionStatus';
 export * from './projectInput';
+export * from './projectLifecycleEvent';
+export * from './projectLifecycleEventAction';
 export * from './projectManager';
 export * from './projectUpdate';
 export * from './purchaseApproval';

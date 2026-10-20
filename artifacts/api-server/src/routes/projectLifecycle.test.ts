@@ -9,6 +9,7 @@ import {
   importedProjectsTable,
   importedVendorsTable,
   projectActivitiesTable,
+  projectLifecycleEventsTable,
   projectImportBatchesTable,
   standaloneVendorProfilesTable,
   vendorJobHistoryTable,
@@ -58,6 +59,10 @@ afterEach(async () => {
   for (const server of servers.splice(0)) server.close();
   if (activityIds.length) {
     await db.delete(projectActivitiesTable).where(inArray(projectActivitiesTable.id, activityIds.splice(0)));
+  }
+  if (projectIds.length) {
+    await db.delete(projectLifecycleEventsTable)
+      .where(inArray(projectLifecycleEventsTable.projectId, projectIds));
   }
   if (vendorHistoryIds.length) {
     await db.delete(vendorJobHistoryTable).where(inArray(vendorJobHistoryTable.id, vendorHistoryIds.splice(0)));
@@ -169,6 +174,7 @@ test("archive and restore are Administrator-only and keep records out of the act
 
   assert.equal((await requestAs(base, managerId, `/projects/${projectId}/archive`, { method: "POST" })).status, 403);
   assert.equal((await requestAs(base, adminId, `/projects/${projectId}/archive`, { method: "POST" })).status, 204);
+  assert.equal((await requestAs(base, adminId, `/projects/${projectId}/archive`, { method: "POST" })).status, 204);
 
   const activeResponse = await requestAs(base, adminId, "/projects");
   assert.equal(activeResponse.status, 200);
@@ -206,6 +212,27 @@ test("archive and restore are Administrator-only and keep records out of the act
     .from(projectActivitiesTable)
     .where(eq(projectActivitiesTable.id, activityId));
   assert(retainedActivity);
+
+  assert.equal((await requestAs(base, managerId, "/project-lifecycle-events")).status, 403);
+  const lifecycleResponse = await requestAs(base, adminId, "/project-lifecycle-events");
+  assert.equal(lifecycleResponse.status, 200);
+  const events = await lifecycleResponse.json() as Array<{
+    id: string;
+    workspaceId: string;
+    projectId: string;
+    projectName: string;
+    actorId: string;
+    action: string;
+    createdAt: string;
+  }>;
+  const projectEvents = events.filter((event) => event.projectId === projectId);
+  assert.deepEqual(projectEvents.map((event) => event.action).sort(), ["archived", "restored"]);
+  for (const event of projectEvents) {
+    assert.equal(event.workspaceId, "default");
+    assert.equal(event.projectName, `Lifecycle project ${projectId}`);
+    assert.equal(event.actorId, adminId);
+    assert(Number.isFinite(Date.parse(event.createdAt)));
+  }
 });
 
 test("permanent deletion removes project data without deleting shared vendor profiles or other projects", async () => {
@@ -304,6 +331,8 @@ test("permanent deletion removes project data without deleting shared vendor pro
   const [remainingImportedVendor] = await db.select({ id: importedVendorsTable.id })
     .from(importedVendorsTable)
     .where(eq(importedVendorsTable.id, importedVendorId));
+  const [deletionEvent] = await db.select().from(projectLifecycleEventsTable)
+    .where(eq(projectLifecycleEventsTable.projectId, projectId));
 
   assert.equal(deletedProject, undefined);
   assert(remainingProject);
@@ -311,6 +340,12 @@ test("permanent deletion removes project data without deleting shared vendor pro
   assert.equal(remainingHistory, undefined);
   assert.equal(remainingActivity, undefined);
   assert.equal(remainingImportedVendor, undefined);
+  assert(deletionEvent);
+  assert.equal(deletionEvent.workspaceId, "default");
+  assert.equal(deletionEvent.projectName, `Lifecycle project ${projectId}`);
+  assert.equal(deletionEvent.actorId, adminId);
+  assert.equal(deletionEvent.action, "permanently_deleted");
+  assert(deletionEvent.createdAt instanceof Date);
 });
 
 test("permanent deletion refuses a project with an active import build", async () => {

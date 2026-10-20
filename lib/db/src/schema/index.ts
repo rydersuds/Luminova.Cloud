@@ -23,6 +23,7 @@ export * from "./projectExteriorPhotos";
 export * from "./projectScheduleImages";
 export * from "./projectScheduleMetadata";
 export * from "./projectActivities";
+export * from "./projectLifecycleEvents";
 export * from "./scheduleUploadReservations";
 export * from "./vendorRecords";
 export * from "./standaloneVendorProfiles";

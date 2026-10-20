@@ -1552,6 +1552,25 @@ export interface ProjectImport {
   invoicesCreated: number;
 }
 
+export type ProjectLifecycleEventAction = typeof ProjectLifecycleEventAction[keyof typeof ProjectLifecycleEventAction];
+
+
+export const ProjectLifecycleEventAction = {
+  archived: 'archived',
+  restored: 'restored',
+  permanently_deleted: 'permanently_deleted',
+} as const;
+
+export interface ProjectLifecycleEvent {
+  id: string;
+  workspaceId: string;
+  projectId: string;
+  projectName: string;
+  actorId: string;
+  action: ProjectLifecycleEventAction;
+  createdAt: string;
+}
+
 export type GetProjectsParams = {
 status?: string;
 /**

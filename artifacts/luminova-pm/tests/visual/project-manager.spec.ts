@@ -592,6 +592,7 @@ test('shows portfolio schedule items and switches to calendar view', async ({ pa
       position: 0,
     }],
   }));
+  await page.clock.install({ time: new Date('2026-10-12T12:00:00.000Z') });
 
   await page.goto('/__visual/schedule');
   await expect(page.getByRole('heading', { name: 'Schedule', exact: true })).toBeVisible();
