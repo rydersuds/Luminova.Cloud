@@ -1,8 +1,9 @@
-import { and, asc, eq, gt, or } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import {
   db,
   clientsTable,
+  invoiceUploadReservationsTable,
   projectDocumentsTable,
   projectExteriorPhotosTable,
   projectPanoramasTable,
@@ -61,6 +62,80 @@ export interface ScheduleImageObjectStorage {
 
 const servingUrl = (objectPath: string) => `/api/storage${objectPath}`;
 
+export type ObjectPathReference =
+  | { source: "document"; objectPath: string; projectId: string | null; importBatchId: string }
+  | { source: "scheduleImage"; objectPath: string; projectId: string; workspaceId: string }
+  | { source: "panorama" | "exteriorPhoto"; objectPath: string; projectId: string }
+  | { source: "clientLogo"; objectPath: string }
+  | { source: "scheduleReservation" | "invoiceReservation"; objectPath: string; projectId: string };
+
+export async function getObjectPathReferences(
+  executor: Pick<typeof db, "select">,
+  objectPaths: string[],
+): Promise<ObjectPathReference[]> {
+  if (!objectPaths.length) return [];
+
+  const references: ObjectPathReference[] = [];
+  const documents = await executor.select({
+    objectPath: projectDocumentsTable.objectPath,
+    projectId: projectDocumentsTable.projectId,
+    importBatchId: projectDocumentsTable.importBatchId,
+  }).from(projectDocumentsTable).where(inArray(projectDocumentsTable.objectPath, objectPaths));
+  references.push(...documents.map((row) => ({ source: "document" as const, ...row })));
+
+  const scheduleImages = await executor.select({
+    objectPath: projectScheduleImagesTable.objectPath,
+    projectId: projectScheduleImagesTable.projectId,
+    workspaceId: projectScheduleImagesTable.workspaceId,
+  }).from(projectScheduleImagesTable).where(inArray(projectScheduleImagesTable.objectPath, objectPaths));
+  references.push(...scheduleImages.map((row) => ({ source: "scheduleImage" as const, ...row })));
+
+  const panoramas = await executor.select({
+    objectPath: projectPanoramasTable.objectPath,
+    projectId: projectPanoramasTable.projectId,
+  }).from(projectPanoramasTable).where(inArray(projectPanoramasTable.objectPath, objectPaths));
+  references.push(...panoramas.map((row) => ({ source: "panorama" as const, ...row })));
+
+  const exteriorPhotos = await executor.select({
+    objectPath: projectExteriorPhotosTable.exteriorImage,
+    projectId: projectExteriorPhotosTable.projectId,
+  }).from(projectExteriorPhotosTable)
+    .where(inArray(projectExteriorPhotosTable.exteriorImage, objectPaths));
+  references.push(...exteriorPhotos.map((row) => ({ source: "exteriorPhoto" as const, ...row })));
+
+  const clients = await executor.select({
+    logoObjectPath: clientsTable.logoObjectPath,
+    pendingLogoObjectPath: clientsTable.pendingLogoObjectPath,
+  }).from(clientsTable).where(or(
+    inArray(clientsTable.logoObjectPath, objectPaths),
+    inArray(clientsTable.pendingLogoObjectPath, objectPaths),
+  ));
+  for (const client of clients) {
+    if (client.logoObjectPath && objectPaths.includes(client.logoObjectPath)) {
+      references.push({ source: "clientLogo", objectPath: client.logoObjectPath });
+    }
+    if (client.pendingLogoObjectPath && objectPaths.includes(client.pendingLogoObjectPath)) {
+      references.push({ source: "clientLogo", objectPath: client.pendingLogoObjectPath });
+    }
+  }
+
+  const scheduleReservations = await executor.select({
+    objectPath: scheduleUploadReservationsTable.objectPath,
+    projectId: scheduleUploadReservationsTable.projectId,
+  }).from(scheduleUploadReservationsTable)
+    .where(inArray(scheduleUploadReservationsTable.objectPath, objectPaths));
+  references.push(...scheduleReservations.map((row) => ({ source: "scheduleReservation" as const, ...row })));
+
+  const invoiceReservations = await executor.select({
+    objectPath: invoiceUploadReservationsTable.objectPath,
+    projectId: invoiceUploadReservationsTable.projectId,
+  }).from(invoiceUploadReservationsTable)
+    .where(inArray(invoiceUploadReservationsTable.objectPath, objectPaths));
+  references.push(...invoiceReservations.map((row) => ({ source: "invoiceReservation" as const, ...row })));
+
+  return references;
+}
+
 export class DrizzleScheduleImageRepository implements ScheduleImageRepository {
   async list(projectId: string, workspaceId?: string): Promise<ProjectScheduleImage[]> {
     return db.select().from(projectScheduleImagesTable)
@@ -112,19 +187,9 @@ export class DrizzleScheduleImageRepository implements ScheduleImageRepository {
   }
 
   async hasObjectPath(objectPath: string): Promise<boolean> {
-    const checks = await Promise.all([
-      db.select({ value: projectScheduleImagesTable.id }).from(projectScheduleImagesTable)
-        .where(eq(projectScheduleImagesTable.objectPath, objectPath)).limit(1),
-      db.select({ value: projectPanoramasTable.id }).from(projectPanoramasTable)
-        .where(eq(projectPanoramasTable.objectPath, objectPath)).limit(1),
-      db.select({ value: projectDocumentsTable.id }).from(projectDocumentsTable)
-        .where(eq(projectDocumentsTable.objectPath, objectPath)).limit(1),
-      db.select({ value: clientsTable.id }).from(clientsTable)
-        .where(or(eq(clientsTable.logoObjectPath, objectPath), eq(clientsTable.pendingLogoObjectPath, objectPath))).limit(1),
-      db.select({ value: projectExteriorPhotosTable.projectId }).from(projectExteriorPhotosTable)
-        .where(eq(projectExteriorPhotosTable.exteriorImage, objectPath)).limit(1),
-    ]);
-    return checks.some((rows) => rows.length > 0);
+    const references = await getObjectPathReferences(db, [objectPath]);
+    return references.some((reference) =>
+      reference.source !== "scheduleReservation" && reference.source !== "invoiceReservation");
   }
 
   async find(projectId: string, imageId: string, workspaceId: string): Promise<ProjectScheduleImage | undefined> {

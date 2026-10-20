@@ -12,6 +12,7 @@ import {
   projectDocumentsTable,
   projectLifecycleEventsTable,
   projectImportBatchesTable,
+  projectScheduleImagesTable,
   standaloneVendorProfilesTable,
   vendorJobHistoryTable,
 } from "@workspace/db";
@@ -54,6 +55,7 @@ const batchIds: string[] = [];
 const importedVendorIds: string[] = [];
 const activityIds: string[] = [];
 const documentIds: string[] = [];
+const scheduleImageIds: string[] = [];
 const vendorHistoryIds: string[] = [];
 const sharedProfileIds: string[] = [];
 
@@ -64,6 +66,10 @@ afterEach(async () => {
   }
   if (documentIds.length) {
     await db.delete(projectDocumentsTable).where(inArray(projectDocumentsTable.id, documentIds.splice(0)));
+  }
+  if (scheduleImageIds.length) {
+    await db.delete(projectScheduleImagesTable)
+      .where(inArray(projectScheduleImagesTable.id, scheduleImageIds.splice(0)));
   }
   if (projectIds.length) {
     await db.delete(projectLifecycleEventsTable)
@@ -459,6 +465,83 @@ test("deletion preview counts stored files and rejects a stale confirmation", as
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ previewToken: refreshedPreview.previewToken }),
   })).status, 204);
+});
+
+test("project deletion preserves an object also used by another project", async () => {
+  const adminId = `lifecycle-admin-${randomUUID()}`;
+  const projectId = `lifecycle-shared-file-target-${randomUUID()}`;
+  const otherProjectId = `lifecycle-shared-file-other-${randomUUID()}`;
+  const batchId = `lifecycle-shared-file-batch-${randomUUID()}`;
+  const otherBatchId = `lifecycle-shared-file-other-batch-${randomUUID()}`;
+  const documentId = `lifecycle-shared-file-document-${randomUUID()}`;
+  const scheduleImageId = `lifecycle-shared-file-image-${randomUUID()}`;
+  const objectPath = `/objects/lifecycle-shared/${randomUUID()}`;
+  const base = await startApi(fakeClerk([makeUser(adminId, "Admin")]));
+
+  await insertProject(projectId, batchId, adminId);
+  await insertProject(otherProjectId, otherBatchId, adminId);
+  await db.insert(projectImportBatchesTable).values([
+    {
+      id: batchId,
+      projectId,
+      ownerId: adminId,
+      workspaceId: "default",
+      status: "completed",
+      manifest: [],
+    },
+    {
+      id: otherBatchId,
+      projectId: otherProjectId,
+      ownerId: adminId,
+      workspaceId: "default",
+      status: "completed",
+      manifest: [],
+    },
+  ]);
+  documentIds.push(documentId);
+  await db.insert(projectDocumentsTable).values({
+    id: documentId,
+    importBatchId: batchId,
+    projectId,
+    ownerId: adminId,
+    objectPath,
+    relativePath: "Plans/shared-plan.pdf",
+    name: "shared-plan.pdf",
+    contentType: "application/pdf",
+    size: 1024,
+    classification: "project-document",
+  });
+  scheduleImageIds.push(scheduleImageId);
+  await db.insert(projectScheduleImagesTable).values({
+    id: scheduleImageId,
+    projectId: otherProjectId,
+    ownerId: adminId,
+    workspaceId: "default",
+    objectPath,
+    name: "shared-plan.pdf",
+    relativePath: "Plans/shared-plan.pdf",
+    contentType: "application/pdf",
+    size: 1024,
+  });
+
+  const previewResponse = await requestAs(base, adminId, `/projects/${projectId}/delete-preview`);
+  assert.equal(previewResponse.status, 200);
+  const preview = await previewResponse.json() as {
+    storedFileCount: number;
+    previewToken: string;
+  };
+  assert.equal(preview.storedFileCount, 0);
+
+  assert.equal((await requestAs(base, adminId, `/projects/${projectId}`, {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ previewToken: preview.previewToken }),
+  })).status, 204);
+
+  const [remainingReference] = await db.select({
+    objectPath: projectScheduleImagesTable.objectPath,
+  }).from(projectScheduleImagesTable).where(eq(projectScheduleImagesTable.id, scheduleImageId));
+  assert.equal(remainingReference?.objectPath, objectPath);
 });
 
 test("deletion preview excludes import data attached to a batch referenced by another project", async () => {

@@ -26,6 +26,7 @@ import {
   vendorReviewTable,
 } from "@workspace/db";
 import { ObjectStorageService } from "./objectStorage";
+import { getObjectPathReferences } from "./scheduleImageStore";
 
 export class ProjectLifecycleNotFoundError extends Error {}
 export class ProjectLifecycleConflictError extends Error {}
@@ -272,7 +273,29 @@ async function getProjectDeletionSnapshot(
     ...invoiceReservations.map((reservation) => reservation.objectPath),
   );
 
-  const uniqueObjectPaths = [...new Set(objectPaths.filter((path) => path.startsWith("/objects/")))].sort();
+  const candidateObjectPaths = [...new Set(objectPaths.filter((path) => path.startsWith("/objects/")))].sort();
+  const objectPathReferences = await getObjectPathReferences(executor, candidateObjectPaths);
+  const referencedOutsideDeletion = new Set<string>();
+  for (const reference of objectPathReferences) {
+    const referenceIsDeleted = (() => {
+      switch (reference.source) {
+        case "document":
+          return reference.projectId === projectId || importBatchIds.includes(reference.importBatchId);
+        case "scheduleImage":
+          return reference.projectId === projectId && reference.workspaceId === workspaceId;
+        case "panorama":
+        case "exteriorPhoto":
+        case "scheduleReservation":
+        case "invoiceReservation":
+          return reference.projectId === projectId;
+        case "clientLogo":
+          return false;
+      }
+    })();
+    if (!referenceIsDeleted) referencedOutsideDeletion.add(reference.objectPath);
+  }
+  const uniqueObjectPaths = candidateObjectPaths
+    .filter((path) => !referencedOutsideDeletion.has(path));
   const recordCount = Object.values(recordIds).reduce((total, ids) => total + ids.length, 0);
   const previewToken = createHash("sha256")
     .update(JSON.stringify({
