@@ -9,6 +9,7 @@ import {
   importedProjectsTable,
   importedVendorsTable,
   projectActivitiesTable,
+  projectDocumentsTable,
   projectLifecycleEventsTable,
   projectImportBatchesTable,
   standaloneVendorProfilesTable,
@@ -52,6 +53,7 @@ const projectIds: string[] = [];
 const batchIds: string[] = [];
 const importedVendorIds: string[] = [];
 const activityIds: string[] = [];
+const documentIds: string[] = [];
 const vendorHistoryIds: string[] = [];
 const sharedProfileIds: string[] = [];
 
@@ -59,6 +61,9 @@ afterEach(async () => {
   for (const server of servers.splice(0)) server.close();
   if (activityIds.length) {
     await db.delete(projectActivitiesTable).where(inArray(projectActivitiesTable.id, activityIds.splice(0)));
+  }
+  if (documentIds.length) {
+    await db.delete(projectDocumentsTable).where(inArray(projectDocumentsTable.id, documentIds.splice(0)));
   }
   if (projectIds.length) {
     await db.delete(projectLifecycleEventsTable)
@@ -311,7 +316,21 @@ test("permanent deletion removes project data without deleting shared vendor pro
     recordedBy: adminId,
   });
 
-  assert.equal((await requestAs(base, adminId, `/projects/${projectId}`, { method: "DELETE" })).status, 204);
+  const previewResponse = await requestAs(base, adminId, `/projects/${projectId}/delete-preview`);
+  assert.equal(previewResponse.status, 200);
+  const preview = await previewResponse.json() as {
+    recordCount: number;
+    storedFileCount: number;
+    previewToken: string;
+  };
+  assert.equal(preview.recordCount, 5);
+  assert.equal(preview.storedFileCount, 0);
+
+  assert.equal((await requestAs(base, adminId, `/projects/${projectId}`, {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ previewToken: preview.previewToken }),
+  })).status, 204);
 
   const [deletedProject] = await db.select({ id: importedProjectsTable.id })
     .from(importedProjectsTable)
@@ -363,9 +382,137 @@ test("permanent deletion refuses a project with an active import build", async (
     manifest: [],
   });
 
-  assert.equal((await requestAs(base, adminId, `/projects/${projectId}`, { method: "DELETE" })).status, 409);
+  assert.equal((await requestAs(base, adminId, `/projects/${projectId}`, {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ previewToken: "a".repeat(64) }),
+  })).status, 409);
   const [remainingProject] = await db.select({ id: importedProjectsTable.id })
     .from(importedProjectsTable)
     .where(eq(importedProjectsTable.id, projectId));
   assert(remainingProject);
+});
+
+test("deletion preview counts stored files and rejects a stale confirmation", async () => {
+  const adminId = `lifecycle-admin-${randomUUID()}`;
+  const projectId = `lifecycle-preview-${randomUUID()}`;
+  const batchId = `lifecycle-preview-batch-${randomUUID()}`;
+  const documentId = `lifecycle-preview-document-${randomUUID()}`;
+  const base = await startApi(fakeClerk([makeUser(adminId, "Admin")]));
+
+  await insertProject(projectId, batchId, adminId);
+  await db.insert(projectImportBatchesTable).values({
+    id: batchId,
+    projectId,
+    ownerId: adminId,
+    workspaceId: "default",
+    status: "completed",
+    manifest: [],
+  });
+  documentIds.push(documentId);
+  await db.insert(projectDocumentsTable).values({
+    id: documentId,
+    importBatchId: batchId,
+    projectId,
+    ownerId: adminId,
+    objectPath: `/objects/deletion-preview/${randomUUID()}`,
+    relativePath: "Plans/site-plan.pdf",
+    name: "site-plan.pdf",
+    contentType: "application/pdf",
+    size: 1024,
+    classification: "project-document",
+  });
+
+  const previewResponse = await requestAs(base, adminId, `/projects/${projectId}/delete-preview`);
+  assert.equal(previewResponse.status, 200);
+  const preview = await previewResponse.json() as {
+    recordCount: number;
+    storedFileCount: number;
+    previewToken: string;
+  };
+  assert.equal(preview.recordCount, 3);
+  assert.equal(preview.storedFileCount, 1);
+
+  await db.delete(projectDocumentsTable).where(eq(projectDocumentsTable.id, documentId));
+  const staleDelete = await requestAs(base, adminId, `/projects/${projectId}`, {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ previewToken: preview.previewToken }),
+  });
+  assert.equal(staleDelete.status, 409);
+  const [stillPresent] = await db.select({ id: importedProjectsTable.id })
+    .from(importedProjectsTable)
+    .where(eq(importedProjectsTable.id, projectId));
+  assert(stillPresent);
+
+  const refreshedResponse = await requestAs(base, adminId, `/projects/${projectId}/delete-preview`);
+  assert.equal(refreshedResponse.status, 200);
+  const refreshedPreview = await refreshedResponse.json() as {
+    recordCount: number;
+    storedFileCount: number;
+    previewToken: string;
+  };
+  assert.equal(refreshedPreview.recordCount, 2);
+  assert.equal(refreshedPreview.storedFileCount, 0);
+  assert.equal((await requestAs(base, adminId, `/projects/${projectId}`, {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ previewToken: refreshedPreview.previewToken }),
+  })).status, 204);
+});
+
+test("deletion preview excludes import data attached to a batch referenced by another project", async () => {
+  const adminId = `lifecycle-admin-${randomUUID()}`;
+  const projectId = `lifecycle-shared-batch-target-${randomUUID()}`;
+  const otherProjectId = `lifecycle-shared-batch-other-${randomUUID()}`;
+  const batchId = `lifecycle-shared-batch-${randomUUID()}`;
+  const importedVendorId = `lifecycle-shared-batch-vendor-${randomUUID()}`;
+  const base = await startApi(fakeClerk([makeUser(adminId, "Admin")]));
+
+  await insertProject(projectId, batchId, adminId);
+  await insertProject(otherProjectId, batchId, adminId);
+  await db.insert(projectImportBatchesTable).values({
+    id: batchId,
+    projectId,
+    ownerId: adminId,
+    workspaceId: "default",
+    status: "completed",
+    manifest: [],
+  });
+  importedVendorIds.push(importedVendorId);
+  await db.insert(importedVendorsTable).values({
+    id: importedVendorId,
+    importBatchId: batchId,
+    ownerId: adminId,
+    data: { id: importedVendorId, companyName: "Shared batch vendor" },
+  });
+
+  const previewResponse = await requestAs(base, adminId, `/projects/${projectId}/delete-preview`);
+  assert.equal(previewResponse.status, 200);
+  const preview = await previewResponse.json() as {
+    recordCount: number;
+    storedFileCount: number;
+    previewToken: string;
+  };
+  assert.equal(preview.recordCount, 1);
+  assert.equal(preview.storedFileCount, 0);
+
+  assert.equal((await requestAs(base, adminId, `/projects/${projectId}`, {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ previewToken: preview.previewToken }),
+  })).status, 204);
+
+  const [remainingProject] = await db.select({ id: importedProjectsTable.id })
+    .from(importedProjectsTable)
+    .where(eq(importedProjectsTable.id, otherProjectId));
+  const [remainingBatch] = await db.select({ id: projectImportBatchesTable.id })
+    .from(projectImportBatchesTable)
+    .where(eq(projectImportBatchesTable.id, batchId));
+  const [remainingVendor] = await db.select({ id: importedVendorsTable.id })
+    .from(importedVendorsTable)
+    .where(eq(importedVendorsTable.id, importedVendorId));
+  assert(remainingProject);
+  assert(remainingBatch);
+  assert(remainingVendor);
 });

@@ -414,6 +414,9 @@ test('does not expose the assignment control to non-administrators', async ({ pa
 test('administrators get safe archive and permanent-delete confirmations', async ({ page }) => {
   await installIdentity(page, 'Admin');
   await page.route('**/api/projects/riverstone/activity', route => route.fulfill({ json: [] }));
+  await page.route('**/api/projects/riverstone/delete-preview', route => route.fulfill({
+    json: { recordCount: 12, storedFileCount: 3, previewToken: 'a'.repeat(64) },
+  }));
   await page.route('**/api/projects/riverstone', route => route.fulfill({
     json: { ...project, canManageLifecycle: true, archivedAt: null },
   }));
@@ -427,6 +430,7 @@ test('administrators get safe archive and permanent-delete confirmations', async
   await page.getByRole('button', { name: 'Delete permanently', exact: true }).click();
   const deleteDialog = page.getByRole('dialog', { name: 'Permanently delete this project?' });
   await expect(deleteDialog).toContainText('Shared vendor profiles and other projects will not be deleted');
+  await expect(deleteDialog).toContainText('12 records and 3 stored files will be removed');
   const confirmDelete = deleteDialog.getByRole('button', { name: 'Delete permanently', exact: true });
   await expect(confirmDelete).toBeDisabled();
   await deleteDialog.getByLabel('Type Riverstone Residence to confirm.').fill('Riverstone Residence');

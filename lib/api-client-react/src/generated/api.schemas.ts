@@ -243,6 +243,26 @@ export interface Project {
   canManageLifecycle?: boolean;
 }
 
+export interface ProjectDeletionPreview {
+  /** @minimum 1 */
+  recordCount: number;
+  /** @minimum 0 */
+  storedFileCount: number;
+  /**
+     * @minLength 64
+     * @maxLength 64
+     */
+  previewToken: string;
+}
+
+export interface ProjectDeletionConfirmation {
+  /**
+     * @minLength 64
+     * @maxLength 64
+     */
+  previewToken: string;
+}
+
 export interface ProjectInput {
   name: string;
   address: string;
@@ -1623,3 +1643,4 @@ trade?: string;
 status?: VendorQuoteStatus;
 direction?: QuoteDirection;
 };
+

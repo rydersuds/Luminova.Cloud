@@ -1,5 +1,5 @@
 import { and, eq, inArray, isNull, isNotNull, or } from "drizzle-orm";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   conversationParticipantsTable,
   db,
@@ -9,13 +9,13 @@ import {
   importedVendorsTable,
   invoiceUploadReservationsTable,
   projectActivitiesTable,
-  projectLifecycleEventsTable,
   projectBoardGroupsTable,
   projectBoardItemsTable,
   projectConversationsTable,
   projectDocumentsTable,
   projectExteriorPhotosTable,
   projectImportBatchesTable,
+  projectLifecycleEventsTable,
   projectMessagesTable,
   projectPanoramasTable,
   projectScheduleImagesTable,
@@ -29,9 +29,12 @@ import { ObjectStorageService } from "./objectStorage";
 
 export class ProjectLifecycleNotFoundError extends Error {}
 export class ProjectLifecycleConflictError extends Error {}
+export class ProjectLifecyclePreviewStaleError extends Error {}
 export class ProjectLifecycleStorageError extends Error {}
 
 const objectStorage = new ObjectStorageService();
+
+type LifecycleExecutor = Pick<typeof db, "select">;
 
 function projectName(data: unknown, projectId: string): string {
   if (data && typeof data === "object" && "name" in data && typeof data.name === "string") {
@@ -54,6 +57,247 @@ async function recordProjectLifecycleEvent(
     id: randomUUID(),
     ...details,
   });
+}
+
+type ProjectDeletionSnapshot = {
+  recordCount: number;
+  storedFileCount: number;
+  previewToken: string;
+  importBatchIds: string[];
+  objectPaths: string[];
+};
+
+async function getProjectDeletionSnapshot(
+  executor: LifecycleExecutor,
+  projectId: string,
+  workspaceId: string,
+): Promise<ProjectDeletionSnapshot> {
+  const [project] = await executor.select({
+    id: importedProjectsTable.id,
+    importBatchId: importedProjectsTable.importBatchId,
+  })
+    .from(importedProjectsTable)
+    .where(and(
+      eq(importedProjectsTable.id, projectId),
+      eq(importedProjectsTable.workspaceId, workspaceId),
+    ))
+    .limit(1);
+  if (!project) throw new ProjectLifecycleNotFoundError("Project not found");
+
+  const projectBatches = await executor.select({
+    id: projectImportBatchesTable.id,
+    status: projectImportBatchesTable.status,
+  })
+    .from(projectImportBatchesTable)
+    .where(and(
+      eq(projectImportBatchesTable.projectId, projectId),
+      eq(projectImportBatchesTable.workspaceId, workspaceId),
+    ));
+  if (projectBatches.some((batch) => batch.status === "building")) {
+    throw new ProjectLifecycleConflictError("The project is still being built");
+  }
+
+  const candidateBatchIds = [...new Set([
+    project.importBatchId,
+    ...projectBatches.map((batch) => batch.id),
+  ])];
+  const candidateBatchRows = await executor.select({
+    id: projectImportBatchesTable.id,
+    projectId: projectImportBatchesTable.projectId,
+    workspaceId: projectImportBatchesTable.workspaceId,
+  })
+    .from(projectImportBatchesTable)
+    .where(inArray(projectImportBatchesTable.id, candidateBatchIds));
+  const batchesOwnedElsewhere = new Set(candidateBatchRows
+    .filter((batch) => batch.workspaceId !== workspaceId || (batch.projectId && batch.projectId !== projectId))
+    .map((batch) => batch.id));
+  const projectBatchIds = candidateBatchIds.filter((id) => !batchesOwnedElsewhere.has(id));
+  const batchReferences = await executor.select({
+    id: importedProjectsTable.id,
+    importBatchId: importedProjectsTable.importBatchId,
+  })
+    .from(importedProjectsTable)
+    .where(inArray(importedProjectsTable.importBatchId, projectBatchIds));
+  const batchesUsedByAnotherProject = new Set(
+    batchReferences
+      .filter((reference) => reference.id !== projectId)
+      .map((reference) => reference.importBatchId),
+  );
+  const importBatchIds = projectBatchIds.filter((id) => !batchesUsedByAnotherProject.has(id));
+
+  const recordIds: Record<string, string[]> = {};
+  const objectPaths: string[] = [];
+  const addRecords = (kind: string, rows: Array<{ id: string }>) => {
+    recordIds[kind] = [...new Set(rows.map((row) => row.id))].sort();
+  };
+
+  addRecords("project", [{ id: project.id }]);
+  addRecords("importBatches", await executor.select({ id: projectImportBatchesTable.id })
+    .from(projectImportBatchesTable)
+    .where(inArray(projectImportBatchesTable.id, importBatchIds)));
+
+  const documents = await executor.select({
+    id: projectDocumentsTable.id,
+    objectPath: projectDocumentsTable.objectPath,
+  })
+    .from(projectDocumentsTable)
+    .where(or(
+      eq(projectDocumentsTable.projectId, projectId),
+      inArray(projectDocumentsTable.importBatchId, importBatchIds),
+    ));
+  addRecords("documents", documents);
+  objectPaths.push(...documents.map((document) => document.objectPath));
+
+  addRecords("invoices", await executor.select({ id: importedInvoicesTable.id })
+    .from(importedInvoicesTable)
+    .where(inArray(importedInvoicesTable.importBatchId, importBatchIds)));
+  addRecords("vendorQuotes", await executor.select({ id: importedVendorQuotesTable.id })
+    .from(importedVendorQuotesTable)
+    .where(inArray(importedVendorQuotesTable.importBatchId, importBatchIds)));
+  addRecords("importedVendors", await executor.select({ id: importedVendorsTable.id })
+    .from(importedVendorsTable)
+    .where(inArray(importedVendorsTable.importBatchId, importBatchIds)));
+
+  const conversations = await executor.select({ id: projectConversationsTable.id })
+    .from(projectConversationsTable)
+    .where(and(
+      eq(projectConversationsTable.workspaceId, workspaceId),
+      eq(projectConversationsTable.projectId, projectId),
+    ));
+  const conversationIds = conversations.map((conversation) => conversation.id);
+  addRecords("conversations", conversations);
+
+  const conversationMessages = conversationIds.length
+    ? await executor.select({ id: projectMessagesTable.id })
+      .from(projectMessagesTable)
+      .where(inArray(projectMessagesTable.conversationId, conversationIds))
+    : [];
+  const projectMessages = await executor.select({ id: projectMessagesTable.id })
+    .from(projectMessagesTable)
+    .where(and(
+      eq(projectMessagesTable.workspaceId, workspaceId),
+      eq(projectMessagesTable.projectId, projectId),
+    ));
+  addRecords("messages", [...conversationMessages, ...projectMessages]);
+  addRecords("conversationParticipants", conversationIds.length
+    ? (await executor.select({
+      conversationId: conversationParticipantsTable.conversationId,
+      userId: conversationParticipantsTable.userId,
+    })
+      .from(conversationParticipantsTable)
+      .where(and(
+        eq(conversationParticipantsTable.workspaceId, workspaceId),
+        inArray(conversationParticipantsTable.conversationId, conversationIds),
+      ))).map((participant) => ({
+        id: `${participant.conversationId}:${participant.userId}`,
+      }))
+    : []);
+
+  addRecords("boardItems", await executor.select({ id: projectBoardItemsTable.id })
+    .from(projectBoardItemsTable)
+    .where(and(
+      eq(projectBoardItemsTable.workspaceId, workspaceId),
+      eq(projectBoardItemsTable.projectId, projectId),
+    )));
+  addRecords("boardGroups", await executor.select({ id: projectBoardGroupsTable.id })
+    .from(projectBoardGroupsTable)
+    .where(and(
+      eq(projectBoardGroupsTable.workspaceId, workspaceId),
+      eq(projectBoardGroupsTable.projectId, projectId),
+    )));
+  addRecords("scheduleMetadata", await executor.select({ id: projectScheduleMetadataTable.id })
+    .from(projectScheduleMetadataTable)
+    .where(and(
+      eq(projectScheduleMetadataTable.workspaceId, workspaceId),
+      eq(projectScheduleMetadataTable.projectId, projectId),
+    )));
+
+  const scheduleImages = await executor.select({
+    id: projectScheduleImagesTable.id,
+    objectPath: projectScheduleImagesTable.objectPath,
+  })
+    .from(projectScheduleImagesTable)
+    .where(and(
+      eq(projectScheduleImagesTable.workspaceId, workspaceId),
+      eq(projectScheduleImagesTable.projectId, projectId),
+    ));
+  addRecords("scheduleImages", scheduleImages);
+  objectPaths.push(...scheduleImages.map((image) => image.objectPath));
+
+  const panoramas = await executor.select({
+    id: projectPanoramasTable.id,
+    objectPath: projectPanoramasTable.objectPath,
+  })
+    .from(projectPanoramasTable)
+    .where(eq(projectPanoramasTable.projectId, projectId));
+  addRecords("panoramas", panoramas);
+  objectPaths.push(...panoramas.map((panorama) => panorama.objectPath));
+
+  addRecords("exteriorPhotos", (await executor.select({ projectId: projectExteriorPhotosTable.projectId })
+    .from(projectExteriorPhotosTable)
+    .where(eq(projectExteriorPhotosTable.projectId, projectId)))
+    .map((photo) => ({ id: photo.projectId })));
+  addRecords("activities", await executor.select({ id: projectActivitiesTable.id })
+    .from(projectActivitiesTable)
+    .where(eq(projectActivitiesTable.projectId, projectId)));
+  addRecords("vendorJobHistory", await executor.select({ id: vendorJobHistoryTable.id })
+    .from(vendorJobHistoryTable)
+    .where(eq(vendorJobHistoryTable.projectId, projectId)));
+  addRecords("vendorReviews", await executor.select({ id: vendorReviewTable.id })
+    .from(vendorReviewTable)
+    .where(eq(vendorReviewTable.projectId, projectId)));
+  addRecords("purchaseApprovals", await executor.select({ id: purchaseApprovalsTable.id })
+    .from(purchaseApprovalsTable)
+    .where(and(
+      eq(purchaseApprovalsTable.workspaceId, workspaceId),
+      eq(purchaseApprovalsTable.projectId, projectId),
+    )));
+
+  const scheduleReservations = await executor.select({
+    objectPath: scheduleUploadReservationsTable.objectPath,
+  })
+    .from(scheduleUploadReservationsTable)
+    .where(eq(scheduleUploadReservationsTable.projectId, projectId));
+  const invoiceReservations = await executor.select({
+    objectPath: invoiceUploadReservationsTable.objectPath,
+  })
+    .from(invoiceUploadReservationsTable)
+    .where(eq(invoiceUploadReservationsTable.projectId, projectId));
+  addRecords("uploadReservations", [
+    ...scheduleReservations.map(({ objectPath }) => ({ id: objectPath })),
+    ...invoiceReservations.map(({ objectPath }) => ({ id: objectPath })),
+  ]);
+  objectPaths.push(
+    ...scheduleReservations.map((reservation) => reservation.objectPath),
+    ...invoiceReservations.map((reservation) => reservation.objectPath),
+  );
+
+  const uniqueObjectPaths = [...new Set(objectPaths.filter((path) => path.startsWith("/objects/")))].sort();
+  const recordCount = Object.values(recordIds).reduce((total, ids) => total + ids.length, 0);
+  const previewToken = createHash("sha256")
+    .update(JSON.stringify({
+      projectId,
+      workspaceId,
+      recordIds,
+      objectPaths: uniqueObjectPaths,
+    }))
+    .digest("hex");
+
+  return {
+    recordCount,
+    storedFileCount: uniqueObjectPaths.length,
+    previewToken,
+    importBatchIds,
+    objectPaths: uniqueObjectPaths,
+  };
+}
+
+export async function previewProjectDeletion(
+  projectId: string,
+  workspaceId: string,
+): Promise<Pick<ProjectDeletionSnapshot, "recordCount" | "storedFileCount" | "previewToken">> {
+  const { recordCount, storedFileCount, previewToken } = await getProjectDeletionSnapshot(db, projectId, workspaceId);
+  return { recordCount, storedFileCount, previewToken };
 }
 
 export async function archiveProject(projectId: string, workspaceId: string, actorId: string): Promise<boolean> {
@@ -124,10 +368,15 @@ export async function restoreProject(projectId: string, workspaceId: string, act
   });
 }
 
-export async function permanentlyDeleteProject(projectId: string, workspaceId: string, actorId: string): Promise<void> {
+export async function permanentlyDeleteProject(
+  projectId: string,
+  workspaceId: string,
+  actorId: string,
+  expectedPreviewToken: string,
+): Promise<void> {
   await db.transaction(async (tx) => {
     const [project] = await tx.select({
-      importBatchId: importedProjectsTable.importBatchId,
+      id: importedProjectsTable.id,
       data: importedProjectsTable.data,
     })
       .from(importedProjectsTable)
@@ -153,41 +402,12 @@ export async function permanentlyDeleteProject(projectId: string, workspaceId: s
       throw new ProjectLifecycleConflictError("The project is still being built");
     }
 
-    const importBatchIds = [...new Set([
-      project.importBatchId,
-      ...batches.map((batch) => batch.id),
-    ])];
+    const snapshot = await getProjectDeletionSnapshot(tx, projectId, workspaceId);
+    if (snapshot.previewToken !== expectedPreviewToken) {
+      throw new ProjectLifecyclePreviewStaleError("The project changed after the deletion preview was loaded");
+    }
 
-    const documents = await tx.select({ objectPath: projectDocumentsTable.objectPath })
-      .from(projectDocumentsTable)
-      .where(or(
-        eq(projectDocumentsTable.projectId, projectId),
-        inArray(projectDocumentsTable.importBatchId, importBatchIds),
-      ));
-    const scheduleImages = await tx.select({ objectPath: projectScheduleImagesTable.objectPath })
-      .from(projectScheduleImagesTable)
-      .where(and(
-        eq(projectScheduleImagesTable.projectId, projectId),
-        eq(projectScheduleImagesTable.workspaceId, workspaceId),
-      ));
-    const panoramas = await tx.select({ objectPath: projectPanoramasTable.objectPath })
-      .from(projectPanoramasTable)
-      .where(eq(projectPanoramasTable.projectId, projectId));
-    const scheduleReservations = await tx.select({ objectPath: scheduleUploadReservationsTable.objectPath })
-      .from(scheduleUploadReservationsTable)
-      .where(eq(scheduleUploadReservationsTable.projectId, projectId));
-    const invoiceReservations = await tx.select({ objectPath: invoiceUploadReservationsTable.objectPath })
-      .from(invoiceUploadReservationsTable)
-      .where(eq(invoiceUploadReservationsTable.projectId, projectId));
-    const objectPaths = [...new Set([
-      ...documents,
-      ...scheduleImages,
-      ...panoramas,
-      ...scheduleReservations,
-      ...invoiceReservations,
-    ].map((item) => item.objectPath).filter((path) => path.startsWith("/objects/")))];
-
-    const cleanupResults = await Promise.allSettled(objectPaths.map((path) => objectStorage.deleteObject(path)));
+    const cleanupResults = await Promise.allSettled(snapshot.objectPaths.map((path) => objectStorage.deleteObject(path)));
     if (cleanupResults.some((result) => result.status === "rejected")) {
       throw new ProjectLifecycleStorageError("One or more project files could not be removed");
     }
@@ -246,18 +466,12 @@ export async function permanentlyDeleteProject(projectId: string, workspaceId: s
     await tx.delete(invoiceUploadReservationsTable).where(eq(invoiceUploadReservationsTable.projectId, projectId));
     await tx.delete(projectDocumentsTable).where(or(
       eq(projectDocumentsTable.projectId, projectId),
-      inArray(projectDocumentsTable.importBatchId, importBatchIds),
+      inArray(projectDocumentsTable.importBatchId, snapshot.importBatchIds),
     ));
-    await tx.delete(importedInvoicesTable).where(inArray(importedInvoicesTable.importBatchId, importBatchIds));
-    await tx.delete(importedVendorQuotesTable).where(inArray(importedVendorQuotesTable.importBatchId, importBatchIds));
-    await tx.delete(importedVendorsTable).where(inArray(importedVendorsTable.importBatchId, importBatchIds));
-    await tx.delete(projectImportBatchesTable).where(or(
-      and(
-        eq(projectImportBatchesTable.projectId, projectId),
-        eq(projectImportBatchesTable.workspaceId, workspaceId),
-      ),
-      inArray(projectImportBatchesTable.id, importBatchIds),
-    ));
+    await tx.delete(importedInvoicesTable).where(inArray(importedInvoicesTable.importBatchId, snapshot.importBatchIds));
+    await tx.delete(importedVendorQuotesTable).where(inArray(importedVendorQuotesTable.importBatchId, snapshot.importBatchIds));
+    await tx.delete(importedVendorsTable).where(inArray(importedVendorsTable.importBatchId, snapshot.importBatchIds));
+    await tx.delete(projectImportBatchesTable).where(inArray(projectImportBatchesTable.id, snapshot.importBatchIds));
     await tx.delete(importedProjectsTable).where(and(
       eq(importedProjectsTable.id, projectId),
       eq(importedProjectsTable.workspaceId, workspaceId),

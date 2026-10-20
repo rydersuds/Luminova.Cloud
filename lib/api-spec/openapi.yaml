@@ -151,6 +151,12 @@ paths:
       summary: Permanently delete a project
       parameters:
         - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectDeletionConfirmation"
       responses:
         "204":
           description: Project and its project-specific records have been deleted.
@@ -159,9 +165,29 @@ paths:
         "404":
           description: Project not found.
         "409":
-          description: Project is still building and cannot be deleted.
+          description: Project is still building or the deletion preview is stale.
         "502":
           description: Project files could not be removed; project records were preserved.
+  /projects/{projectId}/delete-preview:
+    get:
+      operationId: getProjectDeletionPreview
+      tags: [projects]
+      summary: Preview records and stored files that permanent project deletion will remove
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Project deletion impact preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDeletionPreview"
+        "403":
+          description: Administrator access required.
+        "404":
+          description: Project not found.
+        "409":
+          description: Project is still building.
   /projects/{projectId}/archive:
     post:
       operationId: archiveProject
@@ -2238,6 +2264,20 @@ components:
         description: { type: string }
         archivedAt: { type: ["string", "null"], format: date-time, description: Timestamp when this project was archived. }
         canManageLifecycle: { type: boolean, description: Whether this project has a persisted record that supports archiving and deletion. }
+    ProjectDeletionPreview:
+      type: object
+      additionalProperties: false
+      required: [recordCount, storedFileCount, previewToken]
+      properties:
+        recordCount: { type: integer, minimum: 1 }
+        storedFileCount: { type: integer, minimum: 0 }
+        previewToken: { type: string, minLength: 64, maxLength: 64 }
+    ProjectDeletionConfirmation:
+      type: object
+      additionalProperties: false
+      required: [previewToken]
+      properties:
+        previewToken: { type: string, minLength: 64, maxLength: 64 }
     ProjectInput:
       type: object
       additionalProperties: false

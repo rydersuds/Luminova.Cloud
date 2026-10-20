@@ -367,7 +367,38 @@ export const DeleteProjectParams = zod.object({
   "projectId": zod.coerce.string()
 })
 
+export const deleteProjectBodyPreviewTokenMin = 64;
+export const deleteProjectBodyPreviewTokenMax = 64;
+
+
+
+export const DeleteProjectBody = zod.object({
+  "previewToken": zod.string().min(deleteProjectBodyPreviewTokenMin).max(deleteProjectBodyPreviewTokenMax)
+})
+
 export const DeleteProjectResponse = zod.void()
+
+
+/**
+ * @summary Preview records and stored files that permanent project deletion will remove
+ */
+export const GetProjectDeletionPreviewParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+
+export const getProjectDeletionPreviewResponseStoredFileCountMin = 0;
+
+export const getProjectDeletionPreviewResponsePreviewTokenMin = 64;
+export const getProjectDeletionPreviewResponsePreviewTokenMax = 64;
+
+
+
+export const GetProjectDeletionPreviewResponse = zod.object({
+  "recordCount": zod.number().int().min(1),
+  "storedFileCount": zod.number().int().min(getProjectDeletionPreviewResponseStoredFileCountMin),
+  "previewToken": zod.string().min(getProjectDeletionPreviewResponsePreviewTokenMin).max(getProjectDeletionPreviewResponsePreviewTokenMax)
+})
 
 
 /**
@@ -3362,3 +3393,5 @@ export const DeleteWorkspaceUserParams = zod.object({
 })
 
 export const DeleteWorkspaceUserResponse = zod.void()
+
+

@@ -3,9 +3,11 @@ import { useLocation } from "wouter"
 import { Archive, RotateCcw, Trash2 } from "lucide-react"
 import {
   getGetDashboardSummaryQueryKey,
+  getGetProjectDeletionPreviewQueryKey,
   getGetProjectsQueryKey,
   useArchiveProject,
   useDeleteProject,
+  useGetProjectDeletionPreview,
   useRestoreProject,
 } from "@workspace/api-client-react"
 import { Button } from "@/components/ui/button"
@@ -37,15 +39,25 @@ export function ProjectLifecycleActions({
   const queryClient = useQueryClient()
   const [action, setAction] = React.useState<"archive" | "delete" | null>(null)
   const [confirmation, setConfirmation] = React.useState("")
+  const [previewStale, setPreviewStale] = React.useState(false)
   const archiveProject = useArchiveProject()
   const restoreProject = useRestoreProject()
   const deleteProject = useDeleteProject()
+  const deletionPreview = useGetProjectDeletionPreview(projectId, {
+    query: {
+      queryKey: getGetProjectDeletionPreviewQueryKey(projectId),
+      enabled: action === "delete",
+      staleTime: 0,
+      refetchOnMount: "always",
+    },
+  })
   const isPending = archiveProject.isPending || restoreProject.isPending || deleteProject.isPending
 
   const closeDialog = () => {
     if (isPending) return
     setAction(null)
     setConfirmation("")
+    setPreviewStale(false)
   }
 
   const invalidateProjectLists = () => {
@@ -84,18 +96,37 @@ export function ProjectLifecycleActions({
   }
 
   const handleDelete = () => {
-    if (confirmation !== projectName) return
-    deleteProject.mutate({ projectId }, {
+    const previewToken = deletionPreview.data?.previewToken
+    if (confirmation !== projectName || !previewToken) return
+    deleteProject.mutate({ projectId, data: { previewToken } }, {
       onSuccess: () => {
         invalidateProjectLists()
         toast({ title: "Project permanently deleted" })
         setLocation("/projects")
       },
-      onError: (error) => toast({
-        title: "Could not delete project",
-        description: error.message,
-        variant: "destructive",
-      }),
+      onError: (error) => {
+        if (
+          (error as { status?: number }).status === 409
+          && error.message.toLowerCase().includes("changed since this preview")
+        ) {
+          setConfirmation("")
+          setPreviewStale(true)
+          void queryClient.invalidateQueries({
+            queryKey: getGetProjectDeletionPreviewQueryKey(projectId),
+          })
+          toast({
+            title: "Review the deletion preview again",
+            description: "The project changed after the preview was loaded. Check the updated counts and confirm again.",
+            variant: "destructive",
+          })
+          return
+        }
+        toast({
+          title: "Could not delete project",
+          description: error.message,
+          variant: "destructive",
+        })
+      },
     })
   }
 
@@ -130,6 +161,7 @@ export function ProjectLifecycleActions({
           className="max-w-full whitespace-normal border-border/60 bg-transparent text-muted-foreground hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive"
           onClick={() => {
             setConfirmation("")
+            setPreviewStale(false)
             setAction("delete")
           }}
           disabled={isPending}
@@ -152,17 +184,46 @@ export function ProjectLifecycleActions({
             </DialogDescription>
           </DialogHeader>
           {action === "delete" && (
-            <div className="space-y-2">
-              <Label htmlFor="confirm-project-delete">
-                Type <span className="font-semibold text-foreground">{projectName}</span> to confirm.
-              </Label>
-              <Input
-                id="confirm-project-delete"
-                autoComplete="off"
-                value={confirmation}
-                onChange={(event) => setConfirmation(event.target.value)}
-                disabled={isPending}
-              />
+            <div className="space-y-4">
+              <div className="rounded-md border border-border bg-card/50 p-3">
+                <p className="text-sm font-medium text-foreground">Deletion preview</p>
+                {deletionPreview.isFetching && !deletionPreview.data ? (
+                  <p className="mt-1 text-sm text-muted-foreground">Loading project data counts…</p>
+                ) : deletionPreview.isError ? (
+                  <p className="mt-1 text-sm text-destructive">
+                    {previewStale
+                      ? "The preview could not be refreshed. Close this dialog and try again."
+                      : "The deletion preview could not be loaded, so deletion is unavailable."}
+                  </p>
+                ) : deletionPreview.data ? (
+                  <>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {deletionPreview.data.recordCount.toLocaleString()} records and{" "}
+                      {deletionPreview.data.storedFileCount.toLocaleString()} stored files will be removed.
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Shared vendor profiles and other projects are excluded.
+                    </p>
+                  </>
+                ) : null}
+                {previewStale && deletionPreview.data && !deletionPreview.isFetching && (
+                  <p role="status" className="mt-2 text-sm text-destructive">
+                    The project changed after the previous preview. Review these updated counts and confirm again.
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-project-delete">
+                  Type <span className="font-semibold text-foreground">{projectName}</span> to confirm.
+                </Label>
+                <Input
+                  id="confirm-project-delete"
+                  autoComplete="off"
+                  value={confirmation}
+                  onChange={(event) => setConfirmation(event.target.value)}
+                  disabled={isPending}
+                />
+              </div>
             </div>
           )}
           <DialogFooter>
@@ -172,7 +233,17 @@ export function ProjectLifecycleActions({
                 {isPending ? "Archiving…" : "Archive project"}
               </Button>
             ) : (
-              <Button variant="destructive" onClick={handleDelete} disabled={isPending || confirmation !== projectName}>
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={
+                  isPending
+                  || confirmation !== projectName
+                  || !deletionPreview.data?.previewToken
+                  || deletionPreview.isFetching
+                  || deletionPreview.isError
+                }
+              >
                 {isPending ? "Deleting…" : "Delete permanently"}
               </Button>
             )}

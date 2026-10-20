@@ -47,6 +47,9 @@ import
   UploadProjectEntryAgreementParams,
   UploadProjectEntryAgreementResponse,
   DeleteProjectScheduleImageParams,
+  DeleteProjectBody,
+  GetProjectDeletionPreviewParams,
+  GetProjectDeletionPreviewResponse,
   RestoreProjectScheduleImageParams,
   RestoreProjectScheduleImageResponse,
   UpdateProjectScheduleImageBody,
@@ -204,7 +207,9 @@ import {
   permanentlyDeleteProject,
   ProjectLifecycleConflictError,
   ProjectLifecycleNotFoundError,
+  ProjectLifecyclePreviewStaleError,
   ProjectLifecycleStorageError,
+  previewProjectDeletion,
   restoreProject as restoreProjectRecord,
 } from "../lib/projectLifecycle";
 import {
@@ -5798,6 +5803,34 @@ router.post("/projects/:projectId/restore", async (req: AuthenticatedRequest, re
   }
 });
 
+router.get("/projects/:projectId/delete-preview", async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  if (!await requireProjectLifecycleAdmin(req, res)) return;
+  const parsed = GetProjectDeletionPreviewParams.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  try {
+    const preview = await previewProjectDeletion(parsed.data.projectId, requestWorkspaceId(req));
+    res.json(GetProjectDeletionPreviewResponse.parse(preview));
+  } catch (error) {
+    if (error instanceof ProjectLifecycleNotFoundError) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+    if (error instanceof ProjectLifecycleConflictError) {
+      res.status(409).json({ error: "The project is still being built and cannot be previewed yet." });
+      return;
+    }
+    req.log.error({ err: error }, "Failed to preview project deletion");
+    res.status(500).json({ error: "Project deletion could not be previewed." });
+  }
+});
+
 router.delete("/projects/:projectId", async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.userId) {
     res.status(401).json({ error: "Authentication required" });
@@ -5809,8 +5842,18 @@ router.delete("/projects/:projectId", async (req: AuthenticatedRequest, res): Pr
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const body = DeleteProjectBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
   try {
-    await permanentlyDeleteProject(parsed.data.projectId, requestWorkspaceId(req), req.userId);
+    await permanentlyDeleteProject(
+      parsed.data.projectId,
+      requestWorkspaceId(req),
+      req.userId,
+      body.data.previewToken,
+    );
     res.status(204).end();
   } catch (error) {
     if (error instanceof ProjectLifecycleNotFoundError) {
@@ -5819,6 +5862,10 @@ router.delete("/projects/:projectId", async (req: AuthenticatedRequest, res): Pr
     }
     if (error instanceof ProjectLifecycleConflictError) {
       res.status(409).json({ error: "The project is still being built and cannot be deleted yet." });
+      return;
+    }
+    if (error instanceof ProjectLifecyclePreviewStaleError) {
+      res.status(409).json({ error: "The project changed since this preview. Review the updated deletion preview and confirm again." });
       return;
     }
     if (error instanceof ProjectLifecycleStorageError) {

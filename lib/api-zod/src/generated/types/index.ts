@@ -64,6 +64,8 @@ export * from './panoramaUpdate';
 export * from './photo';
 export * from './project';
 export * from './projectBoard';
+export * from './projectDeletionConfirmation';
+export * from './projectDeletionPreview';
 export * from './projectDetail';
 export * from './projectDocumentPreview';
 export * from './projectDocumentPreviewKind';

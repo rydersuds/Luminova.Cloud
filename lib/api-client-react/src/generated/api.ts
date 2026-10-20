@@ -57,6 +57,8 @@ import type {
   PanoramaUpdate,
   Project,
   ProjectBoard,
+  ProjectDeletionConfirmation,
+  ProjectDeletionPreview,
   ProjectDetail,
   ProjectDocumentPreview,
   ProjectEntryAgreementInput,
@@ -597,14 +599,15 @@ export const getDeleteProjectUrl = (projectId: string,) => {
 /**
  * @summary Permanently delete a project
  */
-export const deleteProject = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+export const deleteProject = async (projectId: string,
+    projectDeletionConfirmation: ProjectDeletionConfirmation, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
 
   return customFetch<void>(getDeleteProjectUrl(projectId),
   {
     ...options,
-    method: 'DELETE'
-
-
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(projectDeletionConfirmation)
   }
 );}
 
@@ -613,8 +616,8 @@ export const deleteProject = async (projectId: string, options?: Parameters<type
 
 
 export const getDeleteProjectMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProject>>, TError,{projectId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteProject>>, TError,{projectId: string}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProject>>, TError,{projectId: string;data: BodyType<ProjectDeletionConfirmation>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteProject>>, TError,{projectId: string;data: BodyType<ProjectDeletionConfirmation>}, TContext> => {
 
 const mutationKey = ['deleteProject'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -626,10 +629,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteProject>>, {projectId: string}> = (props) => {
-          const {projectId} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteProject>>, {projectId: string;data: BodyType<ProjectDeletionConfirmation>}> = (props) => {
+          const {projectId,data} = props ?? {};
 
-          return  deleteProject(projectId,requestOptions)
+          return  deleteProject(projectId,data,requestOptions)
         }
 
 
@@ -640,22 +643,99 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type DeleteProjectMutationResult = NonNullable<Awaited<ReturnType<typeof deleteProject>>>
-
+    export type DeleteProjectMutationBody = BodyType<ProjectDeletionConfirmation>
     export type DeleteProjectMutationError = ErrorType<void>
 
     /**
  * @summary Permanently delete a project
  */
 export const useDeleteProject = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProject>>, TError,{projectId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProject>>, TError,{projectId: string;data: BodyType<ProjectDeletionConfirmation>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof deleteProject>>,
         TError,
-        {projectId: string},
+        {projectId: string;data: BodyType<ProjectDeletionConfirmation>},
         TContext
       > => {
       return useMutation(getDeleteProjectMutationOptions(options));
     }
+
+export const getGetProjectDeletionPreviewUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/delete-preview`
+}
+
+/**
+ * @summary Preview records and stored files that permanent project deletion will remove
+ */
+export const getProjectDeletionPreview = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<ProjectDeletionPreview> => {
+
+  return customFetch<ProjectDeletionPreview>(getGetProjectDeletionPreviewUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProjectDeletionPreviewQueryKey = (projectId: string,) => {
+    return [
+    `/api/projects/${projectId}/delete-preview`
+    ] as const;
+    }
+
+
+export const getGetProjectDeletionPreviewQueryOptions = <TData = Awaited<ReturnType<typeof getProjectDeletionPreview>>, TError = ErrorType<void>>(projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectDeletionPreview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProjectDeletionPreviewQueryKey(projectId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProjectDeletionPreview>>> = ({ signal }) => getProjectDeletionPreview(projectId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProjectDeletionPreview>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProjectDeletionPreviewQueryResult = NonNullable<Awaited<ReturnType<typeof getProjectDeletionPreview>>>
+export type GetProjectDeletionPreviewQueryError = ErrorType<void>
+
+
+/**
+ * @summary Preview records and stored files that permanent project deletion will remove
+ */
+
+export function useGetProjectDeletionPreview<TData = Awaited<ReturnType<typeof getProjectDeletionPreview>>, TError = ErrorType<void>>(
+ projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectDeletionPreview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProjectDeletionPreviewQueryOptions(projectId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getArchiveProjectUrl = (projectId: string,) => {
 
@@ -6639,3 +6719,4 @@ export const useDeleteWorkspaceUser = <TError = ErrorType<void>,
       > => {
       return useMutation(getDeleteWorkspaceUserMutationOptions(options));
     }
+
