@@ -415,7 +415,24 @@ test('administrators get safe archive and permanent-delete confirmations', async
   await installIdentity(page, 'Admin');
   await page.route('**/api/projects/riverstone/activity', route => route.fulfill({ json: [] }));
   await page.route('**/api/projects/riverstone/delete-preview', route => route.fulfill({
-    json: { recordCount: 12, storedFileCount: 3, previewToken: 'a'.repeat(64) },
+    json: {
+      recordCount: 12,
+      recordBreakdown: [
+        { category: 'project', count: 1 },
+        { category: 'importData', count: 2 },
+        { category: 'documents', count: 2 },
+        { category: 'invoices', count: 1 },
+        { category: 'vendorQuotes', count: 1 },
+        { category: 'conversations', count: 0 },
+        { category: 'schedule', count: 2 },
+        { category: 'panoramas', count: 1 },
+        { category: 'exteriorPhotos', count: 0 },
+        { category: 'projectHistory', count: 1 },
+        { category: 'purchaseApprovals', count: 1 },
+      ],
+      storedFileCount: 3,
+      previewToken: 'a'.repeat(64),
+    },
   }));
   await page.route('**/api/projects/riverstone', route => route.fulfill({
     json: { ...project, canManageLifecycle: true, archivedAt: null },
@@ -431,6 +448,10 @@ test('administrators get safe archive and permanent-delete confirmations', async
   const deleteDialog = page.getByRole('dialog', { name: 'Permanently delete this project?' });
   await expect(deleteDialog).toContainText('Shared vendor profiles and other projects will not be deleted');
   await expect(deleteDialog).toContainText('12 records and 3 stored files will be removed');
+  await expect(deleteDialog).toContainText('Documents');
+  await expect(deleteDialog).toContainText('Invoices');
+  await expect(deleteDialog).toContainText('Schedule items and related data');
+  await expect(deleteDialog).toContainText('Project history');
   const confirmDelete = deleteDialog.getByRole('button', { name: 'Delete permanently', exact: true });
   await expect(confirmDelete).toBeDisabled();
   await deleteDialog.getByLabel('Type Riverstone Residence to confirm.').fill('Riverstone Residence');

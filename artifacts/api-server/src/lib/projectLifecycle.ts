@@ -62,6 +62,21 @@ async function recordProjectLifecycleEvent(
 
 type ProjectDeletionSnapshot = {
   recordCount: number;
+  recordBreakdown: Array<{
+    category:
+      | "project"
+      | "importData"
+      | "documents"
+      | "invoices"
+      | "vendorQuotes"
+      | "conversations"
+      | "schedule"
+      | "panoramas"
+      | "exteriorPhotos"
+      | "projectHistory"
+      | "purchaseApprovals";
+    count: number;
+  }>;
   storedFileCount: number;
   previewToken: string;
   importBatchIds: string[];
@@ -264,10 +279,8 @@ async function getProjectDeletionSnapshot(
   })
     .from(invoiceUploadReservationsTable)
     .where(eq(invoiceUploadReservationsTable.projectId, projectId));
-  addRecords("uploadReservations", [
-    ...scheduleReservations.map(({ objectPath }) => ({ id: objectPath })),
-    ...invoiceReservations.map(({ objectPath }) => ({ id: objectPath })),
-  ]);
+  addRecords("scheduleUploadReservations", scheduleReservations.map(({ objectPath }) => ({ id: objectPath })));
+  addRecords("invoiceUploadReservations", invoiceReservations.map(({ objectPath }) => ({ id: objectPath })));
   objectPaths.push(
     ...scheduleReservations.map((reservation) => reservation.objectPath),
     ...invoiceReservations.map((reservation) => reservation.objectPath),
@@ -296,7 +309,34 @@ async function getProjectDeletionSnapshot(
   }
   const uniqueObjectPaths = candidateObjectPaths
     .filter((path) => !referencedOutsideDeletion.has(path));
-  const recordCount = Object.values(recordIds).reduce((total, ids) => total + ids.length, 0);
+  const countRecords = (...kinds: string[]) =>
+    kinds.reduce((total, kind) => total + (recordIds[kind]?.length ?? 0), 0);
+  const recordBreakdown: ProjectDeletionSnapshot["recordBreakdown"] = [
+    { category: "project", count: countRecords("project") },
+    { category: "importData", count: countRecords("importBatches", "importedVendors") },
+    { category: "documents", count: countRecords("documents") },
+    { category: "invoices", count: countRecords("invoices", "invoiceUploadReservations") },
+    { category: "vendorQuotes", count: countRecords("vendorQuotes") },
+    {
+      category: "conversations",
+      count: countRecords("conversations", "messages", "conversationParticipants"),
+    },
+    {
+      category: "schedule",
+      count: countRecords(
+        "boardItems",
+        "boardGroups",
+        "scheduleMetadata",
+        "scheduleImages",
+        "scheduleUploadReservations",
+      ),
+    },
+    { category: "panoramas", count: countRecords("panoramas") },
+    { category: "exteriorPhotos", count: countRecords("exteriorPhotos") },
+    { category: "projectHistory", count: countRecords("activities", "vendorJobHistory", "vendorReviews") },
+    { category: "purchaseApprovals", count: countRecords("purchaseApprovals") },
+  ];
+  const recordCount = recordBreakdown.reduce((total, item) => total + item.count, 0);
   const previewToken = createHash("sha256")
     .update(JSON.stringify({
       projectId,
@@ -308,6 +348,7 @@ async function getProjectDeletionSnapshot(
 
   return {
     recordCount,
+    recordBreakdown,
     storedFileCount: uniqueObjectPaths.length,
     previewToken,
     importBatchIds,
@@ -318,9 +359,10 @@ async function getProjectDeletionSnapshot(
 export async function previewProjectDeletion(
   projectId: string,
   workspaceId: string,
-): Promise<Pick<ProjectDeletionSnapshot, "recordCount" | "storedFileCount" | "previewToken">> {
-  const { recordCount, storedFileCount, previewToken } = await getProjectDeletionSnapshot(db, projectId, workspaceId);
-  return { recordCount, storedFileCount, previewToken };
+): Promise<Pick<ProjectDeletionSnapshot, "recordCount" | "recordBreakdown" | "storedFileCount" | "previewToken">> {
+  const { recordCount, recordBreakdown, storedFileCount, previewToken } =
+    await getProjectDeletionSnapshot(db, projectId, workspaceId);
+  return { recordCount, recordBreakdown, storedFileCount, previewToken };
 }
 
 export async function archiveProject(projectId: string, workspaceId: string, actorId: string): Promise<boolean> {

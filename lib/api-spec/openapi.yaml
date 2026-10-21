@@ -2267,11 +2267,35 @@ components:
     ProjectDeletionPreview:
       type: object
       additionalProperties: false
-      required: [recordCount, storedFileCount, previewToken]
+      required: [recordCount, recordBreakdown, storedFileCount, previewToken]
       properties:
         recordCount: { type: integer, minimum: 1 }
+        recordBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectDeletionRecordCount"
         storedFileCount: { type: integer, minimum: 0 }
         previewToken: { type: string, minLength: 64, maxLength: 64 }
+    ProjectDeletionRecordCount:
+      type: object
+      additionalProperties: false
+      required: [category, count]
+      properties:
+        category:
+          type: string
+          enum:
+            - project
+            - importData
+            - documents
+            - invoices
+            - vendorQuotes
+            - conversations
+            - schedule
+            - panoramas
+            - exteriorPhotos
+            - projectHistory
+            - purchaseApprovals
+        count: { type: integer, minimum: 0 }
     ProjectDeletionConfirmation:
       type: object
       additionalProperties: false

@@ -387,6 +387,8 @@ export const GetProjectDeletionPreviewParams = zod.object({
 })
 
 
+export const getProjectDeletionPreviewResponseRecordBreakdownItemCountMin = 0;
+
 export const getProjectDeletionPreviewResponseStoredFileCountMin = 0;
 
 export const getProjectDeletionPreviewResponsePreviewTokenMin = 64;
@@ -396,6 +398,10 @@ export const getProjectDeletionPreviewResponsePreviewTokenMax = 64;
 
 export const GetProjectDeletionPreviewResponse = zod.object({
   "recordCount": zod.number().int().min(1),
+  "recordBreakdown": zod.array(zod.object({
+  "category": zod.enum(['project', 'importData', 'documents', 'invoices', 'vendorQuotes', 'conversations', 'schedule', 'panoramas', 'exteriorPhotos', 'projectHistory', 'purchaseApprovals']),
+  "count": zod.number().int().min(getProjectDeletionPreviewResponseRecordBreakdownItemCountMin)
+})),
   "storedFileCount": zod.number().int().min(getProjectDeletionPreviewResponseStoredFileCountMin),
   "previewToken": zod.string().min(getProjectDeletionPreviewResponsePreviewTokenMin).max(getProjectDeletionPreviewResponsePreviewTokenMax)
 })

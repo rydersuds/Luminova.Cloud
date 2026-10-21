@@ -243,9 +243,33 @@ export interface Project {
   canManageLifecycle?: boolean;
 }
 
+export type ProjectDeletionRecordCountCategory = typeof ProjectDeletionRecordCountCategory[keyof typeof ProjectDeletionRecordCountCategory];
+
+
+export const ProjectDeletionRecordCountCategory = {
+  project: 'project',
+  importData: 'importData',
+  documents: 'documents',
+  invoices: 'invoices',
+  vendorQuotes: 'vendorQuotes',
+  conversations: 'conversations',
+  schedule: 'schedule',
+  panoramas: 'panoramas',
+  exteriorPhotos: 'exteriorPhotos',
+  projectHistory: 'projectHistory',
+  purchaseApprovals: 'purchaseApprovals',
+} as const;
+
+export interface ProjectDeletionRecordCount {
+  category: ProjectDeletionRecordCountCategory;
+  /** @minimum 0 */
+  count: number;
+}
+
 export interface ProjectDeletionPreview {
   /** @minimum 1 */
   recordCount: number;
+  recordBreakdown: ProjectDeletionRecordCount[];
   /** @minimum 0 */
   storedFileCount: number;
   /**

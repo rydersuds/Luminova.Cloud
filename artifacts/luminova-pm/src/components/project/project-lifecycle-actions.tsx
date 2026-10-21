@@ -5,6 +5,7 @@ import {
   getGetDashboardSummaryQueryKey,
   getGetProjectDeletionPreviewQueryKey,
   getGetProjectsQueryKey,
+  type ProjectDeletionRecordCountCategory,
   useArchiveProject,
   useDeleteProject,
   useGetProjectDeletionPreview,
@@ -28,6 +29,20 @@ type ProjectLifecycleActionsProps = {
   projectId: string
   projectName: string
   archived: boolean
+}
+
+const deletionCategoryLabels: Record<ProjectDeletionRecordCountCategory, string> = {
+  project: "Project record",
+  importData: "Import batches and vendors",
+  documents: "Documents",
+  invoices: "Invoices",
+  vendorQuotes: "Vendor quotes",
+  conversations: "Conversations and messages",
+  schedule: "Schedule items and related data",
+  panoramas: "Panoramas",
+  exteriorPhotos: "Exterior photos",
+  projectHistory: "Project history",
+  purchaseApprovals: "Purchase approvals",
 }
 
 export function ProjectLifecycleActions({
@@ -201,6 +216,16 @@ export function ProjectLifecycleActions({
                       {deletionPreview.data.recordCount.toLocaleString()} records and{" "}
                       {deletionPreview.data.storedFileCount.toLocaleString()} stored files will be removed.
                     </p>
+                    <ul aria-label="Records by category" className="mt-3 grid grid-cols-1 gap-x-5 gap-y-1.5 sm:grid-cols-2">
+                      {deletionPreview.data.recordBreakdown.map(({ category, count }) => (
+                        <li key={category} className="flex items-center justify-between gap-3 text-xs">
+                          <span className="text-muted-foreground">{deletionCategoryLabels[category]}</span>
+                          <span className="shrink-0 font-medium tabular-nums text-foreground">
+                            {count.toLocaleString()}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Shared vendor profiles and other projects are excluded.
                     </p>

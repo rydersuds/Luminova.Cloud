@@ -6,9 +6,12 @@ import type { Server } from "node:http";
 import type { ClerkClient, User } from "@clerk/backend";
 import {
   db,
+  importedInvoicesTable,
   importedProjectsTable,
   importedVendorsTable,
   projectActivitiesTable,
+  projectBoardGroupsTable,
+  projectBoardItemsTable,
   projectDocumentsTable,
   projectLifecycleEventsTable,
   projectImportBatchesTable,
@@ -53,6 +56,9 @@ const servers: Server[] = [];
 const projectIds: string[] = [];
 const batchIds: string[] = [];
 const importedVendorIds: string[] = [];
+const invoiceIds: string[] = [];
+const boardGroupIds: string[] = [];
+const boardItemIds: string[] = [];
 const activityIds: string[] = [];
 const documentIds: string[] = [];
 const scheduleImageIds: string[] = [];
@@ -61,6 +67,15 @@ const sharedProfileIds: string[] = [];
 
 afterEach(async () => {
   for (const server of servers.splice(0)) server.close();
+  if (boardItemIds.length) {
+    await db.delete(projectBoardItemsTable).where(inArray(projectBoardItemsTable.id, boardItemIds.splice(0)));
+  }
+  if (boardGroupIds.length) {
+    await db.delete(projectBoardGroupsTable).where(inArray(projectBoardGroupsTable.id, boardGroupIds.splice(0)));
+  }
+  if (invoiceIds.length) {
+    await db.delete(importedInvoicesTable).where(inArray(importedInvoicesTable.id, invoiceIds.splice(0)));
+  }
   if (activityIds.length) {
     await db.delete(projectActivitiesTable).where(inArray(projectActivitiesTable.id, activityIds.splice(0)));
   }
@@ -159,6 +174,18 @@ async function requestAs(base: string, userId: string, path: string, init?: Requ
       "x-test-user": userId,
     },
   });
+}
+
+function getDeletionBreakdownCounts(preview: {
+  recordCount: number;
+  recordBreakdown: Array<{ category: string; count: number }>;
+}) {
+  assert.equal(preview.recordBreakdown.length, 11);
+  assert.equal(
+    preview.recordBreakdown.reduce((total, item) => total + item.count, 0),
+    preview.recordCount,
+  );
+  return Object.fromEntries(preview.recordBreakdown.map(({ category, count }) => [category, count]));
 }
 
 test("archive and restore are Administrator-only and keep records out of the active list", async () => {
@@ -326,10 +353,24 @@ test("permanent deletion removes project data without deleting shared vendor pro
   assert.equal(previewResponse.status, 200);
   const preview = await previewResponse.json() as {
     recordCount: number;
+    recordBreakdown: Array<{ category: string; count: number }>;
     storedFileCount: number;
     previewToken: string;
   };
   assert.equal(preview.recordCount, 5);
+  assert.deepEqual(getDeletionBreakdownCounts(preview), {
+    project: 1,
+    importData: 2,
+    documents: 0,
+    invoices: 0,
+    vendorQuotes: 0,
+    conversations: 0,
+    schedule: 0,
+    panoramas: 0,
+    exteriorPhotos: 0,
+    projectHistory: 2,
+    purchaseApprovals: 0,
+  });
   assert.equal(preview.storedFileCount, 0);
 
   assert.equal((await requestAs(base, adminId, `/projects/${projectId}`, {
@@ -404,6 +445,9 @@ test("deletion preview counts stored files and rejects a stale confirmation", as
   const projectId = `lifecycle-preview-${randomUUID()}`;
   const batchId = `lifecycle-preview-batch-${randomUUID()}`;
   const documentId = `lifecycle-preview-document-${randomUUID()}`;
+  const invoiceId = `lifecycle-preview-invoice-${randomUUID()}`;
+  const groupId = `lifecycle-preview-group-${randomUUID()}`;
+  const itemId = `lifecycle-preview-item-${randomUUID()}`;
   const base = await startApi(fakeClerk([makeUser(adminId, "Admin")]));
 
   await insertProject(projectId, batchId, adminId);
@@ -414,6 +458,40 @@ test("deletion preview counts stored files and rejects a stale confirmation", as
     workspaceId: "default",
     status: "completed",
     manifest: [],
+  });
+  invoiceIds.push(invoiceId);
+  await db.insert(importedInvoicesTable).values({
+    id: invoiceId,
+    importBatchId: batchId,
+    ownerId: adminId,
+    data: {
+      id: invoiceId,
+      invoiceNumber: "PREVIEW-001",
+      projectId,
+      projectName: "Deletion preview project",
+      vendor: "Test vendor",
+      amount: 100,
+      date: "2026-10-01",
+      status: "Submitted",
+      lineItem: "Schedule test",
+      overage: 0,
+    },
+  });
+  boardGroupIds.push(groupId);
+  await db.insert(projectBoardGroupsTable).values({
+    id: groupId,
+    workspaceId: "default",
+    projectId,
+    name: "Planning",
+  });
+  boardItemIds.push(itemId);
+  await db.insert(projectBoardItemsTable).values({
+    id: itemId,
+    workspaceId: "default",
+    projectId,
+    groupId,
+    name: "Install framing",
+    createdBy: adminId,
   });
   documentIds.push(documentId);
   await db.insert(projectDocumentsTable).values({
@@ -433,10 +511,15 @@ test("deletion preview counts stored files and rejects a stale confirmation", as
   assert.equal(previewResponse.status, 200);
   const preview = await previewResponse.json() as {
     recordCount: number;
+    recordBreakdown: Array<{ category: string; count: number }>;
     storedFileCount: number;
     previewToken: string;
   };
-  assert.equal(preview.recordCount, 3);
+  assert.equal(preview.recordCount, 6);
+  const breakdown = getDeletionBreakdownCounts(preview);
+  assert.equal(breakdown.documents, 1);
+  assert.equal(breakdown.invoices, 1);
+  assert.equal(breakdown.schedule, 2);
   assert.equal(preview.storedFileCount, 1);
 
   await db.delete(projectDocumentsTable).where(eq(projectDocumentsTable.id, documentId));
@@ -455,10 +538,15 @@ test("deletion preview counts stored files and rejects a stale confirmation", as
   assert.equal(refreshedResponse.status, 200);
   const refreshedPreview = await refreshedResponse.json() as {
     recordCount: number;
+    recordBreakdown: Array<{ category: string; count: number }>;
     storedFileCount: number;
     previewToken: string;
   };
-  assert.equal(refreshedPreview.recordCount, 2);
+  assert.equal(refreshedPreview.recordCount, 5);
+  const refreshedBreakdown = getDeletionBreakdownCounts(refreshedPreview);
+  assert.equal(refreshedBreakdown.documents, 0);
+  assert.equal(refreshedBreakdown.invoices, 1);
+  assert.equal(refreshedBreakdown.schedule, 2);
   assert.equal(refreshedPreview.storedFileCount, 0);
   assert.equal((await requestAs(base, adminId, `/projects/${projectId}`, {
     method: "DELETE",
@@ -574,10 +662,24 @@ test("deletion preview excludes import data attached to a batch referenced by an
   assert.equal(previewResponse.status, 200);
   const preview = await previewResponse.json() as {
     recordCount: number;
+    recordBreakdown: Array<{ category: string; count: number }>;
     storedFileCount: number;
     previewToken: string;
   };
   assert.equal(preview.recordCount, 1);
+  assert.deepEqual(getDeletionBreakdownCounts(preview), {
+    project: 1,
+    importData: 0,
+    documents: 0,
+    invoices: 0,
+    vendorQuotes: 0,
+    conversations: 0,
+    schedule: 0,
+    panoramas: 0,
+    exteriorPhotos: 0,
+    projectHistory: 0,
+    purchaseApprovals: 0,
+  });
   assert.equal(preview.storedFileCount, 0);
 
   assert.equal((await requestAs(base, adminId, `/projects/${projectId}`, {

@@ -5,10 +5,12 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ProjectDeletionRecordCount } from './projectDeletionRecordCount';
 
 export interface ProjectDeletionPreview {
   /** @minimum 1 */
   recordCount: number;
+  recordBreakdown: ProjectDeletionRecordCount[];
   /** @minimum 0 */
   storedFileCount: number;
   /**

@@ -66,6 +66,8 @@ export * from './project';
 export * from './projectBoard';
 export * from './projectDeletionConfirmation';
 export * from './projectDeletionPreview';
+export * from './projectDeletionRecordCount';
+export * from './projectDeletionRecordCountCategory';
 export * from './projectDetail';
 export * from './projectDocumentPreview';
 export * from './projectDocumentPreviewKind';
