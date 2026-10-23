@@ -1653,6 +1653,30 @@
   .board-chip-carries { border-top-right-radius: 0; border-bottom-right-radius: 0; margin-right: 0 !important; }
   .board-more { align-self: flex-start; font-size: .7rem; font-weight: 600; color: hsl(var(--muted-foreground)); padding: 0 .25rem; border-radius: .3rem; }
   .board-more:hover { color: hsl(var(--foreground)); }
+
+  /* day view */
+  .board-day-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
+  .board-day-date-picker { display: inline-flex; align-items: center; gap: .5rem; height: 2.25rem; padding: 0 .65rem; border: 1px solid hsl(var(--border)); border-radius: .65rem; background: hsl(var(--card)); }
+  .board-day-date-input { width: 8.5rem; min-width: 0; color: hsl(var(--foreground)); background: transparent; font-size: .8rem; outline: none; }
+  .board-day-list { display: flex; flex-direction: column; gap: .85rem; }
+  .board-day-group { overflow: hidden; border: 1px solid hsl(var(--border)); border-radius: .9rem; background: hsl(var(--card) / .75); }
+  .board-day-group-header { display: flex; align-items: center; gap: .55rem; min-height: 2.6rem; padding: .55rem .85rem; color: hsl(var(--group)); background: hsl(var(--group) / .08); }
+  .board-day-group-mark { width: .55rem; height: .55rem; flex: 0 0 auto; border-radius: 999px; background: hsl(var(--group)); box-shadow: 0 0 0 3px hsl(var(--group) / .15); }
+  .board-day-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(9rem, 12rem) minmax(8rem, 9rem); align-items: center; gap: .75rem; min-height: 4rem; padding: .55rem .85rem; border-top: 1px solid hsl(var(--border) / .65); }
+  .board-day-row:hover { background: hsl(var(--primary) / .035); }
+  .board-day-task { display: flex; align-items: center; gap: .7rem; min-width: 0; }
+  .board-day-status-dot { width: .65rem; height: .65rem; margin: 0; box-shadow: 0 0 0 3px hsl(var(--group) / .14); }
+  .board-day-owner { width: 1.1rem; height: 1.1rem; font-size: .5rem; box-shadow: none; }
+  .board-day-dates, .board-day-status { min-width: 0; }
+  .board-day-empty { padding: 2rem 1rem; border: 1px dashed hsl(var(--border)); border-radius: .9rem; text-align: center; background: hsl(var(--card) / .4); }
+  @media (max-width: 639px) {
+    .board-day-controls { align-items: flex-start; }
+    .board-day-controls > div:first-child { width: 100%; }
+    .board-day-row { grid-template-columns: minmax(0, 1fr) minmax(7rem, 9rem); gap: .5rem; }
+    .board-day-task { grid-column: 1 / -1; }
+    .board-day-dates { grid-column: 1; }
+    .board-day-status { grid-column: 2; }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

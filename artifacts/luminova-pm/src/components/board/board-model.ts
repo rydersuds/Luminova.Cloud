@@ -109,6 +109,13 @@ export function itemSpan(item: Pick<BoardItem, "startDate" | "endDate">): { star
   return { start: start ?? end!, end: end ?? start! }
 }
 
+export function itemsForDay<T extends Pick<BoardItem, "startDate" | "endDate">>(items: T[], day: number): T[] {
+  return items.filter((item) => {
+    const span = itemSpan(item)
+    return span !== null && span.start <= day && span.end >= day
+  })
+}
+
 export function timelineLabel(item: Pick<BoardItem, "startDate" | "endDate">) {
   const span = itemSpan(item)
   if (!span) return ""

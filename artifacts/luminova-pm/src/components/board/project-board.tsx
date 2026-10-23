@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react"
 import type { BoardItemStatus } from "@workspace/api-client-react"
-import { CalendarDays, GanttChartSquare, Search, Table2 } from "lucide-react"
+import { CalendarClock, CalendarDays, GanttChartSquare, Search, Table2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { BoardCalendar, type CalendarEntry } from "./board-calendar"
 import { BOARD_STATUSES, STATUS_TONE, formatCents, isOverdue } from "./board-model"
+import { BoardDayView } from "./board-day-view"
 import { BoardTable } from "./board-table"
 import { BoardTimeline, type TimelineSection } from "./board-timeline"
 import { ProjectBoardImport } from "./project-board-import"
@@ -13,6 +14,7 @@ const VIEWS = [
   { id: "table", label: "Table", icon: Table2 },
   { id: "timeline", label: "Timeline", icon: GanttChartSquare },
   { id: "calendar", label: "Calendar", icon: CalendarDays },
+  { id: "day", label: "Day", icon: CalendarClock },
 ] as const
 type View = (typeof VIEWS)[number]["id"]
 const VIEW_KEY = "luminova-board-view"
@@ -141,6 +143,16 @@ export function ProjectBoard({ projectId }: { projectId: string }) {
       )}
       {view === "calendar" && (
         <BoardCalendar entries={calendarEntries} onDatesChange={onDatesChange} undatedCount={visibleItems.filter((item) => !item.startDate && !item.endDate).length} />
+      )}
+      {view === "day" && (
+        <BoardDayView
+          groups={groups}
+          items={visibleItems}
+          undatedCount={visibleItems.filter((item) => !item.startDate && !item.endDate).length}
+          filtered={filtered}
+          onDatesChange={(id, dates) => void board.updateItem(id, dates)}
+          onStatusChange={(id, status) => void board.updateItem(id, { status })}
+        />
       )}
     </section>
   )
