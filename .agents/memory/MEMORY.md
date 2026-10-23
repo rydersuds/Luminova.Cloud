@@ -43,3 +43,4 @@
 - [Schedule availability](schedule-availability.md) — unavailable schedules hide the project board without deleting its saved tasks.
 - [Tax-excluded workbook totals](tax-excluded-workbook-totals.md) — recognize GST/PST wording in grand-total labels without folding excluded tax or client-facing totals into internal budgets.
 - [Numbered suite budgets](numbered-suite-budgets.md) — requests follow actual numbered suites mapped to source dwelling types, with shared costs and historical unallocated costs separate.
+- [Browser popup fixtures](browser-popup-fixtures.md) — intercept new-tab document fixtures on the browser context; page routes miss a popup's initial navigation.

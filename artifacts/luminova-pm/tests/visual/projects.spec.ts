@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 const makeProject = (overrides: Partial<Record<string, unknown>> = {}) => ({
   id: 'project-calgary',
@@ -13,6 +13,127 @@ const makeProject = (overrides: Partial<Record<string, unknown>> = {}) => ({
   budgetEnabled: true,
   progress: 35,
   ...overrides,
+});
+
+const sourceFiles = [
+  {
+    id: 'invoice-workbook',
+    name: 'Framing invoice.xlsx',
+    classification: 'invoice',
+    collection: 'Invoices',
+    contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    url: '/__source-files/invoice.xlsx',
+  },
+  {
+    id: 'quote-pdf',
+    name: 'Electrical quote.pdf',
+    classification: 'quote',
+    collection: 'Quotes',
+    contentType: 'application/pdf',
+    url: '/__source-files/quote.pdf',
+  },
+];
+
+async function openProjectFinancials(page: Page, files: object[] = sourceFiles) {
+  await page.addInitScript(() => localStorage.setItem('luminova-cookie-consent-v1', 'accepted'));
+  await page.route('**/api/users/me', route => route.fulfill({
+    json: { userId: 'user-pm', role: 'Project Manager' },
+  }));
+  await page.route('**/api/projects/riverstone/activity', route => route.fulfill({ json: [] }));
+  await page.route('**/api/projects/riverstone', route => route.fulfill({
+    json: makeProject({
+      id: 'riverstone', budgetEnabled: false, files, photos: [], panoramas: [],
+      invoices: [], trades: [], lineItems: [], scheduleImages: [],
+      startDate: '2026-01-01', description: '', exteriorImage: '',
+      clientQuote: { total: 0, revision: '', portions: [] },
+    }),
+  }));
+  await page.route('**/api/projects/riverstone/documents/invoice-workbook/preview', route => route.fulfill({
+    json: {
+      kind: 'excel', text: null, truncated: false,
+      worksheets: [{ name: 'Summary', rows: [['Trade', 'Amount'], ['Framing', '1250']] }],
+    },
+  }));
+  await page.context().route('**/__source-files/quote.pdf', route => route.fulfill({
+    contentType: 'text/plain', body: 'Original quote document',
+  }));
+  await page.goto('/__visual/project-panorama?tab=budget');
+}
+
+test.describe('Project Source Files disclosure', () => {
+  for (const width of [1280, 390]) {
+    test(`collapses and restores document actions at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await openProjectFinancials(page);
+      const toggle = page.getByRole('button', { name: /Source Files$/ });
+      const preview = page.getByRole('button', { name: 'Preview Framing invoice.xlsx' });
+      const open = page.getByRole('link', { name: 'Open Electrical quote.pdf' });
+      await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      const contentId = await toggle.getAttribute('aria-controls');
+      expect(contentId).toBeTruthy();
+      const content = page.locator(`[id="${contentId}"]`);
+      await expect(content).toBeVisible();
+      await expect(preview).toBeVisible();
+      await expect(open).toBeVisible();
+      await expect(toggle.locator('svg')).not.toHaveClass(/-rotate-90/);
+      expect(await toggle.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+
+      await toggle.click();
+      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await expect(toggle.locator('svg')).toHaveClass(/-rotate-90/);
+      await expect(page.getByRole('heading', { name: /Source Files/ })).toBeVisible();
+      await expect(content).toBeHidden();
+      await expect(preview).toHaveCount(0);
+      await expect(open).toHaveCount(0);
+      await page.keyboard.press('Tab');
+      await expect(toggle).not.toBeFocused();
+      expect(await page.evaluate(id => document.getElementById(id!)?.contains(document.activeElement), contentId)).toBe(false);
+
+      // Tab changes unmount the panel, but not the user's disclosure choice.
+      await page.getByRole('tab', { name: 'Overview', exact: true }).click();
+      await page.getByRole('tab', { name: 'Budget', exact: true }).click();
+      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await toggle.focus();
+      await page.keyboard.press('Enter');
+      await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      await expect(preview).toBeVisible();
+      await page.keyboard.press('Space');
+      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await page.keyboard.press('Space');
+      await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      await expect(open).toHaveAttribute('href', sourceFiles[1].url);
+      await expect(open).toHaveAttribute('target', '_blank');
+      const reopenedContentId = await toggle.getAttribute('aria-controls');
+      const reopenedContent = page.locator(`[id="${reopenedContentId}"]`);
+      expect(await reopenedContent.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+
+      await preview.click();
+      const dialog = page.getByRole('dialog');
+      await expect(dialog.getByRole('table', { name: 'Worksheet Summary' })).toBeVisible();
+      await expect(dialog.getByRole('link', { name: 'Download original Framing invoice.xlsx' }))
+        .toHaveAttribute('href', sourceFiles[0].url);
+      await page.keyboard.press('Escape');
+      await expect(dialog).toBeHidden();
+      const popupPromise = page.waitForEvent('popup');
+      await open.click();
+      const popup = await popupPromise;
+      await popup.waitForLoadState();
+      await expect(popup.locator('body')).toContainText('Original quote document');
+      await popup.close();
+      await page.reload();
+      await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    });
+  }
+
+  for (const files of [[], [{ ...sourceFiles[1], classification: 'contract' }]]) {
+    test(`omits the section with ${files.length ? 'only unrelated files' : 'no files'}`, async ({ page }) => {
+      await openProjectFinancials(page, files);
+      await expect(page.getByRole('tab', { name: 'Budget', exact: true })).toHaveAttribute('data-state', 'active');
+      await expect(page.getByRole('heading', { name: 'Calgary Tower Renewal' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Source Files' })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: /Source Files$/ })).toHaveCount(0);
+    });
+  }
 });
 
 test('project cards omit budget figures when internal budgeting is disabled', async ({ page }) => {

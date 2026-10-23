@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -126,6 +127,8 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const [entryAgreementError, setEntryAgreementError] = React.useState("")
   const [isEntryAgreementUploading, setIsEntryAgreementUploading] = React.useState(false)
   const [previewFile, setPreviewFile] = React.useState<ProjectDocumentPreviewFile | null>(null)
+  const [sourceFilesDisclosure, setSourceFilesDisclosure] = React.useState({ projectId, open: true })
+  const sourceFilesOpen = sourceFilesDisclosure.projectId === projectId ? sourceFilesDisclosure.open : true
   const [photoIndex, setPhotoIndex] = React.useState<number | null>(null)
   const [activePanorama, setActivePanorama] = React.useState<ProjectPanorama | null>(null)
   const [editingPanorama, setEditingPanorama] = React.useState<ProjectPanorama | null>(null)
@@ -1477,12 +1480,30 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                 </Card>
               )}
               {(invoiceFiles.length > 0 || quoteFiles.length > 0) && (
+                <Collapsible
+                  key={projectId}
+                  open={sourceFilesOpen}
+                  onOpenChange={(open) => setSourceFilesDisclosure({ projectId, open })}
+                  asChild
+                >
                 <Card>
                   <CardHeader>
-                    <CardTitle>Source Files</CardTitle>
+                    <CardTitle>
+                      <CollapsibleTrigger
+                        className="flex min-h-11 w-full items-center justify-between gap-3 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        aria-label={`${sourceFilesOpen ? "Collapse" : "Expand"} Source Files`}
+                      >
+                        Source Files
+                        <ChevronDown
+                          className={cn("h-5 w-5 shrink-0", !sourceFilesOpen && "-rotate-90")}
+                          aria-hidden="true"
+                        />
+                      </CollapsibleTrigger>
+                    </CardTitle>
                     <CardDescription>Original uploaded invoice and quote documents</CardDescription>
                   </CardHeader>
-                  <CardContent className="grid gap-3 md:grid-cols-2">
+                  <CollapsibleContent>
+                  <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     {[...invoiceFiles, ...quoteFiles].map((file) => (
                       <div key={file.id} className="flex items-center gap-3 rounded-lg border p-3 hover:bg-muted">
                         <FileText className="h-5 w-5 shrink-0 text-primary" />
@@ -1512,7 +1533,9 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                       </div>
                     ))}
                   </CardContent>
+                  </CollapsibleContent>
                 </Card>
+                </Collapsible>
               )}
               {project.budgetEnabled && <Card>
                 <CardHeader>
