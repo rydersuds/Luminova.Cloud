@@ -396,6 +396,64 @@ test('edits the project start and end dates without exposing manual progress', a
   await expect(page.getByText('74.3%', { exact: true })).toBeVisible();
 });
 
+test('hides and restores the project board without changing its tasks', async ({ page }) => {
+  await installIdentity(page);
+  let current = { ...structuredClone(project), scheduleAvailable: true };
+  const state = makeBoardState();
+  const originalItems = structuredClone(state.items);
+  const scheduleUpdates: boolean[] = [];
+  let boardReads = 0;
+
+  await page.route('**/api/projects/riverstone/activity', route => route.fulfill({ json: [] }));
+  await page.route('**/api/projects/riverstone', async route => {
+    if (route.request().method() === 'PATCH') {
+      const update = route.request().postDataJSON() as { scheduleAvailable: boolean };
+      scheduleUpdates.push(update.scheduleAvailable);
+      current = { ...current, ...update };
+      await route.fulfill({ json: current });
+      return;
+    }
+    await route.fulfill({ json: current });
+  });
+  await page.route('**/api/projects/riverstone/panoramas', route => route.fulfill({ json: [] }));
+  await page.route('**/api/projects/riverstone/board', route => {
+    boardReads += 1;
+    return route.fulfill({ json: state });
+  });
+
+  await page.goto('/__visual/project-panorama?tab=board');
+  await expect(page.getByRole('tab', { name: 'Board', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByText('Submit permit drawings', { exact: true }).first()).toBeVisible();
+
+  await page.getByRole('button', { name: 'Edit Project' }).click();
+  const editDialog = page.getByRole('dialog', { name: 'Edit Project' });
+  const scheduleUnavailable = editDialog.getByTestId('input-schedule-not-available');
+  await scheduleUnavailable.check();
+  await editDialog.getByRole('button', { name: 'Save Changes' }).click();
+  await expect(editDialog).toBeHidden();
+  await expect(page.getByRole('tab', { name: 'Board', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: 'Overview', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect.poll(() => scheduleUpdates).toEqual([false]);
+  expect(state.items).toEqual(originalItems);
+
+  // A bookmarked board URL must land on Overview after the schedule is hidden.
+  await page.goto('/__visual/project-panorama?tab=board');
+  await expect(page.getByRole('tab', { name: 'Board', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: 'Overview', exact: true })).toHaveAttribute('aria-selected', 'true');
+  expect(boardReads).toBe(1);
+  expect(state.items).toEqual(originalItems);
+
+  await page.getByRole('button', { name: 'Edit Project' }).click();
+  const restoreDialog = page.getByRole('dialog', { name: 'Edit Project' });
+  await restoreDialog.getByTestId('input-schedule-not-available').uncheck();
+  await restoreDialog.getByRole('button', { name: 'Save Changes' }).click();
+  await expect(restoreDialog).toBeHidden();
+  await expect(page.getByRole('tab', { name: 'Board', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByText('Submit permit drawings', { exact: true }).first()).toBeVisible();
+  await expect.poll(() => scheduleUpdates).toEqual([false, true]);
+  expect(state.items).toEqual(originalItems);
+});
+
 test('does not expose the assignment control to non-administrators', async ({ page }) => {
   await installIdentity(page, 'Project Manager');
   await page.route('**/api/projects/riverstone/activity', route => route.fulfill({ json: [] }));
