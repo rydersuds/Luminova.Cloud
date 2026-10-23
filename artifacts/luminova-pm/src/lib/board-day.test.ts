@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { adjustTimelineSpan, boardDayTimelineRange, itemsForDay, parseDay } from "../components/board/board-model.ts"
+import { adjustTimelineSpan, boardDayTimelineRange, datedTimelineEntries, itemsForDay, parseDay } from "../components/board/board-model.ts"
 
 test("day view includes every day in a task range and handles one-sided dates", () => {
   const day = parseDay("2026-06-12")!
@@ -40,4 +40,14 @@ test("timeline date editing moves and resizes a task span without crossing its o
   assert.deepEqual(adjustTimelineSpan(span, "start", 2), { start: 102, end: 104 })
   assert.deepEqual(adjustTimelineSpan(span, "start", 8), { start: 104, end: 104 })
   assert.deepEqual(adjustTimelineSpan(span, "end", -8), { start: 100, end: 100 })
+})
+
+test("timeline omits undated placeholders without changing recorded task dates", () => {
+  const rows = [
+    { id: "undated", startDate: null, endDate: null },
+    { id: "range", startDate: "2026-07-13", endDate: "2026-07-17" },
+    { id: "milestone", startDate: null, endDate: "2026-11-09" },
+  ]
+  assert.deepEqual(datedTimelineEntries(rows), [rows[1], rows[2]])
+  assert.equal(rows.length, 3, "undated tasks remain available for editing in the table")
 })

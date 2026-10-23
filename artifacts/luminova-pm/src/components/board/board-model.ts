@@ -109,6 +109,11 @@ export function itemSpan(item: Pick<BoardItem, "startDate" | "endDate">): { star
   return { start: start ?? end!, end: end ?? start! }
 }
 
+/** Undated items stay editable in the table; the timeline only plots recorded dates. */
+export function datedTimelineEntries<T extends Pick<BoardItem, "startDate" | "endDate">>(items: T[]): T[] {
+  return items.filter(item => itemSpan(item) !== null)
+}
+
 export function itemsForDay<T extends Pick<BoardItem, "startDate" | "endDate">>(items: T[], day: number): T[] {
   return items.filter((item) => {
     const span = itemSpan(item)

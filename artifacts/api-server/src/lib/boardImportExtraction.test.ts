@@ -45,6 +45,22 @@ test("parses CSV headers and normalizes task fields while preserving row validat
   assert.ok(preview.rows[1].issues.some((issue) => issue.includes("Start date")));
 });
 
+test("XLSX chart-helper columns cannot overwrite the source task and its paired dates", async () => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Construction Schedule");
+  sheet.addRow(["#", "Task", "Start Date", "End Date", "", "Task", "Start", "Duration"]);
+  sheet.addRow([1, "Roof Framing", new Date("2026-07-13T00:00:00Z"), new Date("2026-07-17T00:00:00Z"),
+    "", "Building completion", new Date("2026-11-09T00:00:00Z"), 1]);
+  sheet.addRow([2, "Building completion", new Date("2026-11-09T00:00:00Z"), new Date("2026-11-09T00:00:00Z"),
+    "", "Roof Framing", new Date("2026-07-13T00:00:00Z"), 5]);
+  const preview = await extractBoardImport(Buffer.from(await workbook.xlsx.writeBuffer()), "schedule.xlsx");
+  assert.deepEqual(preview.rows.map(row => [row.name, row.startDate, row.endDate]), [
+    ["Roof Framing", "2026-07-13", "2026-07-17"],
+    ["Building completion", "2026-11-09", "2026-11-09"],
+  ]);
+  assert.ok(preview.rows.every(row => row.issues.length === 0));
+});
+
 test("parses XLSX worksheets and leaves dates and empty values editable", async () => {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Schedule");

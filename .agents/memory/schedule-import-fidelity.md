@@ -14,3 +14,9 @@ PDF daily grids can have unequal column widths. AI may return plausible, nonblan
 **Why:** Comparing the supplied basement-suite schedule to its actual PDF geometry exposed right-edge date drift and lost neutral task colours.
 
 **How to apply:** When a PDF contains a verifiable labelled daily grid, cross-check all matching task bars against their actual column positions and preserve their original fills. Do not extrapolate weekly grids or overwrite ambiguous repeated task names. Keep AI responsible for semantic category suggestions.
+
+Show only tasks physically present in the project's own schedule, and populate dates actually documented there. Do not substitute generic construction tasks or another project's schedule.
+
+**Why:** The user explicitly requested actual source items and dates after Building 79 displayed unrelated basement-suite tasks with missing dates.
+
+**How to apply:** Verify project-bound source documents before reconciling a board. Honor explicit dated revisions or annotations over older copied values, retain a recovery copy before replacing incorrect rows, and never fill missing dates with arbitrary durations.

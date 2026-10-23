@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerE
 import type { BoardGroupColor, BoardItemStatus } from "@workspace/api-client-react"
 import { Link } from "wouter"
 import { cn } from "@/lib/utils"
-import { GROUP_TONE, STATUS_TONE, dayToDate, formatDay, groupTone, groupTextColor, isOverdue, itemSpan, shortDate, timelineLabel, todayDay } from "./board-model"
+import { GROUP_TONE, STATUS_TONE, datedTimelineEntries, dayToDate, formatDay, groupTone, groupTextColor, isOverdue, itemSpan, shortDate, timelineLabel, todayDay } from "./board-model"
 
 export type TimelineEntry = {
   id: string
@@ -49,8 +49,10 @@ export function BoardTimeline({
     const start = first - dayToDate(first).getUTCDay()
     const flat: Array<{ kind: "section"; section: TimelineSection } | { kind: "entry"; entry: TimelineEntry; section: TimelineSection }> = []
     for (const section of sections) {
+      const entries = datedTimelineEntries(section.entries)
+      if (!entries.length) continue
       flat.push({ kind: "section", section })
-      for (const entry of section.entries) flat.push({ kind: "entry", entry, section })
+      for (const entry of entries) flat.push({ kind: "entry", entry, section })
     }
     return { rangeStart: start, days: last - start + 1, rows: flat }
   }, [sections, today])
@@ -140,7 +142,7 @@ export function BoardTimeline({
 
       {!hasDated && <p className="board-empty">{emptyMessage}</p>}
 
-      <div className="board-timeline">
+      {hasDated && <div className="board-timeline">
         <div className="board-timeline-labels" style={{ paddingTop: 52 }}>
           {rows.map((row) => row.kind === "section" ? (
             <div key={`s-${row.section.id}`} className="board-timeline-section" style={{ height: ROW, "--group": groupTone(row.section.color) } as React.CSSProperties}>
@@ -210,19 +212,7 @@ export function BoardTimeline({
                 const entry = row.entry
                 const span = spanFor(entry)
                 const top = index * ROW
-                if (!span) {
-                  return editable ? (
-                    <button
-                      key={entry.id}
-                      type="button"
-                      className="board-timeline-set"
-                      style={{ top: top + 8, left: x(today) }}
-                      onClick={() => commit(entry, { start: today, end: today + 4 })}
-                    >
-                      Add dates for {entry.name}
-                    </button>
-                  ) : null
-                }
+                if (!span) return null
                 const overdue = isOverdue(entry, today)
                 return (
                   <div
@@ -258,7 +248,7 @@ export function BoardTimeline({
             </div>
           </div>
         </div>
-      </div>
+      </div>}
     </div>
   )
 }

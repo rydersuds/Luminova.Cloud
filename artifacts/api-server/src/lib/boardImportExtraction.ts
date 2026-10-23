@@ -90,7 +90,16 @@ function parseCsv(text: string): string[][] {
 
 function findHeader(rows: string[][]) {
   for (let index = 0; index < Math.min(rows.length, 15); index += 1) {
-    const columns = rows[index].map((value) => headerKey(value));
+    // Gantt workbooks often repeat Task/Start in a chart-helper table to the
+    // right. Mixing those (sometimes reverse-ordered) rows with the main End
+    // Date column corrupts otherwise explicit schedule dates.
+    const seen = new Set<BoardTableField>();
+    const columns = rows[index].map((value) => {
+      const key = headerKey(value);
+      if (!key || seen.has(key)) return null;
+      seen.add(key);
+      return key;
+    });
     if (columns.includes("name")) return { index, columns };
   }
   throw new Error("No task or item column was found. Add a header named Task, Item, or Name.");

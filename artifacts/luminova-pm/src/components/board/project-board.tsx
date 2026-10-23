@@ -138,7 +138,7 @@ export function ProjectBoard({ projectId }: { projectId: string }) {
         <BoardTimeline
           sections={sections}
           onDatesChange={onDatesChange}
-          emptyMessage="No items have dates yet. Use “Add dates” on a row below, or set dates in the Table view."
+          emptyMessage="No dated items to display. Add verified dates in the Table view; undated items are not plotted."
         />
       )}
       {view === "calendar" && (
