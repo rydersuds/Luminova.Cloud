@@ -103,11 +103,13 @@ test("purchase invoices persist, enforce assigned-project scope, and apply cumul
   };
   const submit = (input: InvoiceInput, user = pm) => request("/invoices", user, input);
 
-  const available = await (await request("/invoice-projects")).json() as Array<{ id: string; budgetEnabled: boolean; categories: Array<{ remaining: number }> }>;
+  const available = await (await request("/invoice-projects")).json() as Array<{ id: string; registerVersion: string; budgetEnabled: boolean; categories: Array<{ remaining: number }> }>;
   assert.equal(available.length, 3);
   assert.equal(available.find(project => project.id === projectIds[0])?.categories[0].remaining, 8000);
   assert.equal(available.find(project => project.id === projectIds[0])?.budgetEnabled, true, "omitted legacy settings default to enabled");
-  assert.deepEqual(available.find(project => project.id === projectIds[3]), {
+  const { registerVersion, ...disabledProject } = available.find(project => project.id === projectIds[3])!;
+  assert.match(registerVersion, /^[a-f0-9]{64}$/, "register concurrency version is present even when budget amounts are hidden");
+  assert.deepEqual(disabledProject, {
     id: projectIds[3], name: `Invoice Test ${projectIds[3]}`, budgetEnabled: false, categories: [],
   }, "disabled project budgets are not exposed to invoice checks");
   assert.equal((await patchProject(projectIds[3], pm, { budgetEnabled: true })).status, 404, "only the project owner can change this setting");

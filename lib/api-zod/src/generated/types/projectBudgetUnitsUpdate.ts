@@ -8,6 +8,8 @@
 import type { ProjectBudgetUnit } from './projectBudgetUnit';
 
 export interface ProjectBudgetUnitsUpdate {
+  /** @minLength 1 */
+  baseVersion: string;
   /** @maxItems 2000 */
   units: ProjectBudgetUnit[];
 }

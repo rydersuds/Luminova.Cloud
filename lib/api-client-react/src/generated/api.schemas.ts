@@ -833,10 +833,13 @@ export interface ProjectBudgetUnit {
 }
 
 export interface ProjectBudgetUnitsUpdate {
+  /** @minLength 1 */
+  baseVersion: string;
   /** @maxItems 2000 */
   units: ProjectBudgetUnit[];
 }
 
+export type UnitDocumentEvidenceMethod = typeof UnitDocumentEvidenceMethod[keyof typeof UnitDocumentEvidenceMethod];
 export interface BudgetDwellingType {
   id: string;
   name: string;
@@ -870,6 +873,7 @@ export interface InvoiceBudgetCategory {
 }
 
 export interface InvoiceProject {
+  registerVersion?: string;
   id: string;
   name: string;
   budgetEnabled: boolean;
@@ -1761,3 +1765,47 @@ trade?: string;
 status?: VendorQuoteStatus;
 direction?: QuoteDirection;
 };
+
+export type UnitDocumentReviewSourceStatus = typeof UnitDocumentReviewSourceStatus[keyof typeof UnitDocumentReviewSourceStatus];
+
+export const UnitDocumentEvidenceMethod = {
+  text: 'text',
+  ocr: 'ocr',
+} as const;
+
+export interface UnitDocumentReviewSource {
+  documentId: string;
+  sourcePath: string;
+  pagesRead: number;
+  pageCount: number;
+  status: UnitDocumentReviewSourceStatus;
+}
+
+export interface DocumentedUnitReview {
+  complete: false;
+  candidates: DocumentedUnitCandidate[];
+  sources: UnitDocumentReviewSource[];
+  warnings: string[];
+}
+
+export interface UnitDocumentEvidence {
+  documentId: string;
+  sourcePath: string;
+  page: number;
+  text: string;
+  method: UnitDocumentEvidenceMethod;
+}
+
+export interface DocumentedUnitCandidate {
+  label: string;
+  /** @nullable */
+  unitTypeId: string | null;
+  uncertain: boolean;
+  evidence: UnitDocumentEvidence[];
+}
+
+export const UnitDocumentReviewSourceStatus = {
+  reviewed: 'reviewed',
+  partial: 'partial',
+  unavailable: 'unavailable',
+} as const;

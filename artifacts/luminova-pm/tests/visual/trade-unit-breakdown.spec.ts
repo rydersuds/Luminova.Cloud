@@ -5,7 +5,7 @@ test.use({ hasTouch: true })
 function fixture() {
   const units = [{ id: "suite-a", label: "101", unitTypeId: "one" }, { id: "suite-b", label: "PH 2", unitTypeId: "two" }]
   return {
-    id: "project-1", name: "Suite project", budgetEnabled: true, unitBudgetEnabled: true,
+    id: "project-1", name: "Suite project", budgetEnabled: true, unitBudgetEnabled: true, registerVersion: "fixture-version",
     allocationWarning: null as string | null,
     units,
     unitTypes: [

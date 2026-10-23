@@ -45,3 +45,4 @@
 - [Numbered suite budgets](numbered-suite-budgets.md) — requests follow actual numbered suites mapped to source dwelling types, with shared costs and historical unallocated costs separate.
 - [Browser popup fixtures](browser-popup-fixtures.md) — intercept new-tab document fixtures on the browser context; page routes miss a popup's initial navigation.
 - [Browser layout assertions](browser-layout-assertions.md) — exclude inline and screen-reader-only boxes from overflow checks; activate keyboard modality for focus-visible assertions.
+- [Madison Park unit evidence](madison-park-unit-evidence.md) — rebuild PDF page 5 names twelve units; text does not establish each label's dwelling type or completeness.

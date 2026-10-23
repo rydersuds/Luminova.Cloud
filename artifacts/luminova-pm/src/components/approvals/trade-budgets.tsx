@@ -34,10 +34,12 @@ export function TradeBudgets({ projectId }: { projectId: string }) {
       {unit && project && (
         <>
           {project.allocationWarning && <p role="alert" className="rounded-lg border border-warning/50 bg-warning/10 p-3 text-sm font-semibold text-warning" data-testid="text-allocation-warning">{project.allocationWarning}</p>}
-          <BudgetSection title="Suite register">
-            <div className="px-4 pb-4"><SuiteRegister project={project} /></div>
-          </BudgetSection>
         </>
+      )}
+      {project && (
+        <BudgetSection key={project.id} title="Suite register">
+          <div className="px-4 pb-4"><SuiteRegister project={project} /></div>
+        </BudgetSection>
       )}
       {(isError || invalidProjectData) ? (
         <p className="board-empty" role="alert">Trade budgets couldn't be loaded. <button type="button" className="underline" onClick={() => void refetch()}>Try again</button></p>

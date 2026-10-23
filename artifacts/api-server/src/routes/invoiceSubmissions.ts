@@ -19,6 +19,7 @@ import type { InvoiceInput, Invoice } from "@workspace/api-zod";
 import { getRequestWorkspaceRole, workspaceUserDisplayName } from "./users";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { extractWorkbookInternalBudget } from "../lib/financialDocumentExtraction";
+import { extractStoredUnitReview, suiteRegisterVersion } from "../lib/documentedUnits";
 import {
   commitmentRecords,
   externalAuthorizationDecision,
@@ -96,6 +97,7 @@ export function createInvoiceSubmissionRouter(dependencies: InvoiceSubmissionDep
   const roleFor = dependencies.role ?? getRequestWorkspaceRole;
   const displayName = dependencies.displayName ?? workspaceUserDisplayName;
   const notify = dependencies.notify ?? emailApprovalNotifier;
+  const extractingUnits = new Set<string>();
   /** Email is best effort and happens after the response: a mail outage never blocks an approval. */
   const notifyLater = (req: AuthRequest, event: Parameters<ApprovalNotifier>[1]) => {
     void notify(req, event).catch((error) => req.log?.warn?.({ err: error }, "Approval notification failed"));
@@ -149,12 +151,34 @@ export function createInvoiceSubmissionRouter(dependencies: InvoiceSubmissionDep
         id: project.id,
         name: data.name,
         budgetEnabled,
+        registerVersion: suiteRegisterVersion(data, project.importBatchId),
         ...suiteBudgetExtras(data, [...invoices.map(record => record.data as PurchaseRecord), ...commitments]),
         categories: budgetEnabled
           ? suiteTradeBudgets(data, [...invoices.map(record => record.data as PurchaseRecord), ...commitments])
           : [],
       };
     })));
+  }));
+
+  router.post("/projects/:projectId/documented-units", safe(async (req, res) => {
+    const actor = await actorFor(req);
+    const project = await projectFor(actor, String(req.params.projectId));
+    if (extractingUnits.has(project.id)) throw new InvoiceError(409, "A document review is already running for this project.");
+    extractingUnits.add(project.id);
+    try {
+      const documents = await db.select().from(projectDocumentsTable).where(and(
+        eq(projectDocumentsTable.projectId, project.id),
+        eq(projectDocumentsTable.importBatchId, project.importBatchId),
+        eq(projectDocumentsTable.ownerId, project.ownerId),
+      ));
+      const review = await extractStoredUnitReview(documents, project.data as ProjectData, storage);
+      // Access may have been revoked while private documents were being read.
+      const current = await projectFor(actor, project.id);
+      if (current.importBatchId !== project.importBatchId || current.ownerId !== project.ownerId) {
+        throw new InvoiceError(409, "The project sources changed during review. Retry with the current project.");
+      }
+      res.json(review);
+    } finally { extractingUnits.delete(project.id); }
   }));
 
   router.patch("/projects/:projectId/budget-units", safe(async (req, res) => {
@@ -205,11 +229,14 @@ export function createInvoiceSubmissionRouter(dependencies: InvoiceSubmissionDep
         }
       }
     }
-    await db.transaction(async tx => {
+    const savedVersion = await db.transaction(async tx => {
       const [locked] = await tx.select().from(importedProjectsTable)
         .where(eq(importedProjectsTable.id, project.id)).for("update");
       if (!locked || !accessible(locked, actor)) throw new InvoiceError(404, "Project not accessible");
       const data = locked.data as ProjectData;
+      if (parsed.data.baseVersion !== suiteRegisterVersion(data, locked.importBatchId)) {
+        throw new InvoiceError(409, "The saved suite register or source budget changed. Your edits are still here; reopen the register with current data before saving.");
+      }
       const validation = validateBudgetUnits(data, units);
       if (validation) throw new InvoiceError(400, validation);
       const approvals = await tx.select().from(purchaseApprovalsTable).where(and(
@@ -225,6 +252,11 @@ export function createInvoiceSubmissionRouter(dependencies: InvoiceSubmissionDep
         ...invoices.filter(row => (row.data as Invoice).projectId === locked.id).map(row => (row.data as Invoice).budgetLineItemId),
       ];
       for (const old of data.budgetUnits ?? []) {
+        if (units.some(unit => unit.id !== old.id &&
+          unit.label.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, " ") ===
+          old.label.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, " "))) {
+          throw new InvoiceError(409, `Suite ${old.label} is already registered. Keep its existing identifier instead of replacing it.`);
+        }
         const replacement = units.find(unit => unit.id === old.id);
         if ((!replacement || replacement.unitTypeId !== old.unitTypeId) &&
           identifiers.some(id => id?.startsWith(scopePrefix(old.id)))) {
@@ -237,8 +269,11 @@ export function createInvoiceSubmissionRouter(dependencies: InvoiceSubmissionDep
         ...data, budgetUnits: units, ...(sameSource && recoveredBudget ? { unitBudget: recoveredBudget } : {}),
       } })
         .where(eq(importedProjectsTable.id, locked.id));
+      return suiteRegisterVersion({
+        ...data, budgetUnits: units, ...(sameSource && recoveredBudget ? { unitBudget: recoveredBudget } : {}),
+      }, locked.importBatchId);
     });
-    res.json(UpdateProjectBudgetUnitsResponse.parse({ units }));
+    res.json(UpdateProjectBudgetUnitsResponse.parse({ units, baseVersion: savedVersion }));
   }));
 
   router.post("/invoice-uploads", safe(async (req, res) => {

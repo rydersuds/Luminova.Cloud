@@ -10,6 +10,7 @@ import type { InvoiceBudgetCategory } from './invoiceBudgetCategory';
 import type { ProjectBudgetUnit } from './projectBudgetUnit';
 
 export interface InvoiceProject {
+  registerVersion?: string;
   id: string;
   name: string;
   budgetEnabled: boolean;

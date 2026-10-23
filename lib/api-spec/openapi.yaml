@@ -1243,6 +1243,20 @@ paths:
           description: Administrator access required
         "404":
           description: Review or trade not found
+  /projects/{projectId}/documented-units:
+    post:
+      operationId: extractDocumentedUnits
+      tags: [invoices]
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Bounded review of stored rebuild PDFs; never an asserted complete register
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DocumentedUnitReview" }
+        "404":
+          description: Project not accessible
   /projects/{projectId}/budget-units:
     patch:
       operationId: updateProjectBudgetUnits
@@ -2762,12 +2776,55 @@ components:
     ProjectBudgetUnitsUpdate:
       type: object
       additionalProperties: false
-      required: [units]
+      required: [units, baseVersion]
       properties:
+        baseVersion: { type: string, minLength: 1 }
         units:
           type: array
           maxItems: 2000
           items: { $ref: "#/components/schemas/ProjectBudgetUnit" }
+    UnitDocumentEvidence:
+      type: object
+      required: [documentId, sourcePath, page, text, method]
+      properties:
+        documentId: { type: string }
+        sourcePath: { type: string }
+        page: { type: integer }
+        text: { type: string }
+        method: { type: string, enum: [text, ocr] }
+    DocumentedUnitCandidate:
+      type: object
+      required: [label, unitTypeId, uncertain, evidence]
+      properties:
+        label: { type: string }
+        unitTypeId: { type: [string, "null"] }
+        uncertain: { type: boolean }
+        evidence:
+          type: array
+          items: { $ref: "#/components/schemas/UnitDocumentEvidence" }
+    UnitDocumentReviewSource:
+      type: object
+      required: [documentId, sourcePath, pagesRead, pageCount, status]
+      properties:
+        documentId: { type: string }
+        sourcePath: { type: string }
+        pagesRead: { type: integer }
+        pageCount: { type: integer }
+        status: { type: string, enum: [reviewed, partial, unavailable] }
+    DocumentedUnitReview:
+      type: object
+      required: [candidates, sources, warnings, complete]
+      properties:
+        complete: { type: boolean, enum: [false] }
+        candidates:
+          type: array
+          items: { $ref: "#/components/schemas/DocumentedUnitCandidate" }
+        sources:
+          type: array
+          items: { $ref: "#/components/schemas/UnitDocumentReviewSource" }
+        warnings:
+          type: array
+          items: { type: string }
     BudgetDwellingType:
       type: object
       required: [id, name, unitCount, perUnitTotal, total]
@@ -2781,6 +2838,7 @@ components:
       type: object
       required: [id, name, budgetEnabled, categories]
       properties:
+        registerVersion: { type: string }
         id: { type: string }
         name: { type: string }
         budgetEnabled: { type: boolean }

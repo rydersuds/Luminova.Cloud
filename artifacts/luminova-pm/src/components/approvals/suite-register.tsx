@@ -4,6 +4,7 @@ import { getGetInvoiceProjectsQueryKey, getGetProjectQueryKey, useUpdateProjectB
 import { Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { DocumentUnitReview } from "./document-unit-review"
 
 export function SuiteRegister({ project }: { project: InvoiceProject }) {
   const qc = useQueryClient()
@@ -12,13 +13,14 @@ export function SuiteRegister({ project }: { project: InvoiceProject }) {
   const [open, setOpen] = useState(false)
   const [units, setUnits] = useState<ProjectBudgetUnit[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [baseVersion, setBaseVersion] = useState("")
 
-  const begin = () => { setUnits((project.units ?? []).map((u) => ({ ...u }))); setError(null); setOpen(true) }
+  const begin = () => { setUnits((project.units ?? []).map((u) => ({ ...u }))); setBaseVersion(project.registerVersion ?? ""); setError(null); setOpen(true) }
   const assigned = (id: string) => units.filter((u) => u.unitTypeId === id).length
   const add = (typeId: string) => setUnits((l) => [...l, { id: crypto.randomUUID(), label: "", unitTypeId: typeId }])
   const patch = (id: string, label: string) => setUnits((l) => l.map((u) => (u.id === id ? { ...u, label } : u)))
   const remove = (id: string) => setUnits((l) => l.filter((u) => u.id !== id))
-  const labels = units.map((u) => u.label.trim().toLowerCase())
+  const labels = units.map((u) => u.label.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, " "))
   const blank = units.some((u) => !u.label.trim())
   const dup = new Set(labels).size !== labels.length
   const over = types.some((t) => assigned(t.id) > t.unitCount)
@@ -26,7 +28,7 @@ export function SuiteRegister({ project }: { project: InvoiceProject }) {
   const submit = async () => {
     setError(null)
     try {
-      await save.mutateAsync({ projectId: project.id, data: { units: units.map((u) => ({ ...u, label: u.label.trim() })) } })
+      await save.mutateAsync({ projectId: project.id, data: { baseVersion, units: units.map((u) => ({ ...u, label: u.label.trim() })) } })
       await Promise.all([
         qc.invalidateQueries({ queryKey: getGetInvoiceProjectsQueryKey() }),
         qc.invalidateQueries({ queryKey: getGetProjectQueryKey(project.id) }),
@@ -43,7 +45,7 @@ export function SuiteRegister({ project }: { project: InvoiceProject }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-sm font-semibold">Suite register</p>
-          <p className="text-xs text-muted-foreground">Only registered suites get trade budgets. Enter your own suite numbers.</p>
+          <p className="text-xs text-muted-foreground">Register documented suite numbers or enter them manually. Only mapped, registered suites get trade budgets.</p>
         </div>
         {!open && <Button type="button" variant="outline" size="sm" onClick={begin} data-testid="button-edit-suites">Edit suites</Button>}
       </div>
@@ -54,7 +56,13 @@ export function SuiteRegister({ project }: { project: InvoiceProject }) {
         })}
       </ul>
       {open && (
-        <div className="space-y-4">
+        <fieldset className="space-y-4" disabled={save.isPending}>
+          {!types.length && <p className="text-xs text-muted-foreground">This project has no verified dwelling-type budget yet. You can review documented labels, but cannot assign suite allowances or save mappings until that source budget is available.</p>}
+          {!baseVersion && <p role="alert" className="text-xs text-destructive">The current register version is unavailable. Refresh the project before saving.</p>}
+          <DocumentUnitReview project={project} units={units} onAdd={additions => setUnits(current => {
+            const existing = new Set(current.map(unit => unit.label.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, " ")))
+            return [...current, ...additions.filter(unit => !existing.has(unit.label.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, " ")))]
+          })} />
           {types.map((t) => (
             <div key={t.id} className="space-y-2">
               <p className="text-xs font-semibold">{t.name} <span className="font-normal text-muted-foreground">{assigned(t.id)} of {t.unitCount} assigned</span></p>
@@ -70,10 +78,10 @@ export function SuiteRegister({ project }: { project: InvoiceProject }) {
           {(blank || dup || over) && <p className="text-xs text-warning">{blank ? "Every suite needs a label. " : ""}{dup ? "Labels must be unique. " : ""}{over ? "A type has more suites than its source count." : ""}</p>}
           {error && <p role="alert" className="text-xs text-destructive" data-testid="text-suite-error">{error}</p>}
           <div className="flex gap-2">
-            <Button type="button" disabled={save.isPending || blank || dup || over} onClick={() => void submit()} data-testid="button-save-suites">{save.isPending ? "Saving…" : "Save suites"}</Button>
+            <Button type="button" disabled={save.isPending || blank || dup || over || !types.length || !baseVersion} onClick={() => void submit()} data-testid="button-save-suites">{save.isPending ? "Saving…" : "Save suites"}</Button>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
           </div>
-        </div>
+        </fieldset>
       )}
     </div>
   )
