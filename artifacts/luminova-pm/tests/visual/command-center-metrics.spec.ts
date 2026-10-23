@@ -71,6 +71,15 @@ test('Command Center stacks financial figures when space is tight', async ({ pag
       return columns === (canFitTwo ? 2 : 1) && element.scrollWidth <= element.clientWidth;
     })).toBe(true);
     expect(await amount.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await expect(overview.locator('details, summary')).toHaveCount(0);
+    // No empty disclosure row or reserved space below the figures.
+    expect(await overview.locator('[data-financial-amount]').evaluateAll(amounts =>
+      amounts.every(amount => {
+        const content = amount.closest('.ledger-cell')!.firstElementChild!;
+        const padding = parseFloat(getComputedStyle(content).paddingBottom);
+        return content.getBoundingClientRect().bottom - amount.parentElement!.getBoundingClientRect().bottom <= padding + 1;
+      }),
+    )).toBe(true);
   }
   await page.route('**/api/invoices/summary', route => route.fulfill({
     json: { ...financials, invoicedRevenue: 100, invoicedExpenses: 50, upcomingClientPayments: 100 },
@@ -117,12 +126,48 @@ test('failed Command Center totals stay explicit and recover through retry', asy
   await expect(page.getByRole('region', { name: 'Financial overview' })).toContainText('$120,000');
   await expect(page.getByText('Dashboard metrics and activity are unavailable.', { exact: true })).toHaveCount(0);
 });
-test('Command Center metric definitions open from Details', async ({ page }) => {
+test('Command Center keeps financial loading placeholders without disclosures', async ({ page }) => {
+  await installWorkspace(page);
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/dashboard/summary', async route => {
+    await pending;
+    await route.fulfill({ json: dashboard });
+  });
+  await page.route('**/api/invoices/summary', async route => {
+    await pending;
+    await route.fulfill({ json: financials });
+  });
+  await page.goto('/__visual/dashboard-cards');
+  const grid = page.getByLabel('Financial overview');
+  try {
+    await expect(grid.locator('[data-financial-amount]').filter({ hasText: '—' })).toHaveCount(6);
+    await expect(grid.locator('details, summary')).toHaveCount(0);
+  } finally {
+    release();
+  }
+  await expect(grid).toContainText('$120,000');
+});
+
+test('Command Center financial cards omit Details and explanatory text', async ({ page }) => {
   await installWorkspace(page);
   await page.route('**/api/dashboard/summary', route => route.fulfill({ json: dashboard }));
   await page.route('**/api/invoices/summary', route => route.fulfill({ json: financials }));
   await page.goto('/__visual/dashboard-cards');
   const grid = page.getByLabel('Financial overview');
-  await grid.getByText('Details').first().click();
-  await expect(grid.getByText('Client invoices issued; not payments received.')).toBeVisible();
+  await expect(grid.locator('.ledger-cell')).toHaveCount(6);
+  await expect(grid.locator('[data-financial-amount]')).toHaveCount(6);
+  await expect(grid.locator('.ledger-cell svg')).toHaveCount(6);
+  await expect(grid.getByText('Details', { exact: true })).toHaveCount(0);
+  await expect(grid.locator('details, summary, [aria-expanded]')).toHaveCount(0);
+  for (const description of [
+    'Client invoices issued; not payments received.',
+    'Vendor invoices or imported internal actuals, without double-counting.',
+    'Invoiced revenue minus recorded internal costs; not cash profit.',
+    'Allocated internal budgets across your visible projects.',
+    'Accepted client quotes, with imported project quote totals as fallback.',
+    'Client quote value not yet invoiced, floored at zero per project.',
+  ]) {
+    await expect(grid).not.toContainText(description);
+  }
 });

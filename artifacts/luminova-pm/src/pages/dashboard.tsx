@@ -265,7 +265,6 @@ export default function Dashboard() {
   const financialCards = [
     {
       label: "Invoiced Revenue",
-      description: "Client invoices issued; not payments received.",
       value: revenue,
       icon: FileText,
       accent: "text-success bg-success/10",
@@ -273,7 +272,6 @@ export default function Dashboard() {
     },
     {
       label: "Recorded Internal Costs",
-      description: "Vendor invoices or imported internal actuals, without double-counting.",
       value: expenses,
       icon: Activity,
       accent: "text-warning bg-warning/10",
@@ -281,7 +279,6 @@ export default function Dashboard() {
     },
     {
       label: "Recorded Margin",
-      description: "Invoiced revenue minus recorded internal costs; not cash profit.",
       value: recordedMargin,
       icon: DollarSign,
       accent: (recordedMargin ?? 0) >= 0 ? "text-success bg-success/10" : "text-destructive bg-destructive/10",
@@ -289,7 +286,6 @@ export default function Dashboard() {
     },
     {
       label: "Internal Cost Budget",
-      description: "Allocated internal budgets across your visible projects.",
       value: finiteAmount(summary?.budgeted),
       icon: DollarSign,
       accent: "text-info bg-info/10",
@@ -297,7 +293,6 @@ export default function Dashboard() {
     },
     {
       label: "Client Quote Value",
-      description: "Accepted client quotes, with imported project quote totals as fallback.",
       value: finiteAmount(financials?.acceptedClientQuoteValue),
       icon: CheckCircle2,
       accent: "text-info bg-info/10",
@@ -305,7 +300,6 @@ export default function Dashboard() {
     },
     {
       label: "Unbilled Client Work",
-      description: "Client quote value not yet invoiced, floored at zero per project.",
       value: finiteAmount(financials?.upcomingClientPayments),
       icon: Clock,
       accent: "text-primary bg-primary/10",
@@ -637,7 +631,7 @@ export default function Dashboard() {
           <FinancialFiguresGrid aria-label="Financial overview" className="ledger" amountAllowance={50}>
             {financialCards
               .filter((stat) => stat.label !== "Internal Cost Budget" || summary?.budgetEnabledProjects !== 0)
-              .map(({ label, description, value, icon: Icon, accent, loading }) => (
+              .map(({ label, value, icon: Icon, accent, loading }) => (
               <Card key={label} className="ledger-cell group min-w-0 rounded-none border-0 shadow-none">
                 <CardContent className="p-5 sm:p-6">
                   <div className="flex min-h-24 flex-col justify-between">
@@ -650,7 +644,6 @@ export default function Dashboard() {
                     <p className="font-heading text-3xl font-extrabold tabular-nums tracking-[-0.03em] text-foreground sm:text-[2.1rem]">
                       <span data-financial-amount className="inline-block whitespace-nowrap">{loading ? "—" : value === undefined ? "Unavailable" : formatCurrency(value)}</span>
                     </p>
-                    <details className="mt-2 text-xs text-muted-foreground"><summary className="cursor-pointer select-none">Details</summary><p className="mt-1 leading-relaxed">{description}</p></details>
                   </div>
                 </CardContent>
               </Card>
