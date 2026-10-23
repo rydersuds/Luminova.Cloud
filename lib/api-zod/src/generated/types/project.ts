@@ -25,6 +25,8 @@ export interface Project {
   targetDate: string;
   /** Whether internal project budgeting and trade limits are active. */
   budgetEnabled: boolean;
+  /** Whether the project schedule board is available. */
+  scheduleAvailable: boolean;
   budgeted: number;
   invoiced: number;
   exteriorImage: string;

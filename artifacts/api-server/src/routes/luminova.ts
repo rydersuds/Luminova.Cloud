@@ -1921,6 +1921,7 @@ type Project = (typeof projects)[number] &
 
   canManageLifecycle?: boolean;
 
+  scheduleAvailable?: boolean;
 
   projectManagerId?: string | null
 ;
@@ -3095,6 +3096,7 @@ export const projectsForOwner = async (
       archivedAt: row.archivedAt?.toISOString() ?? null,
       canManageLifecycle: true,
       budgetEnabled: persistedProject.budgetEnabled !== false,
+      scheduleAvailable: persistedProject.scheduleAvailable !== false,
       budgetAmountUnit: persistedProject.budgetAmountUnit ??
         (row.importBatchId.startsWith("manual-") ? "cents" : "dollars"),
       invoiced: invoicedRevenueForProject(financialRecords.invoices, persistedProject.id),
@@ -3113,6 +3115,7 @@ export const projectsForOwner = async (
       archivedAt: null,
       canManageLifecycle: false,
       budgetEnabled: (project as Project).budgetEnabled !== false,
+      scheduleAvailable: (project as Project).scheduleAvailable !== false,
       budgetAmountUnit: "cents" as const,
     };
     const exteriorPhoto = exteriorPhotoByProject.get(normalizedProject.id);
@@ -4413,6 +4416,7 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
 
       ...project,
       budgetEnabled: project.budgetEnabled !== false,
+      scheduleAvailable: project.scheduleAvailable !== false,
       startDate: resolveProjectStartDate(project),
       clientQuote,
       lineItems: (project.budgetLineItems ?? []).map(line => {
@@ -4475,6 +4479,7 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
 
     ...project,
     budgetEnabled: project.budgetEnabled !== false,
+    scheduleAvailable: project.scheduleAvailable !== false,
     startDate: resolveProjectStartDate(project),
     clientQuote,
     lineItems: project.budgetLineItems ?? [],
@@ -6003,6 +6008,7 @@ router.post("/projects", async (req, res): Promise<void> =>
     const project = withCalculatedProjectProgress({
       ...parsed.data,
       budgetEnabled: parsed.data.budgetEnabled ?? true,
+      scheduleAvailable: parsed.data.scheduleAvailable ?? true,
       budgetAmountUnit: "cents" as const,
       pmName: manager.profile.name,
       projectManagerId: manager.profile.id,
@@ -6938,6 +6944,7 @@ const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: R
     targetDate: analysis.project.targetDate && isValidCalendarDate(analysis.project.targetDate) ? analysis.project.targetDate : "",
     budgeted: resolveImportedProjectBudget(internalBudget?.total, analysis.project.internalBudgetDollars),
     budgetEnabled: true,
+    scheduleAvailable: true,
     budgetAmountUnit: "dollars",
     invoiced: 0,
     exteriorImage: "",
@@ -9277,6 +9284,7 @@ router.patch("/projects/:projectId", async (req: AuthenticatedRequest, res): Pro
 
 ),
     budgetEnabled: projectFields.budgetEnabled ?? currentProject.budgetEnabled ?? true,
+    scheduleAvailable: projectFields.scheduleAvailable ?? currentProject.scheduleAvailable ?? true,
   
 }
 

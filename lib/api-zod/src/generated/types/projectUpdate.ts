@@ -17,6 +17,8 @@ export interface ProjectUpdate {
   /** @minLength 1 */
   projectManagerId?: string;
   budgetEnabled?: boolean;
+  /** Set false to hide the board without deleting scheduled tasks. */
+  scheduleAvailable?: boolean;
   /**
      * URL of an existing standard photo belonging to this project, or null to clear the exterior photo
      * @nullable

@@ -71,6 +71,7 @@ export const GetProjectsResponseItem = zod.object({
   "startDate": zod.string().regex(getProjectsResponseStartDateRegExp),
   "targetDate": zod.string().regex(getProjectsResponseTargetDateRegExp),
   "budgetEnabled": zod.boolean().describe('Whether internal project budgeting and trade limits are active.'),
+  "scheduleAvailable": zod.boolean().describe('Whether the project schedule board is available.'),
   "budgeted": zod.number(),
   "invoiced": zod.number(),
   "exteriorImage": zod.string(),
@@ -88,6 +89,7 @@ export const GetProjectsResponse = zod.array(GetProjectsResponseItem)
 export const createProjectBodyStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const createProjectBodyTargetDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const createProjectBodyBudgetEnabledDefault = true;
+export const createProjectBodyScheduleAvailableDefault = true;
 
 export const CreateProjectBody = zod.object({
   "name": zod.string(),
@@ -100,6 +102,7 @@ export const CreateProjectBody = zod.object({
   "targetDate": zod.string().regex(createProjectBodyTargetDateRegExp),
   "budgeted": zod.number(),
   "budgetEnabled": zod.boolean().default(createProjectBodyBudgetEnabledDefault).describe('Defaults to enabled for new projects.'),
+  "scheduleAvailable": zod.boolean().default(createProjectBodyScheduleAvailableDefault).describe('Defaults to available for new projects.'),
   "description": zod.string(),
   "exteriorImage": zod.string().optional()
 })
@@ -122,6 +125,7 @@ export const CreateProjectResponse = zod.object({
   "startDate": zod.string().regex(createProjectResponseStartDateRegExp),
   "targetDate": zod.string().regex(createProjectResponseTargetDateRegExp),
   "budgetEnabled": zod.boolean().describe('Whether internal project budgeting and trade limits are active.'),
+  "scheduleAvailable": zod.boolean().describe('Whether the project schedule board is available.'),
   "budgeted": zod.number(),
   "invoiced": zod.number(),
   "exteriorImage": zod.string(),
@@ -174,6 +178,7 @@ export const GetProjectResponse = zod.object({
   "startDate": zod.string().regex(getProjectResponseOneStartDateRegExp),
   "targetDate": zod.string().regex(getProjectResponseOneTargetDateRegExp),
   "budgetEnabled": zod.boolean().describe('Whether internal project budgeting and trade limits are active.'),
+  "scheduleAvailable": zod.boolean().describe('Whether the project schedule board is available.'),
   "budgeted": zod.number(),
   "invoiced": zod.number(),
   "exteriorImage": zod.string(),
@@ -330,6 +335,7 @@ export const UpdateProjectBody = zod.object({
   "description": zod.string().optional(),
   "projectManagerId": zod.string().min(1).optional(),
   "budgetEnabled": zod.boolean().optional(),
+  "scheduleAvailable": zod.boolean().optional().describe('Set false to hide the board without deleting scheduled tasks.'),
   "exteriorImage": zod.string().nullish().describe('URL of an existing standard photo belonging to this project, or null to clear the exterior photo')
 })
 
@@ -351,6 +357,7 @@ export const UpdateProjectResponse = zod.object({
   "startDate": zod.string().regex(updateProjectResponseStartDateRegExp),
   "targetDate": zod.string().regex(updateProjectResponseTargetDateRegExp),
   "budgetEnabled": zod.boolean().describe('Whether internal project budgeting and trade limits are active.'),
+  "scheduleAvailable": zod.boolean().describe('Whether the project schedule board is available.'),
   "budgeted": zod.number(),
   "invoiced": zod.number(),
   "exteriorImage": zod.string(),
@@ -486,6 +493,7 @@ export const GetArchivedProjectResponse = zod.object({
   "startDate": zod.string().regex(getArchivedProjectResponseOneStartDateRegExp),
   "targetDate": zod.string().regex(getArchivedProjectResponseOneTargetDateRegExp),
   "budgetEnabled": zod.boolean().describe('Whether internal project budgeting and trade limits are active.'),
+  "scheduleAvailable": zod.boolean().describe('Whether the project schedule board is available.'),
   "budgeted": zod.number(),
   "invoiced": zod.number(),
   "exteriorImage": zod.string(),
@@ -1508,6 +1516,7 @@ export const CreateProjectImportResponse = zod.object({
   "startDate": zod.string().regex(createProjectImportResponseProjectStartDateRegExp),
   "targetDate": zod.string().regex(createProjectImportResponseProjectTargetDateRegExp),
   "budgetEnabled": zod.boolean().describe('Whether internal project budgeting and trade limits are active.'),
+  "scheduleAvailable": zod.boolean().describe('Whether the project schedule board is available.'),
   "budgeted": zod.number(),
   "invoiced": zod.number(),
   "exteriorImage": zod.string(),
@@ -1747,6 +1756,7 @@ export const BuildProjectImportSessionResponse = zod.object({
   "startDate": zod.string().regex(buildProjectImportSessionResponseProjectStartDateRegExp),
   "targetDate": zod.string().regex(buildProjectImportSessionResponseProjectTargetDateRegExp),
   "budgetEnabled": zod.boolean().describe('Whether internal project budgeting and trade limits are active.'),
+  "scheduleAvailable": zod.boolean().describe('Whether the project schedule board is available.'),
   "budgeted": zod.number(),
   "invoiced": zod.number(),
   "exteriorImage": zod.string(),
@@ -3399,3 +3409,5 @@ export const DeleteWorkspaceUserParams = zod.object({
 })
 
 export const DeleteWorkspaceUserResponse = zod.void()
+
+

@@ -2243,7 +2243,7 @@ components:
             $ref: "#/components/schemas/Activity"
     Project:
       type: object
-      required: [id, name, address, region, status, progress, pmName, projectManagerId, clientName, startDate, targetDate, budgetEnabled, budgeted, invoiced, exteriorImage, description]
+      required: [id, name, address, region, status, progress, pmName, projectManagerId, clientName, startDate, targetDate, budgetEnabled, scheduleAvailable, budgeted, invoiced, exteriorImage, description]
       properties:
         id: { type: string }
         name: { type: string }
@@ -2258,6 +2258,7 @@ components:
         startDate: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
         targetDate: { type: string, pattern: '^$|^\d{4}-\d{2}-\d{2}$' }
         budgetEnabled: { type: boolean, description: Whether internal project budgeting and trade limits are active. }
+        scheduleAvailable: { type: boolean, description: Whether the project schedule board is available. }
         budgeted: { type: number }
         invoiced: { type: number }
         exteriorImage: { type: string }
@@ -2317,6 +2318,7 @@ components:
         targetDate: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
         budgeted: { type: number }
         budgetEnabled: { type: boolean, default: true, description: Defaults to enabled for new projects. }
+        scheduleAvailable: { type: boolean, default: true, description: Defaults to available for new projects. }
         description: { type: string }
         exteriorImage: { type: string }
     ProjectUpdate:
@@ -2330,6 +2332,7 @@ components:
         description: { type: string }
         projectManagerId: { type: string, minLength: 1 }
         budgetEnabled: { type: boolean }
+        scheduleAvailable: { type: boolean, description: Set false to hide the board without deleting scheduled tasks. }
         exteriorImage:
           type: [string, "null"]
           description: URL of an existing standard photo belonging to this project, or null to clear the exterior photo

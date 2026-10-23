@@ -140,8 +140,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   const uploadEntryAgreement = useUploadProjectEntryAgreement()
   const panoramaName = (label: string | null) => label || "Untitled panorama"
   const { data: currentUser } = useGetCurrentWorkspaceUser()
-  const canUseBoard = !isArchivedView && currentUser?.role !== "Client"
-  const activeTab = projectTabFromSearch(search, canUseBoard)
+  const roleCanUseBoard = !isArchivedView && currentUser?.role !== "Client"
   const isAdmin = currentUser?.role === "Admin"
   const { data: projectManagers, isLoading: loadingProjectManagers, isError: projectManagersError } = useGetProjectManagers({
     query: { enabled: isAdmin && !isArchivedView, queryKey: getGetProjectManagersQueryKey() },
@@ -161,6 +160,8 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
   })
   const project = isArchivedView ? archivedProjectQuery.data : activeProjectQuery.data
   const isLoading = isArchivedView ? archivedProjectQuery.isLoading : activeProjectQuery.isLoading
+  const canUseBoard = roleCanUseBoard && project?.scheduleAvailable !== false
+  const activeTab = projectTabFromSearch(search, canUseBoard)
 
   const { data: activityList } = useGetProjectActivity(projectId, {
     query: {
@@ -405,6 +406,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
     if (!project) return
     const formData = new FormData(e.currentTarget)
     const projectManagerId = formData.get("projectManagerId")
+    const scheduleNotAvailable = formData.get("scheduleNotAvailable") === "on"
     updateProject.mutate({
       projectId,
       data: {
@@ -414,6 +416,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
         targetDate: formData.get("targetDate") as string,
         description: formData.get("description") as string,
         budgetEnabled: formData.get("budgetEnabled") === "on",
+        scheduleAvailable: !scheduleNotAvailable,
         ...(isAdmin &&
           typeof projectManagerId === "string" &&
           projectManagerId !== "__legacy__" &&
@@ -423,10 +426,11 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
           : {}),
       }
     }, {
-      onSuccess: () => {
+      onSuccess: (updatedProject) => {
         queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) })
         queryClient.invalidateQueries({ queryKey: getGetProjectsQueryKey() })
         queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() })
+        if (!updatedProject.scheduleAvailable && activeTab === "board") selectTab("overview")
         setIsEditOpen(false)
       },
       onError: () => toast({ title: "Project could not be saved", description: "Check the project manager selection and try again.", variant: "destructive" }),
@@ -812,6 +816,24 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                            </span>
                          </label>
                        </div>
+                        <div className="rounded-lg border p-3">
+                          <label htmlFor="scheduleNotAvailable" className="flex cursor-pointer items-start gap-3">
+                            <input
+                              id="scheduleNotAvailable"
+                              name="scheduleNotAvailable"
+                              type="checkbox"
+                              defaultChecked={project.scheduleAvailable === false}
+                              data-testid="input-schedule-not-available"
+                              className="mt-1 h-4 w-4 accent-[hsl(var(--primary))]"
+                            />
+                            <span>
+                              <span className="block text-sm font-medium">Schedule not available</span>
+                              <span className="mt-1 block text-xs text-muted-foreground">
+                                Hide the project board without deleting its tasks. Clear this setting to reopen the board.
+                              </span>
+                            </span>
+                          </label>
+                        </div>
                       <DialogFooter>
                         <Button type="submit" disabled={updateProject.isPending}>
                           {updateProject.isPending ? "Saving..." : "Save Changes"}

@@ -230,6 +230,8 @@ export interface Project {
   targetDate: string;
   /** Whether internal project budgeting and trade limits are active. */
   budgetEnabled: boolean;
+  /** Whether the project schedule board is available. */
+  scheduleAvailable: boolean;
   budgeted: number;
   invoiced: number;
   exteriorImage: string;
@@ -302,6 +304,8 @@ export interface ProjectInput {
   budgeted: number;
   /** Defaults to enabled for new projects. */
   budgetEnabled?: boolean;
+  /** Defaults to available for new projects. */
+  scheduleAvailable?: boolean;
   description: string;
   exteriorImage?: string;
 }
@@ -317,6 +321,8 @@ export interface ProjectUpdate {
   /** @minLength 1 */
   projectManagerId?: string;
   budgetEnabled?: boolean;
+  /** Set false to hide the board without deleting scheduled tasks. */
+  scheduleAvailable?: boolean;
   /**
      * URL of an existing standard photo belonging to this project, or null to clear the exterior photo
      * @nullable
@@ -1667,3 +1673,4 @@ trade?: string;
 status?: VendorQuoteStatus;
 direction?: QuoteDirection;
 };
+

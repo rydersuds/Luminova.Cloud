@@ -21,6 +21,8 @@ export interface ProjectInput {
   budgeted: number;
   /** Defaults to enabled for new projects. */
   budgetEnabled?: boolean;
+  /** Defaults to available for new projects. */
+  scheduleAvailable?: boolean;
   description: string;
   exteriorImage?: string;
 }

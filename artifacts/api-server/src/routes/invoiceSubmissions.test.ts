@@ -195,6 +195,13 @@ test("purchase invoices persist, enforce assigned-project scope, and apply cumul
   const reenabled = await patchProject(projectIds[3], admin, { budgetEnabled: true });
   assert.equal(reenabled.status, 200);
   assert.equal((await reenabled.json() as { budgetEnabled: boolean }).budgetEnabled, true);
+  const scheduleClosed = await patchProject(projectIds[3], admin, { scheduleAvailable: false });
+  assert.equal(scheduleClosed.status, 200);
+  assert.equal((await scheduleClosed.json() as { scheduleAvailable: boolean }).scheduleAvailable, false);
+  const scheduleAfterReload = await (await request(`/projects/${projectIds[3]}`, admin)).json() as { scheduleAvailable: boolean };
+  assert.equal(scheduleAfterReload.scheduleAvailable, false, "schedule availability persists while the board is hidden");
+  const scheduleReopened = await patchProject(projectIds[3], admin, { scheduleAvailable: true });
+  assert.equal((await scheduleReopened.json() as { scheduleAvailable: boolean }).scheduleAvailable, true);
   const restored = await (await request("/invoice-projects")).json() as Array<{ id: string; budgetEnabled: boolean; categories: Array<{ budgeted: number | null }> }>;
   assert.equal(restored.find(project => project.id === projectIds[3])?.categories[0].budgeted, 10000, "retained budget categories return when re-enabled");
   const restoredPurchaseResponse = await request("/purchase-approvals", pm, {
