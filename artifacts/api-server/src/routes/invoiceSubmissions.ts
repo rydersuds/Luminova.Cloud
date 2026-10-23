@@ -13,23 +13,29 @@ import {
   GetInvoiceSubmissionsResponse, RequestInvoiceUploadBody, RequestInvoiceUploadResponse,
   CreatePurchaseApprovalBody, CreatePurchaseApprovalResponse, DecidePurchaseApprovalBody,
   DecidePurchaseApprovalParams, DecidePurchaseApprovalResponse, GetPurchaseApprovalsResponse,
+  UpdateProjectBudgetUnitsBody, UpdateProjectBudgetUnitsParams, UpdateProjectBudgetUnitsResponse,
 } from "@workspace/api-zod";
 import type { InvoiceInput, Invoice } from "@workspace/api-zod";
 import { getRequestWorkspaceRole, workspaceUserDisplayName } from "./users";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { extractWorkbookInternalBudget } from "../lib/financialDocumentExtraction";
 import {
   commitmentRecords,
   externalAuthorizationDecision,
-  remainingTradeBudgets,
   purchaseApproval,
   type CostCategory,
   type PurchaseRecord,
 } from "../lib/invoiceBudget";
 import { emailApprovalNotifier, type ApprovalEmailFacts, type ApprovalNotifier } from "../lib/approvalNotifications";
+import {
+  suiteTradeBudgets, suiteBudgetExtras, validateBudgetUnits, scopePrefix, scopedTradeLabel,
+  type UnitBudgetProject,
+} from "../lib/unitTradeBudgets";
 
 type Actor = { id: string; workspaceId: string; role: "Admin" | "Project Manager" };
-type ProjectData = {
+type ProjectData = UnitBudgetProject & {
   id: string; name: string; projectManagerId?: string | null; budgetEnabled?: boolean; budgetLineItems?: CostCategory[];
+  internalBudgetSource?: string;
 };
 type ProjectRow = typeof importedProjectsTable.$inferSelect;
 type StoredInvoice = Invoice & { submissionFingerprint?: string };
@@ -143,11 +149,96 @@ export function createInvoiceSubmissionRouter(dependencies: InvoiceSubmissionDep
         id: project.id,
         name: data.name,
         budgetEnabled,
+        ...suiteBudgetExtras(data, [...invoices.map(record => record.data as PurchaseRecord), ...commitments]),
         categories: budgetEnabled
-          ? remainingTradeBudgets(data.budgetLineItems ?? [], [...invoices.map(record => record.data as PurchaseRecord), ...commitments])
+          ? suiteTradeBudgets(data, [...invoices.map(record => record.data as PurchaseRecord), ...commitments])
           : [],
       };
     })));
+  }));
+
+  router.patch("/projects/:projectId/budget-units", safe(async (req, res) => {
+    const actor = await actorFor(req);
+    const params = UpdateProjectBudgetUnitsParams.safeParse(req.params);
+    const parsed = UpdateProjectBudgetUnitsBody.safeParse(req.body);
+    if (!params.success || !parsed.success) throw new InvoiceError(400, "Enter valid suite labels and dwelling types.");
+    const project = await projectFor(actor, params.data.projectId);
+    const units = parsed.data.units.map(unit => ({ ...unit, label: unit.label.trim() }));
+    const original = project.data as ProjectData;
+    let recoveredBudget = original.unitBudget;
+    // Older imports kept the detail but not the category subtotals. Recover only from
+    // the project's original workbook, and only when every dwelling-type total agrees.
+    if (original.unitBudget?.unitTypes.some(type => !type.categoryBudgets?.length) && original.internalBudgetSource) {
+      const [document] = await db.select().from(projectDocumentsTable).where(and(
+        eq(projectDocumentsTable.projectId, project.id), eq(projectDocumentsTable.importBatchId, project.importBatchId),
+        eq(projectDocumentsTable.ownerId, project.ownerId), eq(projectDocumentsTable.relativePath, original.internalBudgetSource),
+      )).limit(1);
+      if (document && document.size <= 15 * 1024 * 1024 && /\.xlsx$/i.test(document.name)) {
+        try {
+          const file = await storage.getObjectEntityFile(document.objectPath);
+          const response = await storage.downloadObject(file);
+          const reader = response.body?.getReader();
+          if (!reader) throw new Error("Missing budget source");
+          const chunks: Uint8Array[] = [];
+          let size = 0;
+          try {
+            while (true) {
+              const chunk = await reader.read();
+              if (chunk.done) break;
+              size += chunk.value.length;
+              if (size > 15 * 1024 * 1024) throw new Error("Budget source too large");
+              chunks.push(chunk.value);
+            }
+          } finally { await reader.cancel(); }
+          const source = (await extractWorkbookInternalBudget(Buffer.concat(chunks), document.relativePath))?.unitBudget;
+          if (source && cents(source.total) === cents(original.unitBudget.total) &&
+            source.unitTypes.length === original.unitBudget.unitTypes.length &&
+            original.unitBudget.unitTypes.every(type => source.unitTypes.some(candidate =>
+              candidate.name === type.name && candidate.unitCount === type.unitCount &&
+              cents(candidate.perUnitTotal) === cents(type.perUnitTotal) && cents(candidate.total) === cents(type.total)))) {
+            recoveredBudget = { ...original.unitBudget, unitTypes: original.unitBudget.unitTypes.map(type => ({
+              ...type, categoryBudgets: source.unitTypes.find(candidate => candidate.name === type.name)!.categoryBudgets,
+            })) };
+          }
+        } catch {
+          req.log?.warn?.({ projectId: project.id }, "Source trade subtotals could not be verified; suite checks remain conservative");
+        }
+      }
+    }
+    await db.transaction(async tx => {
+      const [locked] = await tx.select().from(importedProjectsTable)
+        .where(eq(importedProjectsTable.id, project.id)).for("update");
+      if (!locked || !accessible(locked, actor)) throw new InvoiceError(404, "Project not accessible");
+      const data = locked.data as ProjectData;
+      const validation = validateBudgetUnits(data, units);
+      if (validation) throw new InvoiceError(400, validation);
+      const approvals = await tx.select().from(purchaseApprovalsTable).where(and(
+        eq(purchaseApprovalsTable.projectId, locked.id),
+        eq(purchaseApprovalsTable.importBatchId, locked.importBatchId),
+        eq(purchaseApprovalsTable.ownerId, locked.ownerId),
+      ));
+      const invoices = await tx.select().from(importedInvoicesTable).where(and(
+        eq(importedInvoicesTable.importBatchId, locked.importBatchId), eq(importedInvoicesTable.ownerId, locked.ownerId),
+      ));
+      const identifiers = [
+        ...approvals.map(row => row.budgetLineItemId),
+        ...invoices.filter(row => (row.data as Invoice).projectId === locked.id).map(row => (row.data as Invoice).budgetLineItemId),
+      ];
+      for (const old of data.budgetUnits ?? []) {
+        const replacement = units.find(unit => unit.id === old.id);
+        if ((!replacement || replacement.unitTypeId !== old.unitTypeId) &&
+          identifiers.some(id => id?.startsWith(scopePrefix(old.id)))) {
+          throw new InvoiceError(409, `Suite ${old.label} has requests or invoices and cannot be removed or assigned another dwelling type.`);
+        }
+      }
+      const sameSource = JSON.stringify(data.unitBudget) === JSON.stringify(original.unitBudget) &&
+        data.internalBudgetSource === original.internalBudgetSource;
+      await tx.update(importedProjectsTable).set({ data: {
+        ...data, budgetUnits: units, ...(sameSource && recoveredBudget ? { unitBudget: recoveredBudget } : {}),
+      } })
+        .where(eq(importedProjectsTable.id, locked.id));
+    });
+    res.json(UpdateProjectBudgetUnitsResponse.parse({ units }));
   }));
 
   router.post("/invoice-uploads", safe(async (req, res) => {
@@ -268,16 +359,17 @@ export function createInvoiceSubmissionRouter(dependencies: InvoiceSubmissionDep
           a.amountCents - b.amountCents || a.requestedAt.getTime() - b.requestedAt.getTime())[0];
       const commitments = commitmentRecords(approvals.filter(approval => approval.id !== preApproved?.id));
       const categories = budgetEnabled
-        ? remainingTradeBudgets(data.budgetLineItems ?? [], [...costs, ...commitments])
+        ? suiteTradeBudgets(data, [...costs, ...commitments])
         : [];
       const category = budgetEnabled ? categories.find(category => category.id === input.budgetLineItemId) : undefined;
       if (budgetEnabled && input.budgetLineItemId !== null && !category) throw new InvoiceError(400, "Select a budget category belonging to this project.");
+      if (budgetEnabled && data.unitBudget && !category) throw new InvoiceError(400, "Select an individual suite or shared area and its trade.");
       const checked = budgetEnabled ? purchaseApproval(category, input.amount) : externalAuthorizationDecision();
       const decision = preApproved && checked.status === PENDING
         ? { ...checked, status: "Approved", approvalReason: "pre_approved" as const }
         : checked;
       const tradeLabel = category
-        ? `${category.code} · ${category.description}`
+        ? scopedTradeLabel(category)
         : budgetEnabled ? input.lineItem : "External authorization required";
       const approvalId = decision.status === PENDING ? `approval-${id}` : preApproved?.id ?? null;
       const record: StoredInvoice = {
@@ -344,19 +436,17 @@ export function createInvoiceSubmissionRouter(dependencies: InvoiceSubmissionDep
       const [locked] = await tx.select().from(importedProjectsTable).where(eq(importedProjectsTable.id, project.id)).for("update");
       if (!locked || !accessible(locked, actor)) throw new InvoiceError(404, "Project not accessible");
       const data = locked.data as ProjectData;
-      const [invoices, approvals] = await Promise.all([
-        tx.select().from(importedInvoicesTable).where(and(eq(importedInvoicesTable.importBatchId, locked.importBatchId), eq(importedInvoicesTable.ownerId, locked.ownerId))),
-        tx.select().from(purchaseApprovalsTable).where(and(eq(purchaseApprovalsTable.projectId, locked.id), eq(purchaseApprovalsTable.importBatchId, locked.importBatchId), eq(purchaseApprovalsTable.ownerId, locked.ownerId))),
-      ]);
+      const invoices = await tx.select().from(importedInvoicesTable).where(and(eq(importedInvoicesTable.importBatchId, locked.importBatchId), eq(importedInvoicesTable.ownerId, locked.ownerId)));
+      const approvals = await tx.select().from(purchaseApprovalsTable).where(and(eq(purchaseApprovalsTable.projectId, locked.id), eq(purchaseApprovalsTable.importBatchId, locked.importBatchId), eq(purchaseApprovalsTable.ownerId, locked.ownerId)));
       const costs = invoices.map(record => record.data as StoredInvoice).filter(record => record.projectId === locked.id);
       const budgetEnabled = data.budgetEnabled !== false;
       const categories = budgetEnabled
-        ? remainingTradeBudgets(data.budgetLineItems ?? [], [...costs, ...commitmentRecords(approvals)])
+        ? suiteTradeBudgets(data, [...costs, ...commitmentRecords(approvals)])
         : [];
       const category = budgetEnabled ? categories.find(candidate => candidate.id === input.budgetLineItemId) : undefined;
       if (budgetEnabled && !category) throw new InvoiceError(400, "Select a trade from this project's budget.");
       const decision = budgetEnabled ? purchaseApproval(category, input.amount) : externalAuthorizationDecision();
-      const tradeLabel = category ? `${category.code} · ${category.description}` : "External authorization required";
+      const tradeLabel = category ? scopedTradeLabel(category) : "External authorization required";
       const [row] = await tx.insert(purchaseApprovalsTable).values({
         id: `approval-${randomUUID()}`, workspaceId: actor.workspaceId, projectId: locked.id, importBatchId: locked.importBatchId,
         ownerId: locked.ownerId, kind: "purchase", invoiceId: null, budgetLineItemId: category?.id ?? null,
@@ -397,6 +487,9 @@ export function createInvoiceSubmissionRouter(dependencies: InvoiceSubmissionDep
       const approve = decision === "approve";
       let budgetIncreaseCents: number | null = null;
       if (approve && raiseBudget && row.budgetLineItemId && row.overageCents > 0) {
+        if ((locked.data as ProjectData).unitBudget) {
+          throw new InvoiceError(409, "Suite trade limits come from the dwelling-type source budget. Approve without changing that budget, or revise the source budget first.");
+        }
         // A change order: add exactly the overage to the trade, so later purchases are measured against the new budget.
         const data = locked.data as ProjectData;
         const items = (data.budgetLineItems ?? []).map(item => item.id === row.budgetLineItemId && typeof item.budgeted === "number"

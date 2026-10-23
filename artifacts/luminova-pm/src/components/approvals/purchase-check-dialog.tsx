@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { scopeKeyOf, scopesOf, isUnitProject } from "./suite-scope"
 import { money, verdictFor } from "./approval-model"
 
 type Props = {
@@ -43,6 +44,7 @@ function PurchaseCheckForm({ projectId: fixedProjectId, onDone }: { projectId?: 
   const invalidProjectData = projects !== undefined && !Array.isArray(projects)
   const [projectId, setProjectId] = useState(fixedProjectId ?? "")
   const [tradeId, setTradeId] = useState("")
+  const [scopeKey, setScopeKey] = useState("")
   const [amountText, setAmountText] = useState("")
   const [vendor, setVendor] = useState("")
   const [description, setDescription] = useState("")
@@ -54,7 +56,10 @@ function PurchaseCheckForm({ projectId: fixedProjectId, onDone }: { projectId?: 
   }, [projectList, projectId])
 
   const project = projectList.find((candidate) => candidate.id === projectId)
-  const categories = Array.isArray(project?.categories) ? project.categories : []
+  const unitMode = isUnitProject(project)
+  const scopes = scopesOf(project)
+  const allCategories = Array.isArray(project?.categories) ? project.categories : []
+  const categories = unitMode ? allCategories.filter((c) => scopeKeyOf(c) === scopeKey) : allCategories
   const trade: InvoiceBudgetCategory | undefined = categories.find((category) => category.id === tradeId)
   const externalAuthorization = project?.budgetEnabled === false
   const amount = Number(amountText.replace(/[$,\s]/g, ""))
@@ -117,24 +122,34 @@ function PurchaseCheckForm({ projectId: fixedProjectId, onDone }: { projectId?: 
           {!fixedProjectId && (
             <div className="space-y-1.5">
               <Label htmlFor="purchase-project">Project</Label>
-              <select id="purchase-project" className="hud-select w-full" value={projectId} onChange={(event) => { setProjectId(event.target.value); setTradeId("") }}>
+              <select id="purchase-project" className="hud-select w-full" value={projectId} onChange={(event) => { setProjectId(event.target.value); setTradeId(""); setScopeKey("") }}>
                 <option value="">Choose a project</option>
                 {projectList.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
               </select>
             </div>
           )}
-          {project && !externalAuthorization && (
+          {project && !externalAuthorization && unitMode && (
+            <div className="space-y-1.5">
+              <Label htmlFor="purchase-scope">Suite or shared area</Label>
+              <select id="purchase-scope" data-testid="select-purchase-scope" className="hud-select w-full" value={scopeKey} onChange={(event) => { setScopeKey(event.target.value); setTradeId("") }}>
+                <option value="">Choose a suite or shared area</option>
+                {scopes.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+              </select>
+              {scopes.length === 0 && <p className="text-xs text-warning">{project.allocationWarning ?? "No suites are registered yet."}</p>}
+            </div>
+          )}
+          {project && !externalAuthorization && (!unitMode || scopeKey) && (
             <div className="space-y-1.5">
               <Label htmlFor="purchase-trade">Trade</Label>
               <select id="purchase-trade" className="hud-select w-full" value={tradeId} onChange={(event) => setTradeId(event.target.value)}>
                 <option value="">Choose a trade</option>
-                {project.categories.map((category) => (
+                {categories.map((category) => (
                   <option key={category.id} value={category.id}>
                     {category.description} ({category.code}){category.remaining === null ? "" : ` · ${money(category.remaining)} left`}
                   </option>
                 ))}
               </select>
-              {project.categories.length === 0 && <p className="text-xs text-muted-foreground">This project has no trade budgets yet.</p>}
+              {categories.length === 0 && <p className="text-xs text-muted-foreground">This project has no trade budgets yet.</p>}
             </div>
           )}
           {project && externalAuthorization && (

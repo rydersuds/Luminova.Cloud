@@ -1243,6 +1243,30 @@ paths:
           description: Administrator access required
         "404":
           description: Review or trade not found
+  /projects/{projectId}/budget-units:
+    patch:
+      operationId: updateProjectBudgetUnits
+      tags: [invoices]
+      summary: Set numbered suites and their source dwelling types
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectBudgetUnitsUpdate" }
+      responses:
+        "200":
+          description: Saved unit register
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectBudgetUnitsUpdate" }
+        "400":
+          description: Invalid units or dwelling type capacity exceeded
+        "404":
+          description: Project not accessible
+        "409":
+          description: Units with spending cannot be removed or reassigned
   /invoice-projects:
     get:
       operationId: getInvoiceProjects
@@ -2440,6 +2464,9 @@ components:
         unitCount: { type: integer, minimum: 1 }
         perUnitTotal: { type: number }
         total: { type: number }
+        categoryBudgets:
+          type: array
+          items: { $ref: "#/components/schemas/UnitTradeBudget" }
         lineItems:
           type: array
           items:
@@ -2718,6 +2745,38 @@ components:
         contentType:
           type: string
           enum: [application/pdf, image/jpeg, image/png, image/webp]
+    UnitTradeBudget:
+      type: object
+      required: [category, budgeted]
+      properties:
+        category: { type: string }
+        budgeted: { type: [number, "null"] }
+    ProjectBudgetUnit:
+      type: object
+      additionalProperties: false
+      required: [id, label, unitTypeId]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string, minLength: 1, maxLength: 80 }
+        unitTypeId: { type: string, minLength: 1 }
+    ProjectBudgetUnitsUpdate:
+      type: object
+      additionalProperties: false
+      required: [units]
+      properties:
+        units:
+          type: array
+          maxItems: 2000
+          items: { $ref: "#/components/schemas/ProjectBudgetUnit" }
+    BudgetDwellingType:
+      type: object
+      required: [id, name, unitCount, perUnitTotal, total]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        unitCount: { type: integer }
+        perUnitTotal: { type: number }
+        total: { type: number }
     InvoiceProject:
       type: object
       required: [id, name, budgetEnabled, categories]
@@ -2725,6 +2784,14 @@ components:
         id: { type: string }
         name: { type: string }
         budgetEnabled: { type: boolean }
+        unitBudgetEnabled: { type: boolean }
+        allocationWarning: { type: [string, "null"] }
+        units:
+          type: array
+          items: { $ref: "#/components/schemas/ProjectBudgetUnit" }
+        unitTypes:
+          type: array
+          items: { $ref: "#/components/schemas/BudgetDwellingType" }
         categories:
           type: array
           items: { $ref: "#/components/schemas/InvoiceBudgetCategory" }
@@ -2735,6 +2802,10 @@ components:
         id: { type: string }
         code: { type: string }
         description: { type: string }
+        unitId: { type: string }
+        unitLabel: { type: string }
+        unitTypeName: { type: string }
+        scopeKind: { type: string, enum: [suite, shared] }
         budgeted: { type: ["number", "null"] }
         used: { type: number }
         remaining: { type: ["number", "null"] }

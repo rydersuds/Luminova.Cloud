@@ -42,3 +42,4 @@
 - [Board-driven project completion](board-driven-project-completion.md) — board schedule dates override project dates for the existing date-based completion percentage.
 - [Schedule availability](schedule-availability.md) — unavailable schedules hide the project board without deleting its saved tasks.
 - [Tax-excluded workbook totals](tax-excluded-workbook-totals.md) — recognize GST/PST wording in grand-total labels without folding excluded tax or client-facing totals into internal budgets.
+- [Numbered suite budgets](numbered-suite-budgets.md) — requests follow actual numbered suites mapped to source dwelling types, with shared costs and historical unallocated costs separate.

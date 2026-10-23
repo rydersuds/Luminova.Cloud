@@ -118,6 +118,10 @@ test("extracts mixed dwelling types and shared costs without adding client charg
   const result = await extractWorkbookInternalBudget(buffer, "Project/Cost Plan.xlsx");
 
   assert.equal(result?.total, 1_230);
+  assert.deepEqual(result?.unitBudget?.unitTypes[0].categoryBudgets, [
+    { category: "DRYWALL", budgeted: 100 },
+    { category: "CABINETS", budgeted: 50 },
+  ]);
   assert.deepEqual(result?.unitBudget?.unitTypes.map((type) => [
     type.name,
     type.unitCount,

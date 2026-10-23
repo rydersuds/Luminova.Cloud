@@ -1361,7 +1361,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                       <div>
                         <CardTitle>Dwelling-type and shared-area budget</CardTitle>
                         <CardDescription>
-                          Internal costs only. Itemized values are supporting detail; category budgets remain the authority for purchase limits.
+                          Internal costs only. Suite trade limits use these dwelling-type category budgets; shared-area costs are tracked separately. Itemized values are supporting detail.
                         </CardDescription>
                       </div>
                       <div className="shrink-0 rounded-lg border bg-muted/30 px-4 py-3 sm:text-right">
@@ -1416,6 +1416,11 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                             </TableBody>
                           </Table>
                         </div>
+                        {type.categoryBudgets && type.categoryBudgets.length > 0 && (
+                          <p className="text-xs text-muted-foreground tabular-nums">
+                            Per-unit trade limits: {type.categoryBudgets.map((c) => `${c.category} ${c.budgeted === null ? "n/a" : formatCurrency(c.budgeted)}`).join(" · ")}
+                          </p>
+                        )}
                         <p className="text-right text-sm font-medium tabular-nums">
                           {formatCurrency(type.perUnitTotal)} × {type.unitCount.toLocaleString()} = {formatCurrency(type.total)}
                         </p>

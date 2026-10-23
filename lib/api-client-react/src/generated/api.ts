@@ -57,6 +57,7 @@ import type {
   PanoramaUpdate,
   Project,
   ProjectBoard,
+  ProjectBudgetUnitsUpdate,
   ProjectDeletionConfirmation,
   ProjectDeletionPreview,
   ProjectDetail,
@@ -4265,6 +4266,78 @@ export const useDeleteTradeReview = <TError = ErrorType<void>,
       return useMutation(getDeleteTradeReviewMutationOptions(options));
     }
 
+export const getUpdateProjectBudgetUnitsUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/budget-units`
+}
+
+/**
+ * @summary Set numbered suites and their source dwelling types
+ */
+export const updateProjectBudgetUnits = async (projectId: string,
+    projectBudgetUnitsUpdate: ProjectBudgetUnitsUpdate, options?: Parameters<typeof customFetch>[1]): Promise<ProjectBudgetUnitsUpdate> => {
+
+  return customFetch<ProjectBudgetUnitsUpdate>(getUpdateProjectBudgetUnitsUrl(projectId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(projectBudgetUnitsUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateProjectBudgetUnitsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProjectBudgetUnits>>, TError,{projectId: string;data: BodyType<ProjectBudgetUnitsUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateProjectBudgetUnits>>, TError,{projectId: string;data: BodyType<ProjectBudgetUnitsUpdate>}, TContext> => {
+
+const mutationKey = ['updateProjectBudgetUnits'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateProjectBudgetUnits>>, {projectId: string;data: BodyType<ProjectBudgetUnitsUpdate>}> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  updateProjectBudgetUnits(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateProjectBudgetUnitsMutationResult = NonNullable<Awaited<ReturnType<typeof updateProjectBudgetUnits>>>
+    export type UpdateProjectBudgetUnitsMutationBody = BodyType<ProjectBudgetUnitsUpdate>
+    export type UpdateProjectBudgetUnitsMutationError = ErrorType<void>
+
+    /**
+ * @summary Set numbered suites and their source dwelling types
+ */
+export const useUpdateProjectBudgetUnits = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProjectBudgetUnits>>, TError,{projectId: string;data: BodyType<ProjectBudgetUnitsUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateProjectBudgetUnits>>,
+        TError,
+        {projectId: string;data: BodyType<ProjectBudgetUnitsUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateProjectBudgetUnitsMutationOptions(options));
+    }
+
 export const getGetInvoiceProjectsUrl = () => {
 
 
@@ -6719,3 +6792,4 @@ export const useDeleteWorkspaceUser = <TError = ErrorType<void>,
       > => {
       return useMutation(getDeleteWorkspaceUserMutationOptions(options));
     }
+

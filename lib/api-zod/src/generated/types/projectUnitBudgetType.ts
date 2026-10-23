@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ProjectUnitBudgetLineItem } from './projectUnitBudgetLineItem';
+import type { UnitTradeBudget } from './unitTradeBudget';
 
 export interface ProjectUnitBudgetType {
   id: string;
@@ -14,5 +15,6 @@ export interface ProjectUnitBudgetType {
   unitCount: number;
   perUnitTotal: number;
   total: number;
+  categoryBudgets?: UnitTradeBudget[];
   lineItems: ProjectUnitBudgetLineItem[];
 }

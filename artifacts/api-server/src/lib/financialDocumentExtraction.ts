@@ -50,6 +50,7 @@ export type InternalUnitBudgetType = {
   unitCount: number;
   perUnitTotal: number;
   total: number;
+  categoryBudgets?: Array<{ category: string; budgeted: number | null }>;
   lineItems: InternalUnitBudgetLineItem[];
 };
 
@@ -635,6 +636,15 @@ function extractUnitTypeBudget(
     }
 
     if (unitTypes.length !== columns.groups.length || sharedAreas.length === 0) continue;
+    for (const type of unitTypes) {
+      const prefix = `${normalizeUnitType(type.name)}:`;
+      type.categoryBudgets = [...categoryTotals.entries()]
+        .filter(([key]) => key.startsWith(prefix))
+        .map(([key, budgeted]) => ({
+          category: categoryNames.get(key.slice(prefix.length)) ?? key.slice(prefix.length),
+          budgeted,
+        }));
+    }
     const roundedUnitTotal = roundCurrency(unitTypes.reduce((sum, type) => sum + type.total, 0));
     const roundedSharedTotal = roundCurrency(sharedAreas.reduce((sum, area) => sum + area.total, 0));
     const expectedTotal = roundCurrency(roundedUnitTotal + roundedSharedTotal);

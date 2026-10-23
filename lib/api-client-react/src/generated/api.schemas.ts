@@ -342,6 +342,12 @@ export interface ClientQuote {
   portions: QuotePortion[];
 }
 
+export interface UnitTradeBudget {
+  category: string;
+  /** @nullable */
+  budgeted: number | null;
+}
+
 export interface ProjectUnitBudgetLineItem {
   id: string;
   category: string;
@@ -363,6 +369,7 @@ export interface ProjectUnitBudgetType {
   unitCount: number;
   perUnitTotal: number;
   total: number;
+  categoryBudgets?: UnitTradeBudget[];
   lineItems: ProjectUnitBudgetLineItem[];
 }
 
@@ -814,10 +821,46 @@ export interface InvoiceUploadInput {
   contentType: InvoiceUploadInputContentType;
 }
 
+export interface ProjectBudgetUnit {
+  id: string;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  label: string;
+  /** @minLength 1 */
+  unitTypeId: string;
+}
+
+export interface ProjectBudgetUnitsUpdate {
+  /** @maxItems 2000 */
+  units: ProjectBudgetUnit[];
+}
+
+export interface BudgetDwellingType {
+  id: string;
+  name: string;
+  unitCount: number;
+  perUnitTotal: number;
+  total: number;
+}
+
+export type InvoiceBudgetCategoryScopeKind = typeof InvoiceBudgetCategoryScopeKind[keyof typeof InvoiceBudgetCategoryScopeKind];
+
+
+export const InvoiceBudgetCategoryScopeKind = {
+  suite: 'suite',
+  shared: 'shared',
+} as const;
+
 export interface InvoiceBudgetCategory {
   id: string;
   code: string;
   description: string;
+  unitId?: string;
+  unitLabel?: string;
+  unitTypeName?: string;
+  scopeKind?: InvoiceBudgetCategoryScopeKind;
   /** @nullable */
   budgeted: number | null;
   used: number;
@@ -830,6 +873,11 @@ export interface InvoiceProject {
   id: string;
   name: string;
   budgetEnabled: boolean;
+  unitBudgetEnabled?: boolean;
+  /** @nullable */
+  allocationWarning?: string | null;
+  units?: ProjectBudgetUnit[];
+  unitTypes?: BudgetDwellingType[];
   categories: InvoiceBudgetCategory[];
 }
 
@@ -1713,3 +1761,4 @@ trade?: string;
 status?: VendorQuoteStatus;
 direction?: QuoteDirection;
 };
+

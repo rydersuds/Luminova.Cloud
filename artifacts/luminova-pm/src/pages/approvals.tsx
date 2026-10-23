@@ -159,7 +159,7 @@ function PendingCard({ approval, isAdmin }: { approval: PurchaseApproval; isAdmi
   const [note, setNote] = useState("")
   const [raiseBudget, setRaiseBudget] = useState(true)
   const [busy, setBusy] = useState<"approve" | "decline" | null>(null)
-  const canRaise = approval.overage > 0 && approval.budgetLineItemId !== null
+  const canRaise = approval.overage > 0 && approval.budgetLineItemId !== null && !approval.budgetLineItemId.startsWith("ub:")
   const externalAuthorization = approval.approvalReason === "external_authorization_required"
 
   const decide = async (decision: "approve" | "decline") => {

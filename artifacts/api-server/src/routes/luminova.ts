@@ -275,6 +275,7 @@ import
 ;
 
 import { remainingTradeBudgets } from "../lib/invoiceBudget";
+import { projectCostAllocations } from "../lib/unitTradeBudgets";
 
 
 type AuthenticatedRequest = Request & 
@@ -4337,7 +4338,7 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
 ;
     const projectInvoices = financialRecords.invoices.filter((invoice) => invoice.projectId === project.id)
 ;
-    const currentBudgetCategories = remainingTradeBudgets(project.budgetLineItems ?? [], projectInvoices);
+    const currentBudgetCategories = remainingTradeBudgets(project.budgetLineItems ?? [], projectCostAllocations(project, projectInvoices));
     const currentBudgetById = new Map(currentBudgetCategories.map(category => [category.id, category]));
     const acceptedQuote = acceptedClientQuoteForProject(financialRecords.quotes, project.id)
 ;
@@ -6960,6 +6961,7 @@ const createProjectImportHandler = async (req: ProjectImportBuildRequest, res: R
 
       budgetLineItems: internalBudget.lineItems,
       internalBudgetSource: internalBudget.sourceRelativePath,
+      ...(internalBudget.unitBudget ? { unitBudget: internalBudget.unitBudget } : {}),
     
 }
 
@@ -9378,22 +9380,22 @@ router.patch("/projects/:projectId", async (req: AuthenticatedRequest, res): Pro
 ;
 
 
-    await db.update(importedProjectsTable).set(
+    const [savedProject] = await db.update(importedProjectsTable).set(
 {
 
- data: updated 
+ data: sql`${importedProjectsTable.data} || ${JSON.stringify({ ...normalizedUpdate, progress: updated.progress })}::jsonb`
 }
 
 ).where(and(
       eq(importedProjectsTable.id, params.data.projectId),
       eq(importedProjectsTable.ownerId, req.userId),
       eq(importedProjectsTable.workspaceId, workspaceId),
-    ))
+    )).returning({ data: importedProjectsTable.data })
 ;
 
 
     res.json(UpdateProjectResponse.parse(
-      await withBoardCalculatedProjectProgress(updated, workspaceId),
+      await withBoardCalculatedProjectProgress(savedProject.data as Project, workspaceId),
     ))
 ;
 

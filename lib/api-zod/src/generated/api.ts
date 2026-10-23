@@ -203,6 +203,10 @@ export const GetProjectResponse = zod.object({
   "unitCount": zod.number().int().min(1),
   "perUnitTotal": zod.number(),
   "total": zod.number(),
+  "categoryBudgets": zod.array(zod.object({
+  "category": zod.string(),
+  "budgeted": zod.number().nullable()
+})).optional(),
   "lineItems": zod.array(zod.object({
   "id": zod.string(),
   "category": zod.string(),
@@ -553,6 +557,10 @@ export const GetArchivedProjectResponse = zod.object({
   "unitCount": zod.number().int().min(1),
   "perUnitTotal": zod.number(),
   "total": zod.number(),
+  "categoryBudgets": zod.array(zod.object({
+  "category": zod.string(),
+  "budgeted": zod.number().nullable()
+})).optional(),
   "lineItems": zod.array(zod.object({
   "id": zod.string(),
   "category": zod.string(),
@@ -2373,16 +2381,77 @@ export const DeleteTradeReviewResponse = zod.void()
 
 
 /**
+ * @summary Set numbered suites and their source dwelling types
+ */
+export const UpdateProjectBudgetUnitsParams = zod.object({
+  "projectId": zod.coerce.string()
+})
+
+export const updateProjectBudgetUnitsBodyUnitsItemLabelMax = 80;
+
+
+export const updateProjectBudgetUnitsBodyUnitsMax = 2000;
+
+
+
+export const UpdateProjectBudgetUnitsBody = zod.object({
+  "units": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "label": zod.string().min(1).max(updateProjectBudgetUnitsBodyUnitsItemLabelMax),
+  "unitTypeId": zod.string().min(1)
+})).max(updateProjectBudgetUnitsBodyUnitsMax)
+})
+
+export const updateProjectBudgetUnitsResponseUnitsItemLabelMax = 80;
+
+
+export const updateProjectBudgetUnitsResponseUnitsMax = 2000;
+
+
+
+export const UpdateProjectBudgetUnitsResponse = zod.object({
+  "units": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "label": zod.string().min(1).max(updateProjectBudgetUnitsResponseUnitsItemLabelMax),
+  "unitTypeId": zod.string().min(1)
+})).max(updateProjectBudgetUnitsResponseUnitsMax)
+})
+
+
+/**
  * @summary List projects and remaining trade budgets available for invoice submission
  */
+export const getInvoiceProjectsResponseUnitsItemLabelMax = 80;
+
+
+
+
 export const GetInvoiceProjectsResponseItem = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "budgetEnabled": zod.boolean(),
+  "unitBudgetEnabled": zod.boolean().optional(),
+  "allocationWarning": zod.string().nullish(),
+  "units": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "label": zod.string().min(1).max(getInvoiceProjectsResponseUnitsItemLabelMax),
+  "unitTypeId": zod.string().min(1)
+})).optional(),
+  "unitTypes": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "unitCount": zod.number().int(),
+  "perUnitTotal": zod.number(),
+  "total": zod.number()
+})).optional(),
   "categories": zod.array(zod.object({
   "id": zod.string(),
   "code": zod.string(),
   "description": zod.string(),
+  "unitId": zod.string().optional(),
+  "unitLabel": zod.string().optional(),
+  "unitTypeName": zod.string().optional(),
+  "scopeKind": zod.enum(['suite', 'shared']).optional(),
   "budgeted": zod.number().nullable(),
   "used": zod.number(),
   "remaining": zod.number().nullable(),
@@ -3479,3 +3548,5 @@ export const DeleteWorkspaceUserParams = zod.object({
 })
 
 export const DeleteWorkspaceUserResponse = zod.void()
+
+

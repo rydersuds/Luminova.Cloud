@@ -5,11 +5,18 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { BudgetDwellingType } from './budgetDwellingType';
 import type { InvoiceBudgetCategory } from './invoiceBudgetCategory';
+import type { ProjectBudgetUnit } from './projectBudgetUnit';
 
 export interface InvoiceProject {
   id: string;
   name: string;
   budgetEnabled: boolean;
+  unitBudgetEnabled?: boolean;
+  /** @nullable */
+  allocationWarning?: string | null;
+  units?: ProjectBudgetUnit[];
+  unitTypes?: BudgetDwellingType[];
   categories: InvoiceBudgetCategory[];
 }

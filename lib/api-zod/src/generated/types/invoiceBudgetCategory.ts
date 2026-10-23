@@ -5,11 +5,16 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { InvoiceBudgetCategoryScopeKind } from './invoiceBudgetCategoryScopeKind';
 
 export interface InvoiceBudgetCategory {
   id: string;
   code: string;
   description: string;
+  unitId?: string;
+  unitLabel?: string;
+  unitTypeName?: string;
+  scopeKind?: InvoiceBudgetCategoryScopeKind;
   /** @nullable */
   budgeted: number | null;
   used: number;

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { AlertTriangle, FileUp, RefreshCw } from "lucide-react"
 import { formatCurrency } from "@/lib/utils"
+import { scopeKeyOf, scopesOf, isUnitProject } from "@/components/approvals/suite-scope"
 
 const MAX_BYTES = 20 * 1024 * 1024
 const TYPES = ["application/pdf", "image/jpeg", "image/png", "image/webp"] as const
@@ -40,6 +41,7 @@ export function InvoiceUploadForm({
   const createInvoice = useCreateInvoice()
   const [projectId, setProjectId] = React.useState(() => projects.some(project => project.id === initialProjectId) ? initialProjectId : "")
   const [categoryId, setCategoryId] = React.useState("")
+  const [scopeKey, setScopeKey] = React.useState("")
   const [file, setFile] = React.useState<File | null>(null)
   const [invoiceNumber, setInvoiceNumber] = React.useState("")
   const [vendor, setVendor] = React.useState("")
@@ -63,6 +65,9 @@ export function InvoiceUploadForm({
 
   const project = projects.find((p) => p.id === projectId)
   const category = project?.categories.find((c) => c.id === categoryId)
+  const unitMode = isUnitProject(project) && project?.budgetEnabled !== false
+  const scopes = scopesOf(project)
+  const categoryList = (project?.categories ?? []).filter((c) => !unitMode || scopeKeyOf(c) === scopeKey)
   const noBudget = categoryId === NO_BUDGET
   const externalAuthorization = project?.budgetEnabled === false
   const amountNum = Number(amount)
@@ -89,6 +94,7 @@ export function InvoiceUploadForm({
     if (locked) return
     setProjectId(id)
     const selected = projects.find((candidate) => candidate.id === id)
+    setScopeKey("")
     setCategoryId(selected?.budgetEnabled === false ? NO_BUDGET : "")
     setLineItem("")
     reservation.current = null
@@ -98,7 +104,12 @@ export function InvoiceUploadForm({
     if (locked) return
     setCategoryId(id)
     const c = project?.categories.find((x) => x.id === id)
-    setLineItem(c ? `${c.code} ${c.description}`.trim() : "")
+    setLineItem(c ? `${c.unitLabel ? c.unitLabel + " " : ""}${c.code} ${c.description}`.trim() : "")
+  }
+
+  const onScope = (key: string) => {
+    if (locked) return
+    setScopeKey(key); setCategoryId(""); setLineItem("")
   }
 
   const uploadAgain = () => {
@@ -110,6 +121,7 @@ export function InvoiceUploadForm({
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (inFlight.current) return
+    if (!frozen.current && unitMode && (!category || noBudget)) { setError("Choose a suite or shared area and a trade with a budget."); return }
     if (!frozen.current && (!file || !project || !categoryId)) return
     if (!frozen.current && !(amountNum > 0)) { setError("Enter a total greater than zero."); return }
     inFlight.current = true
@@ -163,7 +175,7 @@ export function InvoiceUploadForm({
         submissionId.current = crypto.randomUUID()
         setUncertain(false); setNeedsReupload(false)
         setFile(null); setInvoiceNumber(""); setVendor(""); setDate(""); setAmount("")
-        setLineItem(""); setCategoryId("")
+        setLineItem(""); setCategoryId(""); setScopeKey("")
         onSubmitted(invoice)
       } catch (err) {
         const status = (err as { status?: number })?.status
@@ -199,17 +211,28 @@ export function InvoiceUploadForm({
           {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
       </div>
+      {unitMode && (
+        <div className={field}>
+          <Label htmlFor="inv-scope">Suite or shared area</Label>
+          <select id="inv-scope" required disabled={!project} value={scopeKey} onChange={(e) => onScope(e.target.value)}
+            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-50" data-testid="select-invoice-scope">
+            <option value="">{project ? "Select a suite or shared area" : "Choose a project first"}</option>
+            {scopes.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+          </select>
+          {project?.allocationWarning && <p role="alert" className="text-xs font-semibold text-warning">{project.allocationWarning}</p>}
+        </div>
+      )}
       <div className={field}>
         <Label htmlFor="inv-category">{externalAuthorization ? "Budget review" : "Trade / budget category"}</Label>
-        <select id="inv-category" required disabled={!project} value={categoryId} onChange={(e) => onCategory(e.target.value)}
+        <select id="inv-category" required disabled={!project || (unitMode && !scopeKey)} value={categoryId} onChange={(e) => onCategory(e.target.value)}
           className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-50" data-testid="select-invoice-category">
           <option value="">{externalAuthorization ? "External authorization required" : project ? "Select a category" : "Choose a project first"}</option>
-          {project?.categories.map((c) => (
+          {categoryList.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.code} {c.description} — {c.remaining === null ? "no priced budget" : `${formatCurrency(c.remaining)} remaining`}
+              {c.unitLabel ? `${c.unitLabel} · ` : ""}{c.code} {c.description} — {c.remaining === null ? "no priced budget" : `${formatCurrency(c.remaining)} remaining`}
             </option>
           ))}
-          {project && <option value={NO_BUDGET}>{externalAuthorization ? "External authorization required" : "No matching budget category"}</option>}
+          {project && !unitMode && <option value={NO_BUDGET}>{externalAuthorization ? "External authorization required" : "No matching budget category"}</option>}
         </select>
       </div>
 
@@ -281,7 +304,7 @@ export function InvoiceUploadForm({
       )}
 
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={busy || (!uncertain && (!file || !project || !categoryId))} className="gap-2" data-testid="button-submit-invoice">
+        <Button type="submit" disabled={busy || (!uncertain && (!file || !project || !categoryId || (unitMode && !category)))} className="gap-2" data-testid="button-submit-invoice">
           {uncertain && <RefreshCw className="h-4 w-4" />}
           {busy ? "Submitting..." : uncertain ? "Retry same submission" : "Submit invoice"}
         </Button>
