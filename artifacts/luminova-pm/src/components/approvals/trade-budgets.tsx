@@ -1,6 +1,7 @@
 import { getGetInvoiceProjectsQueryKey, useGetCurrentWorkspaceUser, useGetInvoiceProjects } from "@workspace/api-client-react"
 import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { BudgetSection } from "@/components/budget-section"
 import { cn } from "@/lib/utils"
 import { BudgetBar, PurchaseCheckDialog } from "./purchase-check-dialog"
 import { SuiteRegister } from "./suite-register"
@@ -21,12 +22,11 @@ export function TradeBudgets({ projectId }: { projectId: string }) {
   const unit = isUnitProject(project)
   const shown = project?.categories ?? []
   return (
-    <section className="surface-3d space-y-4 p-5" aria-labelledby="trade-budgets-heading">
+    <BudgetSection title="Trade budgets"
+      description={<>Purchases within what's left are approved automatically. Over budget needs an Admin.{unit && " Each suite or shared area has its own limits."}</>}
+      className="surface-3d">
+      <div className="space-y-4 px-5 pb-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 id="trade-budgets-heading" className="text-lg font-bold">Trade budgets</h2>
-          <p className="text-sm text-muted-foreground">Purchases within what's left are approved automatically. Over budget needs an Admin.{unit && " Each suite or shared area has its own limits."}</p>
-        </div>
         {project && (project.categories.length > 0) && (
           <PurchaseCheckDialog projectId={projectId} trigger={<Button><Plus className="mr-1.5 h-4 w-4" />Check a purchase</Button>} />
         )}
@@ -34,7 +34,9 @@ export function TradeBudgets({ projectId }: { projectId: string }) {
       {unit && project && (
         <>
           {project.allocationWarning && <p role="alert" className="rounded-lg border border-warning/50 bg-warning/10 p-3 text-sm font-semibold text-warning" data-testid="text-allocation-warning">{project.allocationWarning}</p>}
-          <SuiteRegister project={project} />
+          <BudgetSection title="Suite register">
+            <div className="px-4 pb-4"><SuiteRegister project={project} /></div>
+          </BudgetSection>
         </>
       )}
       {(isError || invalidProjectData) ? (
@@ -64,6 +66,7 @@ export function TradeBudgets({ projectId }: { projectId: string }) {
           })}
         </ul>
       )}
-    </section>
+      </div>
+    </BudgetSection>
   )
 }

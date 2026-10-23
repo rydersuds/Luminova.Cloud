@@ -1,5 +1,6 @@
 import type { InvoiceBudgetCategory, InvoiceProject } from "@workspace/api-client-react"
 import { ChevronDown } from "lucide-react"
+import { BudgetSection } from "@/components/budget-section"
 import { tradeUnitBreakdown } from "@/lib/trade-unit-breakdown"
 import { money } from "./approval-model"
 
@@ -57,18 +58,20 @@ export function TradeUnitBreakdown({ project }: { project: InvoiceProject }) {
         ))}
       </ul>
       {!!data.shared.length && (
-        <section className="space-y-3" aria-label="Shared-area budgets">
-          <h3 className="font-semibold">Shared-area budgets</h3>
+        <BudgetSection title="Shared-area budgets">
+          <div className="space-y-3 px-4 pb-4">
           <p className="text-xs text-muted-foreground">Separate source budgets, not suite allowances. Not divided across units or included in registered-suite subtotals.</p>
           {data.shared.map(category => <div key={category.id} className="min-w-0 space-y-2 rounded-lg border p-3"><p className="break-words text-sm font-semibold">{category.unitLabel ?? category.description}</p><Amounts category={category} /></div>)}
-        </section>
+          </div>
+        </BudgetSection>
       )}
       {!!data.aggregate.length && (
-        <section className="space-y-3" aria-label="Budgets without suite allocations">
-          <h3 className="font-semibold">Budgets without suite allocations</h3>
+        <BudgetSection title="Budgets without suite allocations">
+          <div className="space-y-3 px-4 pb-4">
           <p className="text-xs text-muted-foreground">These amounts have no matching registered-suite allocation. They are not per-suite allowances.</p>
           {data.aggregate.map(category => <div key={category.id} className="min-w-0 space-y-2 rounded-lg border p-3"><p className="break-words text-sm font-semibold">{category.description}</p><Amounts category={category} /></div>)}
-        </section>
+          </div>
+        </BudgetSection>
       )}
     </div>
   )

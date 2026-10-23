@@ -3,6 +3,7 @@ import { Link, useLocation, useParams, useSearch } from "wouter"
 import { projectTabFromSearch, projectWorkflowHref } from "@/lib/project-workflow"
 import { ProjectBoard } from "@/components/board/project-board"
 import { TradeBudgets } from "@/components/approvals/trade-budgets"
+import { BudgetSection } from "@/components/budget-section"
 import { 
   useGetProject, 
   getGetProjectQueryKey,
@@ -1358,35 +1359,27 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
             <TabsContent value="budget" className="space-y-6">
               {project.budgetEnabled && <TradeBudgets projectId={project.id} />}
               {project.budgetEnabled && project.unitBudget && (
-                <Card data-testid="card-unit-budget-breakdown">
-                  <CardHeader>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <CardTitle>Dwelling-type and shared-area budget</CardTitle>
-                        <CardDescription>
-                          Internal costs only. Suite trade limits use these dwelling-type category budgets; shared-area costs are tracked separately. Itemized values are supporting detail.
-                        </CardDescription>
-                      </div>
+                <BudgetSection
+                  data-testid="card-unit-budget-breakdown"
+                  title="Dwelling-type and shared-area budget"
+                  description="Internal costs only. Suite trade limits use these dwelling-type category budgets; shared-area costs are tracked separately. Itemized values are supporting detail."
+                  aside={
                       <div className="shrink-0 rounded-lg border bg-muted/30 px-4 py-3 sm:text-right">
                         <p className="text-xs text-muted-foreground">Reconciled project internal budget</p>
                         <p className="text-lg font-semibold tabular-nums" data-testid="text-unit-budget-project-total">
                           {formatCurrency(project.unitBudget.total)}
                         </p>
                       </div>
-                    </div>
-                  </CardHeader>
+                  }
+                >
                   <CardContent className="space-y-6">
                     {project.unitBudget.unitTypes.map((type) => (
-                      <section key={type.id} className="space-y-3 rounded-lg border p-4" data-testid={`section-unit-budget-${type.id}`}>
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                          <div>
-                            <h3 className="font-semibold">{type.name}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {type.unitCount.toLocaleString()} {type.unitCount === 1 ? "unit" : "units"} · {formatCurrency(type.perUnitTotal)} per unit
-                            </p>
-                          </div>
-                          <p className="font-semibold tabular-nums">{formatCurrency(type.total)} total</p>
-                        </div>
+                      <BudgetSection key={type.id} data-testid={`section-unit-budget-${type.id}`}
+                        title={type.name}
+                        description={`${type.unitCount.toLocaleString()} ${type.unitCount === 1 ? "unit" : "units"} · ${formatCurrency(type.perUnitTotal)} per unit`}
+                        aside={`${formatCurrency(type.total)} total`}
+                      >
+                        <div className="space-y-3 px-4 pb-4">
                         <div className="overflow-x-auto rounded-md border">
                           <Table className="min-w-[48rem]">
                             <TableHeader>
@@ -1427,17 +1420,14 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                         <p className="text-right text-sm font-medium tabular-nums">
                           {formatCurrency(type.perUnitTotal)} × {type.unitCount.toLocaleString()} = {formatCurrency(type.total)}
                         </p>
-                      </section>
+                        </div>
+                      </BudgetSection>
                     ))}
                     {project.unitBudget.sharedAreas.map((area) => (
-                      <section key={area.id} className="space-y-3 rounded-lg border border-dashed p-4" data-testid={`section-shared-budget-${area.id}`}>
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <h3 className="font-semibold">{area.name}</h3>
-                            <p className="text-sm text-muted-foreground">Shared or project-wide internal costs</p>
-                          </div>
-                          <p className="font-semibold tabular-nums">{formatCurrency(area.total)}</p>
-                        </div>
+                      <BudgetSection key={area.id} className="border-dashed" data-testid={`section-shared-budget-${area.id}`}
+                        title={area.name} description="Shared or project-wide internal costs" aside={formatCurrency(area.total)}
+                      >
+                        <div className="px-4 pb-4">
                         <div className="overflow-x-auto rounded-md border">
                           <Table className="min-w-[42rem]">
                             <TableHeader>
@@ -1470,14 +1460,15 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                             </TableBody>
                           </Table>
                         </div>
-                      </section>
+                        </div>
+                      </BudgetSection>
                     ))}
                     <div className="flex items-center justify-between border-t pt-4 font-semibold">
                       <span>Dwelling types and shared costs</span>
                       <span className="tabular-nums">{formatCurrency(project.unitBudget.total)}</span>
                     </div>
                   </CardContent>
-                </Card>
+                </BudgetSection>
               )}
               {(invoiceFiles.length > 0 || quoteFiles.length > 0) && (
                 <Collapsible
@@ -1537,19 +1528,16 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                 </Card>
                 </Collapsible>
               )}
-              {project.budgetEnabled && <Card>
-                <CardHeader>
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <CardTitle>Quoted vs Invoiced</CardTitle>
-                      <CardDescription>Client billing issued to {project.clientName} against the current project quote</CardDescription>
-                    </div>
+              {project.budgetEnabled && <BudgetSection
+                title="Quoted vs Invoiced"
+                description={<>Client billing issued to {project.clientName} against the current project quote</>}
+                aside={
                     <div className="flex min-w-0 items-center gap-2">
                       <ClientIdentity name={project.clientName} logoUrl={project.clientLogoUrl} size="sm" />
                       <span className="max-w-[16rem] truncate text-sm font-medium">{project.clientName}</span>
                     </div>
-                  </div>
-                </CardHeader>
+                }
+              >
                 <CardContent className="space-y-6">
                   <div className="grid gap-4 sm:grid-cols-3">
                     <div className="rounded-lg border bg-muted/30 p-4">
@@ -1618,14 +1606,8 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                     </Table>
                   )}
                 </CardContent>
-              </Card>}
-              <Card>
-                <CardHeader>
-                  <div>
-                    <CardTitle>Budget vs Invoiced Expenses</CardTitle>
-                    <CardDescription>Internal cost budget with verified expenses invoiced to Luminova; client billings are excluded.</CardDescription>
-                  </div>
-                </CardHeader>
+              </BudgetSection>}
+              <BudgetSection title="Budget vs Invoiced Expenses" description="Internal cost budget with verified expenses invoiced to Luminova; client billings are excluded.">
                 <CardContent>
                   <Table>
                     <TableHeader>
@@ -1746,13 +1728,9 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                     </TableBody>
                   </Table>
                 </CardContent>
-              </Card>
+              </BudgetSection>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Client Quote Detail</CardTitle>
-                  <CardDescription>Revision: {project.clientQuote.revision}</CardDescription>
-                </CardHeader>
+              <BudgetSection title="Client Quote Detail" description={<>Revision: {project.clientQuote.revision}</>}>
                 <CardContent>
                   <Table>
                     <TableHeader>
@@ -1774,7 +1752,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                     Total: <span className="tabular-nums ml-4">{formatCurrency(project.clientQuote.total)}</span>
                   </div>
                 </CardContent>
-              </Card>
+              </BudgetSection>
             </TabsContent>
             
             <TabsContent value="trades" className="space-y-6">
