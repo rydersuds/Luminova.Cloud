@@ -70,7 +70,7 @@ export default function SchedulePage() {
         <div>
           <p className="hud-kicker">Portfolio schedule</p>
           <h1 className="mt-2 text-4xl font-extrabold tracking-tight sm:text-5xl">Schedule</h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Every dated board item across your projects. Open a project's board to change dates or status.</p>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Every dated schedule item across your projects. Open a project's schedule to change dates or status.</p>
         </div>
         <div className="hud-segment" role="group" aria-label="Schedule view">
           <button type="button" aria-pressed={view === "timeline"} onClick={() => setView("timeline")}><GanttChartSquare className="h-3.5 w-3.5" aria-hidden="true" />Timeline</button>
@@ -117,7 +117,7 @@ export default function SchedulePage() {
           )}
 
           {scheduleItems.length === 0 ? (
-            <p className="board-empty">No board items have dates yet. Add dates to items on a project's board and they'll appear here.</p>
+            <p className="board-empty">No schedule items have dates yet. Add dates to items on a project's schedule and they'll appear here.</p>
           ) : view === "timeline" ? (
             <BoardTimeline sections={sections} emptyMessage="Every project is hidden. Turn one back on above." />
           ) : (

@@ -831,7 +831,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                             <span>
                               <span className="block text-sm font-medium">Schedule not available</span>
                               <span className="mt-1 block text-xs text-muted-foreground">
-                                Hide the project board without deleting its tasks. Clear this setting to reopen the board.
+                                Hide the project schedule without deleting its tasks. Clear this setting to reopen it.
                               </span>
                             </span>
                           </label>
@@ -895,7 +895,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
           </nav>
           <Tabs value={activeTab} onValueChange={selectTab} className="w-full">
             <TabsList className="mb-6 grid w-full grid-cols-2 md:flex md:justify-start h-auto bg-transparent gap-2 p-0">
-              {canUseBoard && <TabsTrigger value="board" className="data-[state=active]:bg-card data-[state=active]:shadow border border-transparent data-[state=active]:border-border px-4 py-2">Board</TabsTrigger>}
+              {canUseBoard && <TabsTrigger value="board" className="data-[state=active]:bg-card data-[state=active]:shadow border border-transparent data-[state=active]:border-border px-4 py-2">Schedule</TabsTrigger>}
               <TabsTrigger value="overview" className="data-[state=active]:bg-card data-[state=active]:shadow border border-transparent data-[state=active]:border-border px-4 py-2">Overview</TabsTrigger>
               <TabsTrigger value="photos" className="data-[state=active]:bg-card data-[state=active]:shadow border border-transparent data-[state=active]:border-border px-4 py-2">Photos & 360s</TabsTrigger>
               <TabsTrigger value="budget" className="data-[state=active]:bg-card data-[state=active]:shadow border border-transparent data-[state=active]:border-border px-4 py-2">Budget</TabsTrigger>

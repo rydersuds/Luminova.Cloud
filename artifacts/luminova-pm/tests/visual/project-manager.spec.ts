@@ -396,7 +396,7 @@ test('edits the project start and end dates without exposing manual progress', a
   await expect(page.getByText('74.3%', { exact: true })).toBeVisible();
 });
 
-test('hides and restores the project board without changing its tasks', async ({ page }) => {
+test('hides and restores the project schedule without changing its tasks', async ({ page }) => {
   await installIdentity(page);
   let current = { ...structuredClone(project), scheduleAvailable: true };
   const state = makeBoardState();
@@ -422,7 +422,7 @@ test('hides and restores the project board without changing its tasks', async ({
   });
 
   await page.goto('/__visual/project-panorama?tab=board');
-  await expect(page.getByRole('tab', { name: 'Board', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Schedule', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByText('Submit permit drawings', { exact: true }).first()).toBeVisible();
 
   await page.getByRole('button', { name: 'Edit Project' }).click();
@@ -431,14 +431,14 @@ test('hides and restores the project board without changing its tasks', async ({
   await scheduleUnavailable.check();
   await editDialog.getByRole('button', { name: 'Save Changes' }).click();
   await expect(editDialog).toBeHidden();
-  await expect(page.getByRole('tab', { name: 'Board', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: 'Schedule', exact: true })).toHaveCount(0);
   await expect(page.getByRole('tab', { name: 'Overview', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect.poll(() => scheduleUpdates).toEqual([false]);
   expect(state.items).toEqual(originalItems);
 
-  // A bookmarked board URL must land on Overview after the schedule is hidden.
+  // The legacy project link must land on Overview after the schedule is hidden.
   await page.goto('/__visual/project-panorama?tab=board');
-  await expect(page.getByRole('tab', { name: 'Board', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: 'Schedule', exact: true })).toHaveCount(0);
   await expect(page.getByRole('tab', { name: 'Overview', exact: true })).toHaveAttribute('aria-selected', 'true');
   expect(boardReads).toBe(1);
   expect(state.items).toEqual(originalItems);
@@ -448,7 +448,7 @@ test('hides and restores the project board without changing its tasks', async ({
   await restoreDialog.getByTestId('input-schedule-not-available').uncheck();
   await restoreDialog.getByRole('button', { name: 'Save Changes' }).click();
   await expect(restoreDialog).toBeHidden();
-  await expect(page.getByRole('tab', { name: 'Board', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Schedule', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByText('Submit permit drawings', { exact: true }).first()).toBeVisible();
   await expect.poll(() => scheduleUpdates).toEqual([false, true]);
   expect(state.items).toEqual(originalItems);
@@ -533,7 +533,7 @@ test('archived project detail shows restore and permanent-delete actions', async
   await expect(page.getByRole('button', { name: 'Archive project', exact: true })).toHaveCount(0);
 });
 
-test('shows project board groups and scheduled work', async ({ page }) => {
+test('shows the project schedule and preserves legacy board navigation', async ({ page }) => {
   await installIdentity(page, 'Project Manager');
   await page.route('**/api/projects/riverstone', route => route.fulfill({
     json: {
@@ -574,8 +574,10 @@ test('shows project board groups and scheduled work', async ({ page }) => {
   }));
 
   await page.goto('/__visual/project-panorama?tab=board');
-  await expect(page.getByRole('tab', { name: 'Board', exact: true })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByRole('region', { name: 'Project board' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Schedule', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page).toHaveURL(/tab=board/);
+  await expect(page.getByRole('region', { name: 'Project schedule' })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Schedule view' })).toBeVisible();
   await expect(page.getByText('Pre-construction', { exact: true })).toBeVisible();
   await expect(page.getByText('Submit permit drawings', { exact: true }).first()).toBeVisible();
 
@@ -585,9 +587,14 @@ test('shows project board groups and scheduled work', async ({ page }) => {
     await expect(control).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByText('Submit permit drawings', { exact: true }).first()).toBeVisible();
   }
+  await page.getByRole('tab', { name: 'Overview', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Project' }).click();
+  const settings = page.getByRole('dialog', { name: 'Edit Project' });
+  await expect(settings.getByText('Schedule not available', { exact: true })).toBeVisible();
+  await expect(settings).toContainText('Hide the project schedule without deleting its tasks.');
 });
 
-test('reviews, fixes, maps, and confirms imported board rows before appending them', async ({ page }) => {
+test('reviews, fixes, maps, and imports schedule rows from the legacy board link', async ({ page }) => {
   const state = makeBoardState([]);
   await installProjectBoard(page, state);
   await page.route('**/api/projects/riverstone/board/import/preview', route => route.fulfill({
@@ -632,7 +639,7 @@ test('reviews, fixes, maps, and confirms imported board rows before appending th
   });
 
   await page.goto('/__visual/project-panorama?tab=board');
-  await page.getByTestId('button-import-board-file').click();
+  await page.getByRole('button', { name: 'Import schedule', exact: true }).click();
   const chooser = page.getByTestId('input-board-import-file');
   await chooser.setInputFiles({ name: 'notes.json', mimeType: 'application/json', buffer: Buffer.from('{}') });
   await expect(page.getByTestId('alert-board-import')).toContainText('Choose a CSV, XLSX, PDF, JPEG, or PNG file.');
@@ -640,6 +647,7 @@ test('reviews, fixes, maps, and confirms imported board rows before appending th
   await chooser.setInputFiles({ name: 'schedule.csv', mimeType: 'text/csv', buffer: Buffer.from('Task,Group\\nPermit review,Pre-construction') });
   const dialog = page.getByRole('dialog', { name: 'Import schedule rows' });
   await expect(dialog.getByTestId('text-board-import-count')).toHaveText('2 rows detected');
+  await expect(dialog.getByLabel('Map Electrical to schedule group')).toBeVisible();
   await expect(dialog.getByTestId('button-confirm-board-import')).toBeDisabled();
   await dialog.getByLabel('Task name for row 3').fill('Install electrical rough-in');
   await dialog.getByLabel('New group name for Electrical').fill('Electrical rough-in');
@@ -679,8 +687,11 @@ test('shows portfolio schedule items and switches to calendar view', async ({ pa
 
   await page.goto('/__visual/schedule');
   await expect(page.getByRole('heading', { name: 'Schedule', exact: true })).toBeVisible();
+  await expect(page.getByText("Every dated schedule item across your projects. Open a project's schedule to change dates or status.", { exact: true })).toBeVisible();
   const weekSection = page.getByRole('region', { name: 'Happening this week' });
-  await expect(weekSection.getByText('Submit permit drawings', { exact: true })).toBeVisible();
+  const taskLink = weekSection.getByRole('link', { name: /Submit permit drawings/ });
+  await expect(taskLink).toBeVisible();
+  await expect(taskLink).toHaveAttribute('href', '/projects/riverstone?tab=board');
   const calendarButton = page.getByRole('button', { name: 'Calendar', exact: true });
   await calendarButton.click();
   await expect(calendarButton).toHaveAttribute('aria-pressed', 'true');

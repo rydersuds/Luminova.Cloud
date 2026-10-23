@@ -220,7 +220,7 @@ export function ProjectBoardImport({ projectId, groups, actions }: Props) {
         data-testid="button-import-board-file"
       >
         <FileUp className="h-4 w-4" aria-hidden="true" />
-        Import file
+        Import schedule
       </button>
       <Dialog open={open} onOpenChange={close}>
         <DialogContent className="flex max-h-[92dvh] w-[min(96vw,76rem)] max-w-none flex-col overflow-hidden p-0">
@@ -243,7 +243,7 @@ export function ProjectBoardImport({ projectId, groups, actions }: Props) {
                 disabled={loading || saving}
                 accept=".csv,.xlsx,.pdf,.jpg,.jpeg,.png"
                 className="sr-only"
-                aria-label="Choose a board import file"
+                aria-label="Choose a schedule import file"
                 data-testid="input-board-import-file"
                 onChange={(event) => {
                   void receiveFile(event.target.files?.[0])
@@ -266,7 +266,7 @@ export function ProjectBoardImport({ projectId, groups, actions }: Props) {
                 <section aria-labelledby="board-import-group-heading" className="space-y-3 rounded-lg border p-4">
                   <div>
                     <h3 id="board-import-group-heading" className="text-sm font-semibold">Map detected groups</h3>
-                    <p className="text-xs text-muted-foreground">Choose an existing board group or create a new group for each detected section.</p>
+                    <p className="text-xs text-muted-foreground">Choose an existing schedule group or create a new group for each detected section.</p>
                   </div>
                   {groupNames.map((key) => {
                     const mapping = mappings[key]
@@ -276,13 +276,13 @@ export function ProjectBoardImport({ projectId, groups, actions }: Props) {
                         <span className="truncate text-sm" title={sourceLabel(key === "__unassigned__" ? null : key)}>{sourceLabel(key === "__unassigned__" ? null : key)}</span>
                         <div className="flex min-w-0 flex-wrap gap-2">
                           <select
-                            aria-label={`Map ${sourceLabel(key === "__unassigned__" ? null : key)} to board group`}
+                            aria-label={`Map ${sourceLabel(key === "__unassigned__" ? null : key)} to schedule group`}
                             data-testid={`select-board-import-group-${key}`}
                             value={isNew ? "__create__" : mapping?.targetRef ?? ""}
                             onChange={(event) => changeMapping(key, event.target.value)}
                             className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm"
                           >
-                            {!mapping && <option value="">Choose a board group</option>}
+                            {!mapping && <option value="">Choose a schedule group</option>}
                             {groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
                             <option value="__create__">Create a new group…</option>
                           </select>
@@ -393,7 +393,7 @@ export function ProjectBoardImport({ projectId, groups, actions }: Props) {
                 data-testid="button-confirm-board-import"
               >
                 {saving && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />}
-                Add {rows.length} {rows.length === 1 ? "row" : "rows"} to board
+                Add {rows.length} {rows.length === 1 ? "row" : "rows"} to schedule
               </button>
             )}
           </DialogFooter>

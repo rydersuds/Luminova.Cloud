@@ -68,12 +68,12 @@ export function ProjectBoard({ projectId }: { projectId: string }) {
     section.entries.map((entry) => ({ ...entry, color: entry.color ?? section.color }))), [sections])
 
   if (board.isLoading) {
-    return <div className="space-y-3" aria-busy="true" aria-label="Loading board">{[0, 1, 2].map((key) => <div key={key} className="skeleton-line h-14" />)}</div>
+    return <div className="space-y-3" aria-busy="true" aria-label="Loading schedule">{[0, 1, 2].map((key) => <div key={key} className="skeleton-line h-14" />)}</div>
   }
   if (board.isError || !data || invalidBoardData) {
     return (
       <div className="board-empty" role="alert">
-        The board couldn't be loaded. <button type="button" className="underline" onClick={() => void board.refetch()}>Try again</button>
+        The schedule couldn't be loaded. <button type="button" className="underline" onClick={() => void board.refetch()}>Try again</button>
       </div>
     )
   }
@@ -85,7 +85,7 @@ export function ProjectBoard({ projectId }: { projectId: string }) {
   const onDatesChange = (id: string, dates: { startDate: string; endDate: string }) => void board.updateItem(id, dates)
 
   return (
-    <section aria-label="Project board" className="space-y-5">
+    <section aria-label="Project schedule" className="space-y-5">
       <div className="board-stats">
         <Stat label="Items" value={String(items.length)} />
         <Stat label="Done" value={items.length ? `${Math.round((done / items.length) * 100)}%` : "—"} />
@@ -95,7 +95,7 @@ export function ProjectBoard({ projectId }: { projectId: string }) {
       </div>
 
       <div className="board-toolbar">
-        <div className="hud-segment" role="group" aria-label="Board view">
+        <div className="hud-segment" role="group" aria-label="Schedule view">
           {VIEWS.map(({ id, label, icon: Icon }) => (
             <button key={id} type="button" aria-pressed={view === id} onClick={() => chooseView(id)}>
               <Icon className="h-3.5 w-3.5" aria-hidden="true" />{label}

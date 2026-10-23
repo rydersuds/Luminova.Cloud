@@ -144,7 +144,7 @@ export function useBoard(projectId: string, enabled = true) {
       settle()
       return created
     } catch (error) {
-      toast({ title: "Board import not saved", description: errorMessage(error), variant: "destructive" })
+      toast({ title: "Schedule import not saved", description: errorMessage(error), variant: "destructive" })
       return null
     }
   }, [projectId, queryClient, key, settle, toast])

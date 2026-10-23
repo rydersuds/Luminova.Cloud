@@ -222,7 +222,7 @@ function GroupHeader({ group, count, collapsed, onToggle, actions, canDelete }: 
               {confirming ? `Delete group and its ${count} ${count === 1 ? "item" : "items"}` : "Delete group"}
             </DropdownMenuItem>
           ) : (
-            <DropdownMenuItem disabled>A board needs at least one group</DropdownMenuItem>
+            <DropdownMenuItem disabled>A schedule needs at least one group</DropdownMenuItem>
           )}
         </DropdownMenuContent>
       </DropdownMenu>

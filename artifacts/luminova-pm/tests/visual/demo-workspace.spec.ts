@@ -62,7 +62,9 @@ test('simulates project, panorama, schedule, quote, and invoice workflows, then 
   await page.getByTestId('select-project-status').selectOption('Watch');
   await expect(page.getByTestId('text-project-count')).toHaveText('1 projects');
   await page.getByTestId('card-project-northline').click();
-  await page.getByTestId('tab-project-board').click();
+  await expect(page.getByTestId('tab-project-schedule')).toBeVisible();
+  await page.getByTestId('tab-project-schedule').click();
+  await expect(page.getByTestId('select-board-filter')).toHaveAttribute('aria-label', 'Filter schedule by status');
   await page.getByTestId('select-status-b4').selectOption('Done');
   await expect(page.getByTestId('select-status-b4')).toHaveValue('Done');
 
