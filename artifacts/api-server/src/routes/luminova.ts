@@ -225,6 +225,7 @@ import {
   boundProjectImportDocumentSnippets,
   enrichFinancialDocumentSnippets,
   extractInternalBudgetFromDocuments,
+  type InternalBudgetBreakdown,
   type InternalBudgetLineItem,
 }
 
@@ -1961,6 +1962,9 @@ type Project = (typeof projects)[number] &
 
 
   budgetLineItems?: InternalBudgetLineItem[]
+;
+
+  unitBudget?: InternalBudgetBreakdown
 ;
 
   budgetEnabled?: boolean
@@ -4419,6 +4423,7 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
       scheduleAvailable: project.scheduleAvailable !== false,
       startDate: resolveProjectStartDate(project),
       clientQuote,
+      ...(project.unitBudget ? { unitBudget: project.unitBudget } : {}),
       lineItems: (project.budgetLineItems ?? []).map(line => {
         const current = currentBudgetById.get(line.id);
         return current ? { ...line, invoiced: current.used, variance: Math.round((line.budgeted - current.used) * 100) / 100 } : line;

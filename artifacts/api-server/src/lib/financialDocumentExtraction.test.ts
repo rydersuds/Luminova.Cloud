@@ -8,6 +8,7 @@ import {
   isFinancialDocumentPath,
   isInternalBudgetDocumentPath,
 } from "./financialDocumentExtraction";
+import { purchaseApproval, remainingTradeBudgets } from "./invoiceBudget";
 
 test("recognizes contracts and agreements as financial documents without treating them as internal budgets", () => {
   assert.equal(isFinancialDocumentPath("Client/Executed Agreement.pdf"), true);
@@ -86,6 +87,100 @@ test("does not infer an internal budget from a client-facing contract price colu
 
   const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
   const result = await extractWorkbookInternalBudget(buffer, "Project/Client Contract.xlsx");
+
+  assert.equal(result, null);
+});
+
+test("extracts mixed dwelling types and shared costs without adding client charges or profit", async () => {
+  const workbook = new ExcelJS.Workbook();
+  const units = workbook.addWorksheet("Pricing Units");
+  units.addRow(["", "", "", "1 BED", "1 BED", "2 BED", "2 BED"]);
+  units.addRow(["", "", "", 150, 150, 280, 280]);
+  units.addRow(["", "UNIT", "RATE", "QTY", "TOTAL", "QTY", "TOTAL"]);
+  units.addRow(["DRYWALL", null, null, null, 100, null, 200]);
+  units.addRow(["Wallboard", "SQFT", 10, 10, 100, 20, 200]);
+  units.addRow(["Unpriced allowance", "LOT", null, 1, null, 1, null]);
+  units.addRow(["CABINETS", null, null, null, 50, null, 80]);
+  units.addRow(["Cabinet install", "HOUR", 25, 2, 50, 3.2, 80]);
+  units.addRow(["UNIT SUMMARY"]);
+  units.addRow(["1 BEDROOM", "EACH", 150, 2, 300]);
+  units.addRow(["2 BEDROOM", "EACH", 280, 3, 840]);
+  units.addRow(["COMMON AREA", null, null, null, 60]);
+  units.addRow(["Shared hall cleaning", "HOUR", 10, 6, 60]);
+  units.addRow(["MISCELLANEOUS", null, null, null, 30]);
+  units.addRow(["Waste removal", "LOT", 30, 1, 30]);
+  units.addRow(["GRAND TOTAL NOT INCLUDING TAX", null, null, null, 1_230]);
+  const pricing = workbook.addWorksheet("Project pricing");
+  pricing.addRow(["Description", "OUR COST", "Client Price", "Profit"]);
+  pricing.addRow(["Project", 999_999, 2_000_000, 1_000_001]);
+
+  const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+  const result = await extractWorkbookInternalBudget(buffer, "Project/Cost Plan.xlsx");
+
+  assert.equal(result?.total, 1_230);
+  assert.deepEqual(result?.unitBudget?.unitTypes.map((type) => [
+    type.name,
+    type.unitCount,
+    type.perUnitTotal,
+    type.total,
+  ]), [
+    ["1 BED", 2, 150, 300],
+    ["2 BED", 3, 280, 840],
+  ]);
+  assert.deepEqual(result?.unitBudget?.sharedAreas.map((area) => [area.name, area.total]), [
+    ["Common areas", 60],
+    ["Project-wide costs", 30],
+  ]);
+  assert.deepEqual(result?.lineItems.map((item) => [item.description, item.budgeted]), [
+    ["DRYWALL", 800],
+    ["CABINETS", 340],
+    ["Common areas", 60],
+    ["Project-wide costs", 30],
+  ]);
+  assert.equal(result?.lineItems.reduce((sum, item) => sum + item.budgeted, 0), result?.total);
+  assert.deepEqual(result?.unitBudget?.unitTypes[0].lineItems[0], {
+    id: "unit-1-5",
+    category: "DRYWALL",
+    description: "Wallboard",
+    unit: "SQFT",
+    quantity: 10,
+    rate: 10,
+    budgeted: 100,
+  });
+  assert.equal(result?.unitBudget?.sharedAreas[0].lineItems[0].budgeted, 60);
+  const unpriced = result?.unitBudget?.unitTypes[0].lineItems.find((item) => item.description === "Unpriced allowance");
+  assert.equal(unpriced?.rate, null);
+  assert.equal(unpriced?.budgeted, null);
+  const purchaseCategories = remainingTradeBudgets(result?.lineItems ?? [], [
+    { amount: 100, budgetLineItemId: "internal-budget-1", submittedById: "pm" },
+  ]);
+  assert.equal(purchaseCategories[0].budgeted, 800);
+  assert.equal(purchaseCategories[0].remaining, 700);
+  assert.equal(purchaseApproval(purchaseCategories[0], 700).status, "Auto-approved");
+  assert.equal(purchaseApproval(purchaseCategories[0], 700.01).status, "Pending approval");
+});
+
+test("does not retain a unit breakdown when source unit subtotals fail reconciliation", async () => {
+  const workbook = new ExcelJS.Workbook();
+  const units = workbook.addWorksheet("Pricing Units");
+  units.addRow(["", "", "", "1 BED", "1 BED", "2 BED", "2 BED"]);
+  units.addRow(["", "", "", 150, 150, 280, 280]);
+  units.addRow(["", "UNIT", "RATE", "QTY", "TOTAL", "QTY", "TOTAL"]);
+  units.addRow(["DRYWALL", null, null, null, 100, null, 200]);
+  units.addRow(["Wallboard", "SQFT", 10, 10, 100, 20, 200]);
+  units.addRow(["CABINETS", null, null, null, 50, null, 80]);
+  units.addRow(["Cabinet install", "HOUR", 25, 2, 50, 3.2, 80]);
+  units.addRow(["UNIT SUMMARY"]);
+  units.addRow(["1 BEDROOM", "EACH", 150, 2, 300]);
+  units.addRow(["2 BEDROOM", "EACH", 280, 3, 840]);
+  units.addRow(["COMMON AREA", null, null, null, 60]);
+  units.addRow(["Shared hall cleaning", "HOUR", 10, 6, 60]);
+  units.addRow(["GRAND TOTAL NOT INCLUDING TAX", null, null, null, 1_199]);
+  const pricing = workbook.addWorksheet("Project pricing");
+  pricing.addRow(["Description", "OUR COST", "Client Price", "Profit"]);
+
+  const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+  const result = await extractWorkbookInternalBudget(buffer, "Project/Cost Plan.xlsx");
 
   assert.equal(result, null);
 });

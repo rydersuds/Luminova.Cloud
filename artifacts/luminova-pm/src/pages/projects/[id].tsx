@@ -1354,6 +1354,123 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
 
             <TabsContent value="budget" className="space-y-6">
               {project.budgetEnabled && <TradeBudgets projectId={project.id} />}
+              {project.budgetEnabled && project.unitBudget && (
+                <Card data-testid="card-unit-budget-breakdown">
+                  <CardHeader>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <CardTitle>Dwelling-type and shared-area budget</CardTitle>
+                        <CardDescription>
+                          Internal costs only. Itemized values are supporting detail; category budgets remain the authority for purchase limits.
+                        </CardDescription>
+                      </div>
+                      <div className="shrink-0 rounded-lg border bg-muted/30 px-4 py-3 sm:text-right">
+                        <p className="text-xs text-muted-foreground">Reconciled project internal budget</p>
+                        <p className="text-lg font-semibold tabular-nums" data-testid="text-unit-budget-project-total">
+                          {formatCurrency(project.unitBudget.total)}
+                        </p>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {project.unitBudget.unitTypes.map((type) => (
+                      <section key={type.id} className="space-y-3 rounded-lg border p-4" data-testid={`section-unit-budget-${type.id}`}>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <h3 className="font-semibold">{type.name}</h3>
+                            <p className="text-sm text-muted-foreground">
+                              {type.unitCount.toLocaleString()} {type.unitCount === 1 ? "unit" : "units"} · {formatCurrency(type.perUnitTotal)} per unit
+                            </p>
+                          </div>
+                          <p className="font-semibold tabular-nums">{formatCurrency(type.total)} total</p>
+                        </div>
+                        <div className="overflow-x-auto rounded-md border">
+                          <Table className="min-w-[48rem]">
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Category</TableHead>
+                                <TableHead>Work item</TableHead>
+                                <TableHead className="text-right">Quantity</TableHead>
+                                <TableHead>Unit</TableHead>
+                                <TableHead className="text-right">Internal rate</TableHead>
+                                <TableHead className="text-right">Extended per unit</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {type.lineItems.map((item) => (
+                                <TableRow key={item.id} data-testid={`row-unit-budget-item-${item.id}`}>
+                                  <TableCell className="text-muted-foreground">{item.category}</TableCell>
+                                  <TableCell className="font-medium">{item.description}</TableCell>
+                                  <TableCell className="text-right tabular-nums">
+                                    {item.quantity === null ? "—" : item.quantity.toLocaleString()}
+                                  </TableCell>
+                                  <TableCell>{item.unit ?? "—"}</TableCell>
+                                  <TableCell className="text-right tabular-nums">
+                                    {item.rate === null ? "—" : formatCurrency(item.rate)}
+                                  </TableCell>
+                                  <TableCell className="text-right tabular-nums">
+                                    {item.budgeted === null ? "Not provided" : formatCurrency(item.budgeted)}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                        <p className="text-right text-sm font-medium tabular-nums">
+                          {formatCurrency(type.perUnitTotal)} × {type.unitCount.toLocaleString()} = {formatCurrency(type.total)}
+                        </p>
+                      </section>
+                    ))}
+                    {project.unitBudget.sharedAreas.map((area) => (
+                      <section key={area.id} className="space-y-3 rounded-lg border border-dashed p-4" data-testid={`section-shared-budget-${area.id}`}>
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <h3 className="font-semibold">{area.name}</h3>
+                            <p className="text-sm text-muted-foreground">Shared or project-wide internal costs</p>
+                          </div>
+                          <p className="font-semibold tabular-nums">{formatCurrency(area.total)}</p>
+                        </div>
+                        <div className="overflow-x-auto rounded-md border">
+                          <Table className="min-w-[42rem]">
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Category</TableHead>
+                                <TableHead>Work item</TableHead>
+                                <TableHead className="text-right">Quantity</TableHead>
+                                <TableHead>Unit</TableHead>
+                                <TableHead className="text-right">Internal rate</TableHead>
+                                <TableHead className="text-right">Extended cost</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {area.lineItems.map((item) => (
+                                <TableRow key={item.id} data-testid={`row-shared-budget-item-${item.id}`}>
+                                  <TableCell className="text-muted-foreground">{item.category}</TableCell>
+                                  <TableCell className="font-medium">{item.description}</TableCell>
+                                  <TableCell className="text-right tabular-nums">
+                                    {item.quantity === null ? "—" : item.quantity.toLocaleString()}
+                                  </TableCell>
+                                  <TableCell>{item.unit ?? "—"}</TableCell>
+                                  <TableCell className="text-right tabular-nums">
+                                    {item.rate === null ? "—" : formatCurrency(item.rate)}
+                                  </TableCell>
+                                  <TableCell className="text-right tabular-nums">
+                                    {item.budgeted === null ? "Not provided" : formatCurrency(item.budgeted)}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </section>
+                    ))}
+                    <div className="flex items-center justify-between border-t pt-4 font-semibold">
+                      <span>Dwelling types and shared costs</span>
+                      <span className="tabular-nums">{formatCurrency(project.unitBudget.total)}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
               {(invoiceFiles.length > 0 || quoteFiles.length > 0) && (
                 <Card>
                   <CardHeader>
@@ -1548,20 +1665,21 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                                 aria-hidden={!isExpanded}
                                 data-testid={`row-budget-details-${item.id}`}
                               >
-                                <TableCell colSpan={5} className="p-0">
+                                <TableCell colSpan={6} className="p-0">
                                   <div className="space-y-3 p-4">
                                     <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Itemized details from workbook</p>
                                       <p className="text-xs text-muted-foreground">Internal cost only</p>
                                     </div>
                                     <div className="overflow-x-auto rounded-md border bg-card">
-                                      <Table className="min-w-[38rem]">
+                                      <Table className="min-w-[44rem]">
                                         <TableHeader>
                                           <TableRow>
                                             <TableHead>Work item</TableHead>
                                             <TableHead className="text-right">Quantity</TableHead>
                                             <TableHead>Unit</TableHead>
-                                            <TableHead className="text-right">Internal cost</TableHead>
+                                            <TableHead className="text-right">Internal rate</TableHead>
+                                            <TableHead className="text-right">Extended cost</TableHead>
                                           </TableRow>
                                         </TableHeader>
                                         <TableBody>
@@ -1572,6 +1690,9 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
                                                 {detail.quantity === null ? "—" : detail.quantity.toLocaleString()}
                                               </TableCell>
                                               <TableCell>{detail.unit ?? "—"}</TableCell>
+                                              <TableCell className="text-right tabular-nums">
+                                                {detail.rate == null ? "—" : formatCurrency(detail.rate)}
+                                              </TableCell>
                                               <TableCell className="text-right tabular-nums">
                                                 {detail.budgeted === null
                                                   ? <span className="text-xs text-muted-foreground">Not provided</span>

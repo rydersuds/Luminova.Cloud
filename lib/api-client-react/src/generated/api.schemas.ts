@@ -342,6 +342,19 @@ export interface ClientQuote {
   portions: QuotePortion[];
 }
 
+export interface ProjectUnitBudgetLineItem {
+  id: string;
+  category: string;
+  description: string;
+  /** @nullable */
+  unit: string | null;
+  /** @nullable */
+  quantity: number | null;
+  /** @nullable */
+  rate: number | null;
+  /** @nullable */
+  budgeted: number | null;
+}
 export interface BudgetLineItemDetail {
   id: string;
   description: string;
@@ -351,6 +364,8 @@ export interface BudgetLineItemDetail {
   quantity: number | null;
   /** @nullable */
   budgeted: number | null;
+  /** @nullable */
+  rate?: number | null;
 }
 
 export interface BudgetLineItem {
@@ -541,6 +556,7 @@ export interface ScheduleImage {
 
 export type ProjectDetail = Project & {
   clientQuote: ClientQuote;
+  unitBudget?: ProjectUnitBudget;
   lineItems: BudgetLineItem[];
   invoices: Invoice[];
   trades: Trade[];
@@ -1673,3 +1689,26 @@ trade?: string;
 status?: VendorQuoteStatus;
 direction?: QuoteDirection;
 };
+
+export interface ProjectUnitBudget {
+  unitTypes: ProjectUnitBudgetType[];
+  sharedAreas: ProjectSharedBudgetArea[];
+  total: number;
+}
+
+export interface ProjectUnitBudgetType {
+  id: string;
+  name: string;
+  /** @minimum 1 */
+  unitCount: number;
+  perUnitTotal: number;
+  total: number;
+  lineItems: ProjectUnitBudgetLineItem[];
+}
+
+export interface ProjectSharedBudgetArea {
+  id: string;
+  name: string;
+  total: number;
+  lineItems: ProjectUnitBudgetLineItem[];
+}

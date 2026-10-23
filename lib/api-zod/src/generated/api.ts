@@ -195,6 +195,39 @@ export const GetProjectResponse = zod.object({
   "amount": zod.number()
 }))
 }),
+  "unitBudget": zod.object({
+  "unitTypes": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "unitCount": zod.number().int().min(1),
+  "perUnitTotal": zod.number(),
+  "total": zod.number(),
+  "lineItems": zod.array(zod.object({
+  "id": zod.string(),
+  "category": zod.string(),
+  "description": zod.string(),
+  "unit": zod.string().nullable(),
+  "quantity": zod.number().nullable(),
+  "rate": zod.number().nullable(),
+  "budgeted": zod.number().nullable()
+}))
+})),
+  "sharedAreas": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "total": zod.number(),
+  "lineItems": zod.array(zod.object({
+  "id": zod.string(),
+  "category": zod.string(),
+  "description": zod.string(),
+  "unit": zod.string().nullable(),
+  "quantity": zod.number().nullable(),
+  "rate": zod.number().nullable(),
+  "budgeted": zod.number().nullable()
+}))
+})),
+  "total": zod.number()
+}).optional(),
   "lineItems": zod.array(zod.object({
   "id": zod.string(),
   "code": zod.string(),
@@ -207,7 +240,8 @@ export const GetProjectResponse = zod.object({
   "description": zod.string(),
   "unit": zod.string().nullable(),
   "quantity": zod.number().nullable(),
-  "budgeted": zod.number().nullable()
+  "budgeted": zod.number().nullable(),
+  "rate": zod.number().nullish()
 })).optional()
 })),
   "invoices": zod.array(zod.object({
@@ -510,6 +544,39 @@ export const GetArchivedProjectResponse = zod.object({
   "amount": zod.number()
 }))
 }),
+  "unitBudget": zod.object({
+  "unitTypes": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "unitCount": zod.number().int().min(1),
+  "perUnitTotal": zod.number(),
+  "total": zod.number(),
+  "lineItems": zod.array(zod.object({
+  "id": zod.string(),
+  "category": zod.string(),
+  "description": zod.string(),
+  "unit": zod.string().nullable(),
+  "quantity": zod.number().nullable(),
+  "rate": zod.number().nullable(),
+  "budgeted": zod.number().nullable()
+}))
+})),
+  "sharedAreas": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "total": zod.number(),
+  "lineItems": zod.array(zod.object({
+  "id": zod.string(),
+  "category": zod.string(),
+  "description": zod.string(),
+  "unit": zod.string().nullable(),
+  "quantity": zod.number().nullable(),
+  "rate": zod.number().nullable(),
+  "budgeted": zod.number().nullable()
+}))
+})),
+  "total": zod.number()
+}).optional(),
   "lineItems": zod.array(zod.object({
   "id": zod.string(),
   "code": zod.string(),
@@ -522,7 +589,8 @@ export const GetArchivedProjectResponse = zod.object({
   "description": zod.string(),
   "unit": zod.string().nullable(),
   "quantity": zod.number().nullable(),
-  "budgeted": zod.number().nullable()
+  "budgeted": zod.number().nullable(),
+  "rate": zod.number().nullish()
 })).optional()
 })),
   "invoices": zod.array(zod.object({

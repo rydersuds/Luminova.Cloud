@@ -13,11 +13,13 @@ import type { Panorama } from './panorama';
 import type { Photo } from './photo';
 import type { Project } from './project';
 import type { ProjectFile } from './projectFile';
+import type { ProjectUnitBudget } from './projectUnitBudget';
 import type { ScheduleImage } from './scheduleImage';
 import type { Trade } from './trade';
 
 export type ProjectDetail = Project & {
   clientQuote: ClientQuote;
+  unitBudget?: ProjectUnitBudget;
   lineItems: BudgetLineItem[];
   invoices: Invoice[];
   trades: Trade[];

@@ -31,6 +31,39 @@ export type InternalBudgetLineItemDetail = {
   unit: string | null;
   quantity: number | null;
   budgeted: number | null;
+  rate?: number | null;
+};
+
+export type InternalUnitBudgetLineItem = {
+  id: string;
+  category: string;
+  description: string;
+  unit: string | null;
+  quantity: number | null;
+  rate: number | null;
+  budgeted: number | null;
+};
+
+export type InternalUnitBudgetType = {
+  id: string;
+  name: string;
+  unitCount: number;
+  perUnitTotal: number;
+  total: number;
+  lineItems: InternalUnitBudgetLineItem[];
+};
+
+export type InternalSharedBudgetArea = {
+  id: string;
+  name: string;
+  total: number;
+  lineItems: InternalUnitBudgetLineItem[];
+};
+
+export type InternalBudgetBreakdown = {
+  unitTypes: InternalUnitBudgetType[];
+  sharedAreas: InternalSharedBudgetArea[];
+  total: number;
 };
 
 export type InternalBudgetLineItem = {
@@ -47,6 +80,7 @@ export type ExtractedInternalBudget = {
   sourceRelativePath: string;
   total: number;
   lineItems: InternalBudgetLineItem[];
+  unitBudget?: InternalBudgetBreakdown;
 };
 
 const MAX_DOCUMENT_BYTES = 15 * 1024 * 1024;
@@ -221,7 +255,7 @@ async function extractWorkbook(buffer: Buffer) {
     if (numericValue !== null) {
       return /[$€£]|0\.00/.test(cell.numFmt) ? numericValue.toFixed(2) : String(numericValue);
     }
-    return cell.text.trim();
+    return safeCellText(cell);
   };
   workbook.eachSheet((sheet) => {
     lines.push(`Worksheet: ${sheet.name}`);
@@ -240,13 +274,25 @@ const currencyValue = (cell: ExcelJS.Cell) => {
   if (value && typeof value === "object" && "result" in value && typeof value.result === "number" && Number.isFinite(value.result)) {
     return value.result;
   }
-  const text = cell.text.trim().replace(/[−–]/g, "-");
+  const text = safeCellText(cell).replace(/[−–]/g, "-");
   if (!text) return null;
   const isParenthesizedNegative = /^\(.*\)$/.test(text);
   const numericText = text.replace(/[^\d.-]/g, "");
   const parsed = Number(numericText);
   if (!Number.isFinite(parsed)) return null;
   return isParenthesizedNegative ? -Math.abs(parsed) : parsed;
+};
+
+const safeCellText = (cell: ExcelJS.Cell) => {
+  try {
+    return cell.text.trim();
+  } catch {
+    return typeof cell.value === "string" ? cell.value.trim() : "";
+  }
+};
+
+const measurementUnit = (cell: ExcelJS.Cell) => {
+  return typeof cell.value === "string" ? safeCellText(cell) || null : null;
 };
 
 const roundCurrency = (value: number) => Math.round(value * 100) / 100;
@@ -266,16 +312,16 @@ function findInternalBudgetTable(sheet: ExcelJS.Worksheet): BudgetTableColumns |
   for (let rowNumber = 1; rowNumber <= maxHeaderRow; rowNumber += 1) {
     const row = sheet.getRow(rowNumber);
     const columns = Array.from({ length: row.cellCount }, (_, index) => index + 1);
-    const descriptionColumn = columns.find((column) => descriptionHeaderPattern.test(row.getCell(column).text));
+    const descriptionColumn = columns.find((column) => descriptionHeaderPattern.test(safeCellText(row.getCell(column))));
     const amountColumns = columns.filter((column) => {
-      const header = row.getCell(column).text;
+      const header = safeCellText(row.getCell(column));
       return internalBudgetAmountHeaderPattern.test(header) && !clientFacingAmountHeaderPattern.test(header);
     });
     if (!descriptionColumn || amountColumns.length === 0) continue;
 
     amountColumns.sort((left, right) => {
       const score = (column: number) => {
-        const header = row.getCell(column).text;
+        const header = safeCellText(row.getCell(column));
         if (/internal|our cost|luminova/i.test(header)) return 3;
         if (/budget/i.test(header)) return 2;
         return 1;
@@ -292,8 +338,8 @@ function hasClientFacingFinancialHeader(sheet: ExcelJS.Worksheet) {
   for (let rowNumber = 1; rowNumber <= maxHeaderRow; rowNumber += 1) {
     const row = sheet.getRow(rowNumber);
     const columns = Array.from({ length: row.cellCount }, (_, index) => index + 1);
-    const hasDescription = columns.some((column) => descriptionHeaderPattern.test(row.getCell(column).text));
-    const hasClientAmount = columns.some((column) => clientFacingAmountHeaderPattern.test(row.getCell(column).text));
+    const hasDescription = columns.some((column) => descriptionHeaderPattern.test(safeCellText(row.getCell(column))));
+    const hasClientAmount = columns.some((column) => clientFacingAmountHeaderPattern.test(safeCellText(row.getCell(column))));
     if (hasDescription && hasClientAmount) return true;
   }
   return false;
@@ -349,7 +395,7 @@ function extractBudgetTable(
   const totals: Array<{ amount: number; score: number }> = [];
   sheet.eachRow((row, rowNumber) => {
     if (rowNumber <= columns.headerRow) return;
-    const description = row.getCell(columns.descriptionColumn).text.trim();
+    const description = safeCellText(row.getCell(columns.descriptionColumn));
     const amount = currencyValue(row.getCell(columns.amountColumn));
     if (!description || amount === null || amount < 0) return;
     const score = budgetTotalScore(description);
@@ -367,7 +413,7 @@ function extractLegacyBudgetSummary(sheet: ExcelJS.Worksheet, sourceRelativePath
   const rows: Array<{ description: string; amount: number }> = [];
   const totals: Array<{ amount: number; score: number }> = [];
   sheet.eachRow((row) => {
-    const description = row.getCell(2).text.trim();
+    const description = safeCellText(row.getCell(2));
     const amount = currencyValue(row.getCell(3));
     if (!description || amount === null || amount < 0) return;
     const score = budgetTotalScore(description);
@@ -381,9 +427,279 @@ function extractLegacyBudgetSummary(sheet: ExcelJS.Worksheet, sourceRelativePath
   return assembleInternalBudget(sourceRelativePath, rows, totals);
 }
 
+const unitTypePattern = /\b(?:\d+\s*(?:bed(?:room)?s?|br)|studio|micro[\s-]?suite)\b/i;
+const normalizeUnitType = (value: string) =>
+  value.toLowerCase().replace(/\bbed\b/g, "bedroom").replace(/\s+/g, " ").trim();
+
+function unitTypeNameForColumn(sheet: ExcelJS.Worksheet, headerRow: number, column: number) {
+  for (let rowNumber = headerRow - 1; rowNumber >= Math.max(1, headerRow - 3); rowNumber -= 1) {
+    const row = sheet.getRow(rowNumber);
+    for (const headerColumn of [column, column - 1]) {
+      if (headerColumn < 1) continue;
+      const value = safeCellText(row.getCell(headerColumn));
+      if (unitTypePattern.test(value)) return value;
+    }
+  }
+  return null;
+}
+
+function workbookHasInternalCostEvidence(workbook: ExcelJS.Workbook) {
+  return workbook.worksheets.some((sheet) => {
+    const maxRow = Math.min(sheet.rowCount, 30);
+    for (let rowNumber = 1; rowNumber <= maxRow; rowNumber += 1) {
+      const row = sheet.getRow(rowNumber);
+      for (let column = 1; column <= row.cellCount; column += 1) {
+        const header = safeCellText(row.getCell(column));
+        if (internalBudgetAmountHeaderPattern.test(header) && !clientFacingAmountHeaderPattern.test(header)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  });
+}
+
+function extractUnitTypeBudget(
+  workbook: ExcelJS.Workbook,
+  sourceRelativePath: string,
+): ExtractedInternalBudget | null {
+  // Unit totals without an internal-cost cue could be client pricing. Require
+  // explicit internal-cost evidence elsewhere in the workbook before trusting
+  // this alternate unit schedule.
+  if (!workbookHasInternalCostEvidence(workbook)) return null;
+
+  for (const sheet of workbook.worksheets) {
+    const maxHeaderRow = Math.min(sheet.rowCount, 12);
+    let columns: { headerRow: number; descriptionColumn: number; unitColumn: number; rateColumn: number; groups: Array<{ name: string; quantityColumn: number; totalColumn: number }> } | null = null;
+    for (let headerRow = 1; headerRow <= maxHeaderRow; headerRow += 1) {
+      const row = sheet.getRow(headerRow);
+      const unitColumn = Array.from({ length: row.cellCount }, (_, index) => index + 1)
+        .find((column) => /^units?$/i.test(safeCellText(row.getCell(column))));
+      const rateColumn = Array.from({ length: row.cellCount }, (_, index) => index + 1)
+        .find((column) => /^rate$/i.test(safeCellText(row.getCell(column))));
+      if (!unitColumn || !rateColumn) continue;
+      const descriptionColumn = unitColumn > 1 ? unitColumn - 1 : 1;
+      const groups: Array<{ name: string; quantityColumn: number; totalColumn: number }> = [];
+      for (let quantityColumn = rateColumn + 1; quantityColumn < row.cellCount; quantityColumn += 2) {
+        const totalColumn = quantityColumn + 1;
+        const name = unitTypeNameForColumn(sheet, headerRow, quantityColumn) ??
+          unitTypeNameForColumn(sheet, headerRow, totalColumn);
+        if (name && !groups.some((group) => normalizeUnitType(group.name) === normalizeUnitType(name))) {
+          groups.push({ name, quantityColumn, totalColumn });
+        }
+      }
+      if (groups.length >= 2) {
+        columns = { headerRow, descriptionColumn, unitColumn, rateColumn, groups };
+        break;
+      }
+    }
+    if (!columns) continue;
+
+    const unitSummaryRow = Array.from({ length: sheet.rowCount }, (_, index) => index + 1)
+      .find((rowNumber) => /unit summary/i.test(
+        Array.from({ length: sheet.getRow(rowNumber).cellCount }, (_, index) =>
+          safeCellText(sheet.getRow(rowNumber).getCell(index + 1)),
+        ).join(" "),
+      ));
+    if (!unitSummaryRow) continue;
+
+    const summary = new Map<string, { unitCount: number; perUnitTotal: number; total: number }>();
+    for (let rowNumber = unitSummaryRow + 1; rowNumber <= sheet.rowCount; rowNumber += 1) {
+      const row = sheet.getRow(rowNumber);
+      const name = safeCellText(row.getCell(columns.descriptionColumn));
+      if (!unitTypePattern.test(name)) continue;
+      const matchingGroup = columns.groups.find((group) =>
+        normalizeUnitType(group.name) === normalizeUnitType(name) ||
+        normalizeUnitType(name).startsWith(normalizeUnitType(group.name)),
+      );
+      if (!matchingGroup) continue;
+      const perUnitTotal = currencyValue(row.getCell(columns.rateColumn));
+      const unitCount = currencyValue(row.getCell(columns.groups[0].quantityColumn));
+      const total = currencyValue(row.getCell(columns.groups[0].totalColumn));
+      if (perUnitTotal === null || unitCount === null || unitCount <= 0) continue;
+      const extendedTotal = total ?? roundCurrency(perUnitTotal * unitCount);
+      summary.set(normalizeUnitType(matchingGroup.name), {
+        unitCount,
+        perUnitTotal: roundCurrency(perUnitTotal),
+        total: roundCurrency(extendedTotal),
+      });
+    }
+    if (columns.groups.some((group) => !summary.has(normalizeUnitType(group.name)))) continue;
+
+    const firstSharedAreaRow = Array.from({ length: sheet.rowCount }, (_, index) => index + 1)
+      .find((rowNumber) => /common\s+area/i.test(safeCellText(sheet.getRow(rowNumber).getCell(columns.descriptionColumn))));
+    if (!firstSharedAreaRow || firstSharedAreaRow <= unitSummaryRow) continue;
+
+    const unitTypes: InternalUnitBudgetType[] = [];
+    const categoryTotals = new Map<string, number>();
+    const categoryNames = new Map<string, string>();
+    let activeCategory = "";
+    for (let rowNumber = columns.headerRow + 1; rowNumber < unitSummaryRow; rowNumber += 1) {
+      const row = sheet.getRow(rowNumber);
+      const description = safeCellText(row.getCell(columns.descriptionColumn));
+      if (!description) continue;
+      const unit = measurementUnit(row.getCell(columns.unitColumn));
+      const rate = currencyValue(row.getCell(columns.rateColumn));
+      if (!unit && rate === null) {
+        if (isSubtotalOrPreTaxTotal(description) || budgetTotalScore(description) > 0) continue;
+        activeCategory = description;
+        categoryNames.set(normalizeUnitType(description), description);
+        for (const group of columns.groups) {
+          const subtotal = currencyValue(row.getCell(group.totalColumn));
+          if (subtotal === null) continue;
+          const key = `${normalizeUnitType(group.name)}:${normalizeUnitType(description)}`;
+          categoryTotals.set(key, roundCurrency(subtotal));
+        }
+        continue;
+      }
+      if ((!unit && rate === null) || !activeCategory) continue;
+      for (const [groupIndex, group] of columns.groups.entries()) {
+        const quantity = currencyValue(row.getCell(group.quantityColumn));
+        const sourceTotal = currencyValue(row.getCell(group.totalColumn));
+        const budgeted = sourceTotal ?? (quantity === null || rate === null ? null : roundCurrency(quantity * rate));
+        const target = unitTypes.find((type) => normalizeUnitType(type.name) === normalizeUnitType(group.name));
+        const detail: InternalUnitBudgetLineItem = {
+          id: `unit-${groupIndex + 1}-${rowNumber}`,
+          category: activeCategory,
+          description,
+          unit,
+          quantity,
+          rate: rate === null ? null : roundCurrency(rate),
+          budgeted,
+        };
+        if (target) target.lineItems.push(detail);
+        else {
+          unitTypes.push({
+            id: `unit-${unitTypes.length + 1}`,
+            name: group.name,
+            unitCount: summary.get(normalizeUnitType(group.name))!.unitCount,
+            perUnitTotal: summary.get(normalizeUnitType(group.name))!.perUnitTotal,
+            total: summary.get(normalizeUnitType(group.name))!.total,
+            lineItems: [detail],
+          });
+        }
+      }
+    }
+
+    const sharedAreas: InternalSharedBudgetArea[] = [];
+    let activeArea: InternalSharedBudgetArea | null = null;
+    let sharedCategory = "";
+    let inSharedSection = false;
+    for (let rowNumber = firstSharedAreaRow; rowNumber <= sheet.rowCount; rowNumber += 1) {
+      const row = sheet.getRow(rowNumber);
+      const description = safeCellText(row.getCell(columns.descriptionColumn));
+      if (!description) continue;
+      const unit = measurementUnit(row.getCell(columns.unitColumn));
+      const rate = currencyValue(row.getCell(columns.rateColumn));
+      if (!unit && rate === null) {
+        if (/grand total|subtotal|total\s+before\s+tax/i.test(description)) continue;
+        if (/common\s+area/i.test(description)) {
+          inSharedSection = true;
+          activeArea = {
+            id: "shared-common-area",
+            name: "Common areas",
+            total: currencyValue(row.getCell(columns.groups[0].totalColumn)) ?? 0,
+            lineItems: [],
+          };
+          sharedAreas.push(activeArea);
+          sharedCategory = "Common areas";
+          continue;
+        }
+        if (inSharedSection) {
+          sharedCategory = description;
+          const headingTotal = currencyValue(row.getCell(columns.groups[0].totalColumn));
+          if (headingTotal !== null) {
+            activeArea = {
+              id: `shared-${sharedAreas.length + 1}`,
+              name: description === "MISCELLANEOUS" ? "Project-wide costs" : description,
+              total: roundCurrency(headingTotal),
+              lineItems: [],
+            };
+            sharedAreas.push(activeArea);
+          }
+        }
+        continue;
+      }
+      if (!inSharedSection || !activeArea || (!unit && rate === null)) continue;
+      const quantity = currencyValue(row.getCell(columns.groups[0].quantityColumn));
+      const sourceTotal = currencyValue(row.getCell(columns.groups[0].totalColumn));
+      activeArea.lineItems.push({
+        id: `shared-${rowNumber}`,
+        category: sharedCategory || activeArea.name,
+        description,
+        unit,
+        quantity,
+        rate: rate === null ? null : roundCurrency(rate),
+        budgeted: sourceTotal ?? (quantity === null || rate === null ? null : roundCurrency(quantity * rate)),
+      });
+    }
+
+    if (unitTypes.length !== columns.groups.length || sharedAreas.length === 0) continue;
+    const roundedUnitTotal = roundCurrency(unitTypes.reduce((sum, type) => sum + type.total, 0));
+    const roundedSharedTotal = roundCurrency(sharedAreas.reduce((sum, area) => sum + area.total, 0));
+    const expectedTotal = roundCurrency(roundedUnitTotal + roundedSharedTotal);
+    const projectTotalRow = Array.from({ length: sheet.rowCount }, (_, index) => index + 1)
+      .find((rowNumber) => /grand total.*(?:not including|excluding).*(?:tax|gst|pst)/i.test(
+        safeCellText(sheet.getRow(rowNumber).getCell(columns.descriptionColumn)),
+      ));
+    const projectTotal = projectTotalRow
+      ? currencyValue(sheet.getRow(projectTotalRow).getCell(columns.groups[0].totalColumn))
+      : null;
+    if (projectTotal === null || Math.abs(expectedTotal - roundCurrency(projectTotal)) > 0.02) continue;
+
+    const lineItems = new Map<string, number>();
+    for (const group of columns.groups) {
+      const typeName = normalizeUnitType(group.name);
+      const typeSummary = summary.get(typeName)!;
+      const typeCategoryTotal = [...categoryTotals.entries()]
+        .filter(([key]) => key.startsWith(`${typeName}:`))
+        .reduce((sum, [, amount]) => sum + amount, 0);
+      if (Math.abs(typeCategoryTotal - typeSummary.perUnitTotal) > 0.02) {
+        lineItems.clear();
+        break;
+      }
+      for (const [key, amount] of categoryTotals) {
+        if (!key.startsWith(`${typeName}:`)) continue;
+        const category = key.slice(typeName.length + 1);
+        lineItems.set(category, (lineItems.get(category) ?? 0) + roundCurrency(amount * typeSummary.unitCount));
+      }
+    }
+    if (lineItems.size === 0) continue;
+
+    for (const area of sharedAreas) {
+      const key = normalizeUnitType(area.name);
+      lineItems.set(key, (lineItems.get(key) ?? 0) + area.total);
+      categoryNames.set(key, area.name);
+    }
+    const budgetCategories = [...lineItems.entries()].map(([key, budgeted], index) => {
+      const description = categoryNames.get(key) ?? key.replace(/(^|\s)\S/g, (letter) => letter.toUpperCase());
+      return {
+        id: `internal-budget-${index + 1}`,
+        code: `IB-${String(index + 1).padStart(2, "0")}`,
+        description,
+        budgeted: roundCurrency(budgeted),
+        invoiced: 0,
+        variance: roundCurrency(budgeted),
+      };
+    });
+    if (Math.abs(roundCurrency(budgetCategories.reduce((sum, item) => sum + item.budgeted, 0)) - projectTotal) > 0.02) continue;
+
+    return {
+      sourceRelativePath,
+      total: roundCurrency(projectTotal),
+      lineItems: budgetCategories,
+      unitBudget: { unitTypes, sharedAreas, total: roundCurrency(projectTotal) },
+    };
+  }
+  return null;
+}
+
 export async function extractWorkbookInternalBudget(buffer: Buffer, sourceRelativePath: string): Promise<ExtractedInternalBudget | null> {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);
+
+  const unitBudget = extractUnitTypeBudget(workbook, sourceRelativePath);
+  if (unitBudget) return unitBudget;
 
   for (const sheet of workbook.worksheets) {
     const columns = findInternalBudgetTable(sheet);

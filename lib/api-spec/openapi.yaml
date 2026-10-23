@@ -2343,6 +2343,8 @@ components:
           required: [clientQuote, lineItems, invoices, trades, photos, files, panoramas, scheduleImages, activity]
           properties:
             clientQuote: { $ref: "#/components/schemas/ClientQuote" }
+            unitBudget:
+              $ref: "#/components/schemas/ProjectUnitBudget"
             lineItems:
               type: array
               items:
@@ -2414,6 +2416,55 @@ components:
         description: { type: string }
         unit: { type: ["string", "null"] }
         quantity: { type: ["number", "null"] }
+        budgeted: { type: ["number", "null"] }
+        rate: { type: ["number", "null"] }
+    ProjectUnitBudget:
+      type: object
+      required: [unitTypes, sharedAreas, total]
+      properties:
+        unitTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectUnitBudgetType"
+        sharedAreas:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectSharedBudgetArea"
+        total: { type: number }
+    ProjectUnitBudgetType:
+      type: object
+      required: [id, name, unitCount, perUnitTotal, total, lineItems]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        unitCount: { type: integer, minimum: 1 }
+        perUnitTotal: { type: number }
+        total: { type: number }
+        lineItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectUnitBudgetLineItem"
+    ProjectSharedBudgetArea:
+      type: object
+      required: [id, name, total, lineItems]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        total: { type: number }
+        lineItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectUnitBudgetLineItem"
+    ProjectUnitBudgetLineItem:
+      type: object
+      required: [id, category, description, unit, quantity, rate, budgeted]
+      properties:
+        id: { type: string }
+        category: { type: string }
+        description: { type: string }
+        unit: { type: ["string", "null"] }
+        quantity: { type: ["number", "null"] }
+        rate: { type: ["number", "null"] }
         budgeted: { type: ["number", "null"] }
     Trade:
       type: object

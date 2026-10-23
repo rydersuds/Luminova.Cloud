@@ -15,4 +15,6 @@ export interface BudgetLineItemDetail {
   quantity: number | null;
   /** @nullable */
   budgeted: number | null;
+  /** @nullable */
+  rate?: number | null;
 }

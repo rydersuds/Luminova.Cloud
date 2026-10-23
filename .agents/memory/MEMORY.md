@@ -41,3 +41,4 @@
 - [OpenAPI regeneration after merges](openapi-regeneration-after-merges.md) — regenerate clients after overlapping spec changes to avoid stale exports and invalid schema initialization order.
 - [Board-driven project completion](board-driven-project-completion.md) — board schedule dates override project dates for the existing date-based completion percentage.
 - [Schedule availability](schedule-availability.md) — unavailable schedules hide the project board without deleting its saved tasks.
+- [Tax-excluded workbook totals](tax-excluded-workbook-totals.md) — recognize GST/PST wording in grand-total labels without folding excluded tax or client-facing totals into internal budgets.
