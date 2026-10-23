@@ -746,6 +746,74 @@ test('date edits survive a refresh and appear in the portfolio schedule', async 
   await expect(page.getByRole('img', { name: /Submit permit drawings, Working on it, Nov 3.*Nov 7/ })).toBeVisible();
 });
 
+test('Day board shows a scrollable daily ruler and keeps date and status edits available', async ({ page }) => {
+  const state = makeBoardState([
+    makeBoardItem(),
+    makeBoardItem({
+      id: 'item-undated',
+      name: 'Schedule inspection',
+      startDate: null,
+      endDate: null,
+      status: 'Not started',
+      position: 1,
+    }),
+  ]);
+  await installProjectBoard(page, state);
+  await page.clock.install({ time: new Date('2026-10-12T12:00:00Z') });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/__visual/project-panorama?tab=board');
+  await page.getByRole('button', { name: 'Day', exact: true }).click();
+
+  const timeline = page.getByRole('region', { name: 'Day-by-day timeline. Scroll horizontally to browse dates.' });
+  await expect(timeline).toBeVisible();
+  await expect(timeline.locator('[data-date="2026-10-12"]')).toBeVisible();
+  await expect(timeline.locator('[data-date="2026-10-13"]')).toBeVisible();
+  await expect(timeline.locator('[data-date="2026-10-14"]')).toBeVisible();
+  await expect(timeline.locator('.board-day-date-today')).toHaveAttribute('data-date', '2026-10-12');
+  await expect(timeline.locator('.board-day-today-marker')).toContainText('Today');
+  await expect(timeline.getByRole('button', { name: 'Add dates' })).toBeVisible();
+
+  const taskLabel = page.locator('.board-day-item-label').filter({ hasText: 'Submit permit drawings' });
+  const labelBefore = await taskLabel.boundingBox();
+  await timeline.evaluate(element => { element.scrollLeft = element.scrollWidth; });
+  await expect.poll(() => timeline.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+  const labelAfter = await taskLabel.boundingBox();
+  expect(labelAfter?.x).toBe(labelBefore?.x);
+
+  await page.getByRole('button', { name: 'Next day' }).click();
+  await expect(page.locator('.board-day-date-input')).toHaveValue('2026-10-13');
+  await page.getByRole('button', { name: 'Today', exact: true }).click();
+  await expect(page.locator('.board-day-date-input')).toHaveValue('2026-10-12');
+
+  const bar = timeline.locator('[aria-roledescription="draggable timeline bar"]');
+  await bar.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(() => state.items[0].startDate).toBe('2026-10-14');
+  await expect.poll(() => state.items[0].endDate).toBe('2026-10-16');
+
+  await page.getByRole('button', { name: /Dates: Oct 14 – Oct 16/ }).click();
+  await page.getByLabel('Start', { exact: true }).fill('2026-11-03');
+  await page.getByLabel('End', { exact: true }).fill('2026-11-07');
+  await page.getByRole('button', { name: 'Save dates' }).click();
+  await expect.poll(() => state.items[0].startDate).toBe('2026-11-03');
+  await expect.poll(() => state.items[0].endDate).toBe('2026-11-07');
+
+  await page.getByRole('button', { name: 'Status: Working on it. Change status' }).click();
+  await page.getByRole('menuitem', { name: 'Done' }).click();
+  await expect.poll(() => state.items[0].status).toBe('Done');
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(timeline).toBeVisible();
+  await expect(timeline.locator('[aria-roledescription="draggable timeline bar"]')).toBeVisible();
+  const mobileWidth = await timeline.evaluate(element => ({
+    client: element.clientWidth,
+    scroll: element.scrollWidth,
+    viewport: window.innerWidth,
+  }));
+  expect(mobileWidth.scroll).toBeGreaterThan(mobileWidth.client);
+  expect(mobileWidth.client).toBeLessThanOrEqual(mobileWidth.viewport);
+});
+
 test('keeps a failed board edit available to retry and explains the failure', async ({ page }) => {
   const state = makeBoardState();
   await installProjectBoard(page, state);

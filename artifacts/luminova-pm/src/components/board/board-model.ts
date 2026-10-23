@@ -116,6 +116,28 @@ export function itemsForDay<T extends Pick<BoardItem, "startDate" | "endDate">>(
   })
 }
 
+/** Gives Day view enough context to browse the full schedule while opening near today. */
+export function boardDayTimelineRange<T extends Pick<BoardItem, "startDate" | "endDate">>(
+  items: T[],
+  today = todayDay(),
+): { start: number; end: number } {
+  const spans = items.map(itemSpan).filter((span): span is NonNullable<typeof span> => span !== null)
+  return {
+    start: Math.min(today, ...spans.map((span) => span.start)) - 14,
+    end: Math.max(today + 42, ...spans.map((span) => span.end)) + 14,
+  }
+}
+
+export function adjustTimelineSpan(
+  span: { start: number; end: number },
+  mode: "move" | "start" | "end",
+  delta: number,
+): { start: number; end: number } {
+  if (mode === "move") return { start: span.start + delta, end: span.end + delta }
+  if (mode === "start") return { start: Math.min(span.start + delta, span.end), end: span.end }
+  return { start: span.start, end: Math.max(span.end + delta, span.start) }
+}
+
 export function timelineLabel(item: Pick<BoardItem, "startDate" | "endDate">) {
   const span = itemSpan(item)
   if (!span) return ""
