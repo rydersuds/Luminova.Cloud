@@ -144,6 +144,7 @@ export const GetProjectParams = zod.object({
 
 export const getProjectResponseOneStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const getProjectResponseOneTargetDateRegExp = new RegExp('^$|^\\d{4}-\\d{2}-\\d{2}$');
+
 export const getProjectResponseTwoInvoicesItemAttachmentOneObjectPathRegExp = new RegExp('^/objects');
 export const getProjectResponseTwoInvoicesItemAttachmentOneNameMax = 255;
 
@@ -493,6 +494,7 @@ export const GetArchivedProjectParams = zod.object({
 
 export const getArchivedProjectResponseOneStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const getArchivedProjectResponseOneTargetDateRegExp = new RegExp('^$|^\\d{4}-\\d{2}-\\d{2}$');
+
 export const getArchivedProjectResponseTwoInvoicesItemAttachmentOneObjectPathRegExp = new RegExp('^/objects');
 export const getArchivedProjectResponseTwoInvoicesItemAttachmentOneNameMax = 255;
 

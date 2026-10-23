@@ -355,6 +355,30 @@ export interface ProjectUnitBudgetLineItem {
   /** @nullable */
   budgeted: number | null;
 }
+
+export interface ProjectUnitBudgetType {
+  id: string;
+  name: string;
+  /** @minimum 1 */
+  unitCount: number;
+  perUnitTotal: number;
+  total: number;
+  lineItems: ProjectUnitBudgetLineItem[];
+}
+
+export interface ProjectSharedBudgetArea {
+  id: string;
+  name: string;
+  total: number;
+  lineItems: ProjectUnitBudgetLineItem[];
+}
+
+export interface ProjectUnitBudget {
+  unitTypes: ProjectUnitBudgetType[];
+  sharedAreas: ProjectSharedBudgetArea[];
+  total: number;
+}
+
 export interface BudgetLineItemDetail {
   id: string;
   description: string;
@@ -1689,26 +1713,3 @@ trade?: string;
 status?: VendorQuoteStatus;
 direction?: QuoteDirection;
 };
-
-export interface ProjectUnitBudget {
-  unitTypes: ProjectUnitBudgetType[];
-  sharedAreas: ProjectSharedBudgetArea[];
-  total: number;
-}
-
-export interface ProjectUnitBudgetType {
-  id: string;
-  name: string;
-  /** @minimum 1 */
-  unitCount: number;
-  perUnitTotal: number;
-  total: number;
-  lineItems: ProjectUnitBudgetLineItem[];
-}
-
-export interface ProjectSharedBudgetArea {
-  id: string;
-  name: string;
-  total: number;
-  lineItems: ProjectUnitBudgetLineItem[];
-}
