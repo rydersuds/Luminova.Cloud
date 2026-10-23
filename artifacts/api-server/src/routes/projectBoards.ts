@@ -535,7 +535,8 @@ router.get("/board-items", async (req: AuthenticatedRequest, res): Promise<void>
   if (!await requireWorkspaceRole(req, res, BOARD_ROLES, BOARD_ACCESS_ERROR)) return;
   const workspaceId = requestWorkspaceId(req);
   try {
-    const projects = await projectsForOwner(req.userId, workspaceId);
+    const projects = (await projectsForOwner(req.userId, workspaceId))
+      .filter((project) => project.scheduleAvailable !== false);
     const projectNames = new Map(projects.map((project) => [project.id, project.name]));
     if (!projectNames.size) {
       res.json([]);

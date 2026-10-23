@@ -26,15 +26,16 @@ test("project boards are scoped to authorized project team members and keep orde
   const importBatchId = `board-batch-${suffix}`;
 
   await db.insert(projectImportBatchesTable).values({ id: importBatchId, projectId, ownerId, status: "completed", manifest: [] });
+  const projectData = {
+    id: projectId, name: "Board test project", address: "", region: "Calgary", status: "Planning", progress: 0,
+    pmName: "", clientName: "", startDate: "2099-01-01", targetDate: "2099-12-31",
+    budgeted: 0, invoiced: 0, exteriorImage: "", description: "",
+  };
   await db.insert(importedProjectsTable).values({
     id: projectId,
     importBatchId,
     ownerId,
-    data: {
-      id: projectId, name: "Board test project", address: "", region: "Calgary", status: "Planning", progress: 0,
-      pmName: "", clientName: "", startDate: "2099-01-01", targetDate: "2099-12-31",
-      budgeted: 0, invoiced: 0, exteriorImage: "", description: "",
-    },
+    data: projectData,
   });
 
   setWorkspaceRoleResolverForTests(async (userId) => userId === clientId ? "Client" : userId === ownerId ? "Project Manager" : "Field Team");
@@ -173,6 +174,20 @@ test("project boards are scoped to authorized project team members and keep orde
   const scheduled = schedule.filter((item) => [permit.id, survey.id, footings.id].includes(item.id));
   assert.deepEqual(scheduled.map((item) => item.id).sort(), [permit.id, footings.id].sort(), "only dated items appear on the schedule");
   assert.ok(scheduled.every((item) => item.projectName === "Board test project"));
+
+  await db.update(importedProjectsTable)
+    .set({ data: { ...projectData, scheduleAvailable: false } })
+    .where(eq(importedProjectsTable.id, projectId));
+  const unavailableSchedule = await (await call("GET", "/board-items", ownerId)).json() as Array<{ id: string }>;
+  assert.ok(!unavailableSchedule.some((item) => [permit.id, footings.id].includes(item.id)), "unavailable project tasks are hidden from the portfolio schedule");
+
+  await db.update(importedProjectsTable)
+    .set({ data: { ...projectData, scheduleAvailable: true } })
+    .where(eq(importedProjectsTable.id, projectId));
+  const reopenedSchedule = await (await call("GET", "/board-items", ownerId)).json() as Array<{ id: string }>;
+  assert.ok([permit.id, footings.id].every((id) => reopenedSchedule.some((item) => item.id === id)), "re-enabling the schedule restores saved tasks");
+  const retainedItems = await db.select().from(projectBoardItemsTable).where(eq(projectBoardItemsTable.projectId, projectId));
+  assert.ok(retainedItems.some((item) => item.id === permit.id), "changing schedule availability does not delete tasks");
 
   const beforeImport = await db.select().from(projectBoardItemsTable).where(eq(projectBoardItemsTable.projectId, projectId));
   const importDenied = await call("POST", `${boardPath}/import`, clientId, {

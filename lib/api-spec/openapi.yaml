@@ -693,7 +693,7 @@ paths:
     get:
       operationId: getBoardSchedule
       tags: [boards]
-      summary: Dated board items across every project the user can open, for the portfolio timeline and calendar
+      summary: Dated board items across available project schedules for the portfolio timeline and calendar
       responses:
         "200":
           description: Board items with project names

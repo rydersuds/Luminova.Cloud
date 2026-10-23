@@ -10,6 +10,7 @@ import {
   getGetArchivedProjectQueryKey,
   getGetProjectsQueryKey,
   getGetDashboardSummaryQueryKey,
+  getGetBoardScheduleQueryKey,
   useCreateProjectPanorama,
   useUpdateProjectPanorama,
   useUpdateProject,
@@ -430,6 +431,7 @@ export default function ProjectDetail({ projectIdOverride }: { projectIdOverride
         queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) })
         queryClient.invalidateQueries({ queryKey: getGetProjectsQueryKey() })
         queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() })
+        queryClient.invalidateQueries({ queryKey: getGetBoardScheduleQueryKey() })
         if (!updatedProject.scheduleAvailable && activeTab === "board") selectTab("overview")
         setIsEditOpen(false)
       },
