@@ -3,12 +3,15 @@ import { useLocation } from "wouter"
 import { useQueryClient } from "@tanstack/react-query"
 import {
   getGetVendorQuotesQueryKey,
+  getGetTradesQueryKey,
   useCreateVendorQuote,
   useGetProjects,
   useGetTrades,
   useGetVendorQuotes,
   useRescanProjectVendorQuotes,
   useUpdateVendorQuote,
+  confirmQuoteUpload,
+  type QuoteDraft,
   type VendorQuote,
   type VendorQuoteRescanResult,
   type VendorQuoteStatus,
@@ -23,6 +26,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
 import { cn, formatCurrency, formatDateOnly, getStatusColor } from "@/lib/utils"
+import { QuoteDocumentUpload, QUOTE_LIMITS, QUOTE_ACCEPT, quoteFileError, quoteError } from "@/components/quote-document-upload"
 import { Building2, CalendarClock, ExternalLink, FilePenLine, FileText, FolderKanban, Layers3, Plus, RefreshCw, Search, Trash2, Users } from "lucide-react"
 
 const STATUSES: VendorQuoteStatus[] = ["Draft", "Requested", "Received", "Under review", "Accepted", "Declined", "Expired"]
@@ -44,6 +48,15 @@ export default function Quotes() {
   const [status, setStatus] = React.useState<VendorQuoteStatus | "">("")
   const [groupMode, setGroupMode] = React.useState<GroupMode>("all")
   const [editing, setEditing] = React.useState<VendorQuote | null | undefined>(undefined)
+  const [uploadFile, setUploadFile] = React.useState<File | null>(null)
+  const uploadPicker = React.useRef<HTMLInputElement>(null)
+  const startUpload = (files: FileList | null) => {
+    if (!files?.length) return
+    if (files.length !== 1 || quoteFileError(files[0])) {
+      toast({ title: "Document not supported", description: files.length !== 1 ? "Choose one document at a time." : quoteFileError(files[0])!, variant: "destructive" }); return
+    }
+    setUploadFile(files[0]); setEditing(null)
+  }
   const [scanResult, setScanResult] = React.useState<VendorQuoteRescanResult | null>(null)
   const rescanQuotes = useRescanProjectVendorQuotes()
 
@@ -56,7 +69,7 @@ export default function Quotes() {
   }
   const quotesQuery = useGetVendorQuotes(params, { query: { queryKey: getGetVendorQuotesQueryKey(params) } })
   const { data: projects } = useGetProjects()
-  const { data: vendors } = useGetTrades()
+  const { data: vendors } = useGetTrades(undefined, { query: { queryKey: getGetTradesQueryKey(), refetchOnWindowFocus: "always" } })
   const quotes = quotesQuery.data ?? []
   const tradeOptions = Array.from(new Set(vendors?.map((vendor) => vendor.tradeType) ?? [])).sort()
   const groups = React.useMemo(() => {
@@ -120,6 +133,13 @@ export default function Quotes() {
             <Summary icon={Layers3} label="Combined value" value={formatCurrency(totalValue)} />
             <Summary icon={CalendarClock} label="Due soon" value={String(dueSoon)} />
           </section>
+          <section aria-label="Upload vendor quote with AI" className="glass-panel flex flex-wrap items-center justify-between gap-4 border border-dashed border-primary/40 p-5"
+            onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); startUpload(e.dataTransfer.files) }}>
+            <div><h2 className="font-bold">Upload quote with AI</h2><p className="text-sm text-muted-foreground">Drop a document, then review every detail before saving.</p><p className="mt-1 text-xs text-muted-foreground">{QUOTE_LIMITS}</p></div>
+            <input ref={uploadPicker} type="file" aria-label="Choose quote to upload with AI" className="sr-only" accept={QUOTE_ACCEPT}
+              onChange={e => { startUpload(e.target.files); e.target.value = "" }} />
+            <Button variant="outline" onClick={() => uploadPicker.current?.click()}>Choose quote document</Button>
+          </section>
 
           {scanResult && (
             <section className="glass-panel space-y-3 p-4 sm:p-5" aria-label="Latest vendor quote scan">
@@ -182,12 +202,15 @@ export default function Quotes() {
       <QuoteDialog
         quote={editing}
         open={editing !== undefined}
-        onOpenChange={(open) => !open && setEditing(undefined)}
+        onOpenChange={(open) => { if (!open) { setEditing(undefined); setUploadFile(null) } }}
+        initialProjectId={projectId}
+        initialFile={uploadFile}
         projects={projects ?? []}
         vendors={vendors ?? []}
         onSaved={() => {
           queryClient.invalidateQueries({ queryKey: getGetVendorQuotesQueryKey() })
           setEditing(undefined)
+          setUploadFile(null)
         }}
       />
     </>
@@ -243,7 +266,7 @@ function Empty({ title, body, action }: { title: string; body: string; action: R
   return <div className="glass-panel py-16 text-center"><Building2 className="mx-auto mb-4 h-11 w-11 text-primary/45" /><h2 className="text-xl font-bold">{title}</h2><p className="mx-auto mb-5 mt-2 max-w-md text-sm text-muted-foreground">{body}</p>{action}</div>
 }
 
-function QuoteDialog({ quote, open, onOpenChange, projects, vendors, onSaved }: { quote: VendorQuote | null | undefined; open: boolean; onOpenChange: (open: boolean) => void; projects: Array<{ id: string; name: string }>; vendors: Array<{ id: string; companyName: string; tradeType: string }>; onSaved: () => void }) {
+function QuoteDialog({ quote, open, onOpenChange, projects, vendors, onSaved, initialProjectId, initialFile }: { quote: VendorQuote | null | undefined; open: boolean; onOpenChange: (open: boolean) => void; projects: Array<{ id: string; name: string }>; vendors: Array<{ id: string; companyName: string; tradeType: string }>; onSaved: () => void; initialProjectId: string; initialFile: File | null }) {
   const createQuote = useCreateVendorQuote()
   const updateQuote = useUpdateVendorQuote()
   const [projectId, setProjectId] = React.useState("")
@@ -257,27 +280,57 @@ function QuoteDialog({ quote, open, onOpenChange, projects, vendors, onSaved }: 
   const [notes, setNotes] = React.useState("")
   const [lines, setLines] = React.useState<FormLine[]>([emptyLine()])
   const [validation, setValidation] = React.useState("")
+  const [sourceId, setSourceId] = React.useState<string | null>(null)
+  const [documentSelected, setDocumentSelected] = React.useState(false)
+  const [analyzing, setAnalyzing] = React.useState(false)
+  const [savingSource, setSavingSource] = React.useState(false)
+  const [uncertain, setUncertain] = React.useState(false)
+  const [documentTotal, setDocumentTotal] = React.useState<number | null>(null)
+  const [unresolved, setUnresolved] = React.useState<string[]>([])
+  const [suggestions, setSuggestions] = React.useState<QuoteDraft | null>(null)
+  const editVersion = React.useRef(0)
+  const frozen = React.useRef<Parameters<typeof confirmQuoteUpload> | null>(null)
+  const saveFlight = React.useRef(false)
+  const applyDraft = (draft: QuoteDraft) => {
+    setVendorId(draft.vendorId ?? ""); setQuoteNumber(draft.quoteNumber ?? "")
+    setTrade(draft.trade ?? ""); setIssueDate(draft.issueDate ?? ""); setDueDate(draft.dueDate ?? "")
+    setNotes(draft.notes); setUnresolved([...(draft.vendorName ? [`Document company: ${draft.vendorName}`] : []), ...draft.unresolved])
+    setDocumentTotal(draft.documentTotal)
+    setLines(draft.lineItems.length ? draft.lineItems.map(line => ({ ...line, id: crypto.randomUUID() })) : [emptyLine()])
+    setSuggestions(null)
+  }
 
   React.useEffect(() => {
     if (!open) return
-    setProjectId(quote?.projectId ?? "")
+    setProjectId(quote?.projectId ?? initialProjectId)
     setVendorId(quote?.vendorId ?? "")
     setQuoteNumber(quote?.quoteNumber ?? "")
     setTrade(quote?.trade ?? "")
     setStatus(quote?.status ?? "Draft")
     setRevision(quote?.revision ?? 1)
-    setIssueDate(quote?.issueDate ?? today())
-    setDueDate(quote?.dueDate ?? today())
+    setIssueDate(quote?.issueDate ?? (initialFile ? "" : today()))
+    setDueDate(quote?.dueDate ?? (initialFile ? "" : today()))
     setNotes(quote?.notes ?? "")
     setLines(quote?.lineItems.map((line) => ({ id: line.id, description: line.description, quantity: line.quantity, unitPrice: line.unitPrice })) ?? [emptyLine()])
     setValidation("")
+    setSourceId(null); setDocumentTotal(null); setUnresolved([]); setSuggestions(null)
+    setDocumentSelected(!!initialFile)
+    setUncertain(false); setSavingSource(false); frozen.current = null; editVersion.current = 0
   }, [open, quote])
 
-  const total = lines.reduce((sum, line) => sum + Math.round(line.quantity * line.unitPrice), 0)
-  const pending = createQuote.isPending || updateQuote.isPending
-  const save = (event: React.FormEvent) => {
+  const totalCents = lines.reduce((sum, line) => sum + Math.round(line.quantity * Math.round(line.unitPrice * 100)), 0)
+  const total = totalCents / 100
+  const pending = createQuote.isPending || updateQuote.isPending || savingSource
+  const locked = pending || uncertain
+  const close = (value: boolean) => { if (!locked) onOpenChange(value) }
+  const save = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (!projectId || !vendorId || !quoteNumber.trim() || !trade.trim() || lines.some((line) => !line.description.trim() || line.quantity <= 0 || line.unitPrice < 0)) {
+    if (saveFlight.current || analyzing) return
+    if (documentSelected && !sourceId && !frozen.current) {
+      setValidation("Upload the selected document before saving, or remove it to create a manual quote without a source.")
+      return
+    }
+    if (!frozen.current && (!projectId || !vendorId || !quoteNumber.trim() || !trade.trim() || !issueDate || !dueDate || lines.some((line) => !line.description.trim() || !Number.isFinite(line.quantity) || !Number.isFinite(line.unitPrice) || line.quantity <= 0 || line.unitPrice < 0))) {
       setValidation("Complete all required fields and add valid line item values.")
       return
     }
@@ -302,23 +355,62 @@ function QuoteDialog({ quote, open, onOpenChange, projects, vendors, onSaved }: 
       onSuccess: () => { toast({ title: quote ? "Quote updated" : "Quote created", description: `${quoteNumber} was saved successfully.` }); onSaved() },
       onError: () => setValidation("The quote could not be saved. Review the fields and try again."),
     }
+    if (sourceId || frozen.current) {
+      saveFlight.current = true; setSavingSource(true)
+      frozen.current ??= [sourceId!, data]
+      try {
+        await confirmQuoteUpload(...frozen.current)
+        frozen.current = null; setUncertain(false)
+        options.onSuccess()
+      } catch (error) {
+        const code = (error as { status?: number }).status
+        if (code && [400, 403, 404, 409].includes(code)) {
+          frozen.current = null; setUncertain(false)
+          setValidation(quoteError(error))
+        } else {
+          setUncertain(true)
+          setValidation(`${quoteError(error)} Saving may have succeeded. Retry the same submission to avoid duplicates; details are locked until the result is confirmed.`)
+        }
+      } finally { saveFlight.current = false; setSavingSource(false) }
+      return
+    }
     if (quote) updateQuote.mutate({ quoteId: quote.id, data }, options)
     else createQuote.mutate({ data }, options)
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={close}>
       <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader><DialogTitle>{quote ? "Edit vendor quote" : "Create vendor quote"}</DialogTitle></DialogHeader>
         <form onSubmit={save} className="space-y-5">
+          {!quote && open && <QuoteDocumentUpload projectId={projectId} initialFile={initialFile} disabled={locked} editVersion={editVersion}
+            onSource={id => { setSourceId(id); setSuggestions(null); setDocumentTotal(null); setUnresolved([]) }}
+            onBusy={setAnalyzing} onSelected={selected => {
+              setDocumentSelected(selected)
+              if (selected && editVersion.current === 0) { setIssueDate(""); setDueDate("") }
+            }} onDraft={(draft, version) => {
+              setDocumentTotal(draft.documentTotal)
+              if (editVersion.current === version && version === 0) applyDraft(draft)
+              else setSuggestions(draft)
+            }} />}
+          {suggestions && <div role="status" className="space-y-2 rounded border border-border p-3 text-sm">
+            <p>Suggestions are ready. Your edits were preserved. Applying suggestions will replace the form details below.</p>
+            <Button type="button" variant="outline" disabled={locked} onClick={() => applyDraft(suggestions)}>Replace details with AI suggestions</Button>
+            <Button type="button" variant="ghost" onClick={() => setSuggestions(null)}>Keep my edits</Button>
+          </div>}
+          {!!unresolved.length && <div role="status" className="space-y-1 text-sm"><p className="font-semibold">Review AI suggestions before saving</p>{unresolved.map((item, index) => <p key={index}>{item}</p>)}</div>}
+          <fieldset disabled={locked} className="min-w-0 space-y-5" onChange={event => {
+            if (!(event.target instanceof HTMLSelectElement && event.target.dataset.quoteProject)) ++editVersion.current
+          }}>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Direction"><Input value="Vendor → Luminova" readOnly className="bg-muted/40" /></Field>
-            <Field label="Project"><select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="h-10 w-full border border-input bg-background px-3 text-sm"><option value="">Select project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></Field>
+            <Field label="Project"><select data-quote-project="true" disabled={!!quote?.attachments.length} value={projectId} onChange={(e) => setProjectId(e.target.value)} className="h-10 w-full border border-input bg-background px-3 text-sm"><option value="">Select project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></Field>
             <Field label="Vendor / company">
               <select value={vendorId} onChange={(e) => { setVendorId(e.target.value); const vendor = vendors.find((item) => item.id === e.target.value); if (vendor) setTrade(vendor.tradeType) }} className="h-10 w-full border border-input bg-background px-3 text-sm"><option value="">Select vendor</option>{vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.companyName}</option>)}</select>
+              <a href="/trades" target="_blank" rel="noreferrer" className="inline-block text-xs text-primary underline">Manage vendor directory in a new tab</a>
             </Field>
             <Field label="Quote number"><Input value={quoteNumber} onChange={(e) => setQuoteNumber(e.target.value)} /></Field>
-            <Field label="Trade"><Input value={trade} readOnly className="bg-muted/40" /></Field>
+            <Field label="Trade"><Input value={trade} onChange={e => setTrade(e.target.value)} /></Field>
             <Field label="Status"><select value={status} onChange={(e) => setStatus(e.target.value as VendorQuoteStatus)} className="h-10 w-full border border-input bg-background px-3 text-sm">{STATUSES.map((item) => <option key={item}>{item}</option>)}</select></Field>
             <Field label="Revision"><Input type="number" min={1} value={revision} onChange={(e) => setRevision(Number(e.target.value))} /></Field>
             <Field label="Issue date"><Input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} /></Field>
@@ -326,19 +418,25 @@ function QuoteDialog({ quote, open, onOpenChange, projects, vendors, onSaved }: 
           </div>
           <Field label="Notes"><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Scope clarifications, exclusions, pricing validity…" /></Field>
           <div className="space-y-3">
-            <div className="flex items-center justify-between"><Label>Line items</Label><Button type="button" variant="outline" size="sm" onClick={() => setLines([...lines, emptyLine()])}><Plus className="mr-1 h-4 w-4" /> Add line</Button></div>
+            <div className="flex items-center justify-between"><Label>Line items</Label><Button type="button" variant="outline" size="sm" onClick={() => { ++editVersion.current; setLines([...lines, emptyLine()]) }}><Plus className="mr-1 h-4 w-4" /> Add line</Button></div>
             {lines.map((line, index) => (
               <div key={line.id} className="grid gap-2 border border-border/60 bg-muted/20 p-3 sm:grid-cols-[1fr_90px_140px_40px]">
                 <Input aria-label={`Line ${index + 1} description`} placeholder="Description" value={line.description} onChange={(e) => setLines(lines.map((item) => item.id === line.id ? { ...item, description: e.target.value } : item))} />
                 <Input aria-label="Quantity" type="number" min="0.01" step="0.01" value={line.quantity} onChange={(e) => setLines(lines.map((item) => item.id === line.id ? { ...item, quantity: Number(e.target.value) } : item))} />
-                <Input aria-label="Unit price" type="number" min="0" step="1" value={line.unitPrice} onChange={(e) => setLines(lines.map((item) => item.id === line.id ? { ...item, unitPrice: Number(e.target.value) } : item))} />
-                <Button type="button" variant="ghost" size="icon" disabled={lines.length === 1} onClick={() => setLines(lines.filter((item) => item.id !== line.id))}><Trash2 className="h-4 w-4" /></Button>
+                <Input aria-label="Unit price ($)" type="number" min="0" step="0.01" value={line.unitPrice} onChange={(e) => setLines(lines.map((item) => item.id === line.id ? { ...item, unitPrice: Number(e.target.value) } : item))} />
+                <Button type="button" variant="ghost" size="icon" aria-label={`Remove line ${index + 1}`} disabled={lines.length === 1} onClick={() => { ++editVersion.current; setLines(lines.filter((item) => item.id !== line.id)) }}><Trash2 className="h-4 w-4" /></Button>
               </div>
             ))}
           </div>
           <div className="flex items-center justify-between border-y border-border py-4"><span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Calculated total</span><strong className="text-2xl tabular-nums">{formatCurrency(total)}</strong></div>
+          {documentTotal !== null && <p role={documentTotal !== totalCents ? "alert" : "status"} className="text-sm">
+            Document total: {formatCurrency(documentTotal / 100)}.
+            {documentTotal !== totalCents ? ` Difference: ${formatCurrency(Math.abs(documentTotal - totalCents) / 100)}. Review missing prices, taxes, exclusions, or rounding before saving. No balancing items were added.` : " Matches the calculated line total."}
+          </p>}
+          {quote?.attachments.map(attachment => <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer" className="block text-sm text-primary underline">Open original: {attachment.name}</a>)}
+          </fieldset>
           {validation && <p role="alert" className="text-sm font-medium text-destructive">{validation}</p>}
-          <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button type="submit" disabled={pending}>{pending ? "Saving…" : "Save quote"}</Button></div>
+          <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={locked} onClick={() => close(false)}>Cancel</Button><Button type="submit" disabled={pending || analyzing}>{pending ? "Saving…" : uncertain ? "Retry same submission" : "Save quote"}</Button></div>
         </form>
       </DialogContent>
     </Dialog>
@@ -346,5 +444,7 @@ function QuoteDialog({ quote, open, onOpenChange, projects, vendors, onSaved }: 
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="space-y-2"><Label>{label}</Label>{children}</div>
+  const id = React.useId()
+  const [first, ...rest] = React.Children.toArray(children)
+  return <div className="space-y-2"><Label htmlFor={id}>{label}</Label>{React.isValidElement<{ id?: string }>(first) ? React.cloneElement(first, { id }) : first}{rest}</div>
 }

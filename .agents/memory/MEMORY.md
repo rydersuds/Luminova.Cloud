@@ -46,3 +46,4 @@
 - [Browser popup fixtures](browser-popup-fixtures.md) — intercept new-tab document fixtures on the browser context; page routes miss a popup's initial navigation.
 - [Browser layout assertions](browser-layout-assertions.md) — exclude inline and screen-reader-only boxes from overflow checks; activate keyboard modality for focus-visible assertions.
 - [Madison Park unit evidence](madison-park-unit-evidence.md) — rebuild PDF page 5 names twelve units; text does not establish each label's dwelling type or completeness.
+- [Quote source immutability](quote-source-immutability.md) — seal original bytes before review; keep reviewed uploads outside automatic project-folder rescans.

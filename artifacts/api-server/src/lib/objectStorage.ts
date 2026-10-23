@@ -34,6 +34,13 @@ function parseObjectPath(path: string) {
 }
 
 export class ObjectStorageService {
+  async writeQuoteUpload(id: string, buffer: Buffer, contentType: string): Promise<void> {
+    if (!/^[a-f0-9-]{36}$/.test(id)) throw new Error("Invalid quote upload identifier");
+    const { bucketName, objectName } = parseObjectPath(`${this.getPrivateObjectDir()}/quote-uploads/${id}`);
+    await objectStorageClient.bucket(bucketName).file(objectName).save(buffer, {
+      resumable: false, metadata: { contentType },
+    });
+  }
   getPrivateObjectDir(): string {
     const dir = process.env.PRIVATE_OBJECT_DIR;
     if (!dir) throw new Error("PRIVATE_OBJECT_DIR is not configured");

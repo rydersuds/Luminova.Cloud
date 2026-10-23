@@ -1445,6 +1445,79 @@ paths:
           description: Invalid search query
         "401":
           description: Authentication required
+  /vendor-quote-uploads:
+    post:
+      operationId: requestQuoteUpload
+      tags: [vendor-quotes]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/QuoteUploadInput" }
+      responses:
+        "201":
+          description: Reserved private upload
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QuoteUploadSlot" }
+  /vendor-quote-uploads/{uploadId}/content:
+    parameters:
+      - { name: uploadId, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      operationId: uploadQuoteContent
+      tags: [vendor-quotes]
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        "204": { description: Uploaded and verified }
+  /vendor-quote-uploads/{uploadId}/draft:
+    parameters:
+      - { name: uploadId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: extractQuoteDraft
+      tags: [vendor-quotes]
+      responses:
+        "200":
+          description: Unsaved suggestions for review
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QuoteDraft" }
+  /vendor-quote-uploads/{uploadId}:
+    parameters:
+      - { name: uploadId, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      operationId: cancelQuoteUpload
+      tags: [vendor-quotes]
+      responses:
+        "204": { description: Unattached upload cancelled }
+  /vendor-quote-uploads/{uploadId}/confirm:
+    parameters:
+      - { name: uploadId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: confirmQuoteUpload
+      tags: [vendor-quotes]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VendorQuoteInput" }
+      responses:
+        "201":
+          description: Confirmed durable quote; identical retries return the same quote
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VendorQuote" }
+  /vendor-quotes/{quoteId}/source:
+    get:
+      operationId: getUploadedQuoteSource
+      tags: [vendor-quotes]
+      parameters:
+        - { name: quoteId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Authorized private source document }
   /vendor-quotes:
     get:
       operationId: getVendorQuotes
@@ -2885,6 +2958,43 @@ components:
           type: number
           minimum: 0
           description: Accepted client quote value remaining after outgoing invoices, floored per project at zero.
+    QuoteUploadInput:
+      type: object
+      additionalProperties: false
+      required: [projectId, name, size, contentType]
+      properties:
+        projectId: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1, maxLength: 255 }
+        size: { type: integer, minimum: 1, maximum: 15728640 }
+        contentType: { type: string, enum: [application/pdf, image/jpeg, image/png, image/webp] }
+    QuoteUploadSlot:
+      type: object
+      required: [id]
+      properties:
+        id: { type: string, format: uuid }
+    QuoteDraft:
+      type: object
+      required: [vendorName, vendorId, quoteNumber, trade, issueDate, dueDate, notes, lineItems, documentTotal, unresolved]
+      properties:
+        vendorName: { type: ["string", "null"] }
+        vendorId: { type: ["string", "null"] }
+        quoteNumber: { type: ["string", "null"] }
+        trade: { type: ["string", "null"] }
+        issueDate: { type: ["string", "null"], pattern: '^\d{4}-\d{2}-\d{2}$' }
+        dueDate: { type: ["string", "null"], pattern: '^\d{4}-\d{2}-\d{2}$' }
+        notes: { type: string }
+        documentTotal: { type: ["integer", "null"], minimum: 0 }
+        unresolved: { type: array, items: { type: string } }
+        lineItems:
+          type: array
+          items: { $ref: "#/components/schemas/QuoteDraftLineItem" }
+    QuoteDraftLineItem:
+      type: object
+      required: [description, quantity, unitPrice]
+      properties:
+        description: { type: string }
+        quantity: { type: number, minimum: 0 }
+        unitPrice: { type: number, minimum: 0 }
     VendorQuoteStatus:
       type: string
       enum: [Draft, Requested, Received, Under review, Accepted, Declined, Expired]

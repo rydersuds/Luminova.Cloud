@@ -2759,6 +2759,172 @@ export const SearchWorkspaceResponseItem = zod.object({
 export const SearchWorkspaceResponse = zod.array(SearchWorkspaceResponseItem)
 
 
+
+export const requestQuoteUploadBodyNameMax = 255;
+
+export const requestQuoteUploadBodySizeMax = 15728640;
+
+
+
+export const RequestQuoteUploadBody = zod.object({
+  "projectId": zod.string().min(1),
+  "name": zod.string().min(1).max(requestQuoteUploadBodyNameMax),
+  "size": zod.number().int().min(1).max(requestQuoteUploadBodySizeMax),
+  "contentType": zod.enum(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
+})
+
+export const RequestQuoteUploadResponse = zod.object({
+  "id": zod.string().uuid()
+})
+
+
+export const UploadQuoteContentParams = zod.object({
+  "uploadId": zod.coerce.string().uuid()
+})
+
+export const UploadQuoteContentResponse = zod.void()
+
+
+export const ExtractQuoteDraftParams = zod.object({
+  "uploadId": zod.coerce.string().uuid()
+})
+
+export const extractQuoteDraftResponseIssueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const extractQuoteDraftResponseDueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const extractQuoteDraftResponseDocumentTotalMin = 0;
+
+export const extractQuoteDraftResponseLineItemsItemQuantityMin = 0;
+
+export const extractQuoteDraftResponseLineItemsItemUnitPriceMin = 0;
+
+
+
+export const ExtractQuoteDraftResponse = zod.object({
+  "vendorName": zod.string().nullable(),
+  "vendorId": zod.string().nullable(),
+  "quoteNumber": zod.string().nullable(),
+  "trade": zod.string().nullable(),
+  "issueDate": zod.string().regex(extractQuoteDraftResponseIssueDateRegExp).nullable(),
+  "dueDate": zod.string().regex(extractQuoteDraftResponseDueDateRegExp).nullable(),
+  "notes": zod.string(),
+  "documentTotal": zod.number().int().min(extractQuoteDraftResponseDocumentTotalMin).nullable(),
+  "unresolved": zod.array(zod.string()),
+  "lineItems": zod.array(zod.object({
+  "description": zod.string(),
+  "quantity": zod.number().min(extractQuoteDraftResponseLineItemsItemQuantityMin),
+  "unitPrice": zod.number().min(extractQuoteDraftResponseLineItemsItemUnitPriceMin)
+}))
+})
+
+
+export const CancelQuoteUploadParams = zod.object({
+  "uploadId": zod.coerce.string().uuid()
+})
+
+export const CancelQuoteUploadResponse = zod.void()
+
+
+export const ConfirmQuoteUploadParams = zod.object({
+  "uploadId": zod.coerce.string().uuid()
+})
+
+
+
+
+
+
+export const confirmQuoteUploadBodyIssueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const confirmQuoteUploadBodyDueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+export const confirmQuoteUploadBodyLineItemsItemQuantityExclusiveMin = 0;
+
+export const confirmQuoteUploadBodyLineItemsItemUnitPriceMin = 0;
+
+
+
+
+export const ConfirmQuoteUploadBody = zod.object({
+  "quoteNumber": zod.string().min(1),
+  "projectId": zod.string().min(1),
+  "vendorId": zod.string().min(1),
+  "direction": zod.enum(['luminova_to_client', 'company_to_luminova']),
+  "trade": zod.string().min(1),
+  "status": zod.enum(['Draft', 'Requested', 'Received', 'Under review', 'Accepted', 'Declined', 'Expired']),
+  "revision": zod.number().int().min(1),
+  "issueDate": zod.string().regex(confirmQuoteUploadBodyIssueDateRegExp),
+  "dueDate": zod.string().regex(confirmQuoteUploadBodyDueDateRegExp),
+  "notes": zod.string(),
+  "lineItems": zod.array(zod.object({
+  "id": zod.string().optional(),
+  "description": zod.string().min(1),
+  "quantity": zod.number().gt(confirmQuoteUploadBodyLineItemsItemQuantityExclusiveMin),
+  "unitPrice": zod.number().min(confirmQuoteUploadBodyLineItemsItemUnitPriceMin)
+})).min(1)
+})
+
+
+export const confirmQuoteUploadResponseIssueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const confirmQuoteUploadResponseDueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+export const confirmQuoteUploadResponseLineItemsItemQuantityExclusiveMin = 0;
+
+export const confirmQuoteUploadResponseLineItemsItemUnitPriceMin = 0;
+
+export const confirmQuoteUploadResponseLineItemsItemAmountMin = 0;
+
+
+export const confirmQuoteUploadResponseTotalMin = 0;
+
+
+export const confirmQuoteUploadResponseAttachmentsItemConfidenceMin = 0;
+export const confirmQuoteUploadResponseAttachmentsItemConfidenceMax = 100;
+
+
+
+export const ConfirmQuoteUploadResponse = zod.object({
+  "id": zod.string(),
+  "quoteNumber": zod.string(),
+  "projectId": zod.string(),
+  "projectName": zod.string(),
+  "vendorId": zod.string(),
+  "vendorName": zod.string(),
+  "direction": zod.enum(['luminova_to_client', 'company_to_luminova']),
+  "isProjectTotal": zod.boolean().optional(),
+  "trade": zod.string(),
+  "status": zod.enum(['Draft', 'Requested', 'Received', 'Under review', 'Accepted', 'Declined', 'Expired']),
+  "revision": zod.number().int().min(1),
+  "issueDate": zod.string().regex(confirmQuoteUploadResponseIssueDateRegExp),
+  "dueDate": zod.string().regex(confirmQuoteUploadResponseDueDateRegExp),
+  "notes": zod.string(),
+  "lineItems": zod.array(zod.object({
+  "id": zod.string(),
+  "description": zod.string().min(1),
+  "quantity": zod.number().gt(confirmQuoteUploadResponseLineItemsItemQuantityExclusiveMin),
+  "unitPrice": zod.number().min(confirmQuoteUploadResponseLineItemsItemUnitPriceMin),
+  "amount": zod.number().min(confirmQuoteUploadResponseLineItemsItemAmountMin)
+})).min(1),
+  "total": zod.number().min(confirmQuoteUploadResponseTotalMin),
+  "attachments": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "relativePath": zod.string(),
+  "url": zod.string(),
+  "contentType": zod.string(),
+  "size": zod.number().int().min(1),
+  "confidence": zod.number().int().min(confirmQuoteUploadResponseAttachmentsItemConfidenceMin).max(confirmQuoteUploadResponseAttachmentsItemConfidenceMax).nullish()
+})),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+export const GetUploadedQuoteSourceParams = zod.object({
+  "quoteId": zod.coerce.string()
+})
+
+export const GetUploadedQuoteSourceResponse = zod.unknown()
+
+
 /**
  * @summary List and filter vendor quotes
  */
@@ -3582,3 +3748,5 @@ export const DeleteWorkspaceUserParams = zod.object({
 })
 
 export const DeleteWorkspaceUserResponse = zod.void()
+
+

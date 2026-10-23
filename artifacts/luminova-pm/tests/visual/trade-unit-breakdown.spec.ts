@@ -49,7 +49,7 @@ test("expands categories with keyboard and touch while keeping shared budgets se
   await toggle.tap()
   await page.getByTestId("trade-unit-category").filter({ hasText: "Paint" }).locator("summary").click()
   await expect(drywall.getByText("Suite PH 2", { exact: true })).toBeVisible()
-  await expect(page.getByRole("region", { name: "Shared-area budgets" })).toContainText("$300")
+  await expect(page.getByTestId("trade-unit-breakdown").locator("details").filter({ has: page.getByRole("heading", { name: "Shared-area budgets", exact: true }) })).toContainText("$300")
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.setViewportSize({ width: 320, height: 740 })
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
@@ -111,7 +111,7 @@ test("explains missing registration and missing allocations without inventing al
   project.categories = project.categories.filter(category => category.scopeKind === "shared")
   await load(page, project)
   await expect(page.getByText(/No suites registered. Use Edit suites/)).toBeVisible()
-  await expect(page.getByRole("region", { name: "Shared-area budgets" })).toBeVisible()
+  await expect(page.getByTestId("trade-unit-breakdown").locator("details").filter({ has: page.getByRole("heading", { name: "Shared-area budgets", exact: true }) })).toBeVisible()
   project.units = fixture().units
   await page.reload()
   await expect(page.getByText(/No source trade allocations are available/)).toBeVisible()

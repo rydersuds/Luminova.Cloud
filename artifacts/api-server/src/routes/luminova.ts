@@ -135,6 +135,7 @@ import
  from "../lib/financialSummary"
 ;
 import { applyMadisonParkRevenueCorrection } from "../lib/madisonParkRevenueCorrection";
+import { createQuoteUploadRouter, quoteAwareDocumentUrl } from "./quoteUploads";
 import {
   calculateProjectProgress,
   isValidCalendarDate,
@@ -2099,6 +2100,7 @@ const tradeFromStandaloneProfile = (
 
 type VendorQuote = (typeof vendorQuotes)[number] & 
 {
+  reviewedUpload?: boolean;
 
 
   isProjectTotal?: boolean
@@ -3012,7 +3014,7 @@ const financialRecordsForOwner = async (ownerId: string, scope = "default") =>
             id: document.id,
             name: document.name,
             relativePath: document.relativePath,
-            url: `/api/storage${document.objectPath}`,
+            url: quote.reviewedUpload ? `/api/vendor-quotes/${quote.id}/source` : `/api/storage${document.objectPath}`,
             contentType: document.contentType,
             size: document.size,
             confidence: document.aiConfidence,
@@ -3943,8 +3945,7 @@ export const analyzeImportedQuoteDirections = async (projectId: string, ownerId:
 
   for (const row of quoteRows) 
 {
-
-
+    if ((row.data as VendorQuote).reviewedUpload) continue;
     const direction = directionById.get(row.id)
 ;
 
@@ -4180,8 +4181,7 @@ export const organizeImportedProjectFiles = async (
 
   for (const document of documents) 
 {
-
-
+    if (document.objectPath.startsWith("/objects/quote-uploads/")) continue;
     const folder = document.relativePath.split("/").slice(0, -1).join("/") || "Project photos"
 ;
 
@@ -4237,8 +4237,7 @@ export const organizeImportedProjectFiles = async (
 
   for (const row of quoteRows) 
 {
-
-
+    if ((row.data as VendorQuote).reviewedUpload) continue;
     const classification = quoteDirectionById.get(row.id)
 ;
 
@@ -4368,7 +4367,7 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
 
 
         id: document.id,
-        url: `/api/storage${document.objectPath}`,
+        url: quoteAwareDocumentUrl(document),
         name: document.name,
         relativePath: document.relativePath,
         contentType: document.contentType,
@@ -4398,7 +4397,7 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
 
 
           id: document.id,
-          url: `/api/storage${document.objectPath}`,
+          url: quoteAwareDocumentUrl(document),
           caption: document.relativePath,
           phase: parentFolder,
           date: "",
@@ -4448,7 +4447,7 @@ const detailsFor = async (project: Project, ownerId?: string, workspaceId?: stri
         id: document.id,
         name: document.name,
         relativePath: document.relativePath,
-        url: `/api/storage${document.objectPath}`,
+        url: quoteAwareDocumentUrl(document),
         contentType: document.contentType,
         classification: document.classification,
         isEntryAgreement: document.isEntryAgreement,
@@ -8231,7 +8230,7 @@ router.post("/projects/:projectId/entry-agreement", async (req: AuthenticatedReq
       id: document.id,
       name: document.name,
       relativePath: document.relativePath,
-      url: `/api/storage${document.objectPath}`,
+      url: quoteAwareDocumentUrl(document),
       contentType: document.contentType,
       classification: document.classification,
       isEntryAgreement: document.isEntryAgreement,
@@ -8846,7 +8845,7 @@ router.post("/projects/:projectId/schedule-images/:documentId/restore", async (r
 {
 
       id: document.id,
-      url: `/api/storage${document.objectPath}`,
+      url: quoteAwareDocumentUrl(document),
       name: document.name,
       relativePath: document.relativePath,
       contentType: document.contentType,
@@ -9765,7 +9764,7 @@ router.post("/projects/:projectId/vendor-quotes/rescan", async (req: Authenticat
 ;
 
 
-  const candidates = documents.map((document) => (
+  const candidates = documents.filter(document => !document.relativePath.startsWith("Uploaded quotes/")).map((document) => (
 {
 
 
@@ -10106,7 +10105,7 @@ project.id
 {
 
 
-        if (processingFailures.has(document.relativePath) || document.linkedEntityType !== "quote") continue
+        if (document.relativePath.startsWith("Uploaded quotes/") || processingFailures.has(document.relativePath) || document.linkedEntityType !== "quote") continue
 ;
 
 
@@ -10135,7 +10134,7 @@ project.id
 ;
 
 
-        if (!quote.sourceRelativePaths) continue
+        if (quote.reviewedUpload || !quote.sourceRelativePaths) continue
 ;
 
 
@@ -10228,6 +10227,7 @@ project.id
 
         const existing = quoteByIdentity.get(identity)
 ;
+        if (existing?.reviewedUpload) continue;
 
 
         const rawLines = extracted.lineItems.length
@@ -12625,6 +12625,8 @@ router.get("/invoices/summary", async (req: AuthenticatedRequest, res) =>
 ;
 
 
+router.use(createQuoteUploadRouter({ vendors: tradesForOwner }));
+
 router.get("/vendor-quotes", async (req: AuthenticatedRequest, res) => 
 {
 
@@ -12852,7 +12854,7 @@ router.post("/vendor-quotes", async (req: AuthenticatedRequest, res) =>
     projectName: project.name,
     vendorId: isClientQuote ? "luminova-construction" : vendor!.id,
     vendorName: isClientQuote ? "Luminova Construction" : vendor!.companyName,
-    trade: isClientQuote ? parsed.data.trade : vendor!.tradeType,
+    trade: parsed.data.trade,
     issueDate,
     dueDate,
     lineItems,
@@ -13089,6 +13091,17 @@ router.patch("/vendor-quotes/:quoteId", async (req: AuthenticatedRequest, res) =
 
     const current = imported[0].data as VendorQuote
 ;
+    if (current.reviewedUpload && (
+      (body.data.projectId && body.data.projectId !== current.projectId) ||
+      (body.data.direction && body.data.direction !== "company_to_luminova") ||
+      (body.data.issueDate && !isValidCalendarDate(body.data.issueDate)) ||
+      (body.data.dueDate && !isValidCalendarDate(body.data.dueDate)) ||
+      (body.data.lineItems?.some(line => !line.description.trim() ||
+        Math.abs(Math.round(line.unitPrice * 100) / 100 - line.unitPrice) > 0.00000001))
+    )) {
+      res.status(400).json({ error: "Uploaded quotes must retain their project and direction, with valid calendar dates and prices." });
+      return;
+    }
 
 
     const projectId = body.data.projectId ?? current.projectId
@@ -13164,7 +13177,14 @@ router.patch("/vendor-quotes/:quoteId", async (req: AuthenticatedRequest, res) =
 }
 
 
-    const lineItems = body.data.lineItems ? calculateQuoteLineItems(body.data.lineItems) : current.lineItems
+    const lineItems = body.data.lineItems
+      ? current.reviewedUpload
+        ? body.data.lineItems.map((line, index) => ({
+          ...line, id: line.id || `reviewed-line-${index}`,
+          amount: Math.round(line.quantity * Math.round(line.unitPrice * 100)) / 100,
+        }))
+        : calculateQuoteLineItems(body.data.lineItems)
+      : current.lineItems
 ;
 
 
@@ -13180,11 +13200,13 @@ router.patch("/vendor-quotes/:quoteId", async (req: AuthenticatedRequest, res) =
       projectName: project.name,
       vendorId,
       vendorName: isClientQuote ? "Luminova Construction" : vendor!.companyName,
-      trade: isClientQuote ? body.data.trade ?? current.trade : vendor!.tradeType,
+      trade: body.data.trade ?? current.trade,
       issueDate,
       dueDate,
       lineItems,
-      total: lineItems.reduce((sum, item) => sum + item.amount, 0),
+      total: current.reviewedUpload
+        ? lineItems.reduce((sum, item) => sum + Math.round(item.amount * 100), 0) / 100
+        : lineItems.reduce((sum, item) => sum + item.amount, 0),
       updatedAt: new Date().toISOString(),
     
 }
@@ -13310,7 +13332,7 @@ router.patch("/vendor-quotes/:quoteId", async (req: AuthenticatedRequest, res) =
     projectName: project.name,
     vendorId,
     vendorName: isClientQuote ? "Luminova Construction" : vendor!.companyName,
-    trade: isClientQuote ? body.data.trade ?? current.trade : vendor!.tradeType,
+    trade: body.data.trade ?? current.trade,
     issueDate,
     dueDate,
     lineItems,

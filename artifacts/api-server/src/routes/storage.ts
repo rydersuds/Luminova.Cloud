@@ -81,6 +81,12 @@ router.get("/storage/objects/*path", async (req: AuthenticatedRequest, res: Resp
   try {
     const raw = req.params.path;
     const objectPath = `/objects/${Array.isArray(raw) ? raw.join("/") : raw}`;
+    if (objectPath.startsWith("/objects/quote-uploads/")) {
+      // Quote originals always require the current workspace and project check,
+      // including when the same person belongs to several workspaces.
+      res.status(404).json({ error: "Use the quote source link." });
+      return;
+    }
     const file = await storage.getObjectEntityFile(objectPath);
     if (!await storage.canRead(req.userId, file, getAuth(req).orgId || "default")) {
       res.status(403).json({ error: "Forbidden" });

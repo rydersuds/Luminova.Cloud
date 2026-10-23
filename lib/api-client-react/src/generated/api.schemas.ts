@@ -946,6 +946,73 @@ export interface FinancialSummary {
   upcomingClientPayments: number;
 }
 
+export type QuoteUploadInputContentType = typeof QuoteUploadInputContentType[keyof typeof QuoteUploadInputContentType];
+
+
+export const QuoteUploadInputContentType = {
+  'application/pdf': 'application/pdf',
+  'image/jpeg': 'image/jpeg',
+  'image/png': 'image/png',
+  'image/webp': 'image/webp',
+} as const;
+
+export interface QuoteUploadInput {
+  /** @minLength 1 */
+  projectId: string;
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  name: string;
+  /**
+     * @minimum 1
+     * @maximum 15728640
+     */
+  size: number;
+  contentType: QuoteUploadInputContentType;
+}
+
+export interface QuoteUploadSlot {
+  id: string;
+}
+
+export interface QuoteDraftLineItem {
+  description: string;
+  /** @minimum 0 */
+  quantity: number;
+  /** @minimum 0 */
+  unitPrice: number;
+}
+
+export interface QuoteDraft {
+  /** @nullable */
+  vendorName: string | null;
+  /** @nullable */
+  vendorId: string | null;
+  /** @nullable */
+  quoteNumber: string | null;
+  /** @nullable */
+  trade: string | null;
+  /**
+     * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  issueDate: string | null;
+  /**
+     * @nullable
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  dueDate: string | null;
+  notes: string;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  documentTotal: number | null;
+  unresolved: string[];
+  lineItems: QuoteDraftLineItem[];
+}
+
 export type VendorQuoteStatus = typeof VendorQuoteStatus[keyof typeof VendorQuoteStatus];
 
 
@@ -1812,3 +1879,4 @@ trade?: string;
 status?: VendorQuoteStatus;
 direction?: QuoteDirection;
 };
+

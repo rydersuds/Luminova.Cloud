@@ -77,6 +77,9 @@ import type {
   PurchaseApproval,
   PurchaseApprovalDecision,
   PurchaseApprovalInput,
+  QuoteDraft,
+  QuoteUploadInput,
+  QuoteUploadSlot,
   Review,
   ScheduleImage,
   ScheduleImageInput,
@@ -5023,6 +5026,404 @@ export function useSearchWorkspace<TData = Awaited<ReturnType<typeof searchWorks
 
 
 
+export const getRequestQuoteUploadUrl = () => {
+
+
+
+
+  return `/api/vendor-quote-uploads`
+}
+
+export const requestQuoteUpload = async (quoteUploadInput: QuoteUploadInput, options?: Parameters<typeof customFetch>[1]): Promise<QuoteUploadSlot> => {
+
+  return customFetch<QuoteUploadSlot>(getRequestQuoteUploadUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(quoteUploadInput)
+  }
+);}
+
+
+
+
+
+export const getRequestQuoteUploadMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestQuoteUpload>>, TError,{data: BodyType<QuoteUploadInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestQuoteUpload>>, TError,{data: BodyType<QuoteUploadInput>}, TContext> => {
+
+const mutationKey = ['requestQuoteUpload'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestQuoteUpload>>, {data: BodyType<QuoteUploadInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  requestQuoteUpload(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestQuoteUploadMutationResult = NonNullable<Awaited<ReturnType<typeof requestQuoteUpload>>>
+    export type RequestQuoteUploadMutationBody = BodyType<QuoteUploadInput>
+    export type RequestQuoteUploadMutationError = ErrorType<unknown>
+
+    export const useRequestQuoteUpload = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestQuoteUpload>>, TError,{data: BodyType<QuoteUploadInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestQuoteUpload>>,
+        TError,
+        {data: BodyType<QuoteUploadInput>},
+        TContext
+      > => {
+      return useMutation(getRequestQuoteUploadMutationOptions(options));
+    }
+
+export const getUploadQuoteContentUrl = (uploadId: string,) => {
+
+
+
+
+  return `/api/vendor-quote-uploads/${uploadId}/content`
+}
+
+export const uploadQuoteContent = async (uploadId: string,
+    uploadQuoteContentBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getUploadQuoteContentUrl(uploadId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/octet-stream', ...options?.headers },
+    body: uploadQuoteContentBody
+  }
+);}
+
+
+
+
+
+export const getUploadQuoteContentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadQuoteContent>>, TError,{uploadId: string;data: BodyType<Blob>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadQuoteContent>>, TError,{uploadId: string;data: BodyType<Blob>}, TContext> => {
+
+const mutationKey = ['uploadQuoteContent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadQuoteContent>>, {uploadId: string;data: BodyType<Blob>}> = (props) => {
+          const {uploadId,data} = props ?? {};
+
+          return  uploadQuoteContent(uploadId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadQuoteContentMutationResult = NonNullable<Awaited<ReturnType<typeof uploadQuoteContent>>>
+    export type UploadQuoteContentMutationBody = BodyType<Blob>
+    export type UploadQuoteContentMutationError = ErrorType<unknown>
+
+    export const useUploadQuoteContent = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadQuoteContent>>, TError,{uploadId: string;data: BodyType<Blob>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadQuoteContent>>,
+        TError,
+        {uploadId: string;data: BodyType<Blob>},
+        TContext
+      > => {
+      return useMutation(getUploadQuoteContentMutationOptions(options));
+    }
+
+export const getExtractQuoteDraftUrl = (uploadId: string,) => {
+
+
+
+
+  return `/api/vendor-quote-uploads/${uploadId}/draft`
+}
+
+export const extractQuoteDraft = async (uploadId: string, options?: Parameters<typeof customFetch>[1]): Promise<QuoteDraft> => {
+
+  return customFetch<QuoteDraft>(getExtractQuoteDraftUrl(uploadId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getExtractQuoteDraftMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof extractQuoteDraft>>, TError,{uploadId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof extractQuoteDraft>>, TError,{uploadId: string}, TContext> => {
+
+const mutationKey = ['extractQuoteDraft'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof extractQuoteDraft>>, {uploadId: string}> = (props) => {
+          const {uploadId} = props ?? {};
+
+          return  extractQuoteDraft(uploadId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ExtractQuoteDraftMutationResult = NonNullable<Awaited<ReturnType<typeof extractQuoteDraft>>>
+
+    export type ExtractQuoteDraftMutationError = ErrorType<unknown>
+
+    export const useExtractQuoteDraft = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof extractQuoteDraft>>, TError,{uploadId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof extractQuoteDraft>>,
+        TError,
+        {uploadId: string},
+        TContext
+      > => {
+      return useMutation(getExtractQuoteDraftMutationOptions(options));
+    }
+
+export const getCancelQuoteUploadUrl = (uploadId: string,) => {
+
+
+
+
+  return `/api/vendor-quote-uploads/${uploadId}`
+}
+
+export const cancelQuoteUpload = async (uploadId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getCancelQuoteUploadUrl(uploadId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getCancelQuoteUploadMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelQuoteUpload>>, TError,{uploadId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelQuoteUpload>>, TError,{uploadId: string}, TContext> => {
+
+const mutationKey = ['cancelQuoteUpload'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelQuoteUpload>>, {uploadId: string}> = (props) => {
+          const {uploadId} = props ?? {};
+
+          return  cancelQuoteUpload(uploadId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelQuoteUploadMutationResult = NonNullable<Awaited<ReturnType<typeof cancelQuoteUpload>>>
+
+    export type CancelQuoteUploadMutationError = ErrorType<unknown>
+
+    export const useCancelQuoteUpload = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelQuoteUpload>>, TError,{uploadId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelQuoteUpload>>,
+        TError,
+        {uploadId: string},
+        TContext
+      > => {
+      return useMutation(getCancelQuoteUploadMutationOptions(options));
+    }
+
+export const getConfirmQuoteUploadUrl = (uploadId: string,) => {
+
+
+
+
+  return `/api/vendor-quote-uploads/${uploadId}/confirm`
+}
+
+export const confirmQuoteUpload = async (uploadId: string,
+    vendorQuoteInput: VendorQuoteInput, options?: Parameters<typeof customFetch>[1]): Promise<VendorQuote> => {
+
+  return customFetch<VendorQuote>(getConfirmQuoteUploadUrl(uploadId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(vendorQuoteInput)
+  }
+);}
+
+
+
+
+
+export const getConfirmQuoteUploadMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmQuoteUpload>>, TError,{uploadId: string;data: BodyType<VendorQuoteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmQuoteUpload>>, TError,{uploadId: string;data: BodyType<VendorQuoteInput>}, TContext> => {
+
+const mutationKey = ['confirmQuoteUpload'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmQuoteUpload>>, {uploadId: string;data: BodyType<VendorQuoteInput>}> = (props) => {
+          const {uploadId,data} = props ?? {};
+
+          return  confirmQuoteUpload(uploadId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmQuoteUploadMutationResult = NonNullable<Awaited<ReturnType<typeof confirmQuoteUpload>>>
+    export type ConfirmQuoteUploadMutationBody = BodyType<VendorQuoteInput>
+    export type ConfirmQuoteUploadMutationError = ErrorType<unknown>
+
+    export const useConfirmQuoteUpload = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmQuoteUpload>>, TError,{uploadId: string;data: BodyType<VendorQuoteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmQuoteUpload>>,
+        TError,
+        {uploadId: string;data: BodyType<VendorQuoteInput>},
+        TContext
+      > => {
+      return useMutation(getConfirmQuoteUploadMutationOptions(options));
+    }
+
+export const getGetUploadedQuoteSourceUrl = (quoteId: string,) => {
+
+
+
+
+  return `/api/vendor-quotes/${quoteId}/source`
+}
+
+export const getUploadedQuoteSource = async (quoteId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getGetUploadedQuoteSourceUrl(quoteId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUploadedQuoteSourceQueryKey = (quoteId: string,) => {
+    return [
+    `/api/vendor-quotes/${quoteId}/source`
+    ] as const;
+    }
+
+
+export const getGetUploadedQuoteSourceQueryOptions = <TData = Awaited<ReturnType<typeof getUploadedQuoteSource>>, TError = ErrorType<unknown>>(quoteId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUploadedQuoteSource>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUploadedQuoteSourceQueryKey(quoteId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUploadedQuoteSource>>> = ({ signal }) => getUploadedQuoteSource(quoteId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: quoteId !== null && quoteId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUploadedQuoteSource>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetUploadedQuoteSourceQueryResult = NonNullable<Awaited<ReturnType<typeof getUploadedQuoteSource>>>
+export type GetUploadedQuoteSourceQueryError = ErrorType<unknown>
+
+
+
+export function useGetUploadedQuoteSource<TData = Awaited<ReturnType<typeof getUploadedQuoteSource>>, TError = ErrorType<unknown>>(
+ quoteId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUploadedQuoteSource>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetUploadedQuoteSourceQueryOptions(quoteId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetVendorQuotesUrl = (params?: GetVendorQuotesParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -6858,3 +7259,4 @@ export const useDeleteWorkspaceUser = <TError = ErrorType<void>,
       > => {
       return useMutation(getDeleteWorkspaceUserMutationOptions(options));
     }
+

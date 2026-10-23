@@ -440,6 +440,19 @@ function App() {
     );
   }
 
+  if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/quotes')) {
+    return (
+      <WouterRouter base={basePath}>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <main className="flex h-dvh flex-col"><Suspense fallback={<WorkspacePageFallback />}><Quotes /></Suspense></main>
+            <Toaster />
+          </TooltipProvider>
+        </QueryClientProvider>
+      </WouterRouter>
+    );
+  }
+
   if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/financials')) {
     return (
       <WouterRouter base={basePath}>
