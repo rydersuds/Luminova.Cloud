@@ -47,6 +47,7 @@ const Quotes = lazy(pageModules.quotes);
 const Profile = lazy(pageModules.profile);
 const Schedule = lazy(pageModules.schedule);
 const Approvals = lazy(pageModules.approvals);
+const TradeBudgetsPreview = lazy(() => import('@/components/approvals/trade-budgets').then(module => ({ default: module.TradeBudgets })));
 const ProjectHistory = lazy(pageModules.projectHistory);
 const SignUpPage = lazy(() => import('@/pages/login').then(({ SignUpPage }) => ({ default: SignUpPage })));
 const PrivacyPage = lazy(() => import('@/pages/legal').then(({ PrivacyPage }) => ({ default: PrivacyPage })));
@@ -425,6 +426,17 @@ function App() {
           </QueryClientProvider>
         </ClerkProvider>
       </WouterRouter>
+    );
+  }
+
+  if (import.meta.env.DEV && window.location.pathname.endsWith('/__visual/trade-budgets')) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <main className="mx-auto max-w-5xl p-4"><Suspense fallback={<PageFallback />}><TradeBudgetsPreview projectId="project-1" /></Suspense></main>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
     );
   }
 

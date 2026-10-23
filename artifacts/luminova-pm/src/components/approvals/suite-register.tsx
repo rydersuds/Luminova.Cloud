@@ -50,7 +50,7 @@ export function SuiteRegister({ project }: { project: InvoiceProject }) {
       <ul className="grid gap-1 text-xs tabular-nums sm:grid-cols-2">
         {types.map((t) => {
           const n = (project.units ?? []).filter((u) => u.unitTypeId === t.id).length
-          return <li key={t.id} className="flex justify-between gap-2 rounded border px-2 py-1"><span>{t.name}: {n} of {t.unitCount} assigned</span><span className="text-muted-foreground">${t.perUnitTotal.toLocaleString()} per unit · ${t.total.toLocaleString()}</span></li>
+          return <li key={t.id} className="flex min-w-0 flex-wrap justify-between gap-2 rounded border px-2 py-1"><span className="min-w-0 break-words">{t.name}: {n} of {t.unitCount} assigned</span><span className="min-w-0 break-words text-muted-foreground">${t.perUnitTotal.toLocaleString()} per unit · ${t.total.toLocaleString()}</span></li>
         })}
       </ul>
       {open && (
